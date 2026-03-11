@@ -127,12 +127,11 @@ def lookup_ico(ico: str) -> dict:
         if r.status_code == 200:
             d = r.json()
             sidlo = d.get("sidlo", {})
-            adresa_parts = [
-                sidlo.get("nazevUlice", ""),
-                sidlo.get("cisloDomovni", ""),
-                sidlo.get("cisloOrientacni", ""),
-            ]
-            adresa = " ".join(str(p) for p in adresa_parts if p).strip()
+            ulice = sidlo.get("nazevUlice", "")
+            domovni = str(sidlo.get("cisloDomovni", "")) if sidlo.get("cisloDomovni") else ""
+            orientacni = str(sidlo.get("cisloOrientacni", "")) if sidlo.get("cisloOrientacni") else ""
+            cislo = f"{domovni}/{orientacni}" if domovni and orientacni else domovni or orientacni
+            adresa = f"{ulice} {cislo}".strip() if ulice else cislo
             obec = sidlo.get("nazevObce", "")
             if obec and adresa:
                 adresa_full = f"{adresa}, {obec}"
