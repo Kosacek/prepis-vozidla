@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Přepis vozidla</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f0f2f5;
+    --card: #ffffff;
+    --primary: #1a56db;
+    --primary-dark: #1341b0;
+    --accent: #e8f0fe;
+    --border: #dde1e7;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --success: #059669;
+    --error: #dc2626;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --nav-h: 68px;
+  }
+  body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .app-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 32px; box-shadow: var(--shadow); }
+  .app-header .logo { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .app-header .subtitle { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .container { max-width: 820px; margin: 28px auto; padding: 0 16px calc(var(--nav-h) + 28px); }
+
+  /* ── Stepper ── */
+  .stepper {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    margin-bottom: 28px;
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 20px 16px 16px;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+  /* connecting line between circles */
+  .step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .step-item.done:not(:last-child)::after { background: var(--success); }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    background: var(--border); color: var(--muted);
+    position: relative; z-index: 1;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+  .step-item.active .step-circle  { background: var(--primary); color: #fff; }
+  .step-item.done .step-circle    { background: var(--success); color: #fff; }
+  .step-item.skipped .step-circle { background: #e5e7eb; color: #9ca3af; }
+  .step-lbl {
+    font-size: 11px; color: var(--muted); font-weight: 500;
+    margin-top: 6px; text-align: center; white-space: nowrap;
+  }
+  .step-item.active .step-lbl  { color: var(--primary); font-weight: 700; }
+  .step-item.done .step-lbl    { color: var(--success); }
+  .step-item.skipped .step-lbl { color: #9ca3af; text-decoration: line-through; }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 28px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  input[type=text], select {
+    border: 1.5px solid var(--border); border-radius: 7px; padding: 9px 12px;
+    font-size: 14px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
+
+  /* ICO row */
+  .ico-row { display: flex; gap: 8px; }
+  .ico-row input { flex: 1; }
+  .btn-lookup { padding: 9px 14px; background: var(--accent); border: 1.5px solid var(--primary); color: var(--primary); border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .btn-lookup:hover { background: var(--primary); color: #fff; }
+  .lookup-status { font-size: 12px; margin-top: 4px; padding: 5px 9px; border-radius: 5px; display: none; }
+  .lookup-status.ok  { background: #d1fae5; color: var(--success); display: block; }
+  .lookup-status.err { background: #fee2e2; color: var(--error);   display: block; }
+
+  /* Firm dropdown */
+  .ico-input-wrap { position: relative; flex: 1; }
+  .firm-dropdown { position: absolute; top: calc(100% + 4px); left: 0; z-index: 200; background: #fff; border: 1.5px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); width: 100%; max-height: 220px; overflow-y: auto; display: none; }
+  .firm-dropdown.open { display: block; }
+  .firm-option { padding: 9px 13px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .firm-option:last-child { border-bottom: none; }
+  .firm-option:hover { background: var(--accent); }
+  .firm-name { font-weight: 600; }
+  .firm-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
+  .firm-option.add-new { color: var(--primary); font-weight: 600; }
+
+  /* Správa firem modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border-radius: 14px; box-shadow: 0 8px 40px rgba(0,0,0,0.18); width: 100%; max-width: 680px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 18px 22px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
+  .modal-body { padding: 16px 22px; overflow-y: auto; }
+  .firm-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .firm-row:last-child { border-bottom: none; }
+  .firm-row-info { flex: 1; min-width: 0; }
+  .firm-row-name { font-weight: 600; font-size: 14px; }
+  .firm-row-sub { font-size: 11px; color: var(--muted); }
+  .pm-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: #d1fae5; color: var(--success); white-space: nowrap; }
+  .pm-badge.missing { background: #fee2e2; color: var(--error); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; border: 1.5px solid var(--border); background: #fff; cursor: pointer; white-space: nowrap; }
+  .btn-sm:hover { background: var(--bg); }
+  .btn-sm.danger { border-color: var(--error); color: var(--error); }
+  .btn-sm.danger:hover { background: #fee2e2; }
+
+  /* Jiný provozovatel */
+  .prov-toggle-row { display: flex; align-items: center; gap: 9px; padding: 12px 0 8px; cursor: pointer; user-select: none; }
+  .prov-toggle-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+  .prov-toggle-label { font-size: 14px; font-weight: 600; }
+
+  .prov-section { background: #f6f8ff; border: 1.5px solid #c7d7fc; border-radius: 8px; padding: 18px; margin-top: 2px; }
+  .prov-section-title { font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+
+  /* Step panels */
+  .step-panel { display: none; }
+  .step-panel.active { display: block; }
+
+  /* Mode cards */
+  .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 18px 22px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 16px; }
+  .mode-card:hover { border-color: var(--primary); background: var(--accent); }
+  .mode-card.selected { border-color: var(--primary); background: var(--accent); }
+  .mode-icon { font-size: 28px; flex-shrink: 0; }
+  .mode-title { font-size: 15px; font-weight: 700; }
+  .mode-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Summary */
+  .summary-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--primary); padding: 12px 0 4px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .summary-row:last-child { border: none; }
+  .summary-key { color: var(--muted); font-weight: 500; }
+  .summary-val { font-weight: 600; text-align: right; max-width: 55%; }
+
+  /* Output */
+  .output-card { text-align: center; padding: 36px 28px; }
+  .output-card .check { font-size: 48px; margin-bottom: 10px; }
+  .output-card h2 { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+  .output-card p { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .download-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn-download { display: flex; align-items: center; gap: 8px; padding: 11px 20px; background: var(--primary); color: #fff; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: background .15s; }
+  .btn-download:hover { background: var(--primary-dark); }
+  .btn-print { background: var(--success); }
+  .btn-print:hover { background: #047857; }
+
+  /* Loading */
+  .loading { display: none; text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scan */
+  .scan-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 14px; text-align: center; margin-bottom: 14px; background: #fafbfc; transition: border-color .15s; }
+  .scan-zone:hover { border-color: var(--primary); }
+  .scan-zone input[type=file] { display: none; }
+  .scan-label { cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .scan-icon { font-size: 26px; }
+  .scan-text { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .scan-sub  { font-size: 11px; color: var(--muted); }
+  .scan-result { font-size: 12px; padding: 7px 9px; border-radius: 5px; margin-top: 7px; display: none; }
+  .scan-result.ok      { background: #d1fae5; color: var(--success); display: block; }
+  .scan-result.err     { background: #fee2e2; color: var(--error);   display: block; }
+  .scan-result.loading { background: var(--accent); color: var(--primary); display: block; }
+
+  /* Fixed navigation bar */
+  .nav-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.07);
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 12px; padding: 0 32px;
+    z-index: 200;
+  }
+  .btn { padding: 11px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary   { background: var(--primary); color: #fff; }
+  .btn-primary:hover   { background: var(--primary-dark); }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .nav-bar { padding: 0 16px; }
+    .step-lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header" style="display:flex;align-items:center;justify-content:space-between;">
+  <div>
+    <div class="logo">Přepis Vozidla</div>
+    <div class="subtitle">Automatické vyplnění žádosti</div>
+  </div>
+  <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
+</header>
+
+<!-- Správa firem modal -->
+<div class="modal-overlay" id="firmy-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⚙️ Správa firem a plných mocí</h3>
+      <button class="modal-close" onclick="closeFirmyModal()">✕</button>
+    </div>
+    <div class="modal-body" id="firmy-modal-body">Načítám...</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Stepper (rendered dynamically by renderStepper()) -->
+  <div class="stepper" id="stepper"></div>
+
+  <!-- ── Step 1: Mode ── -->
+  <div class="step-panel active" id="panel-1">
+    <div class="card">
+      <div class="card-title">Typ operace</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="mode-card selected" data-mode="prevod" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')selectMode(this)">
+          <div class="mode-icon">🔄</div>
+          <div>
+            <div class="mode-title">Převod vlastnictví</div>
+            <div class="mode-desc">Přepis vozidla — změna vlastníka nebo provozovatele. Generuje zmeny.pdf + zapis.pdf.</div>
+          </div>
+        </div>
+        <div class="mode-card" data-mode="zapis" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')selectMode(this)">
+          <div class="mode-icon">🆕</div>
+          <div>
+            <div class="mode-title">Zápis nového vozidla</div>
+            <div class="mode-desc">První registrace vozidla v ČR. Generuje pouze zapis.pdf.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Původní vlastník ── -->
+  <div class="step-panel" id="panel-2">
+    <div class="card">
+      <div class="card-title">Původní vlastník (dosavadní)</div>
+      <div class="scan-zone">
+        <label class="scan-label" for="scan-puvodni">
+          <span class="scan-icon">📷</span>
+          <span class="scan-text">Naskenovat doklad původní strany</span>
+          <span class="scan-sub">OP, Plná moc, Osvědčení — foto nebo upload</span>
+        </label>
+        <input type="file" id="scan-puvodni" accept="image/*" capture="environment" onchange="scanDoc(this,'puvodni')">
+        <div class="scan-result" id="scan-puvodni-result"></div>
+      </div>
+      <hr class="divider">
+      <div class="form-grid">
+        <div class="field">
+          <label>Jméno / Název firmy</label>
+          <div style="position:relative"><input type="text" id="puvodni_jmeno" placeholder="Jan Novák / Firma s.r.o." oninput="openFirmDropdown('puvodni','name')" style="width:100%"><div class="firm-dropdown" id="puvodni-name-firms"></div></div>
+        </div>
+        <div class="field">
+          <label>IČO</label>
+          <div class="ico-row">
+            <div class="ico-input-wrap">
+              <input type="text" id="puvodni_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni','ico')">
+              <div class="firm-dropdown" id="puvodni-firms"></div>
+            </div>
+            <button class="btn-lookup" onclick="lookupIco('puvodni')">ARES</button>
+          </div>
+          <div class="lookup-status" id="puvodni-status"></div>
+        </div>
+        <div class="field">
+          <label>Adresa</label>
+          <input type="text" id="puvodni_adresa" placeholder="Ulice 123, Praha">
+        </div>
+        <div class="field">
+          <label>Rodné číslo</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="puvodni_rc_1" placeholder="850101" maxlength="6" style="width:100px;">
+            <span style="font-weight:700;font-size:16px;">/</span>
+            <input type="text" id="puvodni_rc_2" placeholder="1234" maxlength="4" style="width:80px;">
+          </div>
+        </div>
+        <div class="field">
+          <label>PSČ</label>
+          <input type="text" id="puvodni_psc" placeholder="11000" maxlength="6">
+        </div>
+        <div class="field">
+          <label>ID (pro úřad)</label>
+          <input type="text" id="puvodni_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+        </div>
+      </div>
+      <hr class="divider">
+      <label class="prov-toggle-row" for="puvodni_prov_jiny">
+        <input type="checkbox" id="puvodni_prov_jiny" onchange="toggleProvozovatel('puvodni')">
+        <span class="prov-toggle-label">Dosavadní provozovatel je jiná osoba / firma</span>
+      </label>
+      <div id="puvodni-prov-section" style="display:none">
+        <div class="prov-section">
+          <div class="prov-section-title">Dosavadní provozovatel</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Jméno / Název firmy</label>
+              <div style="position:relative"><input type="text" id="puvodni_prov_jmeno" placeholder="Jana Nováková / Firma s.r.o." oninput="openFirmDropdown('puvodni_prov','name')" style="width:100%"><div class="firm-dropdown" id="puvodni_prov-name-firms"></div></div>
+            </div>
+            <div class="field">
+              <label>IČO</label>
+              <div class="ico-row">
+                <div class="ico-input-wrap">
+                  <input type="text" id="puvodni_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni_prov','ico')">
+                  <div class="firm-dropdown" id="puvodni_prov-firms"></div>
+                </div>
+                <button class="btn-lookup" onclick="lookupIco('puvodni_prov')">ARES</button>
+              </div>
+              <div class="lookup-status" id="puvodni_prov-status"></div>
+            </div>
+            <div class="field">
+              <label>Adresa</label>
+              <input type="text" id="puvodni_prov_adresa" placeholder="Ulice 456, Brno">
+            </div>
+            <div class="field">
+              <label>Rodné číslo</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" id="puvodni_prov_rc_1" placeholder="855202" maxlength="6" style="width:100px;">
+                <span style="font-weight:700;font-size:16px;">/</span>
+                <input type="text" id="puvodni_prov_rc_2" placeholder="1234" maxlength="4" style="width:80px;">
+              </div>
+            </div>
+            <div class="field">
+              <label>PSČ</label>
+              <input type="text" id="puvodni_prov_psc" placeholder="60200" maxlength="6">
+            </div>
+            <div class="field">
+              <label>ID (pro úřad)</label>
+              <input type="text" id="puvodni_prov_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Nový vlastník ── -->
+  <div class="step-panel" id="panel-3">
+    <div class="card">
+      <div class="card-title">Nový vlastník</div>
+      <div class="scan-zone">
+        <label class="scan-label" for="scan-novy">
+          <span class="scan-icon">📷</span>
+          <span class="scan-text">Naskenovat doklad nové strany</span>
+          <span class="scan-sub">OP, Plná moc, Osvědčení — foto nebo upload</span>
+        </label>
+        <input type="file" id="scan-novy" accept="image/*" capture="environment" onchange="scanDoc(this,'novy')">
+        <div class="scan-result" id="scan-novy-result"></div>
+      </div>
+      <hr class="divider">
+      <div class="form-grid">
+        <div class="field">
+          <label>Jméno / Název firmy</label>
+          <div style="position:relative"><input type="text" id="novy_jmeno" placeholder="Marie Nováková / Firma s.r.o." oninput="openFirmDropdown('novy','name')" style="width:100%"><div class="firm-dropdown" id="novy-name-firms"></div></div>
+        </div>
+        <div class="field">
+          <label>IČO</label>
+          <div class="ico-row">
+            <div class="ico-input-wrap">
+              <input type="text" id="novy_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy','ico')">
+              <div class="firm-dropdown" id="novy-firms"></div>
+            </div>
+            <button class="btn-lookup" onclick="lookupIco('novy')">ARES</button>
+          </div>
+          <div class="lookup-status" id="novy-status"></div>
+        </div>
+        <div class="field">
+          <label>Adresa</label>
+          <input type="text" id="novy_adresa" placeholder="Ulice 456, Brno">
+        </div>
+        <div class="field">
+          <label>Rodné číslo</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="novy_rc_1" placeholder="905202" maxlength="6" style="width:100px;">
+            <span style="font-weight:700;font-size:16px;">/</span>
+            <input type="text" id="novy_rc_2" placeholder="1234" maxlength="4" style="width:80px;">
+          </div>
+        </div>
+        <div class="field">
+          <label>PSČ</label>
+          <input type="text" id="novy_psc" placeholder="60200" maxlength="6">
+        </div>
+        <div class="field">
+          <label>ID (pro úřad)</label>
+          <input type="text" id="novy_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+        </div>
+      </div>
+      <hr class="divider">
+      <label class="prov-toggle-row" for="novy_prov_jiny">
+        <input type="checkbox" id="novy_prov_jiny" onchange="toggleProvozovatel('novy'); autoZmenaTyp();">
+        <span class="prov-toggle-label">Nový provozovatel je jiná osoba / firma</span>
+      </label>
+      <div id="novy-prov-section" style="display:none">
+        <div class="prov-section">
+          <div class="prov-section-title">Nový provozovatel</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Jméno / Název firmy</label>
+              <div style="position:relative"><input type="text" id="novy_prov_jmeno" placeholder="Raiffeisen Leasing s.r.o." oninput="openFirmDropdown('novy_prov','name')" style="width:100%"><div class="firm-dropdown" id="novy_prov-name-firms"></div></div>
+            </div>
+            <div class="field">
+              <label>IČO</label>
+              <div class="ico-row">
+                <div class="ico-input-wrap">
+                  <input type="text" id="novy_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy_prov','ico')">
+                  <div class="firm-dropdown" id="novy_prov-firms"></div>
+                </div>
+                <button class="btn-lookup" onclick="lookupIco('novy_prov')">ARES</button>
+              </div>
+              <div class="lookup-status" id="novy_prov-status"></div>
+            </div>
+            <div class="field">
+              <label>Adresa</label>
+              <input type="text" id="novy_prov_adresa" placeholder="Ulice 789, Praha">
+            </div>
+            <div class="field">
+              <label>Rodné číslo</label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" id="novy_prov_rc_1" placeholder="760101" maxlength="6" style="width:100px;">
+                <span style="font-weight:700;font-size:16px;">/</span>
+                <input type="text" id="novy_prov_rc_2" placeholder="1234" maxlength="4" style="width:80px;">
+              </div>
+            </div>
+            <div class="field">
+              <label>PSČ</label>
+              <input type="text" id="novy_prov_psc" placeholder="11000" maxlength="6">
+            </div>
+            <div class="field">
+              <label>ID (pro úřad)</label>
+              <input type="text" id="novy_prov_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 4: Vozidlo ── -->
+  <div class="step-panel" id="panel-4">
+    <div class="card">
+      <div class="card-title">Udaje o vozidle</div>
+      <div class="scan-zone">
+        <label class="scan-label" for="scan-vozidlo">
+          <span class="scan-icon">📷</span>
+          <span class="scan-text">Naskenovat COC list nebo osvědčení o registraci</span>
+          <span class="scan-sub">Automaticky vyplni VIN, znacku, barvu a dalsi</span>
+        </label>
+        <input type="file" id="scan-vozidlo" accept="image/*" capture="environment" onchange="scanDoc(this,'vozidlo')">
+        <div class="scan-result" id="scan-vozidlo-result"></div>
+      </div>
+      <hr class="divider">
+
+      <!-- Převod-only -->
+      <div id="vozidlo-prevod-fields">
+        <div class="form-grid">
+          <div class="field">
+            <label>Registrační značka</label>
+            <input type="text" id="registracni_znacka" placeholder="1AB2345">
+          </div>
+          <div class="field">
+            <label>Druh vozidla</label>
+            <select id="druh_vozidla">
+              <option value="osobni automobil" selected>Osobní automobil</option>
+              <option value="nakladni automobil">Nákladní automobil</option>
+              <option value="motocykl">Motocykl</option>
+              <option value="pripojne vozidlo">Přípojné vozidlo</option>
+              <option value="autobus">Autobus</option>
+              <option value="traktor">Traktor</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label>VIN</label>
+            <input type="text" id="vin" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="section-label">Osvědčení o registraci vozidla</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Série (3 znaky)</label>
+            <input type="text" id="osvedceni_serie" placeholder="AA1" maxlength="3" style="font-family:monospace;letter-spacing:.08em;text-transform:uppercase;">
+          </div>
+          <div class="field">
+            <label>Číslo osvědčení</label>
+            <input type="text" id="osvedceni_cislo" placeholder="123456" maxlength="6" style="font-family:monospace;letter-spacing:.08em;">
+          </div>
+          <div class="field full">
+            <label>Jiný doklad k silničnímu vozidlu</label>
+            <input type="text" id="jiny_doklad" placeholder="napr. ZAPIS A50-X">
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="section-label">Typ žádosti o změnu</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;" id="zmena-typ-radios">
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="radio" name="zmena_typ" value="vlastnika"> změna vlastníka
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="radio" name="zmena_typ" value="provozovatele"> změna provozovatele
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="radio" name="zmena_typ" value="oboji" checked> změna vlastníka i provozovatele
+          </label>
+        </div>
+      </div>
+
+      <!-- Zapis-only -->
+      <div id="vozidlo-zapis-fields" style="display:none;">
+        <div class="form-grid" style="margin-top:14px;">
+          <div class="field full">
+            <label>VIN</label>
+            <input type="text" id="vin_z" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+          </div>
+          <div class="field">
+            <label>Druh vozidla</label>
+            <select id="druh_vozidla_z">
+              <option value="osobni automobil" selected>Osobní automobil</option>
+              <option value="nakladni automobil">Nákladní automobil</option>
+              <option value="motocykl">Motocykl</option>
+              <option value="pripojne vozidlo">Přípojné vozidlo</option>
+              <option value="autobus">Autobus</option>
+              <option value="traktor">Traktor</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategorie vozidla</label>
+            <input type="text" id="kategorie_vozidla" placeholder="M1" value="M1">
+          </div>
+          <div class="field">
+            <label>Typ vozidla</label>
+            <input type="text" id="typ_vozidla" placeholder="3C1A">
+          </div>
+          <div class="field">
+            <label>Značka a obchodní označení</label>
+            <input type="text" id="znacka" placeholder="Skoda Octavia">
+          </div>
+          <div class="field">
+            <label>Barva vozidla</label>
+            <select id="barva_vozidla">
+              <option value="">-- Vyberte --</option>
+              <option value="bila">⬜ Bílá</option>
+              <option value="zluta">🟨 Žlutá</option>
+              <option value="oranzova">🟧 Oranžová</option>
+              <option value="cervena">🟥 Červená</option>
+              <option value="fialova">🟪 Fialová</option>
+              <option value="modra">🟦 Modrá</option>
+              <option value="zelena">🟩 Zelená</option>
+              <option value="seda">⬜ Šedá</option>
+              <option value="hneda">🟫 Hnědá</option>
+              <option value="cerna">⬛ Černá</option>
+            </select>
+          </div>
+          <div class="field full-width">
+            <label>Poznámky</label>
+            <input type="text" id="poznamky" placeholder="ZAPIS A50-X">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 5: Summary + Generate ── -->
+  <div class="step-panel" id="panel-5">
+    <div class="card" id="summary-card">
+      <div class="card-title">Shrnutí před generováním</div>
+      <div id="summary-content"></div>
+    </div>
+    <div class="card output-card" id="output-card" style="display:none;">
+      <div class="check">✅</div>
+      <h2>Formuláře vygenerovány!</h2>
+      <p>Žádosti jsou připraveny k tisku nebo stažení.</p>
+      <div class="download-btns">
+        <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
+        <a id="btn-zapis" class="btn-download" target="_blank">📄 Žádost o zápis do registru</a>
+        <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
+      </div>
+      <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
+      <div style="margin-top:18px;">
+        <button class="btn btn-secondary" onclick="resetForm()">Nový přepis</button>
+      </div>
+    </div>
+    <div class="loading" id="loading">
+      <span class="spinner"></span> Generuji PDF formuláře...
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Fixed nav bar -->
+<div class="nav-bar">
+  <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">← Zpět</button>
+  <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
+</div>
+
+<script>
+let appMode = 'prevod';
+let flowIdx = 0;
+let generatedUrls = {};
+
+// panel id → which HTML panel to show
+// prevod: Typ(1) → Vozidlo(4) → Puvodni(2) → Novy(3) → Generovat(5)
+// zapis:  Typ(1) → Novy(3) → Vozidlo(4) → Generovat(5)
+const FLOWS = {
+  prevod: { panels: [1,4,2,3,5], labels: ['Typ','Vozidlo','Původní','Nový','Generovat'] },
+  zapis:  { panels: [1,3,4,5],   labels: ['Typ','Nový','Vozidlo','Generovat'] },
+};
+
+function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
+
+// ── Keyboard ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') return;
+
+  // Panel 1: Tab cycles between mode cards, Enter selects + advances
+  if (currentPanel() === 1) {
+    const cards = Array.from(document.querySelectorAll('.mode-card'));
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const idx = cards.indexOf(document.activeElement);
+      cards[(idx + 1) % cards.length].focus();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const focused = document.activeElement;
+      if (focused.classList.contains('mode-card')) selectMode(focused);
+      navNext();
+      return;
+    }
+  }
+
+  if (e.key === 'Enter') {
+    if (e.target.classList.contains('btn-lookup') || e.target.classList.contains('type-btn')) return;
+    if (currentPanel() === 5 && document.getElementById('output-card').style.display !== 'none') return;
+    e.preventDefault();
+    navNext();
+  }
+  if (e.key === 'Escape') navBack();
+});
+
+// ── Mode selection ────────────────────────────────────────────────────────────
+function selectMode(el) {
+  document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  appMode = el.dataset.mode;
+  renderStepper();
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function navNext() {
+  const flow = FLOWS[appMode];
+  if (flowIdx >= flow.panels.length - 1) {
+    if (document.getElementById('output-card').style.display === 'none') generatePDFs();
+    return;
+  }
+  flowIdx++;
+  activatePanel(currentPanel());
+}
+
+function navBack() {
+  // If output card is visible, go back to summary/edit without resetting
+  const outputCard = document.getElementById('output-card');
+  if (outputCard.style.display !== 'none') {
+    outputCard.style.display = 'none';
+    document.getElementById('plne-moce-links').style.display = 'none';
+    document.getElementById('summary-card').style.display = 'block';
+    document.getElementById('nav-next').style.display = '';
+    document.getElementById('nav-next').disabled = false;
+    document.getElementById('nav-back').textContent = '← Zpět';
+    buildSummary();
+    return;
+  }
+  if (flowIdx <= 0) return;
+  flowIdx--;
+  activatePanel(currentPanel());
+}
+
+function activatePanel(n) {
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${n}`).classList.add('active');
+  if (n === 1) { const c = document.querySelector('.mode-card.selected'); if (c) setTimeout(() => c.focus(), 50); }
+
+  // Show/hide vehicle sub-sections on the vehicle panel
+  if (n === 4) {
+    document.getElementById('vozidlo-prevod-fields').style.display = appMode === 'prevod' ? '' : 'none';
+    document.getElementById('vozidlo-zapis-fields').style.display  = appMode === 'zapis'  ? '' : 'none';
+  }
+
+  renderStepper();
+
+  // Nav bar
+  document.getElementById('nav-back').style.display = flowIdx > 0 ? '' : 'none';
+  document.getElementById('nav-next').textContent = (flowIdx === FLOWS[appMode].panels.length - 1) ? 'Generovat PDF' : 'Pokračovat →';
+
+  if (n === 5) buildSummary();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => {
+    const first = document.querySelector(`#panel-${n} input[type=text], #panel-${n} select`);
+    if (first) first.focus();
+  }, 80);
+}
+
+function renderStepper() {
+  const flow = FLOWS[appMode];
+  const stepper = document.getElementById('stepper');
+  stepper.innerHTML = flow.labels.map((lbl, i) => {
+    let cls = '';
+    if (i < flowIdx)      cls = 'done';
+    else if (i === flowIdx) cls = 'active';
+    return `<div class="step-item ${cls}"><div class="step-circle">${i+1}</div><div class="step-lbl">${lbl}</div></div>`;
+  }).join('');
+}
+
+// ── Provozovatel toggle ──────────────────────────────────────────────────────
+function toggleProvozovatel(prefix) {
+  const checked = document.getElementById(`${prefix}_prov_jiny`).checked;
+  document.getElementById(`${prefix}-prov-section`).style.display = checked ? '' : 'none';
+}
+
+// Auto-set zmena typ based on provozovatel checkboxes
+function autoZmenaTyp() {
+  const novyProv  = document.getElementById('novy_prov_jiny').checked;
+  const val = novyProv ? 'oboji' : 'vlastnika';
+  const radio = document.querySelector(`input[name="zmena_typ"][value="${val}"]`);
+  if (radio) radio.checked = true;
+}
+
+// ── Saved firms ──────────────────────────────────────────────────────────────
+// ── Saved firms (Excel backend) ───────────────────────────────────────────────
+let _firmsCache = null;
+async function getSavedFirms() {
+  if (_firmsCache) return _firmsCache;
+  try {
+    const res = await fetch('/api/firmy');
+    _firmsCache = await res.json();
+  } catch { _firmsCache = []; }
+  return _firmsCache;
+}
+async function saveFirm(firm) {
+  await fetch('/api/firmy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(firm) });
+  _firmsCache = null; // force reload on next dropdown open
+}
+async function deleteFirm(ico) {
+  await fetch(`/api/firmy/${ico}`, { method:'DELETE' });
+  if (_firmsCache) _firmsCache = _firmsCache.filter(f => f.ico !== ico);
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function _hideDropdowns(party) {
+  [`${party}-firms`, `${party}-name-firms`].forEach(id => {
+    const d = document.getElementById(id);
+    if (d) d.classList.remove('open');
+  });
+}
+// source: 'ico' or 'name' — only the matching dropdown opens
+async function openFirmDropdown(party, source) {
+  const activeDropdownId = source === 'ico' ? `${party}-firms` : `${party}-name-firms`;
+  const otherDropdownId  = source === 'ico' ? `${party}-name-firms` : `${party}-firms`;
+  const otherEl = document.getElementById(otherDropdownId);
+  if (otherEl) otherEl.classList.remove('open');
+  const dropdown = document.getElementById(activeDropdownId);
+  if (!dropdown) return;
+
+  const firms = await getSavedFirms();
+  const query = source === 'ico'
+    ? document.getElementById(`${party}_ico`).value.trim()
+    : document.getElementById(`${party}_jmeno`).value.trim();
+
+  if (!query) { dropdown.classList.remove('open'); return; }
+
+  const filtered = firms.filter(f =>
+    f.nazev.toLowerCase().includes(query.toLowerCase()) || f.ico.includes(query)
+  );
+  let html = filtered.map(f => `
+    <div class="firm-option" onclick="selectFirm('${esc(party)}','${esc(f.ico)}')">
+      <div class="firm-name">${esc(f.nazev)}</div>
+      <div class="firm-sub">IČO: ${esc(f.ico)} · ${esc(f.adresa)}</div>
+    </div>`).join('');
+  const curIco  = document.getElementById(`${party}_ico`).value.trim();
+  const curName = document.getElementById(`${party}_jmeno`).value.trim();
+  if (curIco && curName && !firms.find(f => f.ico === curIco)) {
+    html += `<div class="firm-option add-new" onclick="saveCurrentFirm('${esc(party)}')">➕ Uložit tuto firmu</div>`;
+  }
+  if (!html) { dropdown.classList.remove('open'); return; }
+  dropdown.innerHTML = html;
+  dropdown.classList.add('open');
+}
+async function selectFirm(party, ico) {
+  const firms = await getSavedFirms();
+  const firm = firms.find(f => f.ico === ico);
+  if (!firm) return;
+  document.getElementById(`${party}_ico`).value    = firm.ico;
+  document.getElementById(`${party}_jmeno`).value  = firm.nazev;
+  document.getElementById(`${party}_adresa`).value = firm.adresa;
+  document.getElementById(`${party}_psc`).value    = firm.psc;
+  const idEl = document.getElementById(`${party}_id`); if (idEl) idEl.value = firm.id || '';
+  _hideDropdowns(party);
+}
+async function saveCurrentFirm(party) {
+  const ico    = document.getElementById(`${party}_ico`).value.trim();
+  const nazev  = document.getElementById(`${party}_jmeno`).value.trim();
+  const adresa = document.getElementById(`${party}_adresa`).value.trim();
+  const psc    = document.getElementById(`${party}_psc`).value.trim();
+  const idEl   = document.getElementById(`${party}_id`);
+  const id     = idEl ? idEl.value.trim() : '';
+  if (ico && nazev) await saveFirm({ ico, nazev, adresa, psc, id });
+  _hideDropdowns(party);
+}
+document.addEventListener('click', e => {
+  document.querySelectorAll('.firm-dropdown.open').forEach(d => {
+    if (!d.parentElement.contains(e.target)) d.classList.remove('open');
+  });
+});
+
+// ── Firma modal (Správa firem + plné moci) ───────────────────────────────────
+function openFirmyModal() {
+  document.getElementById('firmy-modal').style.display = 'flex';
+  renderFirmyModal();
+}
+function closeFirmyModal() {
+  document.getElementById('firmy-modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFirmyModal();
+});
+
+function _renderFirmyBody() {
+  const body = document.getElementById('firmy-modal-body');
+  const firms = _firmsCache || [];
+  if (!firms.length) { body.innerHTML = '<p style="color:var(--muted);padding:16px">Žádné uložené firmy.</p>'; return; }
+  body.innerHTML = firms.map(f => `
+    <div class="firm-row" id="firm-row-${esc(f.ico)}">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${esc(f.nazev)}</div>
+        <div style="font-size:12px;color:var(--muted)">IČO: ${esc(f.ico)}${f.adresa ? ' · '+esc(f.adresa) : ''}${f.id ? ' · ID: '+esc(f.id) : ''}</div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+          ${f.has_plna_moc
+            ? `<span class="pm-badge">📄 Plná moc</span>
+               <a href="/plna-moc/${esc(f.ico)}" target="_blank" class="btn-sm" style="text-decoration:none">Zobrazit</a>
+               <button class="btn-sm danger" onclick="deletePlnaMoc('${esc(f.ico)}')">Odstranit</button>`
+            : `<label class="btn-sm" style="cursor:pointer">➕ Nahrát plnou moc
+                 <input type="file" accept="application/pdf" style="display:none" onchange="uploadPlnaMoc('${esc(f.ico)}', this)">
+               </label>`
+          }
+        </div>
+      </div>
+      <button class="btn-sm danger" onclick="deleteFirmModal('${esc(f.ico)}')">🗑 Smazat</button>
+    </div>`).join('');
+}
+
+async function renderFirmyModal() {
+  const body = document.getElementById('firmy-modal-body');
+  if (!_firmsCache) {
+    body.innerHTML = 'Načítám...';
+    await getSavedFirms(); // populates _firmsCache
+  }
+  _renderFirmyBody();
+}
+
+async function uploadPlnaMoc(ico, input) {
+  if (!input.files || !input.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  const res = await fetch(`/api/firmy/${ico}/plna-moc`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    if (_firmsCache) { const f = _firmsCache.find(x => x.ico === ico); if (f) f.has_plna_moc = true; }
+    _renderFirmyBody();
+  } else alert('Chyba: ' + data.error);
+}
+
+async function deletePlnaMoc(ico) {
+  if (!confirm('Odstranit plnou moc pro tuto firmu?')) return;
+  await fetch(`/api/firmy/${ico}/plna-moc`, { method: 'DELETE' });
+  if (_firmsCache) { const f = _firmsCache.find(x => x.ico === ico); if (f) f.has_plna_moc = false; }
+  _renderFirmyBody();
+}
+
+async function deleteFirmModal(ico) {
+  if (!confirm('Smazat tuto firmu ze seznamu?')) return;
+  await fetch(`/api/firmy/${ico}`, { method: 'DELETE' });
+  if (_firmsCache) _firmsCache = _firmsCache.filter(f => f.ico !== ico);
+  _renderFirmyBody();
+}
+
+// ── ARES lookup ──────────────────────────────────────────────────────────────
+async function lookupIco(party) {
+  const ico = document.getElementById(`${party}_ico`).value.trim();
+  if (!ico) return;
+  const statusEl = document.getElementById(`${party}-status`);
+  statusEl.className = 'lookup-status'; statusEl.textContent = 'Načítám...'; statusEl.style.display = 'block';
+  try {
+    const res  = await fetch('/api/ico', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ico}) });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById(`${party}_jmeno`).value  = data.nazev;
+      document.getElementById(`${party}_adresa`).value = data.adresa;
+      document.getElementById(`${party}_psc`).value    = data.psc;
+      statusEl.className = 'lookup-status ok';
+      statusEl.textContent = `✓ ${data.nazev}`;
+      await openFirmDropdown(party, 'ico'); // show "Uložit tuto firmu" option
+    } else {
+      statusEl.className = 'lookup-status err';
+      statusEl.textContent = `✗ ${data.error}`;
+    }
+  } catch {
+    statusEl.className = 'lookup-status err';
+    statusEl.textContent = '✗ Chyba spojení';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function v(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+function cb(id) { const el = document.getElementById(id); return el ? el.checked : false; }
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+function buildSummary() {
+  let html = '';
+  const row = (k, val) => `<div class="summary-row"><span class="summary-key">${k}</span><span class="summary-val">${val||'<i style="color:var(--muted)">nevyplněno</i>'}</span></div>`;
+
+  if (appMode === 'prevod') {
+    html += `<div class="summary-section">Původní vlastník</div>`;
+    html += row('Jméno', v('puvodni_jmeno'));
+    html += row('Adresa', v('puvodni_adresa') + (v('puvodni_psc') ? ', '+v('puvodni_psc') : ''));
+    if (cb('puvodni_prov_jiny')) {
+      html += `<div class="summary-section">Dosavadní provozovatel</div>`;
+      html += row('Jméno', v('puvodni_prov_jmeno'));
+      html += row('Adresa', v('puvodni_prov_adresa'));
+    }
+  }
+
+  html += `<div class="summary-section">Nový vlastník</div>`;
+  html += row('Jméno', v('novy_jmeno'));
+  html += row('Adresa', v('novy_adresa') + (v('novy_psc') ? ', '+v('novy_psc') : ''));
+  if (cb('novy_prov_jiny')) {
+    html += `<div class="summary-section">Nový provozovatel</div>`;
+    html += row('Jméno', v('novy_prov_jmeno'));
+    html += row('Adresa', v('novy_prov_adresa'));
+  }
+
+  html += `<div class="summary-section">Vozidlo</div>`;
+  html += row('VIN', appMode === 'prevod' ? v('vin') : v('vin_z'));
+  if (appMode === 'prevod') {
+    html += row('RZ', v('registracni_znacka'));
+    const druhSel = document.getElementById('druh_vozidla');
+    html += row('Druh', druhSel ? druhSel.options[druhSel.selectedIndex].text : '');
+    const zmena = document.querySelector('input[name="zmena_typ"]:checked');
+    const zmenaLabel = { vlastnika: 'změna vlastníka', provozovatele: 'změna provozovatele', oboji: 'změna vlastníka i provozovatele' };
+    html += row('Typ změny', zmena ? (zmenaLabel[zmena.value] || zmena.value) : '');
+  } else {
+    const druhSelZ = document.getElementById('druh_vozidla_z');
+    html += row('Druh', druhSelZ ? druhSelZ.options[druhSelZ.selectedIndex].text : '');
+    html += row('Kategorie', v('kategorie_vozidla'));
+    html += row('Značka', v('znacka'));
+    const barvaSel = document.getElementById('barva_vozidla');
+    html += row('Barva', barvaSel && barvaSel.value ? barvaSel.options[barvaSel.selectedIndex].text : '');
+  }
+  html += row('Místo podpisu', 'Brno');
+
+  document.getElementById('summary-content').innerHTML = html;
+}
+
+// ── Generate PDFs ─────────────────────────────────────────────────────────────
+async function generatePDFs() {
+  const zmenaTyp = document.querySelector('input[name="zmena_typ"]:checked');
+
+  const data = {
+    mode: appMode,
+    puvodni_jmeno:   v('puvodni_jmeno'),
+    puvodni_adresa:  v('puvodni_adresa'),
+    puvodni_psc:     v('puvodni_psc'),
+    puvodni_rc_1:    v('puvodni_rc_1'),
+    puvodni_rc_2:    v('puvodni_rc_2'),
+    puvodni_ico:     v('puvodni_ico'),
+    puvodni_id:      v('puvodni_id'),
+    puvodni_prov_jiny:   cb('puvodni_prov_jiny'),
+    puvodni_prov_jmeno:  v('puvodni_prov_jmeno'),
+    puvodni_prov_adresa: v('puvodni_prov_adresa'),
+    puvodni_prov_psc:    v('puvodni_prov_psc'),
+    puvodni_prov_rc_1:   v('puvodni_prov_rc_1'),
+    puvodni_prov_rc_2:   v('puvodni_prov_rc_2'),
+    puvodni_prov_ico:    v('puvodni_prov_ico'),
+    puvodni_prov_id:     v('puvodni_prov_id'),
+    novy_jmeno:   v('novy_jmeno'),
+    novy_adresa:  v('novy_adresa'),
+    novy_psc:     v('novy_psc'),
+    novy_rc_1:    v('novy_rc_1'),
+    novy_rc_2:    v('novy_rc_2'),
+    novy_ico:     v('novy_ico'),
+    novy_id:      v('novy_id'),
+    novy_prov_jiny:   cb('novy_prov_jiny'),
+    novy_prov_jmeno:  v('novy_prov_jmeno'),
+    novy_prov_adresa: v('novy_prov_adresa'),
+    novy_prov_psc:    v('novy_prov_psc'),
+    novy_prov_rc_1:   v('novy_prov_rc_1'),
+    novy_prov_rc_2:   v('novy_prov_rc_2'),
+    novy_prov_ico:    v('novy_prov_ico'),
+    novy_prov_id:     v('novy_prov_id'),
+    vin:                 appMode === 'prevod' ? v('vin') : v('vin_z'),
+    registracni_znacka:  v('registracni_znacka'),
+    druh_vozidla:        appMode === 'prevod' ? v('druh_vozidla') : v('druh_vozidla_z'),
+    kategorie_vozidla:   v('kategorie_vozidla'),
+    typ_vozidla:         v('typ_vozidla'),
+    znacka:              v('znacka'),
+    barva_vozidla:       v('barva_vozidla'),
+    cislo_schvaleni:     '',
+    osvedceni_serie:     v('osvedceni_serie'),
+    osvedceni_cislo:     v('osvedceni_cislo'),
+    jiny_doklad:         v('jiny_doklad'),
+    poznamky:            v('poznamky'),
+    zmena_vlastnika:     zmenaTyp ? zmenaTyp.value === 'vlastnika'     : false,
+    zmena_provozovatele: zmenaTyp ? zmenaTyp.value === 'provozovatele' : false,
+    zmena_oboji:         zmenaTyp ? zmenaTyp.value === 'oboji'         : true,
+  };
+
+  document.getElementById('nav-next').disabled = true;
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('summary-card').style.display = 'none';
+
+  try {
+    const res    = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    if (result.success) {
+      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, plne_moce: result.plne_moce || [] };
+      if (result.zmeny) { document.getElementById('btn-zmeny').href = result.zmeny; document.getElementById('btn-zmeny').style.display = ''; }
+      document.getElementById('btn-zapis').href = result.zapis;
+      // Show plné moci links
+      const pmDiv = document.getElementById('plne-moce-links');
+      if (generatedUrls.plne_moce.length) {
+        pmDiv.innerHTML = '<div style="margin-top:12px;font-size:13px;font-weight:600;color:var(--muted)">Plné moci k vytištění:</div>' +
+          generatedUrls.plne_moce.map(url => {
+            const ico = url.split('/').pop();
+            return `<a href="${url}" target="_blank" class="btn-download" style="font-size:13px;padding:8px 14px;margin-top:6px">📋 Plná moc (IČO ${ico})</a>`;
+          }).join('');
+        pmDiv.style.display = 'block';
+      } else {
+        pmDiv.style.display = 'none';
+      }
+      document.getElementById('output-card').style.display = 'block';
+      document.getElementById('nav-next').style.display = 'none';
+      document.getElementById('nav-back').style.display = '';
+      document.getElementById('nav-back').textContent = '← Upravit údaje';
+    } else {
+      document.getElementById('summary-card').style.display = 'block';
+      document.getElementById('nav-next').disabled = false;
+    }
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('summary-card').style.display = 'block';
+    document.getElementById('nav-next').disabled = false;
+    alert('Chyba při generování PDF.');
+  }
+}
+
+function printAll() {
+  if (generatedUrls.zmeny) window.open(generatedUrls.zmeny, '_blank');
+  if (generatedUrls.zapis) window.open(generatedUrls.zapis, '_blank');
+  (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
+}
+
+// ── Scan ──────────────────────────────────────────────────────────────────────
+async function scanDoc(input, target) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const resultEl = document.getElementById(`scan-${target}-result`);
+  resultEl.className = 'scan-result loading';
+  resultEl.textContent = 'Skenuji dokument...';
+
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const res    = await fetch('/api/scan', { method:'POST', body: formData });
+    const result = await res.json();
+    if (!result.success) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + result.error; return; }
+
+    const d = result.data;
+    let filled = [];
+
+    if (target === 'puvodni') {
+      if (d.jmeno)  { document.getElementById('puvodni_jmeno').value  = d.jmeno;  filled.push('jmeno'); }
+      if (d.adresa) { document.getElementById('puvodni_adresa').value = d.adresa; filled.push('adresa'); }
+      if (d.psc)    { document.getElementById('puvodni_psc').value    = d.psc;    filled.push('PSČ'); }
+      if (d.rc_1)   { document.getElementById('puvodni_rc_1').value   = d.rc_1;   filled.push('RC'); }
+      if (d.rc_2)   { document.getElementById('puvodni_rc_2').value   = d.rc_2; }
+      if (d.ico)    { document.getElementById('puvodni_ico').value    = d.ico;    filled.push('ICO'); }
+    } else if (target === 'novy') {
+      if (d.jmeno)  { document.getElementById('novy_jmeno').value  = d.jmeno;  filled.push('jmeno'); }
+      if (d.adresa) { document.getElementById('novy_adresa').value = d.adresa; filled.push('adresa'); }
+      if (d.psc)    { document.getElementById('novy_psc').value    = d.psc;    filled.push('PSČ'); }
+      if (d.rc_1)   { document.getElementById('novy_rc_1').value   = d.rc_1;   filled.push('RC'); }
+      if (d.rc_2)   { document.getElementById('novy_rc_2').value   = d.rc_2; }
+      if (d.ico)    { document.getElementById('novy_ico').value    = d.ico;    filled.push('ICO'); }
+    } else if (target === 'vozidlo') {
+      if (d.vin) {
+        const vinId = appMode === 'prevod' ? 'vin' : 'vin_z';
+        document.getElementById(vinId).value = d.vin; filled.push('VIN');
+      }
+      if (d.registracni_znacka){ document.getElementById('registracni_znacka').value = d.registracni_znacka; filled.push('RZ'); }
+      if (d.kategorie_vozidla) { document.getElementById('kategorie_vozidla').value = d.kategorie_vozidla; filled.push('kategorie'); }
+      if (d.typ_vozidla)       { document.getElementById('typ_vozidla').value = d.typ_vozidla; filled.push('typ'); }
+      if (d.znacka)            { document.getElementById('znacka').value = d.znacka; filled.push('znacka'); }
+      if (d.barva_vozidla)     { document.getElementById('barva_vozidla').value = d.barva_vozidla; filled.push('barva'); }
+      if (d.druh_vozidla) {
+        for (const selId of ['druh_vozidla','druh_vozidla_z']) {
+          const sel = document.getElementById(selId);
+          for (let o of sel.options) { if (o.value.includes(d.druh_vozidla.toLowerCase().split(' ')[0])) { sel.value = o.value; break; } }
+        }
+        filled.push('druh');
+      }
+    }
+
+    resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
+    resultEl.textContent = filled.length ? '✓ Vyplneno: ' + filled.join(', ') : '⚠ Zadna data nenalezena';
+  } catch(e) {
+    resultEl.className = 'scan-result err';
+    resultEl.textContent = '✗ Chyba: ' + e.message;
+  }
+}
+
+function resetForm() { location.reload(); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderStepper();
+document.getElementById('nav-back').style.display = 'none';
+</script>
+</body>
+</html>

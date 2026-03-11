@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Generated output PDFs
+prepis_app/output/
+
+# Excel data (may contain sensitive firm info)
+# prepis_app/firmy.xlsx  # uncomment to exclude
+
+# OS
+.DS_Store
+Thumbs.db
