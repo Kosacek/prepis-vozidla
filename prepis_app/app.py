@@ -427,8 +427,8 @@ def build_zapis_fields(data: dict) -> dict:
         "undefined_4": "",
         "fill_6_2":    data.get("cislo_schvaleni", ""),
 
-        "fill_7_2": data.get("poznamky", ""),
-        "fill_8_2": "",
+        "fill_7_2": data.get("poznamky", "").strip(),
+        "fill_8_2": "VOZIDLO BYLO ŘÁDNĚ ZAKOUPENO A ZAPLACENO DPH",
         "fill_9":   "",
         "fill_10":  "",
 
