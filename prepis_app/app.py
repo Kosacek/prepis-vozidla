@@ -12,12 +12,22 @@ app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.secret_key = "prepis-vozidla-secret-2024"
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+import sys
+BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+# Writable data dir — next to the .exe when frozen, else next to app.py
+if getattr(sys, 'frozen', False):
+    DATA_DIR = os.path.join(os.path.dirname(sys.executable), "data")
+else:
+    DATA_DIR = BASE_DIR
+
 PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
-FIRMY_XLSX = os.path.join(BASE_DIR, "firmy.xlsx")
-PLNE_MOCE_DIR = os.path.join(BASE_DIR, "plne_moce")
+FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
+PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
+SCANS_DIR = os.path.join(DATA_DIR, "scans")
 os.makedirs(PLNE_MOCE_DIR, exist_ok=True)
+os.makedirs(SCANS_DIR, exist_ok=True)
 
 # ── Excel helpers ─────────────────────────────────────────────────────────────
 def _load_firmy_wb():
@@ -83,6 +93,84 @@ Extract these fields (use null if not found):
   "barva_vozidla": "color: bila/zluta/oranzova/cervena/fialova/modra/zelena/seda/hneda/cerna",
   "cislo_schvaleni": "cislo schvaleni technicke zpusobilosti",
   "document_type": "coc or osveceni or plna_moc or op or other"
+}"""
+
+ORV_SCAN_PROMPT = """You are reading one or more Czech vehicle documents. Extract all available data and return ONLY valid JSON — no explanation, no markdown fences.
+
+DOCUMENT TYPES YOU MAY SEE:
+
+1. ORV — "Osvědčení o registraci vozidla" (large green/white card or booklet, A4 or folded)
+   - Section "I. VLASTNÍK VOZIDLA" or "Vlastník" → owner name, address, RČ or IČO, datum narození
+   - Section "II. PROVOZOVATEL VOZIDLA" or "Provozovatel" → operator (may be blank = same as owner)
+   - Field labels to look for:
+     - "Příjmení nebo název" / "Jméno" → full name
+     - "Místo trvalého pobytu nebo sídlo" / "Adresa" → street + city
+     - "PSČ" → postal code
+     - "Rodné číslo" / "RČ" → birth number (format XXXXXX/XXXX)
+     - "IČO" / "IČ" → company ID (8 digits)
+     - "Datum narození" → date of birth
+   - Vehicle fields:
+     - "(E) VIN" or "Identifikační číslo vozidla (VIN)" → 17-char VIN
+     - "(A) Registrační značka" / "SPZ" → plate e.g. 1AB2345
+     - "(J) Kategorie" → M1, N1 etc.
+     - "(D.2) Typ" ONLY → type code (do NOT include D.3 Varianta or D.4 Verze)
+     - "(D.1) Značka" / "Obchodní označení" → brand + model e.g. "Škoda Octavia"
+     - "(R) Barva" → color
+     - "(K) Číslo schválení typu" → type approval number
+     - "Série" / "Séria" → 2-3 letter series code printed on the document (e.g. "AA", "BC")
+     - "Číslo" / "Číslo dokladu" → 6-digit document number printed on the osvědčení
+
+2. COC list (Certificate of Conformity) — usually printed A4, EU format
+   - "Vehicle Identification Number (E)" → VIN
+   - "Make (D.1)" → brand
+   - "Type (D.2)" ONLY — do NOT include Variant (D.3) or Version (D.4)
+   - "Category (J)" → M1 etc.
+   - "Colour of vehicle (R)"
+   - Owner section usually absent — skip vlastnik/provozovatel
+
+3. OP (Občanský průkaz) — Czech ID card
+   - Front: "Příjmení", "Jméno", "Datum narození", "Rodné číslo" (on back or chip line), address
+   - Use for filling vlastnik or provozovatel depending on context
+
+4. Plná moc — power of attorney, ignore for data extraction
+
+IMPORTANT RULES:
+- RČ (rodné číslo): split at the "/" → rc_1 = 6 digits before slash, rc_2 = 3-4 digits after
+- If provozovatel section is empty or says "stejný jako vlastník" → same_as_vlastnik: true, set all provozovatel fields to null
+- barva: map to one of: bila/zluta/oranzova/cervena/fialova/modra/zelena/seda/hneda/cerna
+- If multiple documents provided, merge data — vehicle data from ORV/COC, person data from OP if ORV is unclear
+- Return null for any field not found — never guess
+
+Return this exact JSON structure:
+{
+  "vlastnik": {
+    "jmeno": "surname + first name, or company name",
+    "adresa": "street + house number + city",
+    "psc": "5-digit postal code",
+    "rc_1": "6 digits before slash",
+    "rc_2": "3-4 digits after slash",
+    "ico": "8-digit company ID or null",
+    "datum_narozeni": "DD.MM.YYYY or null"
+  },
+  "provozovatel": {
+    "jmeno": null,
+    "adresa": null,
+    "psc": null,
+    "rc_1": null,
+    "rc_2": null,
+    "ico": null,
+    "same_as_vlastnik": true
+  },
+  "vin": "17 characters",
+  "registracni_znacka": "e.g. 1AB2345",
+  "druh_vozidla": "e.g. osobní automobil",
+  "kategorie_vozidla": "e.g. M1",
+  "typ_vozidla": "D.2 Typ only — e.g. 'M', never include variant or version",
+  "znacka": "brand + model",
+  "barva_vozidla": "one of the allowed colors",
+  "cislo_schvaleni": "type approval number",
+  "osvedceni_serie": "2-3 letter series of the osvědčení document e.g. 'AA'",
+  "osvedceni_cislo": "6-digit number of the osvědčení document"
 }"""
 
 def scan_document(image_b64: str, mime_type: str) -> dict:
@@ -233,9 +321,19 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
     out.seek(0)
     return out.read()
 
-def build_zmeny_fields(data: dict) -> dict:
+def _next_working_day() -> str:
     from datetime import timedelta
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    d = datetime.now()
+    d += timedelta(days=1)
+    # If landed on Saturday (5) go to Monday; if Sunday (6) go to Monday
+    if d.weekday() == 5:
+        d += timedelta(days=2)
+    elif d.weekday() == 6:
+        d += timedelta(days=1)
+    return d.strftime("%d.%m.%Y")
+
+def build_zmeny_fields(data: dict) -> dict:
+    tomorrow = _next_working_day()
     misto = "Brně"
 
     # Dosavadní provozovatel — use jiný prov if checked, otherwise same as původní vlastník
@@ -350,8 +448,7 @@ def build_zmeny_fields(data: dict) -> dict:
     return fields
 
 def build_zapis_fields(data: dict) -> dict:
-    from datetime import timedelta
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    tomorrow = _next_working_day()
     misto = "Brně"
 
     color_map = {
@@ -512,6 +609,54 @@ def api_ico():
     ico = request.json.get("ico", "")
     return jsonify(lookup_ico(ico))
 
+_DRUH_MAP = {
+    "OSOBNÍ AUTOMOBIL":   "osobni automobil",
+    "NÁKLADNÍ AUTOMOBIL": "nakladni automobil",
+    "MOTOCYKL":           "motocykl",
+    "PŘÍPOJNÉ VOZIDLO":   "pripojne vozidlo",
+    "AUTOBUS":            "autobus",
+    "TRAKTOR":            "traktor",
+}
+
+def lookup_orv(serie: str, cislo: str) -> dict:
+    api_key = "AqyAq8Z46PtuzEEX6yBevKDItydri1F1"
+    orv = (serie.strip() + cislo.strip()).upper()
+    try:
+        r = requests.get(
+            "https://api.dataovozidlech.cz/api/vehicletechnicaldata/v2",
+            params={"orv": orv},
+            headers={"api_key": api_key},
+            timeout=8,
+        )
+        resp = r.json()
+        if r.status_code == 200 and resp.get("Status") == 1 and resp.get("Data"):
+            d = resp["Data"]
+            typ_raw = d.get("Typ", "")
+            typ = typ_raw.split(" / ")[0].strip() if " / " in typ_raw else typ_raw
+            znacka = " ".join(filter(None, [d.get("TovarniZnacka", ""), d.get("ObchodniOznaceni", "")])).strip()
+            druh_raw = (d.get("VozidloDruh") or "").upper()
+            druh = _DRUH_MAP.get(druh_raw, druh_raw.lower())
+            return {
+                "success":           True,
+                "vin":               d.get("VIN", ""),
+                "typ_vozidla":       typ,
+                "znacka":            znacka,
+                "druh_vozidla":      druh,
+                "kategorie_vozidla": d.get("Kategorie", ""),
+                "cislo_schvaleni":   d.get("CisloTypovehoSchvaleni", ""),
+            }
+        status = resp.get("Status")
+        if status == 3:
+            return {"success": False, "error": "Vozidlo nenalezeno"}
+        return {"success": False, "error": f"Chyba registru (status {status})"}
+    except Exception:
+        return {"success": False, "error": "Chyba spojení"}
+
+@app.route("/api/orv", methods=["POST"])
+def api_orv():
+    body = request.json or {}
+    return jsonify(lookup_orv(body.get("serie", ""), body.get("cislo", "")))
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     raw = request.json or {}
@@ -519,7 +664,7 @@ def api_generate():
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
     mode = data.get("mode", "prevod")
 
-    out_dir = os.path.join(BASE_DIR, "output")
+    out_dir = os.path.join(DATA_DIR, "output")
     os.makedirs(out_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -590,9 +735,114 @@ def api_scan():
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
     return jsonify(scan_document(image_b64, mime_type))
 
+@app.route("/api/save-scan", methods=["POST"])
+def api_save_scan():
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({"success": False, "error": "No image data"})
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"scan_{ts}.jpg"
+    filepath = os.path.join(SCANS_DIR, filename)
+    img_data = data['image']
+    if ',' in img_data:
+        img_data = img_data.split(',', 1)[1]
+    with open(filepath, 'wb') as f:
+        f.write(base64.b64decode(img_data))
+    return jsonify({"success": True, "filename": filename})
+
+@app.route("/api/scan-all", methods=["POST"])
+def api_scan_all():
+    # Accept either saved filenames (JSON) or uploaded files (multipart)
+    filenames = request.form.getlist('filenames')
+    content = []
+    if filenames:
+        for fname in filenames:
+            safe = os.path.basename(fname)
+            filepath = os.path.join(SCANS_DIR, safe)
+            if not os.path.exists(filepath):
+                continue
+            with open(filepath, 'rb') as f:
+                image_b64 = base64.b64encode(f.read()).decode('utf-8')
+            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_b64}})
+    else:
+        images = request.files.getlist('images')
+        if not images:
+            return jsonify({"success": False, "error": "No images provided"})
+        for img in images:
+            mime_type = img.mimetype or "image/jpeg"
+            image_b64 = base64.b64encode(img.read()).decode('utf-8')
+            content.append({"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}})
+    if not content:
+        return jsonify({"success": False, "error": "No valid images found"})
+    content.append({"type": "text", "text": ORV_SCAN_PROMPT})
+    try:
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1500,
+                "messages": [{"role": "user", "content": content}]
+            },
+            timeout=45
+        )
+        result = response.json()
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"].get("message", "API error")})
+        text = result["content"][0]["text"].strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"): text = text[4:]
+        return jsonify({"success": True, "data": json.loads(text.strip())})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route("/api/scan-orv", methods=["POST"])
+def api_scan_orv():
+    if 'image' not in request.files:
+        return jsonify({"success": False, "error": "No image provided"})
+    f = request.files['image']
+    mime_type = f.mimetype or "image/jpeg"
+    image_b64 = base64.b64encode(f.read()).decode('utf-8')
+    try:
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1200,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}},
+                        {"type": "text", "text": ORV_SCAN_PROMPT}
+                    ]
+                }]
+            },
+            timeout=30
+        )
+        result = response.json()
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"].get("message", "API error")})
+        text = result["content"][0]["text"].strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"): text = text[4:]
+        return jsonify({"success": True, "data": json.loads(text.strip())})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route("/download/<filename>")
 def download(filename):
-    path = os.path.join(BASE_DIR, "output", filename)
+    path = os.path.join(DATA_DIR, "output", filename)
     if not os.path.exists(path):
         return "File not found", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")

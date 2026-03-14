@@ -22,6 +22,7 @@
     --nav-h: 68px;
   }
   body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; color: var(--text); min-height: 100vh; }
+  ::placeholder { color: #c0c4cc; opacity: 1; }
 
   /* Header */
   .app-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 32px; box-shadow: var(--shadow); }
@@ -82,6 +83,13 @@
   .step-item.active .step-lbl  { color: var(--primary); font-weight: 700; }
   .step-item.done .step-lbl    { color: var(--success); }
   .step-item.skipped .step-lbl { color: #9ca3af; text-decoration: line-through; }
+  .step-item.warn .step-circle { background: #fee2e2; color: #dc2626; }
+  .step-item.warn .step-lbl    { color: #dc2626; }
+
+  /* Keyboard hint bar */
+  .kb-hints { display:flex; gap:18px; justify-content:center; padding:6px 0 2px; flex-wrap:wrap; }
+  .kb-hint  { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .kb-key   { background:#f1f3f5; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; font-size:10px; font-family:monospace; color:#374151; }
 
   /* Cards */
   .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 28px; margin-bottom: 16px; box-shadow: var(--shadow); }
@@ -268,21 +276,40 @@
         </div>
       </div>
     </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title">Naskenovat dokumenty (volitelné)</div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Vyfoťte ORV, COC list, OP nebo plnou moc. Aplikace vyplní vše najednou.</p>
+
+      <!-- Camera preview -->
+      <div id="camera-container" style="display:none;margin-bottom:12px;">
+        <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;"></video>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="capturePhoto()" style="flex:1;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">📸 Vyfotit</button>
+          <button onclick="closeCamera()" style="padding:10px 14px;background:#f3f4f6;border:1.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">✕ Zavřít</button>
+        </div>
+      </div>
+      <canvas id="camera-canvas" style="display:none;"></canvas>
+
+      <!-- Thumbnails -->
+      <div id="scan-all-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button onclick="openCamera()" style="padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;">📷 Kamera</button>
+        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;background:#fff;">
+          <span>📎 Ze souboru</span>
+          <input type="file" id="scan-all-input" accept="image/*" multiple style="display:none" onchange="addScanFiles(this)">
+        </label>
+        <button id="scan-all-btn" onclick="scanAll()" style="padding:8px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:none;">🔍 Skenovat vše</button>
+      </div>
+      <div class="scan-result" id="scan-all-result"></div>
+    </div>
   </div>
 
   <!-- ── Step 2: Původní vlastník ── -->
   <div class="step-panel" id="panel-2">
     <div class="card">
       <div class="card-title">Původní vlastník (dosavadní)</div>
-      <div class="scan-zone">
-        <label class="scan-label" for="scan-puvodni">
-          <span class="scan-icon">📷</span>
-          <span class="scan-text">Naskenovat doklad původní strany</span>
-          <span class="scan-sub">OP, Plná moc, Osvědčení — foto nebo upload</span>
-        </label>
-        <input type="file" id="scan-puvodni" accept="image/*" capture="environment" onchange="scanDoc(this,'puvodni')">
-        <div class="scan-result" id="scan-puvodni-result"></div>
-      </div>
       <hr class="divider">
       <div class="form-grid">
         <div class="field">
@@ -293,7 +320,7 @@
           <label>IČO</label>
           <div class="ico-row">
             <div class="ico-input-wrap">
-              <input type="text" id="puvodni_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni','ico')">
+              <input type="text" id="puvodni_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni','ico');if(this.value.length>=8)lookupIco('puvodni')" onblur="if(this.value.length>=8)lookupIco('puvodni')">
               <div class="firm-dropdown" id="puvodni-firms"></div>
             </div>
             <button class="btn-lookup" onclick="lookupIco('puvodni')">ARES</button>
@@ -338,7 +365,7 @@
               <label>IČO</label>
               <div class="ico-row">
                 <div class="ico-input-wrap">
-                  <input type="text" id="puvodni_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni_prov','ico')">
+                  <input type="text" id="puvodni_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni_prov','ico');if(this.value.length>=8)lookupIco('puvodni_prov')" onblur="if(this.value.length>=8)lookupIco('puvodni_prov')">
                   <div class="firm-dropdown" id="puvodni_prov-firms"></div>
                 </div>
                 <button class="btn-lookup" onclick="lookupIco('puvodni_prov')">ARES</button>
@@ -375,15 +402,6 @@
   <div class="step-panel" id="panel-3">
     <div class="card">
       <div class="card-title">Nový vlastník</div>
-      <div class="scan-zone">
-        <label class="scan-label" for="scan-novy">
-          <span class="scan-icon">📷</span>
-          <span class="scan-text">Naskenovat doklad nové strany</span>
-          <span class="scan-sub">OP, Plná moc, Osvědčení — foto nebo upload</span>
-        </label>
-        <input type="file" id="scan-novy" accept="image/*" capture="environment" onchange="scanDoc(this,'novy')">
-        <div class="scan-result" id="scan-novy-result"></div>
-      </div>
       <hr class="divider">
       <div class="form-grid">
         <div class="field">
@@ -394,7 +412,7 @@
           <label>IČO</label>
           <div class="ico-row">
             <div class="ico-input-wrap">
-              <input type="text" id="novy_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy','ico')">
+              <input type="text" id="novy_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy','ico');if(this.value.length>=8)lookupIco('novy')" onblur="if(this.value.length>=8)lookupIco('novy')">
               <div class="firm-dropdown" id="novy-firms"></div>
             </div>
             <button class="btn-lookup" onclick="lookupIco('novy')">ARES</button>
@@ -439,7 +457,7 @@
               <label>IČO</label>
               <div class="ico-row">
                 <div class="ico-input-wrap">
-                  <input type="text" id="novy_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy_prov','ico')">
+                  <input type="text" id="novy_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy_prov','ico');if(this.value.length>=8)lookupIco('novy_prov')" onblur="if(this.value.length>=8)lookupIco('novy_prov')">
                   <div class="firm-dropdown" id="novy_prov-firms"></div>
                 </div>
                 <button class="btn-lookup" onclick="lookupIco('novy_prov')">ARES</button>
@@ -476,15 +494,6 @@
   <div class="step-panel" id="panel-4">
     <div class="card">
       <div class="card-title">Udaje o vozidle</div>
-      <div class="scan-zone">
-        <label class="scan-label" for="scan-vozidlo">
-          <span class="scan-icon">📷</span>
-          <span class="scan-text">Naskenovat COC list nebo osvědčení o registraci</span>
-          <span class="scan-sub">Automaticky vyplni VIN, znacku, barvu a dalsi</span>
-        </label>
-        <input type="file" id="scan-vozidlo" accept="image/*" capture="environment" onchange="scanDoc(this,'vozidlo')">
-        <div class="scan-result" id="scan-vozidlo-result"></div>
-      </div>
       <hr class="divider">
 
       <!-- Převod-only -->
@@ -514,12 +523,12 @@
         <div class="section-label">Osvědčení o registraci vozidla</div>
         <div class="form-grid">
           <div class="field">
-            <label>Série (3 znaky)</label>
-            <input type="text" id="osvedceni_serie" placeholder="AA1" maxlength="3" style="font-family:monospace;letter-spacing:.08em;text-transform:uppercase;">
-          </div>
-          <div class="field">
-            <label>Číslo osvědčení</label>
-            <input type="text" id="osvedceni_cislo" placeholder="123456" maxlength="6" style="font-family:monospace;letter-spacing:.08em;">
+            <label>Číslo ORV</label>
+            <input type="text" id="osvedceni_orv" placeholder="UBE037263" maxlength="9"
+              style="font-family:monospace;letter-spacing:.08em;text-transform:uppercase;"
+              oninput="if(this.value.replace(/\s/g,'').length>=9)lookupOrv()"
+              onblur="lookupOrv()">
+            <div id="orv-status" class="lookup-status" style="display:none;margin-top:4px"></div>
           </div>
           <div class="field full">
             <label>Jiný doklad k silničnímu vozidlu</label>
@@ -628,6 +637,11 @@
   <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">← Zpět</button>
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
 </div>
+<div class="kb-hints">
+  <span class="kb-hint"><span class="kb-key">Enter</span> / <span class="kb-key">→</span> další krok</span>
+  <span class="kb-hint"><span class="kb-key">Esc</span> / <span class="kb-key">←</span> zpět</span>
+  <span class="kb-hint"><span class="kb-key">Ctrl</span>+<span class="kb-key">Enter</span> generovat PDF</span>
+</div>
 
 <script>
 let appMode = 'prevod';
@@ -666,6 +680,11 @@ document.addEventListener('keydown', e => {
     }
   }
 
+  if (e.key === 'Enter' && e.ctrlKey) {
+    e.preventDefault();
+    generatePDFs().then(() => printAll());
+    return;
+  }
   if (e.key === 'Enter') {
     if (e.target.classList.contains('btn-lookup') || e.target.classList.contains('type-btn')) return;
     if (currentPanel() === 5 && document.getElementById('output-card').style.display !== 'none') return;
@@ -673,6 +692,8 @@ document.addEventListener('keydown', e => {
     navNext();
   }
   if (e.key === 'Escape') navBack();
+  if (e.key === 'ArrowRight' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) { e.preventDefault(); navNext(); }
+  if (e.key === 'ArrowLeft'  && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) { e.preventDefault(); navBack(); }
 });
 
 // ── Mode selection ────────────────────────────────────────────────────────────
@@ -681,6 +702,7 @@ function selectMode(el) {
   el.classList.add('selected');
   appMode = el.dataset.mode;
   renderStepper();
+  setTimeout(() => navNext(), 150);
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -715,7 +737,7 @@ function navBack() {
 function activatePanel(n) {
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
-  if (n === 1) { const c = document.querySelector('.mode-card.selected'); if (c) setTimeout(() => c.focus(), 50); }
+  if (n === 1) { const c = document.querySelector('.mode-card.selected') || document.querySelector('.mode-card'); if (c) setTimeout(() => c.focus(), 50); }
 
   // Show/hide vehicle sub-sections on the vehicle panel
   if (n === 4) {
@@ -737,13 +759,33 @@ function activatePanel(n) {
   }, 80);
 }
 
+const REQUIRED = {
+  prevod: {
+    2: ['puvodni_jmeno'],
+    3: ['novy_jmeno'],
+    4: ['vin', 'registracni_znacka'],
+  },
+  zapis: {
+    3: ['novy_jmeno'],
+    4: ['vin_z'],
+  },
+};
+
+function stepHasMissing(panel) {
+  const fields = (REQUIRED[appMode] || {})[panel];
+  if (!fields) return false;
+  return fields.some(id => { const el = document.getElementById(id); return el && !el.value.trim(); });
+}
+
 function renderStepper() {
-  const flow = FLOWS[appMode];
+  const flow    = FLOWS[appMode];
   const stepper = document.getElementById('stepper');
   stepper.innerHTML = flow.labels.map((lbl, i) => {
+    const panel = flow.panels[i];
     let cls = '';
-    if (i < flowIdx)      cls = 'done';
+    if (i < flowIdx)        cls = 'done';
     else if (i === flowIdx) cls = 'active';
+    if (i < flowIdx && stepHasMissing(panel)) cls = 'warn';
     return `<div class="step-item ${cls}"><div class="step-circle">${i+1}</div><div class="step-lbl">${lbl}</div></div>`;
   }).join('');
 }
@@ -922,24 +964,70 @@ async function deleteFirmModal(ico) {
 }
 
 // ── ARES lookup ──────────────────────────────────────────────────────────────
+let _orvLast = '';
+async function lookupOrv() {
+  const raw   = (document.getElementById('osvedceni_orv').value || '').replace(/\s/g,'').toUpperCase();
+  if (raw.length < 9) return;
+  if (raw === _orvLast) return;
+  _orvLast = raw;
+  const serie = raw.slice(0, 3);
+  const cislo = raw.slice(3);
+  const st = document.getElementById('orv-status');
+  st.className = 'lookup-status'; st.textContent = 'Načítám...'; st.style.display = 'block';
+  try {
+    const res = await fetch('/api/orv', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({serie, cislo}) });
+    const d   = await res.json();
+    if (d.success) {
+      setVal('vin',                d.vin);
+      setVal('vin_z',              d.vin);
+      setVal('typ_vozidla',        d.typ_vozidla);
+      setVal('znacka',             d.znacka);
+      setVal('kategorie_vozidla',  d.kategorie_vozidla);
+      setVal('cislo_schvaleni',    d.cislo_schvaleni);
+      if (d.druh_vozidla) {
+        for (const id of ['druh_vozidla', 'druh_vozidla_z']) {
+          const el = document.getElementById(id);
+          if (el) el.value = d.druh_vozidla;
+        }
+      }
+      st.className = 'lookup-status ok';
+      st.textContent = `✓ ${d.znacka || d.vin || 'Načteno'}`;
+    } else {
+      st.className = 'lookup-status err';
+      st.textContent = `✗ ${d.error}`;
+    }
+  } catch {
+    st.className = 'lookup-status err';
+    st.textContent = '✗ Chyba spojení';
+  }
+}
+
+const _icoLast = {};
 async function lookupIco(party) {
   const ico = document.getElementById(`${party}_ico`).value.trim();
-  if (!ico) return;
+  if (!ico || ico.length < 8) return;
+  if (_icoLast[party] === ico) return;
+  _icoLast[party] = ico;
   const statusEl = document.getElementById(`${party}-status`);
   statusEl.className = 'lookup-status'; statusEl.textContent = 'Načítám...'; statusEl.style.display = 'block';
   try {
     const res  = await fetch('/api/ico', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ico}) });
     const data = await res.json();
+    const icoInput = document.getElementById(`${party}_ico`);
     if (data.success) {
       document.getElementById(`${party}_jmeno`).value  = data.nazev;
       document.getElementById(`${party}_adresa`).value = data.adresa;
       document.getElementById(`${party}_psc`).value    = data.psc;
       statusEl.className = 'lookup-status ok';
       statusEl.textContent = `✓ ${data.nazev}`;
+      icoInput.style.borderColor = 'var(--success)';
+      icoInput.style.boxShadow   = '0 0 0 3px rgba(5,150,105,0.15)';
       await openFirmDropdown(party, 'ico'); // show "Uložit tuto firmu" option
     } else {
       statusEl.className = 'lookup-status err';
       statusEl.textContent = `✗ ${data.error}`;
+      icoInput.style.borderColor = '';
+      icoInput.style.boxShadow   = '';
     }
   } catch {
     statusEl.className = 'lookup-status err';
@@ -1042,8 +1130,8 @@ async function generatePDFs() {
     znacka:              v('znacka'),
     barva_vozidla:       v('barva_vozidla'),
     cislo_schvaleni:     '',
-    osvedceni_serie:     v('osvedceni_serie'),
-    osvedceni_cislo:     v('osvedceni_cislo'),
+    osvedceni_serie:     (v('osvedceni_orv') || '').slice(0, 3),
+    osvedceni_cislo:     (v('osvedceni_orv') || '').slice(3),
     jiny_doklad:         v('jiny_doklad'),
     poznamky:            v('poznamky'),
     zmena_vlastnika:     zmenaTyp ? zmenaTyp.value === 'vlastnika'     : false,
@@ -1095,6 +1183,162 @@ function printAll() {
   if (generatedUrls.zmeny) window.open(generatedUrls.zmeny, '_blank');
   if (generatedUrls.zapis) window.open(generatedUrls.zapis, '_blank');
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+let cameraStream = null;
+
+async function openCamera() {
+  const container = document.getElementById('camera-container');
+  const video = document.getElementById('camera-video');
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    video.srcObject = cameraStream;
+    container.style.display = '';
+  } catch(e) {
+    alert('Kamera není dostupná: ' + e.message);
+  }
+}
+
+function closeCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('camera-container').style.display = 'none';
+}
+
+async function capturePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('camera-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+  // Save to server
+  try {
+    const res = await fetch('/api/save-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl })
+    });
+    const result = await res.json();
+    if (result.success) {
+      scanAllItems.push({ filename: result.filename, dataUrl });
+      renderScanPreviews();
+      document.getElementById('scan-all-btn').style.display = '';
+    }
+  } catch(e) { alert('Chyba při ukládání: ' + e.message); }
+}
+
+// ── Scan all documents ────────────────────────────────────────────────────────
+let scanAllItems = []; // { filename, dataUrl }
+
+async function addScanFiles(input) {
+  for (const file of input.files) {
+    const dataUrl = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+    // Save to server
+    try {
+      const res = await fetch('/api/save-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl })
+      });
+      const result = await res.json();
+      if (result.success) scanAllItems.push({ filename: result.filename, dataUrl });
+    } catch(e) { console.error(e); }
+  }
+  input.value = '';
+  renderScanPreviews();
+  document.getElementById('scan-all-btn').style.display = scanAllItems.length ? '' : 'none';
+}
+
+function removeScanFile(idx) {
+  scanAllItems.splice(idx, 1);
+  renderScanPreviews();
+  document.getElementById('scan-all-btn').style.display = scanAllItems.length ? '' : 'none';
+}
+
+function renderScanPreviews() {
+  const container = document.getElementById('scan-all-previews');
+  container.innerHTML = scanAllItems.map((item, i) => `
+    <div style="position:relative;display:inline-block;">
+      <img src="${item.dataUrl}" style="height:72px;width:72px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);">
+      <button onclick="removeScanFile(${i})" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0;">✕</button>
+    </div>`).join('');
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el && val) el.value = val;
+  return !!(el && val);
+}
+
+function applyOrvData(d) {
+  let filled = [];
+  const v = d.vlastnik || {};
+  if (setVal('puvodni_jmeno',  v.jmeno))  filled.push('jméno vlastníka');
+  if (setVal('puvodni_adresa', v.adresa)) filled.push('adresa');
+  setVal('puvodni_psc',   v.psc);
+  if (setVal('puvodni_rc_1', v.rc_1)) filled.push('RČ');
+  setVal('puvodni_rc_2', v.rc_2);
+  if (setVal('puvodni_ico', v.ico)) filled.push('IČO');
+
+  const p = d.provozovatel || {};
+  if (p.same_as_vlastnik === false && p.jmeno) {
+    const cb = document.getElementById('puvodni_prov_jiny');
+    if (cb && !cb.checked) { cb.checked = true; toggleProvozovatel('puvodni'); }
+    if (setVal('puvodni_prov_jmeno',  p.jmeno))  filled.push('provozovatel');
+    setVal('puvodni_prov_adresa', p.adresa);
+    setVal('puvodni_prov_psc',    p.psc);
+    setVal('puvodni_prov_rc_1',   p.rc_1);
+    setVal('puvodni_prov_rc_2',   p.rc_2);
+    setVal('puvodni_prov_ico',    p.ico);
+  }
+
+  if (d.vin) {
+    const vinId = appMode === 'prevod' ? 'vin' : 'vin_z';
+    if (setVal(vinId, d.vin)) filled.push('VIN');
+  }
+  if (setVal('registracni_znacka', d.registracni_znacka)) filled.push('RZ');
+  setVal('kategorie_vozidla', d.kategorie_vozidla);
+  setVal('typ_vozidla',       d.typ_vozidla);
+  if (setVal('znacka',        d.znacka))       filled.push('značka');
+  if (setVal('barva_vozidla', d.barva_vozidla)) filled.push('barva');
+  setVal('cislo_schvaleni',   d.cislo_schvaleni);
+  if (d.osvedceni_serie || d.osvedceni_cislo)
+    setVal('osvedceni_orv', (d.osvedceni_serie || '') + (d.osvedceni_cislo || ''));
+  if (d.druh_vozidla) {
+    for (const selId of ['druh_vozidla', 'druh_vozidla_z']) {
+      const sel = document.getElementById(selId);
+      if (sel) for (let o of sel.options) { if (o.value.includes(d.druh_vozidla.toLowerCase().split(' ')[0])) { sel.value = o.value; break; } }
+    }
+    filled.push('druh');
+  }
+  return filled;
+}
+
+async function scanAll() {
+  if (!scanAllItems.length) return;
+  const resultEl = document.getElementById('scan-all-result');
+  resultEl.className = 'scan-result loading';
+  resultEl.textContent = `Skenuji ${scanAllItems.length} dokument${scanAllItems.length > 1 ? 'y' : ''}…`;
+
+  const formData = new FormData();
+  for (const item of scanAllItems) formData.append('filenames', item.filename);
+  try {
+    const res = await fetch('/api/scan-all', { method: 'POST', body: formData });
+    const result = await res.json();
+    if (!result.success) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + result.error; return; }
+    const filled = applyOrvData(result.data);
+    resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
+    resultEl.textContent = filled.length ? '✓ Vyplněno: ' + filled.join(', ') : '⚠ Žádná data nenalezena';
+  } catch(e) {
+    resultEl.className = 'scan-result err';
+    resultEl.textContent = '✗ Chyba: ' + e.message;
+  }
 }
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
