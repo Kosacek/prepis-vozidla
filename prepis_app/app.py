@@ -99,56 +99,46 @@ ORV_SCAN_PROMPT = """You are reading one or more Czech vehicle documents. Extrac
 
 DOCUMENT TYPES YOU MAY SEE:
 
-1. ORV — "Osvědčení o registraci vozidla" (large green/white card or booklet, A4 or folded)
-   - Section "I. VLASTNÍK VOZIDLA" or "Vlastník" → owner name, address, RČ or IČO, datum narození
-   - Section "II. PROVOZOVATEL VOZIDLA" or "Provozovatel" → operator (may be blank = same as owner)
-   - Field labels to look for:
-     - "Příjmení nebo název" / "Jméno" → full name
-     - "Místo trvalého pobytu nebo sídlo" / "Adresa" → street + city
-     - "PSČ" → postal code
-     - "Rodné číslo" / "RČ" → birth number (format XXXXXX/XXXX)
-     - "IČO" / "IČ" → company ID (8 digits)
-     - "Datum narození" → date of birth
-   - Vehicle fields:
-     - "(E) VIN" or "Identifikační číslo vozidla (VIN)" → 17-char VIN
-     - "(A) Registrační značka" / "SPZ" → plate e.g. 1AB2345
-     - "(J) Kategorie" → M1, N1 etc.
-     - "(D.2) Typ" ONLY → type code (do NOT include D.3 Varianta or D.4 Verze)
-     - "(D.1) Značka" / "Obchodní označení" → brand + model e.g. "Škoda Octavia"
-     - "(R) Barva" → color
-     - "(K) Číslo schválení typu" → type approval number
-     - "Série" / "Séria" → 2-3 letter series code printed on the document (e.g. "AA", "BC")
-     - "Číslo" / "Číslo dokladu" → 6-digit document number printed on the osvědčení
+1. ORV — "Osvědčení o registraci vozidla" (green/white card, Part I or Part II)
+   - "C.1.1. a C.1.2. PROVOZOVATEL" or "VLASTNÍK" section → person name
+   - "C.1.3. ADRESA POBYTU / SÍDLO" → street + house number + city (WITHOUT postal code)
+   - Postal code (PSČ) is a separate 5-digit number — it may appear at the END of the address line (e.g. "NA STRÁNI 412, HLADKÉ ŽIVOTICE, 742 47") — strip it from adresa and put it only in psc
+   - "(A) REGISTRAČNÍ ZNAČKA VOZIDLA" at the top right → RZ plate, 7-8 chars e.g. "8T25415"
+   - Red large number at bottom e.g. "UBE 037263" → osvedceni_serie = first 3 chars, osvedceni_cislo = last 6 digits (ignore space)
+   - DO NOT extract RČ from ORV — ORV only shows datum narození, not rodné číslo. Set rc_1 and rc_2 to null.
+   - "C.4. PROVOZOVATEL JE VLASTNÍKEM VOZIDLA" ANO → same_as_vlastnik: true
+   - VIN may be on Part II only — set null if not visible
 
-2. COC list (Certificate of Conformity) — usually printed A4, EU format
+2. COC list (Certificate of Conformity) — printed A4, EU format
    - "Vehicle Identification Number (E)" → VIN
    - "Make (D.1)" → brand
    - "Type (D.2)" ONLY — do NOT include Variant (D.3) or Version (D.4)
    - "Category (J)" → M1 etc.
-   - "Colour of vehicle (R)"
-   - Owner section usually absent — skip vlastnik/provozovatel
+   - "Colour of vehicle (R)" → barva
+   - No owner data on COC
 
 3. OP (Občanský průkaz) — Czech ID card
-   - Front: "Příjmení", "Jméno", "Datum narození", "Rodné číslo" (on back or chip line), address
-   - Use for filling vlastnik or provozovatel depending on context
+   - "Příjmení", "Jméno", "Datum narození", address
+   - RČ only from OP (format XXXXXX/XXXX) → rc_1 = 6 digits before slash, rc_2 = digits after slash
 
-4. Plná moc — power of attorney, ignore for data extraction
+4. Plná moc — ignore, no data to extract
 
-IMPORTANT RULES:
-- RČ (rodné číslo): split at the "/" → rc_1 = 6 digits before slash, rc_2 = 3-4 digits after
-- If provozovatel section is empty or says "stejný jako vlastník" → same_as_vlastnik: true, set all provozovatel fields to null
-- barva: map to one of: bila/zluta/oranzova/cervena/fialova/modra/zelena/seda/hneda/cerna
-- If multiple documents provided, merge data — vehicle data from ORV/COC, person data from OP if ORV is unclear
+CRITICAL RULES:
+- adresa must NEVER contain the PSČ — strip any 5-digit postal code from the end of address
+- psc is always exactly 5 digits
+- rc_1 and rc_2 are null unless you see an explicit RČ with a "/" slash (not from ORV)
+- osvedceni_serie + osvedceni_cislo come from the large red number on ORV (e.g. "UBE 037263" → serie="UBE", cislo="037263")
+- registracni_znacka is always 7-8 characters, letters and digits only
 - Return null for any field not found — never guess
 
 Return this exact JSON structure:
 {
   "vlastnik": {
     "jmeno": "surname + first name, or company name",
-    "adresa": "street + house number + city",
-    "psc": "5-digit postal code",
-    "rc_1": "6 digits before slash",
-    "rc_2": "3-4 digits after slash",
+    "adresa": "street + house number + city — NO postal code here",
+    "psc": "5-digit postal code only",
+    "rc_1": null,
+    "rc_2": null,
     "ico": "8-digit company ID or null",
     "datum_narozeni": "DD.MM.YYYY or null"
   },
@@ -161,16 +151,16 @@ Return this exact JSON structure:
     "ico": null,
     "same_as_vlastnik": true
   },
-  "vin": "17 characters",
-  "registracni_znacka": "e.g. 1AB2345",
-  "druh_vozidla": "e.g. osobní automobil",
-  "kategorie_vozidla": "e.g. M1",
-  "typ_vozidla": "D.2 Typ only — e.g. 'M', never include variant or version",
-  "znacka": "brand + model",
-  "barva_vozidla": "one of the allowed colors",
-  "cislo_schvaleni": "type approval number",
-  "osvedceni_serie": "2-3 letter series of the osvědčení document e.g. 'AA'",
-  "osvedceni_cislo": "6-digit number of the osvědčení document"
+  "vin": "17 characters or null",
+  "registracni_znacka": "7-8 char plate or null",
+  "druh_vozidla": "osobni automobil / nakladni automobil / motocykl / pripojne vozidlo / autobus / traktor",
+  "kategorie_vozidla": "M1 / N1 etc. or null",
+  "typ_vozidla": "D.2 Typ code only, never include variant or version",
+  "znacka": "brand + model e.g. Škoda Octavia",
+  "barva_vozidla": "bila/zluta/oranzova/cervena/fialova/modra/zelena/seda/hneda/cerna",
+  "cislo_schvaleni": "type approval number or null",
+  "osvedceni_serie": "3 letters from red ORV number e.g. UBE",
+  "osvedceni_cislo": "6 digits from red ORV number e.g. 037263"
 }"""
 
 def scan_document(image_b64: str, mime_type: str) -> dict:
@@ -183,7 +173,7 @@ def scan_document(image_b64: str, mime_type: str) -> dict:
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-haiku-4-5-20251001",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 800,
                 "messages": [{
                     "role": "user",
@@ -195,6 +185,8 @@ def scan_document(image_b64: str, mime_type: str) -> dict:
             },
             timeout=30
         )
+        if response.status_code != 200:
+            return {"success": False, "error": f"API HTTP {response.status_code}: {response.text[:200]}"}
         result = response.json()
         if "error" in result:
             return {"success": False, "error": result["error"].get("message", "API error")}
@@ -204,7 +196,7 @@ def scan_document(image_b64: str, mime_type: str) -> dict:
             if text.startswith("json"): text = text[4:]
         return {"success": True, "data": json.loads(text.strip())}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": f"{type(e).__name__}: {e}"}
 
 # ── ARES lookup ──────────────────────────────────────────────────────────────
 def lookup_ico(ico: str) -> dict:
@@ -524,8 +516,8 @@ def build_zapis_fields(data: dict) -> dict:
         "undefined_4": "",
         "fill_6_2":    data.get("cislo_schvaleni", ""),
 
-        "fill_7_2": data.get("poznamky", "").strip(),
-        "fill_8_2": "VOZIDLO BYLO ŘÁDNĚ ZAKOUPENO A ZAPLACENO DPH",
+        "fill_7_2": "VOZIDLO BYLO ŘÁDNĚ ZAKOUPENO A ZAPLACENO DPH",
+        "fill_8_2": data.get("poznamky", "").strip(),
         "fill_9":   "",
         "fill_10":  "",
 
@@ -784,7 +776,7 @@ def api_scan_all():
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-haiku-4-5-20251001",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 1500,
                 "messages": [{"role": "user", "content": content}]
             },
@@ -817,7 +809,7 @@ def api_scan_orv():
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-haiku-4-5-20251001",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 1200,
                 "messages": [{
                     "role": "user",

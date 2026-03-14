@@ -164,6 +164,7 @@
   /* Mode cards */
   .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 18px 22px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 16px; }
   .mode-card:hover { border-color: var(--primary); background: var(--accent); }
+  .mode-card:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.2); }
   .mode-card.selected { border-color: var(--primary); background: var(--accent); }
   .mode-icon { font-size: 28px; flex-shrink: 0; }
   .mode-title { font-size: 15px; font-weight: 700; }
@@ -260,14 +261,14 @@
     <div class="card">
       <div class="card-title">Typ operace</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <div class="mode-card selected" data-mode="prevod" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')selectMode(this)">
+        <div class="mode-card selected" data-mode="prevod" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
           <div class="mode-icon">🔄</div>
           <div>
             <div class="mode-title">Převod vlastnictví</div>
             <div class="mode-desc">Přepis vozidla — změna vlastníka nebo provozovatele. Generuje zmeny.pdf + zapis.pdf.</div>
           </div>
         </div>
-        <div class="mode-card" data-mode="zapis" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')selectMode(this)">
+        <div class="mode-card" data-mode="zapis" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
           <div class="mode-icon">🆕</div>
           <div>
             <div class="mode-title">Zápis nového vozidla</div>
@@ -641,6 +642,7 @@
   <span class="kb-hint"><span class="kb-key">Enter</span> / <span class="kb-key">→</span> další krok</span>
   <span class="kb-hint"><span class="kb-key">Esc</span> / <span class="kb-key">←</span> zpět</span>
   <span class="kb-hint"><span class="kb-key">Ctrl</span>+<span class="kb-key">Enter</span> generovat PDF</span>
+
 </div>
 
 <script>
@@ -679,6 +681,7 @@ document.addEventListener('keydown', e => {
       return;
     }
   }
+
 
   if (e.key === 'Enter' && e.ctrlKey) {
     e.preventDefault();
@@ -1308,8 +1311,11 @@ function applyOrvData(d) {
   if (setVal('znacka',        d.znacka))       filled.push('značka');
   if (setVal('barva_vozidla', d.barva_vozidla)) filled.push('barva');
   setVal('cislo_schvaleni',   d.cislo_schvaleni);
-  if (d.osvedceni_serie || d.osvedceni_cislo)
+  if (d.osvedceni_serie || d.osvedceni_cislo) {
     setVal('osvedceni_orv', (d.osvedceni_serie || '') + (d.osvedceni_cislo || ''));
+    _orvLast = '';  // reset debounce so lookup fires
+    lookupOrv();
+  }
   if (d.druh_vozidla) {
     for (const selId of ['druh_vozidla', 'druh_vozidla_z']) {
       const sel = document.getElementById(selId);
@@ -1405,6 +1411,7 @@ function resetForm() { location.reload(); }
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderStepper();
 document.getElementById('nav-back').style.display = 'none';
+setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (c) c.focus(); }, 100);
 </script>
 </body>
 </html>
