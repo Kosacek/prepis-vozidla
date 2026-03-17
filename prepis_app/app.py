@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 import requests
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import io
 import base64
 from datetime import datetime
@@ -93,7 +95,7 @@ def read_firmy() -> list:
             })
     return firms
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "***REMOVED***")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # ── Claude Vision scan ────────────────────────────────────────────────────────
 SCAN_PROMPT = """Analyze this Czech vehicle document image and extract all data.
