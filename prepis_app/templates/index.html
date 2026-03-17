@@ -240,6 +240,12 @@
   <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
 </header>
 
+<!-- Update notification banner -->
+<div id="update-banner" style="display:none;background:#059669;color:#fff;padding:10px 32px;font-size:14px;font-weight:500;text-align:center;">
+  <span id="update-text"></span>
+  <button onclick="applyUpdate()" style="margin-left:12px;padding:5px 14px;border-radius:6px;border:none;background:#fff;color:#059669;font-weight:600;cursor:pointer;font-size:13px;">Restartovat a aktualizovat</button>
+</div>
+
 <!-- Správa firem modal -->
 <div class="modal-overlay" id="firmy-modal">
   <div class="modal-box">
@@ -1407,6 +1413,27 @@ async function scanDoc(input, target) {
 }
 
 function resetForm() { location.reload(); }
+
+// ── Auto-update check ─────────────────────────────────────────────────────────
+async function checkForUpdate() {
+  try {
+    const r = await fetch('/api/update-status');
+    const d = await r.json();
+    if (d.available && d.version) {
+      document.getElementById('update-text').textContent = `Nová verze ${d.version} je připravena k instalaci.`;
+      document.getElementById('update-banner').style.display = 'block';
+    }
+  } catch(e) {}
+}
+async function applyUpdate() {
+  const btn = event.target;
+  btn.textContent = 'Aktualizuji...';
+  btn.disabled = true;
+  try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
+}
+// Check after 8 seconds, then every 30 seconds
+setTimeout(checkForUpdate, 8000);
+setInterval(checkForUpdate, 30000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderStepper();

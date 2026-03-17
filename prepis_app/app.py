@@ -13,13 +13,36 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.secret_key = "prepis-vozidla-secret-2024"
 
 import sys
+import shutil
+from version import __version__
+
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-# Writable data dir — next to the .exe when frozen, else next to app.py
+# Writable data dir — %APPDATA%/PrepisVozidla when frozen, else next to app.py
 if getattr(sys, 'frozen', False):
-    DATA_DIR = os.path.join(os.path.dirname(sys.executable), "data")
+    DATA_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "PrepisVozidla")
 else:
     DATA_DIR = BASE_DIR
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# ── Migrate data from old location (data/ next to exe) ──────────────────────
+if getattr(sys, 'frozen', False):
+    _old_data_dir = os.path.join(os.path.dirname(sys.executable), "data")
+    _migrated_marker = os.path.join(_old_data_dir, "_migrated")
+    if os.path.isdir(_old_data_dir) and not os.path.exists(_migrated_marker):
+        for item in os.listdir(_old_data_dir):
+            src = os.path.join(_old_data_dir, item)
+            dst = os.path.join(DATA_DIR, item)
+            if not os.path.exists(dst):
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+        try:
+            with open(_migrated_marker, "w") as f:
+                f.write("migrated")
+        except OSError:
+            pass
 
 PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
@@ -838,6 +861,32 @@ def download(filename):
     if not os.path.exists(path):
         return "File not found", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
+
+# ── Update endpoints ─────────────────────────────────────────────────────────
+@app.route("/api/version")
+def api_version():
+    return jsonify({"version": __version__})
+
+@app.route("/api/update-status")
+def api_update_status():
+    try:
+        import updater
+        return jsonify({
+            "available": updater.update_ready,
+            "version": updater.update_version,
+            "current": __version__,
+        })
+    except Exception:
+        return jsonify({"available": False, "version": None, "current": __version__})
+
+@app.route("/api/apply-update", methods=["POST"])
+def api_apply_update():
+    try:
+        import updater
+        updater.apply_update_and_restart()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
