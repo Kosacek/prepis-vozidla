@@ -20,8 +20,11 @@ from version import __version__
 
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-# Writable data dir — %APPDATA%/PrepisVozidla when frozen, else next to app.py
-if getattr(sys, 'frozen', False):
+# Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
+NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
+if os.path.isdir(NAS_DATA_DIR):
+    DATA_DIR = NAS_DATA_DIR
+elif getattr(sys, 'frozen', False):
     DATA_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "PrepisVozidla")
 else:
     DATA_DIR = BASE_DIR

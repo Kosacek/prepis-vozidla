@@ -511,6 +511,18 @@
             <input type="text" id="registracni_znacka" placeholder="1AB2345">
           </div>
           <div class="field">
+            <label>Číslo ORV</label>
+            <input type="text" id="osvedceni_orv" placeholder="UBE037263" maxlength="9"
+              style="font-family:monospace;letter-spacing:.08em;text-transform:uppercase;"
+              oninput="if(this.value.replace(/\s/g,'').length>=9)lookupOrv()"
+              onblur="lookupOrv()">
+            <div id="orv-status" class="lookup-status" style="display:none;margin-top:4px"></div>
+          </div>
+          <div class="field">
+            <label>VIN</label>
+            <input type="text" id="vin" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+          </div>
+          <div class="field">
             <label>Druh vozidla</label>
             <select id="druh_vozidla">
               <option value="osobni automobil" selected>Osobní automobil</option>
@@ -521,22 +533,10 @@
               <option value="traktor">Traktor</option>
             </select>
           </div>
-          <div class="field full">
-            <label>VIN</label>
-            <input type="text" id="vin" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
-          </div>
         </div>
         <hr class="divider">
         <div class="section-label">Osvědčení o registraci vozidla</div>
         <div class="form-grid">
-          <div class="field">
-            <label>Číslo ORV</label>
-            <input type="text" id="osvedceni_orv" placeholder="UBE037263" maxlength="9"
-              style="font-family:monospace;letter-spacing:.08em;text-transform:uppercase;"
-              oninput="if(this.value.replace(/\s/g,'').length>=9)lookupOrv()"
-              onblur="lookupOrv()">
-            <div id="orv-status" class="lookup-status" style="display:none;margin-top:4px"></div>
-          </div>
           <div class="field full">
             <label>Jiný doklad k silničnímu vozidlu</label>
             <input type="text" id="jiny_doklad" placeholder="napr. ZAPIS A50-X">
@@ -642,6 +642,7 @@
 <!-- Fixed nav bar -->
 <div class="nav-bar">
   <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">← Zpět</button>
+  <span id="app-version-bar" style="position:absolute;left:32px;font-size:16px;color:#bbb;font-weight:400;pointer-events:none;"></span>
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
 </div>
 <div class="kb-hints">
@@ -1439,6 +1440,9 @@ setInterval(checkForUpdate, 30000);
 renderStepper();
 document.getElementById('nav-back').style.display = 'none';
 setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (c) c.focus(); }, 100);
+</script>
+<script>
+  fetch('/api/version').then(r=>r.json()).then(d=>{ document.getElementById('app-version-bar').textContent = 'v' + d.version; });
 </script>
 </body>
 </html>
