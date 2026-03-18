@@ -6,3 +6,4 @@ build/
 .env
 *.egg-info/
 scans/
+firmy.xlsx
