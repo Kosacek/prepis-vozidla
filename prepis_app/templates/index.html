@@ -878,6 +878,20 @@ async function openFirmDropdown(party, source) {
   dropdown.innerHTML = html;
   dropdown.classList.add('open');
 }
+async function matchFirmByName(party, name) {
+  if (!name) return false;
+  const firms = await getSavedFirms();
+  const q = name.toLowerCase().trim();
+  const match = firms.find(f => f.nazev.toLowerCase().trim() === q) ||
+                firms.find(f => q.includes(f.nazev.toLowerCase().trim()) || f.nazev.toLowerCase().trim().includes(q));
+  if (!match) return false;
+  document.getElementById(`${party}_ico`).value    = match.ico;
+  document.getElementById(`${party}_jmeno`).value  = match.nazev;
+  document.getElementById(`${party}_adresa`).value = match.adresa;
+  document.getElementById(`${party}_psc`).value    = match.psc;
+  const idEl = document.getElementById(`${party}_id`); if (idEl) idEl.value = match.id || '';
+  return true;
+}
 async function selectFirm(party, ico) {
   const firms = await getSavedFirms();
   const firm = firms.find(f => f.ico === ico);
@@ -1292,7 +1306,7 @@ function setVal(id, val) {
   return !!(el && val);
 }
 
-function applyOrvData(d) {
+async function applyOrvData(d) {
   let filled = [];
   const v = d.vlastnik || {};
   if (setVal('puvodni_jmeno',  v.jmeno))  filled.push('jméno vlastníka');
@@ -1301,6 +1315,7 @@ function applyOrvData(d) {
   if (setVal('puvodni_rc_1', v.rc_1)) filled.push('RČ');
   setVal('puvodni_rc_2', v.rc_2);
   if (setVal('puvodni_ico', v.ico)) filled.push('IČO');
+  if (!v.ico && v.jmeno) { const matched = await matchFirmByName('puvodni', v.jmeno); if (matched) filled.push('IČO ze saved firem'); }
 
   const p = d.provozovatel || {};
   if (p.same_as_vlastnik === false && p.jmeno) {
@@ -1312,6 +1327,7 @@ function applyOrvData(d) {
     setVal('puvodni_prov_rc_1',   p.rc_1);
     setVal('puvodni_prov_rc_2',   p.rc_2);
     setVal('puvodni_prov_ico',    p.ico);
+    if (!p.ico && p.jmeno) await matchFirmByName('puvodni_prov', p.jmeno);
   }
 
   if (d.vin) {
@@ -1352,7 +1368,7 @@ async function scanAll() {
     const res = await fetch('/api/scan-all', { method: 'POST', body: formData });
     const result = await res.json();
     if (!result.success) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + result.error; return; }
-    const filled = applyOrvData(result.data);
+    const filled = await applyOrvData(result.data);
     resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
     resultEl.textContent = filled.length ? '✓ Vyplněno: ' + filled.join(', ') : '⚠ Žádná data nenalezena';
   } catch(e) {
