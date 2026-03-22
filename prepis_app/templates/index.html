@@ -1223,7 +1223,10 @@ async function capturePhoto() {
   const canvas = document.getElementById('camera-canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, canvas.height);
+  ctx.rotate(Math.PI);
+  ctx.drawImage(video, 0, 0);
   const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
   // Save to server

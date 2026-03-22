@@ -776,9 +776,9 @@ def api_scan():
     mime_type = f.mimetype or "image/jpeg"
     model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
-    result = scan_document(rotate_180(image_b64, mime_type), mime_type, model)
+    result = scan_document(image_b64, mime_type, model)
     if not _has_data(result):
-        result = scan_document(image_b64, mime_type, model)
+        result = scan_document(rotate_180(image_b64, mime_type), mime_type, model)
     return jsonify(result)
 
 @app.route("/api/save-scan", methods=["POST"])
@@ -856,7 +856,7 @@ def api_scan_orv():
     mime_type = f.mimetype or "image/jpeg"
     model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
-    for candidate in [rotate_180(image_b64, mime_type), image_b64]:
+    for candidate in [image_b64, rotate_180(image_b64, mime_type)]:
         try:
             response = requests.post(
                 "https://api.anthropic.com/v1/messages",
