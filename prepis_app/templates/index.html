@@ -878,6 +878,16 @@ async function openFirmDropdown(party, source) {
   dropdown.innerHTML = html;
   dropdown.classList.add('open');
 }
+async function matchFirmByIco(party, ico) {
+  if (!ico) return false;
+  const firms = await getSavedFirms();
+  const match = firms.find(f => f.ico === ico.trim());
+  if (!match) return false;
+  const idEl = document.getElementById(`${party}_id`); if (idEl && !idEl.value) idEl.value = match.id || '';
+  if (!document.getElementById(`${party}_adresa`).value) document.getElementById(`${party}_adresa`).value = match.adresa || '';
+  if (!document.getElementById(`${party}_psc`).value) document.getElementById(`${party}_psc`).value = match.psc || '';
+  return true;
+}
 async function matchFirmByName(party, name) {
   if (!name) return false;
   const firms = await getSavedFirms();
@@ -1315,7 +1325,8 @@ async function applyOrvData(d) {
   if (setVal('puvodni_rc_1', v.rc_1)) filled.push('RČ');
   setVal('puvodni_rc_2', v.rc_2);
   if (setVal('puvodni_ico', v.ico)) filled.push('IČO');
-  if (!v.ico && v.jmeno) { const matched = await matchFirmByName('puvodni', v.jmeno); if (matched) filled.push('IČO ze saved firem'); }
+  if (v.ico) { await matchFirmByIco('puvodni', v.ico); }
+  else if (v.jmeno) { const matched = await matchFirmByName('puvodni', v.jmeno); if (matched) filled.push('IČO ze saved firem'); }
 
   const p = d.provozovatel || {};
   if (p.same_as_vlastnik === false && p.jmeno) {
@@ -1327,7 +1338,8 @@ async function applyOrvData(d) {
     setVal('puvodni_prov_rc_1',   p.rc_1);
     setVal('puvodni_prov_rc_2',   p.rc_2);
     setVal('puvodni_prov_ico',    p.ico);
-    if (!p.ico && p.jmeno) await matchFirmByName('puvodni_prov', p.jmeno);
+    if (p.ico) { await matchFirmByIco('puvodni_prov', p.ico); }
+    else if (p.jmeno) { await matchFirmByName('puvodni_prov', p.jmeno); }
   }
 
   if (d.vin) {

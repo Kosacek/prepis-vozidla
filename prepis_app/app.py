@@ -886,7 +886,7 @@ def api_scan_orv():
                 text = text.split("```")[1]
                 if text.startswith("json"): text = text[4:]
             data = json.loads(text.strip())
-            if data.get("spz") or data.get("vin") or data.get("znacka"):
+            if data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka") or (data.get("vlastnik") or {}).get("jmeno"):
                 return jsonify({"success": True, "data": data})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
