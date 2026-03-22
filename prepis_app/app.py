@@ -19,9 +19,13 @@ app.secret_key = "prepis-vozidla-secret-2024"
 
 import sys
 import shutil
-from version import __version__
-
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+try:
+    with open(os.path.join(BASE_DIR, 'VERSION')) as _vf:
+        __version__ = _vf.read().strip()
+except Exception:
+    from version import __version__
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
