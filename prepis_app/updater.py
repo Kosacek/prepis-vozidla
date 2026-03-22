@@ -117,7 +117,7 @@ if not errorlevel 1 (
     timeout /t 1 /nobreak >NUL
     goto wait
 )
-xcopy /Y /Q /E /I "{_staged_dir}\\*" "{app_dir}\\"
+xcopy /Y /Q /E /I "{_staged_dir}\\*" "{app_dir}"
 start "" "{exe_path}"
 del "%~f0"
 """
