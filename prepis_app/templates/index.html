@@ -237,7 +237,10 @@
     <div class="logo">Přepis Vozidla</div>
     <div class="subtitle">Automatické vyplnění žádosti</div>
   </div>
-  <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🤖 Sonnet</button>
+    <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
+  </div>
 </header>
 
 <!-- Update notification banner -->
@@ -1341,6 +1344,7 @@ async function scanAll() {
 
   const formData = new FormData();
   for (const item of scanAllItems) formData.append('filenames', item.filename);
+  formData.append('model', getModel());
   try {
     const res = await fetch('/api/scan-all', { method: 'POST', body: formData });
     const result = await res.json();
@@ -1364,6 +1368,7 @@ async function scanDoc(input, target) {
 
   const formData = new FormData();
   formData.append('image', file);
+  formData.append('model', getModel());
   try {
     const res    = await fetch('/api/scan', { method:'POST', body: formData });
     const result = await res.json();
@@ -1414,6 +1419,18 @@ async function scanDoc(input, target) {
 }
 
 function resetForm() { location.reload(); }
+
+// ── Model toggle ──────────────────────────────────────────────────────────────
+function getModel() { return localStorage.getItem('scan_model') || 'sonnet'; }
+function toggleModel() {
+  const next = getModel() === 'sonnet' ? 'haiku' : 'sonnet';
+  localStorage.setItem('scan_model', next);
+  document.getElementById('model-toggle-btn').textContent = '🤖 ' + (next === 'sonnet' ? 'Sonnet' : 'Haiku');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const m = getModel();
+  document.getElementById('model-toggle-btn').textContent = '🤖 ' + (m === 'sonnet' ? 'Sonnet' : 'Haiku');
+});
 
 // ── Auto-update check ─────────────────────────────────────────────────────────
 async function checkForUpdate() {

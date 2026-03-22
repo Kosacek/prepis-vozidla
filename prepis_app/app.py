@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file
 import requests
 import json
 import os
@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import io
 import base64
+from PIL import Image
 from datetime import datetime
 from pypdf import PdfReader, PdfWriter
 import openpyxl
@@ -99,6 +100,10 @@ def read_firmy() -> list:
     return firms
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+MODELS = {
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5-20251001",
+}
 
 # ── Claude Vision scan ────────────────────────────────────────────────────────
 SCAN_PROMPT = """Analyze this Czech vehicle document image and extract all data.
@@ -191,7 +196,22 @@ Return this exact JSON structure:
   "osvedceni_cislo": "6 digits from red ORV number e.g. 037263"
 }"""
 
-def scan_document(image_b64: str, mime_type: str) -> dict:
+def rotate_180(image_b64: str, mime_type: str) -> str:
+    img_bytes = base64.b64decode(image_b64)
+    img = Image.open(io.BytesIO(img_bytes))
+    img = img.rotate(180)
+    buf = io.BytesIO()
+    fmt = "JPEG" if "jpeg" in mime_type or "jpg" in mime_type else "PNG"
+    img.save(buf, format=fmt)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+def _has_data(result: dict) -> bool:
+    if not result.get("success"):
+        return False
+    data = result.get("data", {})
+    return bool(data.get("spz") or data.get("vin") or data.get("znacka"))
+
+def scan_document(image_b64: str, mime_type: str, model: str = "sonnet") -> dict:
     try:
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -201,7 +221,7 @@ def scan_document(image_b64: str, mime_type: str) -> dict:
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-sonnet-4-6",
+                "model": MODELS.get(model, MODELS["sonnet"]),
                 "max_tokens": 800,
                 "messages": [{
                     "role": "user",
@@ -752,8 +772,12 @@ def api_scan():
         return jsonify({"success": False, "error": "No image provided"})
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
+    model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
-    return jsonify(scan_document(image_b64, mime_type))
+    result = scan_document(rotate_180(image_b64, mime_type), mime_type, model)
+    if not _has_data(result):
+        result = scan_document(image_b64, mime_type, model)
+    return jsonify(result)
 
 @app.route("/api/save-scan", methods=["POST"])
 def api_save_scan():
@@ -773,6 +797,7 @@ def api_save_scan():
 @app.route("/api/scan-all", methods=["POST"])
 def api_scan_all():
     # Accept either saved filenames (JSON) or uploaded files (multipart)
+    model = request.form.get('model', 'sonnet')
     filenames = request.form.getlist('filenames')
     content = []
     if filenames:
@@ -804,7 +829,7 @@ def api_scan_all():
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-sonnet-4-6",
+                "model": MODELS.get(model, MODELS["sonnet"]),
                 "max_tokens": 1500,
                 "messages": [{"role": "user", "content": content}]
             },
@@ -827,38 +852,43 @@ def api_scan_orv():
         return jsonify({"success": False, "error": "No image provided"})
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
+    model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
-    try:
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 1200,
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}},
-                        {"type": "text", "text": ORV_SCAN_PROMPT}
-                    ]
-                }]
-            },
-            timeout=30
-        )
-        result = response.json()
-        if "error" in result:
-            return jsonify({"success": False, "error": result["error"].get("message", "API error")})
-        text = result["content"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"): text = text[4:]
-        return jsonify({"success": True, "data": json.loads(text.strip())})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+    for candidate in [rotate_180(image_b64, mime_type), image_b64]:
+        try:
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": MODELS.get(model, MODELS["sonnet"]),
+                    "max_tokens": 1200,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": candidate}},
+                            {"type": "text", "text": ORV_SCAN_PROMPT}
+                        ]
+                    }]
+                },
+                timeout=30
+            )
+            result = response.json()
+            if "error" in result:
+                return jsonify({"success": False, "error": result["error"].get("message", "API error")})
+            text = result["content"][0]["text"].strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"): text = text[4:]
+            data = json.loads(text.strip())
+            if data.get("spz") or data.get("vin") or data.get("znacka"):
+                return jsonify({"success": True, "data": data})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+    return jsonify({"success": True, "data": data})
 
 @app.route("/download/<filename>")
 def download(filename):
