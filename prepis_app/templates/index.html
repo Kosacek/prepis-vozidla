@@ -882,11 +882,25 @@ async function matchFirmByIco(party, ico) {
   if (!ico) return false;
   const firms = await getSavedFirms();
   const match = firms.find(f => f.ico === ico.trim());
-  if (!match) return false;
-  const idEl = document.getElementById(`${party}_id`); if (idEl && !idEl.value) idEl.value = match.id || '';
-  if (!document.getElementById(`${party}_adresa`).value) document.getElementById(`${party}_adresa`).value = match.adresa || '';
-  if (!document.getElementById(`${party}_psc`).value) document.getElementById(`${party}_psc`).value = match.psc || '';
-  return true;
+  if (match) {
+    const idEl = document.getElementById(`${party}_id`); if (idEl && !idEl.value) idEl.value = match.id || '';
+    if (match.nazev)  document.getElementById(`${party}_jmeno`).value  = match.nazev;
+    if (match.adresa) document.getElementById(`${party}_adresa`).value = match.adresa;
+    if (match.psc)    document.getElementById(`${party}_psc`).value    = match.psc;
+    return true;
+  }
+  // Fallback: load authoritative name + address from ARES
+  try {
+    const res = await fetch('/api/ico', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ico}) });
+    const data = await res.json();
+    if (data.success) {
+      if (data.nazev)  document.getElementById(`${party}_jmeno`).value  = data.nazev;
+      if (data.adresa) document.getElementById(`${party}_adresa`).value = data.adresa;
+      if (data.psc)    document.getElementById(`${party}_psc`).value    = data.psc;
+      return true;
+    }
+  } catch {}
+  return false;
 }
 async function matchFirmByName(party, name) {
   if (!name) return false;
