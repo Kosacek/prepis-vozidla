@@ -146,20 +146,35 @@ def apply_update_and_restart():
 
     update_dir = os.path.join(tempfile.gettempdir(), "PrepisVozidla_update")
     bat_path = os.path.join(update_dir, "do_update.bat")
+    log_path = os.path.join(update_dir, "do_update.log")
 
+    # Use pushd for UNC paths (maps a drive letter automatically),
+    # robocopy instead of xcopy for reliability, and cmd /c for exe launch
     bat_content = f"""@echo off
+echo [%date% %time%] Update script started > "{log_path}"
+
 :wait
 tasklist /FI "PID eq {pid}" 2>NUL | find /I "{pid}" >NUL
 if not errorlevel 1 (
+    echo [%date% %time%] Waiting for PID {pid} to exit... >> "{log_path}"
     timeout /t 1 /nobreak >NUL
     goto wait
 )
-xcopy /Y /Q /E /I "{_staged_dir}\\*" "{app_dir}"
-start "" "{exe_path}"
-del "%~f0"
+echo [%date% %time%] Process exited, copying files... >> "{log_path}"
+
+robocopy "{_staged_dir}" "{app_dir}" /E /IS /IT /NFL /NDL /NJH /NJS >> "{log_path}" 2>&1
+echo [%date% %time%] Robocopy exit code: %errorlevel% >> "{log_path}"
+
+echo [%date% %time%] Starting exe: {exe_path} >> "{log_path}"
+cmd /c start "" "{exe_path}" >> "{log_path}" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] start failed, trying direct launch... >> "{log_path}"
+    "{exe_path}" >> "{log_path}" 2>&1
+)
+echo [%date% %time%] Update script done >> "{log_path}"
 """
 
-    log.info("Writing update batch to %s (app_dir=%s)", bat_path, app_dir)
+    log.info("Writing update batch to %s (app_dir=%s, exe=%s)", bat_path, app_dir, exe_path)
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
