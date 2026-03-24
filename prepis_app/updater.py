@@ -8,14 +8,37 @@ import time
 import shutil
 import zipfile
 import tempfile
-import threading
+import logging
 import subprocess
 import requests
 
-from version import __version__
+# ── Logging ─────────────────────────────────────────────────────────────────
+log = logging.getLogger("updater")
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("[updater] %(levelname)s: %(message)s"))
+log.addHandler(_handler)
+log.setLevel(logging.DEBUG)
+
+# Also log to a file in temp dir for debugging on client machines
+try:
+    _fh = logging.FileHandler(
+        os.path.join(tempfile.gettempdir(), "PrepisVozidla_updater.log"),
+        encoding="utf-8",
+    )
+    _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    log.addHandler(_fh)
+except Exception:
+    pass
+
+# ── Version — read from VERSION file (same source as app.py) ───────────────
+BASE_DIR = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+try:
+    with open(os.path.join(BASE_DIR, "VERSION")) as _vf:
+        __version__ = _vf.read().strip()
+except Exception:
+    from version import __version__
 
 # ── Configuration ────────────────────────────────────────────────────────────
-# TODO: Fill in your GitHub username and repo name after creating the repo
 GITHUB_OWNER = "Kosacek"
 GITHUB_REPO = "prepis-vozidla"
 ASSET_NAME = "PrepisVozidla.zip"
@@ -41,23 +64,30 @@ def check_for_update() -> dict | None:
     """Check GitHub Releases for a newer version. Returns release info or None."""
     try:
         url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+        log.info("Checking for update at %s (current: %s)", url, __version__)
         r = requests.get(url, timeout=10, headers={"Accept": "application/vnd.github.v3+json"})
         if r.status_code != 200:
+            log.warning("GitHub API returned status %d", r.status_code)
             return None
         release = r.json()
         tag = release.get("tag_name", "").lstrip("v")
+        log.info("Latest release: %s", tag)
         if not _compare_versions(__version__, tag):
+            log.info("Already up to date (%s >= %s)", __version__, tag)
             return None
         # Find the zip asset
         for asset in release.get("assets", []):
             if asset["name"] == ASSET_NAME:
+                log.info("Update available: %s -> %s (%d bytes)", __version__, tag, asset["size"])
                 return {
                     "version": tag,
                     "download_url": asset["browser_download_url"],
                     "size": asset["size"],
                 }
+        log.warning("Release %s has no asset named %s", tag, ASSET_NAME)
         return None
-    except Exception:
+    except Exception as e:
+        log.error("Update check failed: %s", e)
         return None
 
 
@@ -73,14 +103,17 @@ def download_update(download_url: str) -> str | None:
         staged = os.path.join(update_dir, "staged")
 
         # Stream download
+        log.info("Downloading update from %s", download_url)
         with requests.get(download_url, stream=True, timeout=120) as r:
             r.raise_for_status()
             with open(zip_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=65536):
                     f.write(chunk)
+        log.info("Downloaded %d bytes", os.path.getsize(zip_path))
 
         # Verify zip
         if not zipfile.is_zipfile(zip_path):
+            log.error("Downloaded file is not a valid zip")
             return None
 
         # Extract
@@ -90,10 +123,14 @@ def download_update(download_url: str) -> str | None:
         # The zip contains a PrepisVozidla/ folder — find it
         contents = os.listdir(staged)
         if len(contents) == 1 and os.path.isdir(os.path.join(staged, contents[0])):
-            return os.path.join(staged, contents[0])
-        return staged
+            result = os.path.join(staged, contents[0])
+        else:
+            result = staged
+        log.info("Update staged at %s", result)
+        return result
 
-    except Exception:
+    except Exception as e:
+        log.error("Download failed: %s", e)
         return None
 
 
@@ -122,6 +159,7 @@ start "" "{exe_path}"
 del "%~f0"
 """
 
+    log.info("Writing update batch to %s (app_dir=%s)", bat_path, app_dir)
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
@@ -156,5 +194,7 @@ def background_check():
         _staged_dir = staged
         update_version = info["version"]
         update_ready = True
+        log.info("Update ready: v%s staged at %s", update_version, _staged_dir)
     except Exception as e:
         update_error = str(e)
+        log.error("Background check failed: %s", e)

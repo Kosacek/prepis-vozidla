@@ -916,6 +916,7 @@ def api_update_status():
             "available": updater.update_ready,
             "version": updater.update_version,
             "current": __version__,
+            "error": updater.update_error,
         })
     except Exception:
         return jsonify({"available": False, "version": None, "current": __version__})

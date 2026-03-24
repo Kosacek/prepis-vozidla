@@ -1242,6 +1242,9 @@ let cameraStream = null;
 async function openCamera() {
   const container = document.getElementById('camera-container');
   const video = document.getElementById('camera-video');
+  // Clean up any previous stream before requesting a new one
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  video.srcObject = null;
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     video.srcObject = cameraStream;
@@ -1252,7 +1255,9 @@ async function openCamera() {
 }
 
 function closeCamera() {
+  const video = document.getElementById('camera-video');
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  if (video) video.srcObject = null;
   document.getElementById('camera-container').style.display = 'none';
 }
 
