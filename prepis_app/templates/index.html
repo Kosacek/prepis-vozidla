@@ -1483,21 +1483,39 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Auto-update check ─────────────────────────────────────────────────────────
+let _updateMode = null;
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/update-status');
     const d = await r.json();
     if (d.available && d.version) {
-      document.getElementById('update-text').textContent = `Nová verze ${d.version} je připravena k instalaci.`;
-      document.getElementById('update-banner').style.display = 'block';
+      _updateMode = d.mode || 'download';
+      const banner = document.getElementById('update-banner');
+      const btn = banner.querySelector('button');
+      if (_updateMode === 'restart') {
+        document.getElementById('update-text').textContent = `Nová verze ${d.version} je k dispozici.`;
+        btn.textContent = 'Zavřít a znovu otevřít';
+      } else {
+        document.getElementById('update-text').textContent = `Nová verze ${d.version} je připravena k instalaci.`;
+        btn.textContent = 'Restartovat a aktualizovat';
+      }
+      banner.style.display = 'block';
     }
   } catch(e) {}
 }
 async function applyUpdate() {
   const btn = event.target;
-  btn.textContent = 'Aktualizuji...';
-  btn.disabled = true;
-  try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
+  if (_updateMode === 'restart') {
+    btn.textContent = 'Zavírám...';
+    btn.disabled = true;
+    try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
+    // App will exit — tell user to reopen
+    document.getElementById('update-text').textContent = 'Aplikace se zavřela. Otevřete ji znovu.';
+  } else {
+    btn.textContent = 'Aktualizuji...';
+    btn.disabled = true;
+    try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
+  }
 }
 // Check after 8 seconds, then every 30 seconds
 setTimeout(checkForUpdate, 8000);

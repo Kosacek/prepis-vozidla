@@ -1,6 +1,10 @@
 """
 Auto-updater for PrepisVozidla.
-Checks GitHub Releases for new versions, downloads silently, prompts restart.
+
+Two update strategies:
+1. NAS clients: app runs from shared NAS folder — just detect version mismatch
+   and tell the user to restart (NAS files are updated via deploy_to_nas.bat).
+2. Local installs: download zip from GitHub Releases and replace files.
 """
 import os
 import sys
@@ -19,7 +23,6 @@ _handler.setFormatter(logging.Formatter("[updater] %(levelname)s: %(message)s"))
 log.addHandler(_handler)
 log.setLevel(logging.DEBUG)
 
-# Also log to a file in temp dir for debugging on client machines
 try:
     _fh = logging.FileHandler(
         os.path.join(tempfile.gettempdir(), "PrepisVozidla_updater.log"),
@@ -30,7 +33,7 @@ try:
 except Exception:
     pass
 
-# ── Version — read from VERSION file (same source as app.py) ───────────────
+# ── Version ─────────────────────────────────────────────────────────────────
 BASE_DIR = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 try:
     with open(os.path.join(BASE_DIR, "VERSION")) as _vf:
@@ -43,10 +46,16 @@ GITHUB_OWNER = "Kosacek"
 GITHUB_REPO = "prepis-vozidla"
 ASSET_NAME = "PrepisVozidla.zip"
 
+# Detect if running from NAS (UNC path)
+_app_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else ""
+is_nas = _app_dir.startswith("\\\\")
+log.info("App dir: %s (NAS: %s, version: %s)", _app_dir, is_nas, __version__)
+
 # ── Module state ─────────────────────────────────────────────────────────────
 update_ready = False
 update_version = None
 update_error = None
+update_mode = None  # "restart" (NAS) or "download" (local)
 _staged_dir = None
 
 
@@ -60,34 +69,57 @@ def _compare_versions(current: str, remote: str) -> bool:
         return False
 
 
+def _check_nas_version() -> str | None:
+    """Check the VERSION file on the NAS (live, not bundled). Returns version or None."""
+    try:
+        nas_version_path = os.path.join(_app_dir, "_internal", "VERSION")
+        if os.path.isfile(nas_version_path):
+            with open(nas_version_path) as f:
+                return f.read().strip()
+    except Exception as e:
+        log.warning("Could not read NAS VERSION: %s", e)
+    return None
+
+
 def check_for_update() -> dict | None:
-    """Check GitHub Releases for a newer version. Returns release info or None."""
+    """Check for a newer version. NAS checks local files; local checks GitHub."""
+    # Strategy 1: NAS — compare bundled version vs live NAS version
+    if is_nas:
+        nas_ver = _check_nas_version()
+        if nas_ver and _compare_versions(__version__, nas_ver):
+            log.info("NAS has newer version: %s (running: %s)", nas_ver, __version__)
+            return {"version": nas_ver, "mode": "restart"}
+        log.info("NAS version check: running=%s, nas=%s — no update", __version__, nas_ver)
+        # Also check GitHub as fallback
+
+    # Strategy 2: GitHub Releases
     try:
         url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
-        log.info("Checking for update at %s (current: %s)", url, __version__)
+        log.info("Checking GitHub: %s (current: %s)", url, __version__)
         r = requests.get(url, timeout=10, headers={"Accept": "application/vnd.github.v3+json"})
         if r.status_code != 200:
             log.warning("GitHub API returned status %d", r.status_code)
             return None
         release = r.json()
         tag = release.get("tag_name", "").lstrip("v")
-        log.info("Latest release: %s", tag)
+        log.info("Latest GitHub release: %s", tag)
         if not _compare_versions(__version__, tag):
             log.info("Already up to date (%s >= %s)", __version__, tag)
             return None
-        # Find the zip asset
         for asset in release.get("assets", []):
             if asset["name"] == ASSET_NAME:
-                log.info("Update available: %s -> %s (%d bytes)", __version__, tag, asset["size"])
+                mode = "restart" if is_nas else "download"
+                log.info("Update available: %s -> %s (mode: %s)", __version__, tag, mode)
                 return {
                     "version": tag,
                     "download_url": asset["browser_download_url"],
                     "size": asset["size"],
+                    "mode": mode,
                 }
         log.warning("Release %s has no asset named %s", tag, ASSET_NAME)
         return None
     except Exception as e:
-        log.error("Update check failed: %s", e)
+        log.error("GitHub check failed: %s", e)
         return None
 
 
@@ -102,7 +134,6 @@ def download_update(download_url: str) -> str | None:
         zip_path = os.path.join(update_dir, "update.zip")
         staged = os.path.join(update_dir, "staged")
 
-        # Stream download
         log.info("Downloading update from %s", download_url)
         with requests.get(download_url, stream=True, timeout=120) as r:
             r.raise_for_status()
@@ -111,16 +142,13 @@ def download_update(download_url: str) -> str | None:
                     f.write(chunk)
         log.info("Downloaded %d bytes", os.path.getsize(zip_path))
 
-        # Verify zip
         if not zipfile.is_zipfile(zip_path):
             log.error("Downloaded file is not a valid zip")
             return None
 
-        # Extract
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(staged)
 
-        # The zip contains a PrepisVozidla/ folder — find it
         contents = os.listdir(staged)
         if len(contents) == 1 and os.path.isdir(os.path.join(staged, contents[0])):
             result = os.path.join(staged, contents[0])
@@ -135,8 +163,15 @@ def download_update(download_url: str) -> str | None:
 
 
 def apply_update_and_restart():
-    """Write a batch script that replaces the app after exit, then restart."""
+    """Apply update — behavior depends on mode."""
     global _staged_dir
+
+    # NAS mode: just exit, user will reopen and get new version
+    if update_mode == "restart":
+        log.info("NAS mode: exiting app so user can restart with new version")
+        os._exit(0)
+
+    # Local mode: write batch script to replace files and restart
     if not _staged_dir or not os.path.isdir(_staged_dir):
         raise RuntimeError("No staged update available")
 
@@ -146,54 +181,40 @@ def apply_update_and_restart():
 
     update_dir = os.path.join(tempfile.gettempdir(), "PrepisVozidla_update")
     bat_path = os.path.join(update_dir, "do_update.bat")
-    log_path = os.path.join(update_dir, "do_update.log")
+    bat_log = os.path.join(update_dir, "do_update.log")
 
-    # Use pushd for UNC paths (maps a drive letter automatically),
-    # robocopy instead of xcopy for reliability, and cmd /c for exe launch
     bat_content = f"""@echo off
-echo [%date% %time%] Update script started > "{log_path}"
+echo [%date% %time%] Update script started > "{bat_log}"
 
 :wait
 tasklist /FI "PID eq {pid}" 2>NUL | find /I "{pid}" >NUL
 if not errorlevel 1 (
-    echo [%date% %time%] Waiting for PID {pid} to exit... >> "{log_path}"
     timeout /t 1 /nobreak >NUL
     goto wait
 )
-echo [%date% %time%] Process exited, copying files... >> "{log_path}"
-
-robocopy "{_staged_dir}" "{app_dir}" /E /IS /IT /NFL /NDL /NJH /NJS >> "{log_path}" 2>&1
-echo [%date% %time%] Robocopy exit code: %errorlevel% >> "{log_path}"
-
-echo [%date% %time%] Starting exe: {exe_path} >> "{log_path}"
-cmd /c start "" "{exe_path}" >> "{log_path}" 2>&1
-if errorlevel 1 (
-    echo [%date% %time%] start failed, trying direct launch... >> "{log_path}"
-    "{exe_path}" >> "{log_path}" 2>&1
-)
-echo [%date% %time%] Update script done >> "{log_path}"
+echo [%date% %time%] Copying files... >> "{bat_log}"
+robocopy "{_staged_dir}" "{app_dir}" /E /IS /IT >> "{bat_log}" 2>&1
+echo [%date% %time%] Starting app... >> "{bat_log}"
+start "" "{exe_path}"
+del "%~f0"
 """
 
-    log.info("Writing update batch to %s (app_dir=%s, exe=%s)", bat_path, app_dir, exe_path)
+    log.info("Writing update batch to %s", bat_path)
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
-    # Launch the batch file detached
     subprocess.Popen(
         ["cmd", "/c", bat_path],
-        creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        creationflags=0x00000008 | 0x00000200,
         close_fds=True,
     )
-
-    # Exit the app
     os._exit(0)
 
 
 def background_check():
     """Background thread: check for update, download if available."""
-    global update_ready, update_version, update_error, _staged_dir
+    global update_ready, update_version, update_error, update_mode, _staged_dir
 
-    # Wait a bit before checking
     time.sleep(5)
 
     try:
@@ -201,15 +222,27 @@ def background_check():
         if not info:
             return
 
+        mode = info.get("mode", "download")
+
+        if mode == "restart":
+            # NAS: no download needed, just flag the update
+            update_mode = "restart"
+            update_version = info["version"]
+            update_ready = True
+            log.info("NAS update ready: restart to get v%s", update_version)
+            return
+
+        # Local: download and stage
         staged = download_update(info["download_url"])
         if not staged:
             update_error = "Download failed"
             return
 
         _staged_dir = staged
+        update_mode = "download"
         update_version = info["version"]
         update_ready = True
-        log.info("Update ready: v%s staged at %s", update_version, _staged_dir)
+        log.info("Local update ready: v%s staged at %s", update_version, _staged_dir)
     except Exception as e:
         update_error = str(e)
         log.error("Background check failed: %s", e)
