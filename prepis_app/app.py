@@ -22,10 +22,17 @@ import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
 try:
-    with open(os.path.join(BASE_DIR, 'VERSION')) as _vf:
+    _version_path = os.path.join(BASE_DIR, 'VERSION')
+    with open(_version_path) as _vf:
         __version__ = _vf.read().strip()
-except Exception:
-    from version import __version__
+except Exception as _ve:
+    # Fallback: try _internal dir next to executable
+    try:
+        _exe_internal = os.path.join(os.path.dirname(sys.executable), '_internal', 'VERSION')
+        with open(_exe_internal) as _vf:
+            __version__ = _vf.read().strip()
+    except Exception:
+        from version import __version__
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
