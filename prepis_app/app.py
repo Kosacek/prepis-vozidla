@@ -21,18 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-try:
-    _version_path = os.path.join(BASE_DIR, 'VERSION')
-    with open(_version_path) as _vf:
-        __version__ = _vf.read().strip()
-except Exception as _ve:
-    # Fallback: try _internal dir next to executable
-    try:
-        _exe_internal = os.path.join(os.path.dirname(sys.executable), '_internal', 'VERSION')
-        with open(_exe_internal) as _vf:
-            __version__ = _vf.read().strip()
-    except Exception:
-        from version import __version__
+__version__ = "1.0.15"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -913,7 +902,38 @@ def download(filename):
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")
 def api_version():
-    return jsonify({"version": __version__})
+    return jsonify({
+        "version": __version__,
+        "frozen": getattr(sys, "frozen", False),
+        "executable": sys.executable,
+        "MEIPASS": getattr(sys, "_MEIPASS", "N/A"),
+        "BASE_DIR": BASE_DIR,
+        "cwd": os.getcwd(),
+    })
+
+@app.route("/api/debug-version")
+def api_debug_version():
+    paths = {}
+    paths["frozen"] = getattr(sys, "frozen", False)
+    paths["sys.executable"] = sys.executable
+    paths["MEIPASS"] = getattr(sys, "_MEIPASS", "N/A")
+    paths["BASE_DIR"] = BASE_DIR
+    p1 = os.path.join(BASE_DIR, "VERSION")
+    paths["path1"] = p1
+    paths["path1_exists"] = os.path.exists(p1)
+    p2 = os.path.join(os.path.dirname(sys.executable), "_internal", "VERSION")
+    paths["path2"] = p2
+    paths["path2_exists"] = os.path.exists(p2)
+    paths["cwd"] = os.getcwd()
+    paths["resolved_version"] = __version__
+    # Try reading both right now
+    for key, path in [("path1_content", p1), ("path2_content", p2)]:
+        try:
+            with open(path) as f:
+                paths[key] = f.read().strip()
+        except Exception as e:
+            paths[key] = str(e)
+    return jsonify(paths)
 
 @app.route("/api/update-status")
 def api_update_status():

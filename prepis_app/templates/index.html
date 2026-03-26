@@ -748,6 +748,8 @@ function navBack() {
 }
 
 function activatePanel(n) {
+  // Close camera when leaving panel-1 so the device is fully released
+  if (n !== 1 && cameraStream) closeCamera();
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
   if (n === 1) { const c = document.querySelector('.mode-card.selected') || document.querySelector('.mode-card'); if (c) setTimeout(() => c.focus(), 50); }
@@ -1242,12 +1244,18 @@ let cameraStream = null;
 async function openCamera() {
   const container = document.getElementById('camera-container');
   const video = document.getElementById('camera-video');
-  // Clean up any previous stream before requesting a new one
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  // Fully tear down any previous stream
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
   video.srcObject = null;
+  // Small delay to let the browser fully release the device
+  await new Promise(r => setTimeout(r, 300));
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     video.srcObject = cameraStream;
+    await video.play();
     container.style.display = '';
   } catch(e) {
     alert('Kamera není dostupná: ' + e.message);
@@ -1256,8 +1264,14 @@ async function openCamera() {
 
 function closeCamera() {
   const video = document.getElementById('camera-video');
-  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-  if (video) video.srcObject = null;
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
   document.getElementById('camera-container').style.display = 'none';
 }
 
