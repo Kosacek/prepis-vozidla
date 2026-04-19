@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.0.15"
+__version__ = "1.0.16"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -602,11 +602,42 @@ def api_firmy_add():
     if not ico or not nazev:
         return jsonify({"success": False, "error": "Chybí IČO nebo název"})
     firms = read_firmy()
-    firm_id = "".join(c for c in str(f.get("id","")).strip() if c.isdigit())[:10]
+    firm_id = _normalize_ids(f.get("id", ""))
     if not any(x["ico"] == ico for x in firms):
         firms.append({"nazev": nazev, "ico": ico, "adresa": str(f.get("adresa","")).strip(), "psc": str(f.get("psc","")).strip(), "id": firm_id})
         save_firmy(firms)
     return jsonify({"success": True})
+
+def _normalize_ids(raw: str) -> str:
+    parts = []
+    for seg in str(raw or "").replace(";", ",").split(","):
+        digits = "".join(c for c in seg.strip() if c.isdigit())[:10]
+        if digits:
+            parts.append(digits)
+    return ", ".join(parts)
+
+@app.route("/api/firmy/<ico>", methods=["PATCH"])
+def api_firmy_update(ico):
+    ico = "".join(c for c in ico.strip() if c.isdigit())
+    data = request.json or {}
+    firms = read_firmy()
+    found = None
+    for f in firms:
+        if f["ico"] == ico:
+            if "id" in data:
+                f["id"] = _normalize_ids(data.get("id", ""))
+            if "nazev" in data:
+                f["nazev"] = str(data.get("nazev", "")).strip()
+            if "adresa" in data:
+                f["adresa"] = str(data.get("adresa", "")).strip()
+            if "psc" in data:
+                f["psc"] = str(data.get("psc", "")).strip()
+            found = f
+            break
+    if not found:
+        return jsonify({"success": False, "error": "Firma nenalezena"})
+    save_firmy(firms)
+    return jsonify({"success": True, "firm": found})
 
 @app.route("/api/firmy/<ico>", methods=["DELETE"])
 def api_firmy_delete(ico):

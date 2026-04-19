@@ -355,7 +355,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="puvodni_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+          <input type="text" id="puvodni_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -400,7 +400,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="puvodni_prov_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+              <input type="text" id="puvodni_prov_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -447,7 +447,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="novy_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+          <input type="text" id="novy_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -492,7 +492,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="novy_prov_id" placeholder="1234567890" maxlength="10" inputmode="numeric">
+              <input type="text" id="novy_prov_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -965,7 +965,11 @@ function _renderFirmyBody() {
     <div class="firm-row" id="firm-row-${esc(f.ico)}">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:14px">${esc(f.nazev)}</div>
-        <div style="font-size:12px;color:var(--muted)">IČO: ${esc(f.ico)}${f.adresa ? ' · '+esc(f.adresa) : ''}${f.id ? ' · ID: '+esc(f.id) : ''}</div>
+        <div style="font-size:12px;color:var(--muted)" id="firm-meta-${esc(f.ico)}">
+          IČO: ${esc(f.ico)}${f.adresa ? ' · '+esc(f.adresa) : ''}
+          · ID: <span id="firm-id-text-${esc(f.ico)}">${f.id ? esc(f.id) : '—'}</span>
+          <button class="btn-sm" style="padding:2px 8px;margin-left:4px;font-size:11px" onclick="startEditId('${esc(f.ico)}')" title="Upravit ID">✏️</button>
+        </div>
         <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
           ${f.has_plna_moc
             ? `<span class="pm-badge">📄 Plná moc</span>
@@ -987,6 +991,44 @@ async function renderFirmyModal() {
     body.innerHTML = 'Načítám...';
     await getSavedFirms(); // populates _firmsCache
   }
+  _renderFirmyBody();
+}
+
+function startEditId(ico) {
+  const span = document.getElementById(`firm-id-text-${ico}`);
+  if (!span) return;
+  const firm = (_firmsCache || []).find(x => x.ico === ico);
+  const current = firm && firm.id ? firm.id : '';
+  const meta = document.getElementById(`firm-meta-${ico}`);
+  meta.dataset.originalHtml = meta.innerHTML;
+  meta.innerHTML = `
+    IČO: ${esc(ico)}${firm && firm.adresa ? ' · '+esc(firm.adresa) : ''}
+    · ID: <input type="text" id="firm-id-input-${esc(ico)}" value="${esc(current)}" maxlength="32" inputmode="numeric" placeholder="1234567890, 9876543210" style="padding:2px 6px;font-size:12px;width:200px" onkeydown="if(event.key==='Enter'){saveEditId('${esc(ico)}')}else if(event.key==='Escape'){cancelEditId('${esc(ico)}')}">
+    <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="saveEditId('${esc(ico)}')">Uložit</button>
+    <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="cancelEditId('${esc(ico)}')">Zrušit</button>
+  `;
+  const inp = document.getElementById(`firm-id-input-${ico}`);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function cancelEditId(ico) {
+  const meta = document.getElementById(`firm-meta-${ico}`);
+  if (meta && meta.dataset.originalHtml) meta.innerHTML = meta.dataset.originalHtml;
+}
+
+async function saveEditId(ico) {
+  const inp = document.getElementById(`firm-id-input-${ico}`);
+  if (!inp) return;
+  const raw = inp.value;
+  const normalized = raw.replace(/;/g, ',').split(',')
+    .map(s => s.replace(/\D/g, '').slice(0,10)).filter(Boolean).join(', ');
+  const res = await fetch(`/api/firmy/${ico}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id: normalized })
+  });
+  const data = await res.json();
+  if (!data.success) { alert('Chyba: ' + (data.error || 'neznámá')); return; }
+  if (_firmsCache) { const f = _firmsCache.find(x => x.ico === ico); if (f) f.id = data.firm.id; }
   _renderFirmyBody();
 }
 
