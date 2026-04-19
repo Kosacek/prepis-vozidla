@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.0.16"
+__version__ = "1.0.17"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -61,14 +61,37 @@ os.makedirs(PLNE_MOCE_DIR, exist_ok=True)
 os.makedirs(SCANS_DIR, exist_ok=True)
 
 # ── Excel helpers ─────────────────────────────────────────────────────────────
+FIRMY_BACKUP = FIRMY_XLSX + ".bak"
+
+def _is_valid_xlsx(path: str) -> bool:
+    try:
+        return os.path.exists(path) and os.path.getsize(path) > 0
+    except OSError:
+        return False
+
 def _load_firmy_wb():
-    if os.path.exists(FIRMY_XLSX):
-        return openpyxl.load_workbook(FIRMY_XLSX)
+    # Try main file; if empty/broken, try backup; else start fresh.
+    for path in (FIRMY_XLSX, FIRMY_BACKUP):
+        if _is_valid_xlsx(path):
+            try:
+                wb = openpyxl.load_workbook(path)
+                # If main was broken but backup worked, restore main from backup
+                if path == FIRMY_BACKUP:
+                    try:
+                        shutil.copyfile(FIRMY_BACKUP, FIRMY_XLSX)
+                    except Exception:
+                        pass
+                return wb
+            except Exception:
+                continue
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Firmy"
     ws.append(["Název", "IČO", "Adresa", "PSČ", "ID"])
-    wb.save(FIRMY_XLSX)
+    try:
+        wb.save(FIRMY_XLSX)
+    except Exception:
+        pass
     return wb
 
 def save_firmy(firms: list):
@@ -84,11 +107,25 @@ def save_firmy(firms: list):
     ws.column_dimensions["E"].width = 14
     for f in firms:
         ws.append([f.get("nazev",""), f.get("ico",""), f.get("adresa",""), f.get("psc",""), f.get("id","")])
-    wb.save(FIRMY_XLSX)
+    # Atomic write: save to temp file, then replace.
+    # This way an interrupted write (network blip, AV lock) can never leave
+    # a 0-byte FIRMY_XLSX behind — original stays intact until rename succeeds.
+    tmp_path = FIRMY_XLSX + ".tmp"
+    wb.save(tmp_path)
+    # Keep a backup of the previous good file
+    if _is_valid_xlsx(FIRMY_XLSX):
+        try:
+            shutil.copyfile(FIRMY_XLSX, FIRMY_BACKUP)
+        except Exception:
+            pass
+    os.replace(tmp_path, FIRMY_XLSX)
 
 def read_firmy() -> list:
-    wb = _load_firmy_wb()
-    ws = wb.active
+    try:
+        wb = _load_firmy_wb()
+        ws = wb.active
+    except Exception:
+        return []
     firms = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         if row[0] or row[1]:
