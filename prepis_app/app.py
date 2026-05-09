@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.0.17"
+__version__ = "1.0.19"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -200,6 +200,7 @@ CRITICAL RULES:
 - psc is always exactly 5 digits
 - rc_1 and rc_2 are null unless you see an explicit RČ with a "/" slash (not from ORV)
 - osvedceni_serie + osvedceni_cislo come from the large red number on ORV (e.g. "UBE 037263" → serie="UBE", cislo="037263")
+- osvedceni_serie is ALWAYS 3 LETTERS — NEVER digits. If a character looks like '0', it is the letter 'O' (zero never appears in serie). The 3rd character is especially commonly an 'O' that looks like '0' on print.
 - registracni_znacka is always 7-8 characters, letters and digits only
 - Return null for any field not found — never guess
 
@@ -243,6 +244,15 @@ def rotate_180(image_b64: str, mime_type: str) -> str:
     fmt = "JPEG" if "jpeg" in mime_type or "jpg" in mime_type else "PNG"
     img.save(buf, format=fmt)
     return base64.b64encode(buf.getvalue()).decode('utf-8')
+
+def _fix_orv_serie(data: dict) -> dict:
+    # OCR commonly misreads the letter 'O' as digit '0' in the 3rd char of
+    # osvedceni_serie. The serie is always 3 letters, so '0' there is wrong
+    # and breaks the dataovozidlech.cz API lookup.
+    serie = data.get("osvedceni_serie") or ""
+    if isinstance(serie, str) and len(serie) >= 3 and serie[2] == "0":
+        data["osvedceni_serie"] = serie[:2] + "O" + serie[3:]
+    return data
 
 def _has_data(result: dict) -> bool:
     if not result.get("success"):
@@ -371,13 +381,14 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
     c = canvas.Canvas(overlay_buf, pagesize=A4)
 
     # Group overlays by page
+    ID_FONT_SIZE = 11
     pages_needed = max(o[0] for o in overlays) + 1
     for page_idx in range(pages_needed):
         page_overlays = [o for o in overlays if o[0] == page_idx]
         if page_overlays:
-            c.setFont("Helvetica", 8)
+            c.setFont("Helvetica-Bold", ID_FONT_SIZE)
             for _, x, y, text in page_overlays:
-                tw = stringWidth(text, "Helvetica", 8)
+                tw = stringWidth(text, "Helvetica-Bold", ID_FONT_SIZE)
                 c.drawString(x - tw, y, text)  # right-align to x
         c.showPage()
     c.save()
@@ -912,7 +923,7 @@ def api_scan_all():
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"): text = text[4:]
-        return jsonify({"success": True, "data": json.loads(text.strip())})
+        return jsonify({"success": True, "data": _fix_orv_serie(json.loads(text.strip()))})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
@@ -953,7 +964,7 @@ def api_scan_orv():
             if text.startswith("```"):
                 text = text.split("```")[1]
                 if text.startswith("json"): text = text[4:]
-            data = json.loads(text.strip())
+            data = _fix_orv_serie(json.loads(text.strip()))
             if data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka") or (data.get("vlastnik") or {}).get("jmeno"):
                 return jsonify({"success": True, "data": data})
         except Exception as e:
