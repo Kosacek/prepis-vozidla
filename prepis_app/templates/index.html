@@ -673,6 +673,7 @@
       <div class="download-btns">
         <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
         <a id="btn-zapis" class="btn-download" target="_blank">📄 Žádost o zápis do registru</a>
+        <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
         <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
@@ -1266,9 +1267,10 @@ async function generatePDFs() {
     novy_prov_rc_2:   v('novy_prov_rc_2'),
     novy_prov_ico:    v('novy_prov_ico'),
     novy_prov_id:     v('novy_prov_id'),
-    vin:                 appMode === 'prevod' ? v('vin') : v('vin_z'),
-    registracni_znacka:  v('registracni_znacka'),
-    druh_vozidla:        appMode === 'prevod' ? v('druh_vozidla') : v('druh_vozidla_z'),
+    vin:                 appMode === 'prevod' ? v('vin') : (appMode === 'zapis' ? v('vin_z') : v('vin_zm')),
+    registracni_znacka:  appMode === 'prevod' ? v('registracni_znacka') : (appMode === 'zmena' ? v('registracni_znacka_zm') : ''),
+    druh_vozidla:        appMode === 'prevod' ? v('druh_vozidla') : (appMode === 'zapis' ? v('druh_vozidla_z') : v('druh_vozidla_zm')),
+    zadost_zmena:        appMode === 'zmena' ? v('zadost_zmena') : '',
     kategorie_vozidla:   v('kategorie_vozidla'),
     typ_vozidla:         v('typ_vozidla'),
     znacka:              v('znacka'),
@@ -1292,9 +1294,14 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, plne_moce: result.plne_moce || [] };
-      if (result.zmeny) { document.getElementById('btn-zmeny').href = result.zmeny; document.getElementById('btn-zmeny').style.display = ''; }
-      document.getElementById('btn-zapis').href = result.zapis;
+      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, plne_moce: result.plne_moce || [] };
+      for (const [key, btnId] of [['zmeny','btn-zmeny'], ['zapis','btn-zapis'], ['zmena','btn-zmena']]) {
+        const url = result[key];
+        const btn = document.getElementById(btnId);
+        if (!btn) continue;
+        if (url) { btn.href = url; btn.style.display = ''; }
+        else     { btn.style.display = 'none'; }
+      }
       // Show plné moci links
       const pmDiv = document.getElementById('plne-moce-links');
       if (generatedUrls.plne_moce.length) {
@@ -1324,8 +1331,7 @@ async function generatePDFs() {
 }
 
 function printAll() {
-  if (generatedUrls.zmeny) window.open(generatedUrls.zmeny, '_blank');
-  if (generatedUrls.zapis) window.open(generatedUrls.zapis, '_blank');
+  ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
