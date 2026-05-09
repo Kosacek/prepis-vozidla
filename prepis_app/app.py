@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.1.5"
+__version__ = "1.1.6"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -946,9 +946,9 @@ def api_generate():
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
         if _id_text(data.get("novy_id")):
-            zmena_overlays.append((0, 554, 628, _id_text(data["novy_id"])))
+            zmena_overlays.append((0, 554, 635, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
-            zmena_overlays.append((0, 554, 428, _id_text(data["novy_prov_id"])))
+            zmena_overlays.append((0, 554, 443, _id_text(data["novy_prov_id"])))
         if zmena_overlays:
             zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
         fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
