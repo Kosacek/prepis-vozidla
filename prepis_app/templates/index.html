@@ -283,6 +283,13 @@
             <div class="mode-desc">První registrace vozidla v ČR. Generuje pouze zapis.pdf.</div>
           </div>
         </div>
+        <div class="mode-card" data-mode="zmena" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
+          <div class="mode-icon">🔧</div>
+          <div>
+            <div class="mode-title">Změna technických údajů</div>
+            <div class="mode-desc">Změny v registru (zápis A50-X, ...). Generuje zmena_udaju.pdf.</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card" style="margin-top:12px;">
@@ -666,6 +673,7 @@ let generatedUrls = {};
 const FLOWS = {
   prevod: { panels: [1,4,2,3,5], labels: ['Typ','Vozidlo','Původní','Nový','Generovat'] },
   zapis:  { panels: [1,3,4,5],   labels: ['Typ','Nový','Vozidlo','Generovat'] },
+  zmena:  { panels: [1,3,4,5],   labels: ['Typ','Vlastník','Vozidlo','Generovat'] },
 };
 
 function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
