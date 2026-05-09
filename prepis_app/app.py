@@ -870,6 +870,9 @@ def api_generate():
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
     mode = data.get("mode", "prevod")
 
+    if mode not in {"prevod", "zapis", "zmena"}:
+        return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
+
     out_dir = os.path.join(DATA_DIR, "output")
     os.makedirs(out_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -910,6 +913,18 @@ def api_generate():
         with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
         result["zmeny"] = f"/download/zmeny_{ts}.pdf"
         result["zapis"] = f"/download/zapis_{ts}.pdf"
+    elif mode == "zmena":
+        zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
+        zmena_overlays = []
+        if _id_text(data.get("novy_id")):
+            zmena_overlays.append((0, 554, 700, _id_text(data["novy_id"])))
+        if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
+            zmena_overlays.append((0, 554, 555, _id_text(data["novy_prov_id"])))
+        if zmena_overlays:
+            zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
+        fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
+        with open(fname, "wb") as f: f.write(zmena_bytes)
+        result["zmena"] = f"/download/zmena_{ts}.pdf"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
