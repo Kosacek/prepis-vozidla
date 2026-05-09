@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -710,9 +710,21 @@ def build_zmena_fields(data: dict) -> dict:
         "fill_15":  "",
         "fill_16":  "",
 
-        # Místo + datum
+        # Místo + datum (page 1)
         "V":   misto,
         "dne": tomorrow,
+
+        # Page 2 — Záznam registračního místa: Osvědčení o registraci vozidla + číslo
+        # (Technický průkaz, Jiný doklad, správní poplatek — left blank, filled by úřad)
+        "fill_3_2": data.get("osvedceni_serie", ""),
+        "fill_4":   data.get("osvedceni_cislo", ""),
+
+        # Page 2 — Potvrzení o převzetí dokladů žadatelem (nabytí právní moci):
+        # repeat osvedceni info + place + date so it's prefilled when picking up docs
+        "fill_17":  data.get("osvedceni_serie", ""),
+        "fill_18":  data.get("osvedceni_cislo", ""),
+        "V_2":      misto,
+        "dne_2":    tomorrow,
     }
 
 # ── Routes ────────────────────────────────────────────────────────────────────
