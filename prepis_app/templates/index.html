@@ -300,7 +300,8 @@
       <div id="camera-container" style="display:none;margin-bottom:12px;">
         <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;transform:rotate(180deg);"></video>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="capturePhoto()" style="flex:1;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">📸 Vyfotit</button>
+          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="flex:2;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">📸 Skenovat ORV <span style="opacity:.7;font-weight:500;font-size:12px;">⌨ NumPad Enter</span></button>
+          <button onclick="capturePhoto()" title="Přidat fotku do dávky bez skenování" style="padding:10px 14px;background:#fff;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);">+ Foto do dávky</button>
           <button onclick="closeCamera()" style="padding:10px 14px;background:#f3f4f6;border:1.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">✕ Zavřít</button>
           <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;">🤖 Sonnet</button>
         </div>
@@ -785,7 +786,14 @@ function activatePanel(n) {
   if (n !== 1 && cameraStream) closeCamera();
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
-  if (n === 1) { const c = document.querySelector('.mode-card.selected') || document.querySelector('.mode-card'); if (c) setTimeout(() => c.focus(), 50); }
+  if (n === 1) {
+    // Try to auto-open camera as soon as Step 1 is active. Browsers may block
+    // without a user gesture; tryAutoOpenCamera handles that gracefully (silent
+    // catch + one-shot pointerdown listener attached on first failure).
+    tryAutoOpenCamera();
+    const c = document.querySelector('.mode-card.selected') || document.querySelector('.mode-card');
+    if (c) setTimeout(() => c.focus(), 50);
+  }
 
   // Show/hide vehicle sub-sections on the vehicle panel
   if (n === 4) {
@@ -1336,6 +1344,101 @@ function printAll() {
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 let cameraStream = null;
+let _scanInFlight = false;
+
+// Try to auto-open the camera silently. Browsers may block getUserMedia
+// without a user gesture even with cached permission — handled by attaching
+// a one-shot pointerdown listener that retries on the next user click.
+async function tryAutoOpenCamera() {
+  if (cameraStream) return;  // already open
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    // Permission granted and stream live — wire it up.
+    cameraStream = stream;
+    const video = document.getElementById('camera-video');
+    const container = document.getElementById('camera-container');
+    video.srcObject = stream;
+    try { await video.play(); } catch(_) { /* play may need user gesture later */ }
+    container.style.display = '';
+  } catch (e) {
+    // Browser blocked us — schedule a retry on next user click. Skip mode-card
+    // clicks because selectMode auto-advances away from Step 1 and would close
+    // the camera 150 ms later (visible on/off flash).
+    const handler = (ev) => {
+      if (ev.target.closest && ev.target.closest('.mode-card')) return;
+      document.body.removeEventListener('pointerdown', handler);
+      // Retry only if still on Step 1
+      if (currentPanel() === 1) tryAutoOpenCamera();
+    };
+    document.body.addEventListener('pointerdown', handler, { once: false });
+  }
+}
+
+// One-press capture + scan + advance. Bound to NumPad Enter and the
+// "Skenovat ORV" button. Single-shot only; in-flight guard ignores re-entry.
+async function quickScanOrv() {
+  if (_scanInFlight) return;
+  if (!cameraStream) {
+    alert('Kamera není zapnutá. Klikni na 📷 Kamera nebo dej povolení v prohlížeči.');
+    return;
+  }
+  _scanInFlight = true;
+  const btn = document.getElementById('quick-scan-btn');
+  const origBtnText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Skenuji…'; }
+  const resultEl = document.getElementById('scan-all-result');
+  if (resultEl) { resultEl.className = 'scan-result loading'; resultEl.textContent = 'Skenuji ORV…'; }
+
+  try {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, canvas.height);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(video, 0, 0);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+
+    const fd = new FormData();
+    fd.append('image', blob, 'capture.jpg');
+    fd.append('model', getModel());
+    const resp = await fetch('/api/scan-orv', { method: 'POST', body: fd });
+    const result = await resp.json();
+
+    if (!result.success || !result.data) {
+      if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + (result.error || 'sken selhal'); }
+      return;
+    }
+
+    const filled = await applyOrvData(result.data);
+    if (!filled.length) {
+      if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '⚠ Žádná data — zkus znovu'; }
+      return;
+    }
+
+    if (resultEl) { resultEl.className = 'scan-result ok'; resultEl.textContent = '✓ ' + filled.join(', '); }
+    closeCamera();
+    navNext();
+  } catch (e) {
+    if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + e.message; }
+  } finally {
+    _scanInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = origBtnText || '📸 Skenovat ORV'; }
+  }
+}
+
+// NumPad Enter shortcut on Step 1 with camera open.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'NumpadEnter') return;
+  if (currentPanel() !== 1) return;
+  if (!cameraStream) return;
+  if (_scanInFlight) return;
+  const tag = e.target && e.target.tagName;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+  e.preventDefault();
+  quickScanOrv();
+});
 
 async function openCamera() {
   const container = document.getElementById('camera-container');
@@ -1447,28 +1550,31 @@ function setVal(id, val) {
 
 async function applyOrvData(d) {
   let filled = [];
+  // For prevod mode, the ORV's owner is the SELLER → puvodni_*.
+  // For zmena/zapis modes, the form's primary party uses novy_*.
+  const ownerPrefix = (appMode === 'prevod') ? 'puvodni' : 'novy';
   const v = d.vlastnik || {};
-  if (setVal('puvodni_jmeno',  v.jmeno))  filled.push('jméno vlastníka');
-  if (setVal('puvodni_adresa', v.adresa)) filled.push('adresa');
-  setVal('puvodni_psc',   v.psc);
-  if (setVal('puvodni_rc_1', v.rc_1)) filled.push('RČ');
-  setVal('puvodni_rc_2', v.rc_2);
-  if (setVal('puvodni_ico', v.ico)) filled.push('IČO');
-  if (v.ico) { await matchFirmByIco('puvodni', v.ico); }
-  else if (v.jmeno) { const matched = await matchFirmByName('puvodni', v.jmeno); if (matched) filled.push('IČO ze saved firem'); }
+  if (setVal(`${ownerPrefix}_jmeno`,  v.jmeno))  filled.push('jméno vlastníka');
+  if (setVal(`${ownerPrefix}_adresa`, v.adresa)) filled.push('adresa');
+  setVal(`${ownerPrefix}_psc`,   v.psc);
+  if (setVal(`${ownerPrefix}_rc_1`, v.rc_1)) filled.push('RČ');
+  setVal(`${ownerPrefix}_rc_2`, v.rc_2);
+  if (setVal(`${ownerPrefix}_ico`, v.ico)) filled.push('IČO');
+  if (v.ico) { await matchFirmByIco(ownerPrefix, v.ico); }
+  else if (v.jmeno) { const matched = await matchFirmByName(ownerPrefix, v.jmeno); if (matched) filled.push('IČO ze saved firem'); }
 
   const p = d.provozovatel || {};
   if (p.same_as_vlastnik === false && p.jmeno) {
-    const cb = document.getElementById('puvodni_prov_jiny');
-    if (cb && !cb.checked) { cb.checked = true; toggleProvozovatel('puvodni'); }
-    if (setVal('puvodni_prov_jmeno',  p.jmeno))  filled.push('provozovatel');
-    setVal('puvodni_prov_adresa', p.adresa);
-    setVal('puvodni_prov_psc',    p.psc);
-    setVal('puvodni_prov_rc_1',   p.rc_1);
-    setVal('puvodni_prov_rc_2',   p.rc_2);
-    setVal('puvodni_prov_ico',    p.ico);
-    if (p.ico) { await matchFirmByIco('puvodni_prov', p.ico); }
-    else if (p.jmeno) { await matchFirmByName('puvodni_prov', p.jmeno); }
+    const cb = document.getElementById(`${ownerPrefix}_prov_jiny`);
+    if (cb && !cb.checked) { cb.checked = true; toggleProvozovatel(ownerPrefix); }
+    if (setVal(`${ownerPrefix}_prov_jmeno`,  p.jmeno))  filled.push('provozovatel');
+    setVal(`${ownerPrefix}_prov_adresa`, p.adresa);
+    setVal(`${ownerPrefix}_prov_psc`,    p.psc);
+    setVal(`${ownerPrefix}_prov_rc_1`,   p.rc_1);
+    setVal(`${ownerPrefix}_prov_rc_2`,   p.rc_2);
+    setVal(`${ownerPrefix}_prov_ico`,    p.ico);
+    if (p.ico) { await matchFirmByIco(`${ownerPrefix}_prov`, p.ico); }
+    else if (p.jmeno) { await matchFirmByName(`${ownerPrefix}_prov`, p.jmeno); }
   }
 
   if (d.vin) {
