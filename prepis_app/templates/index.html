@@ -619,6 +619,31 @@
           </div>
         </div>
       </div>
+
+      <!-- Zmena-only -->
+      <div id="vozidlo-zmena-fields" style="display:none;">
+        <div class="form-grid" style="margin-top:14px;">
+          <div class="field">
+            <label>Registrační značka</label>
+            <input type="text" id="registracni_znacka_zm" placeholder="1AB2345">
+          </div>
+          <div class="field">
+            <label>VIN</label>
+            <input type="text" id="vin_zm" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+          </div>
+          <div class="field">
+            <label>Druh vozidla</label>
+            <select id="druh_vozidla_zm">
+              <option value="osobni automobil" selected>Osobní automobil</option>
+              <option value="nakladni automobil">Nákladní automobil</option>
+              <option value="motocykl">Motocykl</option>
+              <option value="pripojne vozidlo">Přípojné vozidlo</option>
+              <option value="autobus">Autobus</option>
+              <option value="traktor">Traktor</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -766,6 +791,7 @@ function activatePanel(n) {
   if (n === 4) {
     document.getElementById('vozidlo-prevod-fields').style.display = appMode === 'prevod' ? '' : 'none';
     document.getElementById('vozidlo-zapis-fields').style.display  = appMode === 'zapis'  ? '' : 'none';
+    document.getElementById('vozidlo-zmena-fields').style.display  = appMode === 'zmena'  ? '' : 'none';
   }
 
   renderStepper();
