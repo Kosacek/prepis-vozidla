@@ -54,11 +54,36 @@ if getattr(sys, 'frozen', False):
 
 PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
+PDF_ZMENA = os.path.join(BASE_DIR, "pdfs", "zmena_udaju.pdf")
 FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
 PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
 SCANS_DIR = os.path.join(DATA_DIR, "scans")
 os.makedirs(PLNE_MOCE_DIR, exist_ok=True)
 os.makedirs(SCANS_DIR, exist_ok=True)
+
+# ── PDF template sanity check ───────────────────────────────────────────────
+import logging as _logging
+_log = _logging.getLogger("prepis")
+
+_EXPECTED_FIELDS = {
+    PDF_ZMENY: {"comb_1", "comb_2", "fill_2", "vlastníka", "provozovatele"},
+    PDF_ZAPIS: {"Text3", "comb_3", "comb_5", "comb_1_2", "Check Box18"},
+    PDF_ZMENA: {"comb_1", "comb_2", "Druh vozidla", "fill_2", "comb_3", "comb_4",
+                "fill_6", "fill_7", "comb_5", "comb_6", "fill_11", "fill_12", "V", "dne"},
+}
+
+def _validate_pdf_templates():
+    for path, expected in _EXPECTED_FIELDS.items():
+        try:
+            r = PdfReader(path)
+            got = set((r.get_fields() or {}).keys())
+            missing = expected - got
+            if missing:
+                _log.warning("PDF %s missing expected fields: %s", os.path.basename(path), sorted(missing))
+        except Exception as e:
+            _log.warning("Could not validate PDF %s: %s", os.path.basename(path), e)
+
+_validate_pdf_templates()
 
 # ── Excel helpers ─────────────────────────────────────────────────────────────
 FIRMY_BACKUP = FIRMY_XLSX + ".bak"
