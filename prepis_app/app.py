@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.0.19"
+__version__ = "1.1.0"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
