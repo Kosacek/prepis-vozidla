@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -353,8 +353,12 @@ def lookup_ico(ico: str) -> dict:
 
 # ── PDF filling helpers ───────────────────────────────────────────────────────
 def fill_pdf(template_path: str, field_map: dict) -> bytes:
-    from pypdf.generic import NameObject, BooleanObject, TextStringObject
+    from pypdf.generic import NameObject, BooleanObject, TextStringObject, NumberObject
     NO_UPPER = {'V', 'V_2', 'V_3', 'V_4', 'dne', 'dne_2', 'dne_3', 'dne_4'}
+    # AcroForm /Q values: 0=left, 1=center, 2=right. Center the Osvědčení o
+    # registraci vozidla (serie + číslo) on page 2/3 of zmena_udaju.pdf and
+    # zmeny.pdf so values land in the middle of the dotted underline.
+    CENTER_FIELDS = {'fill_3_2', 'fill_4', 'fill_4_2'}
     reader = PdfReader(template_path)
     writer = PdfWriter()
     writer.append(reader)
@@ -388,7 +392,10 @@ def fill_pdf(template_path: str, field_map: dict) -> bytes:
                 annot_obj.update({NameObject('/V'): v, NameObject('/AS'): v})
             else:
                 text = str(val) if str(field_name) in NO_UPPER else str(val).upper()
-                annot_obj.update({NameObject('/V'): TextStringObject(text)})
+                update = {NameObject('/V'): TextStringObject(text)}
+                if str(field_name) in CENTER_FIELDS:
+                    update[NameObject('/Q')] = NumberObject(1)
+                annot_obj.update(update)
     buf = io.BytesIO()
     writer.write(buf)
     return buf.getvalue()
@@ -663,6 +670,11 @@ def build_zmena_fields(data: dict) -> dict:
     if data.get("novy_rc_1") or data.get("novy_rc_2"):
         rc_combined = f"{data.get('novy_rc_1','')}/{data.get('novy_rc_2','')}"
 
+    # Provozovatel block: when checkbox 'Jiný provozovatel' is on use that data,
+    # otherwise mirror Vlastník data (same person filling the form). The form
+    # text says "Vyplnit jen, když je provozovatel odlišný od vlastníka", but
+    # users prefer the section visibly populated to avoid úřednice double-checks.
+    # ID overlay is suppressed for the mirrored case (only Vlastník gets the ID).
     if data.get("novy_prov_jiny"):
         prov_jmeno  = data.get("novy_prov_jmeno", "")
         prov_rc     = ""
@@ -672,7 +684,11 @@ def build_zmena_fields(data: dict) -> dict:
         prov_adresa = data.get("novy_prov_adresa", "")
         prov_psc    = data.get("novy_prov_psc", "")
     else:
-        prov_jmeno = prov_rc = prov_ico = prov_adresa = prov_psc = ""
+        prov_jmeno  = data.get("novy_jmeno", "")
+        prov_rc     = rc_combined
+        prov_ico    = data.get("novy_ico", "")
+        prov_adresa = data.get("novy_adresa", "")
+        prov_psc    = data.get("novy_psc", "")
 
     addr_key_v  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
     addr_key_v2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2"
@@ -930,9 +946,9 @@ def api_generate():
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
         if _id_text(data.get("novy_id")):
-            zmena_overlays.append((0, 554, 620, _id_text(data["novy_id"])))
+            zmena_overlays.append((0, 554, 640, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
-            zmena_overlays.append((0, 554, 420, _id_text(data["novy_prov_id"])))
+            zmena_overlays.append((0, 554, 440, _id_text(data["novy_prov_id"])))
         if zmena_overlays:
             zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
         fname = os.path.join(out_dir, f"zmena_{ts}.pdf")

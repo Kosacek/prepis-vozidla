@@ -34,8 +34,9 @@ def test_render_round_trip():
     assert "WBA3A5C51DF123456" in v("comb_2")
     assert "TESTOVACI VLASTNIK" in v("fill_2")
     assert "850101/1234" in v("comb_3")
-    assert v("fill_7") == ""    # provozovatel jméno blank
-    assert v("fill_11") == ""   # provozovatel PSČ blank
+    # Provozovatel mirrors vlastník when not jiný (per user feedback)
+    assert "TESTOVACI VLASTNIK" in v("fill_7")
+    assert v("fill_11") == "60200"
     assert "ZÁPIS A50-X" in v("fill_12")
     assert v("V") == "Brně"     # NOT uppercased
 
@@ -44,4 +45,4 @@ def test_render_round_trip():
     addr_v = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
     addr_p = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1_2"
     assert "TESTOVACI ADRESA 1" in v(addr_v)
-    assert v(addr_p) == ""      # provozovatel address blank when not jiný
+    assert "TESTOVACI ADRESA 1" in v(addr_p)  # mirrors vlastník when not jiný
