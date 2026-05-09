@@ -630,6 +630,66 @@ def build_zapis_fields(data: dict) -> dict:
     }
     return fields
 
+def build_zmena_fields(data: dict) -> dict:
+    tomorrow = _next_working_day()
+    misto = "Brně"
+
+    rc_combined = ""
+    if data.get("novy_rc_1") or data.get("novy_rc_2"):
+        rc_combined = f"{data.get('novy_rc_1','')}/{data.get('novy_rc_2','')}"
+
+    if data.get("novy_prov_jiny"):
+        prov_jmeno  = data.get("novy_prov_jmeno", "")
+        prov_rc     = ""
+        if data.get("novy_prov_rc_1") or data.get("novy_prov_rc_2"):
+            prov_rc = f"{data.get('novy_prov_rc_1','')}/{data.get('novy_prov_rc_2','')}"
+        prov_ico    = data.get("novy_prov_ico", "")
+        prov_adresa = data.get("novy_prov_adresa", "")
+        prov_psc    = data.get("novy_prov_psc", "")
+    else:
+        prov_jmeno = prov_rc = prov_ico = prov_adresa = prov_psc = ""
+
+    addr_key_v  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
+    addr_key_v2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2"
+    addr_key_p  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1_2"
+    addr_key_p2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2_2"
+
+    return {
+        # Vehicle
+        "comb_1":       data.get("registracni_znacka", ""),
+        "comb_2":       data.get("vin", ""),
+        "Druh vozidla": data.get("druh_vozidla", ""),
+
+        # Vlastník
+        "fill_2":   data.get("novy_jmeno", ""),
+        "fill_3":   "",
+        "comb_3":   rc_combined,
+        "comb_4":   data.get("novy_ico", ""),
+        addr_key_v:  data.get("novy_adresa", ""),
+        addr_key_v2: "",
+        "fill_6":   data.get("novy_psc", ""),
+
+        # Provozovatel (blank if not jiný)
+        "fill_7":   prov_jmeno,
+        "fill_8":   "",
+        "comb_5":   prov_rc,
+        "comb_6":   prov_ico,
+        addr_key_p:  prov_adresa,
+        addr_key_p2: "",
+        "fill_11":  prov_psc,
+
+        # Žádá o provedení změny — first line only
+        "fill_12":  data.get("zadost_zmena", ""),
+        "fill_13":  "",
+        "fill_14":  "",
+        "fill_15":  "",
+        "fill_16":  "",
+
+        # Místo + datum
+        "V":   misto,
+        "dne": tomorrow,
+    }
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
