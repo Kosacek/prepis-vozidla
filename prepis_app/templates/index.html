@@ -504,6 +504,19 @@
           </div>
         </div>
       </div>
+      <div id="zmena-changes-section" style="display:none;">
+        <hr class="divider">
+        <div class="section-label">Žádá o provedení změny</div>
+        <div class="form-grid">
+          <div class="field full">
+            <input type="text" id="zadost_zmena" maxlength="80" placeholder="napr. zápis A50-X" style="font-size:14px;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button type="button" onclick="document.getElementById('zadost_zmena').value='zápis A50-X'" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">zápis A50-X</button>
+          <button type="button" onclick="document.getElementById('zadost_zmena').value='zápis'" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">zápis</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -747,6 +760,8 @@ function selectMode(el) {
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   appMode = el.dataset.mode;
+  const zs = document.getElementById('zmena-changes-section');
+  if (zs) zs.style.display = appMode === 'zmena' ? '' : 'none';
   renderStepper();
   setTimeout(() => navNext(), 150);
 }
