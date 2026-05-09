@@ -1200,17 +1200,17 @@ function buildSummary() {
     }
   }
 
-  html += `<div class="summary-section">Nový vlastník</div>`;
+  html += `<div class="summary-section">${appMode === 'zmena' ? 'Vlastník' : 'Nový vlastník'}</div>`;
   html += row('Jméno', v('novy_jmeno'));
   html += row('Adresa', v('novy_adresa') + (v('novy_psc') ? ', '+v('novy_psc') : ''));
   if (cb('novy_prov_jiny')) {
-    html += `<div class="summary-section">Nový provozovatel</div>`;
+    html += `<div class="summary-section">${appMode === 'zmena' ? 'Provozovatel' : 'Nový provozovatel'}</div>`;
     html += row('Jméno', v('novy_prov_jmeno'));
     html += row('Adresa', v('novy_prov_adresa'));
   }
 
   html += `<div class="summary-section">Vozidlo</div>`;
-  html += row('VIN', appMode === 'prevod' ? v('vin') : v('vin_z'));
+  html += row('VIN', appMode === 'prevod' ? v('vin') : (appMode === 'zmena' ? v('vin_zm') : v('vin_z')));
   if (appMode === 'prevod') {
     html += row('RZ', v('registracni_znacka'));
     const druhSel = document.getElementById('druh_vozidla');
@@ -1218,6 +1218,11 @@ function buildSummary() {
     const zmena = document.querySelector('input[name="zmena_typ"]:checked');
     const zmenaLabel = { vlastnika: 'změna vlastníka', provozovatele: 'změna provozovatele', oboji: 'změna vlastníka i provozovatele' };
     html += row('Typ změny', zmena ? (zmenaLabel[zmena.value] || zmena.value) : '');
+  } else if (appMode === 'zmena') {
+    html += row('RZ', v('registracni_znacka_zm'));
+    const druhSelZm = document.getElementById('druh_vozidla_zm');
+    html += row('Druh', druhSelZm ? druhSelZm.options[druhSelZm.selectedIndex].text : '');
+    html += row('Žádá o změnu', v('zadost_zmena'));
   } else {
     const druhSelZ = document.getElementById('druh_vozidla_z');
     html += row('Druh', druhSelZ ? druhSelZ.options[druhSelZ.selectedIndex].text : '');
