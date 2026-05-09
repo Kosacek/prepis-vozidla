@@ -21,7 +21,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.0.19"
+__version__ = "1.1.0"
 
 # Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
@@ -54,11 +54,36 @@ if getattr(sys, 'frozen', False):
 
 PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
+PDF_ZMENA = os.path.join(BASE_DIR, "pdfs", "zmena_udaju.pdf")
 FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
 PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
 SCANS_DIR = os.path.join(DATA_DIR, "scans")
 os.makedirs(PLNE_MOCE_DIR, exist_ok=True)
 os.makedirs(SCANS_DIR, exist_ok=True)
+
+# ── PDF template sanity check ───────────────────────────────────────────────
+import logging as _logging
+_log = _logging.getLogger("prepis")
+
+_EXPECTED_FIELDS = {
+    PDF_ZMENY: {"comb_1", "comb_2", "fill_2", "vlastníka", "provozovatele"},
+    PDF_ZAPIS: {"Text3", "comb_3", "comb_5", "comb_1_2", "Check Box18"},
+    PDF_ZMENA: {"comb_1", "comb_2", "Druh vozidla", "fill_2", "comb_3", "comb_4",
+                "fill_6", "fill_7", "comb_5", "comb_6", "fill_11", "fill_12", "V", "dne"},
+}
+
+def _validate_pdf_templates():
+    for path, expected in _EXPECTED_FIELDS.items():
+        try:
+            r = PdfReader(path)
+            got = set((r.get_fields() or {}).keys())
+            missing = expected - got
+            if missing:
+                _log.warning("PDF %s missing expected fields: %s", os.path.basename(path), sorted(missing))
+        except Exception as e:
+            _log.warning("Could not validate PDF %s: %s", os.path.basename(path), e)
+
+_validate_pdf_templates()
 
 # ── Excel helpers ─────────────────────────────────────────────────────────────
 FIRMY_BACKUP = FIRMY_XLSX + ".bak"
@@ -630,6 +655,66 @@ def build_zapis_fields(data: dict) -> dict:
     }
     return fields
 
+def build_zmena_fields(data: dict) -> dict:
+    tomorrow = _next_working_day()
+    misto = "Brně"
+
+    rc_combined = ""
+    if data.get("novy_rc_1") or data.get("novy_rc_2"):
+        rc_combined = f"{data.get('novy_rc_1','')}/{data.get('novy_rc_2','')}"
+
+    if data.get("novy_prov_jiny"):
+        prov_jmeno  = data.get("novy_prov_jmeno", "")
+        prov_rc     = ""
+        if data.get("novy_prov_rc_1") or data.get("novy_prov_rc_2"):
+            prov_rc = f"{data.get('novy_prov_rc_1','')}/{data.get('novy_prov_rc_2','')}"
+        prov_ico    = data.get("novy_prov_ico", "")
+        prov_adresa = data.get("novy_prov_adresa", "")
+        prov_psc    = data.get("novy_prov_psc", "")
+    else:
+        prov_jmeno = prov_rc = prov_ico = prov_adresa = prov_psc = ""
+
+    addr_key_v  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
+    addr_key_v2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2"
+    addr_key_p  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1_2"
+    addr_key_p2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2_2"
+
+    return {
+        # Vehicle
+        "comb_1":       data.get("registracni_znacka", ""),
+        "comb_2":       data.get("vin", ""),
+        "Druh vozidla": data.get("druh_vozidla", ""),
+
+        # Vlastník
+        "fill_2":   data.get("novy_jmeno", ""),
+        "fill_3":   "",
+        "comb_3":   rc_combined,
+        "comb_4":   data.get("novy_ico", ""),
+        addr_key_v:  data.get("novy_adresa", ""),
+        addr_key_v2: "",
+        "fill_6":   data.get("novy_psc", ""),
+
+        # Provozovatel (blank if not jiný)
+        "fill_7":   prov_jmeno,
+        "fill_8":   "",
+        "comb_5":   prov_rc,
+        "comb_6":   prov_ico,
+        addr_key_p:  prov_adresa,
+        addr_key_p2: "",
+        "fill_11":  prov_psc,
+
+        # Žádá o provedení změny — first line only
+        "fill_12":  data.get("zadost_zmena", ""),
+        "fill_13":  "",
+        "fill_14":  "",
+        "fill_15":  "",
+        "fill_16":  "",
+
+        # Místo + datum
+        "V":   misto,
+        "dne": tomorrow,
+    }
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -785,6 +870,9 @@ def api_generate():
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
     mode = data.get("mode", "prevod")
 
+    if mode not in {"prevod", "zapis", "zmena"}:
+        return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
+
     out_dir = os.path.join(DATA_DIR, "output")
     os.makedirs(out_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -825,6 +913,18 @@ def api_generate():
         with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
         result["zmeny"] = f"/download/zmeny_{ts}.pdf"
         result["zapis"] = f"/download/zapis_{ts}.pdf"
+    elif mode == "zmena":
+        zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
+        zmena_overlays = []
+        if _id_text(data.get("novy_id")):
+            zmena_overlays.append((0, 554, 620, _id_text(data["novy_id"])))
+        if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
+            zmena_overlays.append((0, 554, 420, _id_text(data["novy_prov_id"])))
+        if zmena_overlays:
+            zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
+        fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
+        with open(fname, "wb") as f: f.write(zmena_bytes)
+        result["zmena"] = f"/download/zmena_{ts}.pdf"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)

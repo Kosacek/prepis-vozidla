@@ -283,6 +283,13 @@
             <div class="mode-desc">První registrace vozidla v ČR. Generuje pouze zapis.pdf.</div>
           </div>
         </div>
+        <div class="mode-card" data-mode="zmena" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
+          <div class="mode-icon">🔧</div>
+          <div>
+            <div class="mode-title">Změna technických údajů</div>
+            <div class="mode-desc">Změny v registru (zápis A50-X, ...). Generuje zmena_udaju.pdf.</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card" style="margin-top:12px;">
@@ -503,10 +510,10 @@
   <!-- ── Step 4: Vozidlo ── -->
   <div class="step-panel" id="panel-4">
     <div class="card">
-      <div class="card-title">Udaje o vozidle</div>
+      <div class="card-title">Údaje o vozidle</div>
       <hr class="divider">
 
-      <!-- Převod-only -->
+      <!-- Shared by Převod + Změna technických údajů -->
       <div id="vozidlo-prevod-fields">
         <div class="form-grid">
           <div class="field">
@@ -537,26 +544,49 @@
             </select>
           </div>
         </div>
-        <hr class="divider">
-        <div class="section-label">Osvědčení o registraci vozidla</div>
-        <div class="form-grid">
-          <div class="field full">
-            <label>Jiný doklad k silničnímu vozidlu</label>
-            <input type="text" id="jiny_doklad" placeholder="napr. ZAPIS A50-X">
+
+        <!-- Prevod: Jiný doklad to silničnímu vozidlu -->
+        <div id="prevod-jiny-doklad-section">
+          <hr class="divider">
+          <div class="section-label">Osvědčení o registraci vozidla</div>
+          <div class="form-grid">
+            <div class="field full">
+              <label>Jiný doklad k silničnímu vozidlu</label>
+              <input type="text" id="jiny_doklad" placeholder="napr. ZAPIS A50-X">
+            </div>
           </div>
         </div>
-        <hr class="divider">
-        <div class="section-label">Typ žádosti o změnu</div>
-        <div style="display:flex;gap:18px;flex-wrap:wrap;" id="zmena-typ-radios">
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
-            <input type="radio" name="zmena_typ" value="vlastnika"> změna vlastníka
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
-            <input type="radio" name="zmena_typ" value="provozovatele"> změna provozovatele
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
-            <input type="radio" name="zmena_typ" value="oboji" checked> změna vlastníka i provozovatele
-          </label>
+
+        <!-- Zmena: Žádá o provedení změny -->
+        <div id="zmena-zadost-section" style="display:none;">
+          <hr class="divider">
+          <div class="section-label">Žádá o provedení změny</div>
+          <div class="form-grid">
+            <div class="field full">
+              <input type="text" id="zadost_zmena" maxlength="80" placeholder="napr. zápis A50-X" style="font-size:14px;">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button type="button" onclick="document.getElementById('zadost_zmena').value='zápis A50-X'" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">zápis A50-X</button>
+            <button type="button" onclick="document.getElementById('zadost_zmena').value='zápis kol'" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">zápis kol</button>
+          </div>
+        </div>
+
+        <!-- Prevod-only: Typ žádosti o změnu radios -->
+        <div id="prevod-zmena-typ-section">
+          <hr class="divider">
+          <div class="section-label">Typ žádosti o změnu</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;" id="zmena-typ-radios">
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+              <input type="radio" name="zmena_typ" value="vlastnika"> změna vlastníka
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+              <input type="radio" name="zmena_typ" value="provozovatele"> změna provozovatele
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;">
+              <input type="radio" name="zmena_typ" value="oboji" checked> změna vlastníka i provozovatele
+            </label>
+          </div>
         </div>
       </div>
 
@@ -612,6 +642,7 @@
           </div>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -627,7 +658,8 @@
       <p>Žádosti jsou připraveny k tisku nebo stažení.</p>
       <div class="download-btns">
         <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
-        <a id="btn-zapis" class="btn-download" target="_blank">📄 Žádost o zápis do registru</a>
+        <a id="btn-zapis" class="btn-download" target="_blank" style="display:none;">📄 Žádost o zápis do registru</a>
+        <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
         <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
@@ -666,6 +698,7 @@ let generatedUrls = {};
 const FLOWS = {
   prevod: { panels: [1,4,2,3,5], labels: ['Typ','Vozidlo','Původní','Nový','Generovat'] },
   zapis:  { panels: [1,3,4,5],   labels: ['Typ','Nový','Vozidlo','Generovat'] },
+  zmena:  { panels: [1,4,3,5],   labels: ['Typ','Vozidlo','Vlastník','Generovat'] },
 };
 
 function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
@@ -756,8 +789,15 @@ function activatePanel(n) {
 
   // Show/hide vehicle sub-sections on the vehicle panel
   if (n === 4) {
-    document.getElementById('vozidlo-prevod-fields').style.display = appMode === 'prevod' ? '' : 'none';
-    document.getElementById('vozidlo-zapis-fields').style.display  = appMode === 'zapis'  ? '' : 'none';
+    // prevod and zmena share the same vehicle fields panel; subsections inside toggle by mode.
+    document.getElementById('vozidlo-prevod-fields').style.display = (appMode === 'prevod' || appMode === 'zmena') ? '' : 'none';
+    document.getElementById('vozidlo-zapis-fields').style.display  = appMode === 'zapis' ? '' : 'none';
+    const pjd = document.getElementById('prevod-jiny-doklad-section');
+    const pzt = document.getElementById('prevod-zmena-typ-section');
+    const zzs = document.getElementById('zmena-zadost-section');
+    if (pjd) pjd.style.display = appMode === 'prevod' ? '' : 'none';
+    if (pzt) pzt.style.display = appMode === 'prevod' ? '' : 'none';
+    if (zzs) zzs.style.display = appMode === 'zmena'  ? '' : 'none';
   }
 
   renderStepper();
@@ -783,6 +823,10 @@ const REQUIRED = {
   zapis: {
     3: ['novy_jmeno'],
     4: ['vin_z'],
+  },
+  zmena: {
+    3: ['novy_jmeno'],
+    4: ['vin', 'registracni_znacka'],
   },
 };
 
@@ -1150,17 +1194,17 @@ function buildSummary() {
     }
   }
 
-  html += `<div class="summary-section">Nový vlastník</div>`;
+  html += `<div class="summary-section">${appMode === 'zmena' ? 'Vlastník' : 'Nový vlastník'}</div>`;
   html += row('Jméno', v('novy_jmeno'));
   html += row('Adresa', v('novy_adresa') + (v('novy_psc') ? ', '+v('novy_psc') : ''));
   if (cb('novy_prov_jiny')) {
-    html += `<div class="summary-section">Nový provozovatel</div>`;
+    html += `<div class="summary-section">${appMode === 'zmena' ? 'Provozovatel' : 'Nový provozovatel'}</div>`;
     html += row('Jméno', v('novy_prov_jmeno'));
     html += row('Adresa', v('novy_prov_adresa'));
   }
 
   html += `<div class="summary-section">Vozidlo</div>`;
-  html += row('VIN', appMode === 'prevod' ? v('vin') : v('vin_z'));
+  html += row('VIN', (appMode === 'prevod' || appMode === 'zmena') ? v('vin') : v('vin_z'));
   if (appMode === 'prevod') {
     html += row('RZ', v('registracni_znacka'));
     const druhSel = document.getElementById('druh_vozidla');
@@ -1168,6 +1212,11 @@ function buildSummary() {
     const zmena = document.querySelector('input[name="zmena_typ"]:checked');
     const zmenaLabel = { vlastnika: 'změna vlastníka', provozovatele: 'změna provozovatele', oboji: 'změna vlastníka i provozovatele' };
     html += row('Typ změny', zmena ? (zmenaLabel[zmena.value] || zmena.value) : '');
+  } else if (appMode === 'zmena') {
+    html += row('RZ', v('registracni_znacka'));
+    const druhSel = document.getElementById('druh_vozidla');
+    html += row('Druh', druhSel ? druhSel.options[druhSel.selectedIndex].text : '');
+    html += row('Žádá o změnu', v('zadost_zmena'));
   } else {
     const druhSelZ = document.getElementById('druh_vozidla_z');
     html += row('Druh', druhSelZ ? druhSelZ.options[druhSelZ.selectedIndex].text : '');
@@ -1217,9 +1266,10 @@ async function generatePDFs() {
     novy_prov_rc_2:   v('novy_prov_rc_2'),
     novy_prov_ico:    v('novy_prov_ico'),
     novy_prov_id:     v('novy_prov_id'),
-    vin:                 appMode === 'prevod' ? v('vin') : v('vin_z'),
-    registracni_znacka:  v('registracni_znacka'),
-    druh_vozidla:        appMode === 'prevod' ? v('druh_vozidla') : v('druh_vozidla_z'),
+    vin:                 (appMode === 'prevod' || appMode === 'zmena') ? v('vin') : v('vin_z'),
+    registracni_znacka:  (appMode === 'prevod' || appMode === 'zmena') ? v('registracni_znacka') : '',
+    druh_vozidla:        (appMode === 'prevod' || appMode === 'zmena') ? v('druh_vozidla') : v('druh_vozidla_z'),
+    zadost_zmena:        appMode === 'zmena' ? v('zadost_zmena') : '',
     kategorie_vozidla:   v('kategorie_vozidla'),
     typ_vozidla:         v('typ_vozidla'),
     znacka:              v('znacka'),
@@ -1243,9 +1293,14 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, plne_moce: result.plne_moce || [] };
-      if (result.zmeny) { document.getElementById('btn-zmeny').href = result.zmeny; document.getElementById('btn-zmeny').style.display = ''; }
-      document.getElementById('btn-zapis').href = result.zapis;
+      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, plne_moce: result.plne_moce || [] };
+      for (const [key, btnId] of [['zmeny','btn-zmeny'], ['zapis','btn-zapis'], ['zmena','btn-zmena']]) {
+        const url = result[key];
+        const btn = document.getElementById(btnId);
+        if (!btn) continue;
+        if (url) { btn.href = url; btn.style.display = ''; }
+        else     { btn.style.display = 'none'; }
+      }
       // Show plné moci links
       const pmDiv = document.getElementById('plne-moce-links');
       if (generatedUrls.plne_moce.length) {
@@ -1275,8 +1330,7 @@ async function generatePDFs() {
 }
 
 function printAll() {
-  if (generatedUrls.zmeny) window.open(generatedUrls.zmeny, '_blank');
-  if (generatedUrls.zapis) window.open(generatedUrls.zapis, '_blank');
+  ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
