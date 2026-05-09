@@ -46,3 +46,40 @@ def test_vlastnik_only_no_jiny_provozovatel():
     # Místo + datum
     assert f["V"] == "Brně"
     assert f["dne"]
+
+
+def test_jiny_provozovatel():
+    data = {
+        "novy_jmeno": "VLASTNIK",
+        "novy_rc_1": "850101",
+        "novy_rc_2": "1234",
+        "novy_adresa": "ADRESA 1",
+        "novy_psc": "60200",
+        "novy_prov_jiny": True,
+        "novy_prov_jmeno": "PROVOZOVATEL",
+        "novy_prov_rc_1": "900101",
+        "novy_prov_rc_2": "5678",
+        "novy_prov_ico": "12345678",
+        "novy_prov_adresa": "JINA 5",
+        "novy_prov_psc": "11000",
+    }
+    f = build_zmena_fields(data)
+    assert f["fill_7"] == "PROVOZOVATEL"
+    assert f["comb_5"] == "900101/5678"
+    assert f["comb_6"] == "12345678"
+    assert f["fill_11"] == "11000"
+
+
+def test_pravnicka_osoba_uses_ico_only():
+    data = {
+        "novy_jmeno": "FIRMA s.r.o.",
+        "novy_rc_1": "",
+        "novy_rc_2": "",
+        "novy_ico": "12345678",
+        "novy_adresa": "SIDLO 10",
+        "novy_psc": "60200",
+        "novy_prov_jiny": False,
+    }
+    f = build_zmena_fields(data)
+    assert f["comb_3"] == ""  # no RČ
+    assert f["comb_4"] == "12345678"
