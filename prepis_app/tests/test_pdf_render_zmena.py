@@ -38,3 +38,10 @@ def test_render_round_trip():
     assert v("fill_11") == ""   # provozovatel PSČ blank
     assert "ZÁPIS A50-X" in v("fill_12")
     assert v("V") == "Brně"     # NOT uppercased
+
+    # Long-named address keys — these have a non-obvious double-space in the
+    # PDF field name, so a typo would silently produce a blank address.
+    addr_v = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
+    addr_p = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1_2"
+    assert "TESTOVACI ADRESA 1" in v(addr_v)
+    assert v(addr_p) == ""      # provozovatel address blank when not jiný

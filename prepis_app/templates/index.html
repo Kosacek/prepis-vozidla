@@ -672,7 +672,7 @@
       <p>Žádosti jsou připraveny k tisku nebo stažení.</p>
       <div class="download-btns">
         <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
-        <a id="btn-zapis" class="btn-download" target="_blank">📄 Žádost o zápis do registru</a>
+        <a id="btn-zapis" class="btn-download" target="_blank" style="display:none;">📄 Žádost o zápis do registru</a>
         <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
         <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
@@ -833,6 +833,10 @@ const REQUIRED = {
   zapis: {
     3: ['novy_jmeno'],
     4: ['vin_z'],
+  },
+  zmena: {
+    3: ['novy_jmeno'],
+    4: ['vin_zm', 'registracni_znacka_zm'],
   },
 };
 
