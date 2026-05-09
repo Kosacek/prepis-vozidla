@@ -917,9 +917,9 @@ def api_generate():
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
         if _id_text(data.get("novy_id")):
-            zmena_overlays.append((0, 554, 700, _id_text(data["novy_id"])))
+            zmena_overlays.append((0, 554, 620, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
-            zmena_overlays.append((0, 554, 555, _id_text(data["novy_prov_id"])))
+            zmena_overlays.append((0, 554, 420, _id_text(data["novy_prov_id"])))
         if zmena_overlays:
             zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
         fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
