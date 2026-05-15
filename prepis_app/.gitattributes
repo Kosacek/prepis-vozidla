@@ -1,0 +1,9 @@
+# Shell scripts and Docker files MUST keep LF endings — a CRLF entrypoint.sh
+# fails in the Linux container with "bad interpreter: /usr/bin/env bash^M".
+*.sh            text eol=lf
+docker/*        text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+docker-compose*.yml text eol=lf
+requirements*.txt text eol=lf
+VERSION         text eol=lf
