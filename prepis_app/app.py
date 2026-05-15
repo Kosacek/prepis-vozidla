@@ -15,7 +15,14 @@ import openpyxl
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
-app.secret_key = "prepis-vozidla-secret-2024"
+# Session signing key. Falls back to the historical constant for local
+# desktop use; the web container overrides it via the SECRET_KEY env var.
+app.secret_key = os.environ.get("SECRET_KEY", "prepis-vozidla-secret-2024")
+
+# Behind Cloudflare → nginx the app must trust X-Forwarded-* so it sees
+# scheme=https and stamps Secure cookies. No-op for local desktop (no proxy).
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 import sys
 import shutil
@@ -23,9 +30,15 @@ BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os
 
 __version__ = "1.1.7"
 
-# Writable data dir — NAS when reachable, else %APPDATA%/PrepisVozidla when frozen, else next to app.py
+# Writable data dir. Precedence:
+#   1. DATA_DIR env var (web container sets it to /data — the bind mount)
+#   2. NAS UNC path when reachable (local desktop on the office LAN)
+#   3. %APPDATA%/PrepisVozidla when frozen
+#   4. next to app.py (dev)
 NAS_DATA_DIR = r"\\192.168.1.18\Petr\PrepisVozidla\data"
-if os.path.isdir(NAS_DATA_DIR):
+if os.environ.get("DATA_DIR"):
+    DATA_DIR = os.environ["DATA_DIR"]
+elif os.path.isdir(NAS_DATA_DIR):
     DATA_DIR = NAS_DATA_DIR
 elif getattr(sys, 'frozen', False):
     DATA_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "PrepisVozidla")
@@ -744,6 +757,60 @@ def build_zmena_fields(data: dict) -> dict:
         "dne_2":    tomorrow,
     }
 
+# ── Auth (conditional login gate) ─────────────────────────────────────────────
+# Enforced ONLY when ADMIN_PASSWORD is set in the environment. Local desktop
+# builds have no such env var → no login, unchanged UX. The web container
+# sets ADMIN_PASSWORD so the public site at zadosti.spznaklic.cz is gated.
+from flask import session, redirect, request as _rq, Response
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+_AUTH_EXEMPT = {"/healthz", "/login", "/static"}
+
+_LOGIN_HTML = """<!doctype html><html lang="cs"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Přihlášení — Přepisy</title>
+<style>body{font-family:system-ui,sans-serif;background:#f3f4f6;display:flex;
+min-height:100vh;align-items:center;justify-content:center;margin:0}
+form{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 20px
+rgba(0,0,0,.08);width:300px}h1{font-size:18px;margin:0 0 16px}
+input{width:100%;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;
+font-size:14px;box-sizing:border-box}button{width:100%;margin-top:12px;
+padding:10px;background:#1a56db;color:#fff;border:0;border-radius:8px;
+font-size:14px;font-weight:700;cursor:pointer}.err{color:#dc2626;
+font-size:13px;margin-top:10px}</style></head><body>
+<form method="post"><h1>Přepisy vozidel</h1>
+<input type="password" name="password" placeholder="Heslo" autofocus>
+<button type="submit">Přihlásit</button>__ERR__</form></body></html>"""
+
+
+@app.route("/healthz")
+def healthz():
+    return Response("ok", mimetype="text/plain")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not ADMIN_PASSWORD:
+        return redirect("/")
+    if _rq.method == "POST":
+        if _rq.form.get("password", "") == ADMIN_PASSWORD:
+            session["authed"] = True
+            return redirect("/")
+        return _LOGIN_HTML.replace("__ERR__", '<div class="err">Špatné heslo</div>'), 401
+    return _LOGIN_HTML.replace("__ERR__", "")
+
+
+@app.before_request
+def _require_login():
+    if not ADMIN_PASSWORD:
+        return  # gate disabled (local desktop)
+    path = _rq.path
+    if path == "/login" or path == "/healthz" or path.startswith("/static"):
+        return
+    if not session.get("authed"):
+        return redirect("/login")
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -854,7 +921,12 @@ _DRUH_MAP = {
 }
 
 def lookup_orv(serie: str, cislo: str) -> dict:
-    api_key = "AqyAq8Z46PtuzEEX6yBevKDItydri1F1"
+    # Was hardcoded; moved to env. Local desktop loads it from the bundled
+    # .env (loaded at top via load_dotenv); the web container injects it
+    # from the NAS .env.
+    api_key = os.environ.get("DATAOVOZIDLECH_API_KEY", "")
+    if not api_key:
+        return {"success": False, "error": "Chybí DATAOVOZIDLECH_API_KEY"}
     orv = (serie.strip() + cislo.strip()).upper()
     try:
         r = requests.get(

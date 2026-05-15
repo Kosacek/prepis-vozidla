@@ -1,0 +1,51 @@
+# Production docker-compose for the NAS. Joins the existing
+# spznaklic-web_default network so the shared nginx reverse-proxy reaches
+# `zadosti-app:8089` via container DNS. No external port is published — all
+# ingress is Cloudflare Tunnel → nginx → this container.
+#
+# Usage on the NAS:
+#   cd /share/Container/zadosti
+#   docker compose -f docker-compose.nas.yml build --no-cache --pull
+#   docker compose -f docker-compose.nas.yml up -d
+
+services:
+  zadosti:
+    # Build on the NAS itself (same pattern as hunter/tr212). Source tree
+    # lives at /share/Container/zadosti/source.
+    build:
+      context: /share/Container/zadosti/source
+      dockerfile: Dockerfile
+    image: zadosti:latest
+    container_name: zadosti-app
+    # No ports: published — nginx talks to us over the docker network.
+    networks:
+      - spznaklic-web_default
+    # Container Station rewrites named volumes to binds anyway; declare the
+    # bind explicitly. firmy.xlsx, plne_moce/, scans/, output/ persist here.
+    volumes:
+      - /share/Container/zadosti/data:/data
+    environment:
+      # All secrets come from /share/Container/zadosti/.env (un-committed).
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set in .env}"
+      SECRET_KEY: "${SECRET_KEY:?SECRET_KEY must be set in .env}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set in .env}"
+      DATAOVOZIDLECH_API_KEY: "${DATAOVOZIDLECH_API_KEY:?DATAOVOZIDLECH_API_KEY must be set in .env}"
+      DATA_DIR: "/data"
+      HTTP_PORT: "8089"
+      TZ: "Europe/Prague"
+    # Run as root so the entrypoint can chmod the SMB-owned /data bind mount.
+    user: "0:0"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8089/healthz')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  spznaklic-web_default:
+    external: true
