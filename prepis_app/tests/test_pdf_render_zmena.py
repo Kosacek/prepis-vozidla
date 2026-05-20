@@ -34,15 +34,17 @@ def test_render_round_trip():
     assert "WBA3A5C51DF123456" in v("comb_2")
     assert "TESTOVACI VLASTNIK" in v("fill_2")
     assert "850101/1234" in v("comb_3")
-    # Provozovatel mirrors vlastník when not jiný (per user feedback)
-    assert "TESTOVACI VLASTNIK" in v("fill_7")
-    assert v("fill_11") == "60200"
+    # Provozovatel — blank when same as vlastník (form text says
+    # "Vyplnit jen, když je provozovatel odlišný"). Reverted from mirroring.
+    assert v("fill_7") == ""
+    assert v("fill_11") == ""
     assert "ZÁPIS A50-X" in v("fill_12")
-    assert v("V") == "Brně"     # NOT uppercased
+    assert v("V") == "Brně"  # místo on page 1 stays filled
+    assert v("dne_2") == ""  # last-page date intentionally blank
 
     # Long-named address keys — these have a non-obvious double-space in the
     # PDF field name, so a typo would silently produce a blank address.
     addr_v = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
     addr_p = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1_2"
     assert "TESTOVACI ADRESA 1" in v(addr_v)
-    assert "TESTOVACI ADRESA 1" in v(addr_p)  # mirrors vlastník when not jiný
+    assert v(addr_p) == ""  # provozovatel address blank when not jiný

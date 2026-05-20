@@ -28,7 +28,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.1.7"
+__version__ = "1.1.8"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -472,6 +472,10 @@ def build_zmeny_fields(data: dict) -> dict:
     misto = "Brně"
 
     # Dosavadní provozovatel — use jiný prov if checked, otherwise same as původní vlastník
+    # Per user: when provozovatel is the same as vlastník (checkbox off),
+    # leave the provozovatel section BLANK in the PDF (matches the form text
+    # "vyplnit jen, když je provozovatel odlišný"). Used to mirror the owner
+    # data; reverted per user request.
     if data.get("puvodni_prov_jiny"):
         dos_prov_jmeno  = data.get("puvodni_prov_jmeno", "")
         dos_prov_rc_1   = data.get("puvodni_prov_rc_1", "")
@@ -480,14 +484,9 @@ def build_zmeny_fields(data: dict) -> dict:
         dos_prov_adresa = data.get("puvodni_prov_adresa", "")
         dos_prov_psc    = data.get("puvodni_prov_psc", "")
     else:
-        dos_prov_jmeno  = data.get("puvodni_jmeno", "")
-        dos_prov_rc_1   = data.get("puvodni_rc_1", "")
-        dos_prov_rc_2   = data.get("puvodni_rc_2", "")
-        dos_prov_ico    = data.get("puvodni_ico", "")
-        dos_prov_adresa = data.get("puvodni_adresa", "")
-        dos_prov_psc    = data.get("puvodni_psc", "")
+        dos_prov_jmeno = dos_prov_rc_1 = dos_prov_rc_2 = dos_prov_ico = dos_prov_adresa = dos_prov_psc = ""
 
-    # Nový provozovatel — use jiný prov if checked, otherwise same as nový vlastník
+    # Nový provozovatel — same rule: blank when not jiný.
     if data.get("novy_prov_jiny"):
         novy_prov_jmeno  = data.get("novy_prov_jmeno", "")
         novy_prov_rc_1   = data.get("novy_prov_rc_1", "")
@@ -496,12 +495,7 @@ def build_zmeny_fields(data: dict) -> dict:
         novy_prov_adresa = data.get("novy_prov_adresa", "")
         novy_prov_psc    = data.get("novy_prov_psc", "")
     else:
-        novy_prov_jmeno  = data.get("novy_jmeno", "")
-        novy_prov_rc_1   = data.get("novy_rc_1", "")
-        novy_prov_rc_2   = data.get("novy_rc_2", "")
-        novy_prov_ico    = data.get("novy_ico", "")
-        novy_prov_adresa = data.get("novy_adresa", "")
-        novy_prov_psc    = data.get("novy_psc", "")
+        novy_prov_jmeno = novy_prov_rc_1 = novy_prov_rc_2 = novy_prov_ico = novy_prov_adresa = novy_prov_psc = ""
 
     fields = {
         # Vehicle
@@ -578,7 +572,7 @@ def build_zmeny_fields(data: dict) -> dict:
         "fill_4_2":     data.get("osvedceni_cislo", ""),
         "fill_5_2":     data.get("jiny_doklad", ""),  # first line of "Jiný doklad k silničnímu vozidlu" at top
         "V_4":   misto,
-        "dne_4": tomorrow,
+        "dne_4": "",  # last page date intentionally left blank — user fills by hand at úřad
     }
     return fields
 
@@ -612,12 +606,8 @@ def build_zapis_fields(data: dict) -> dict:
         prov_adresa = data.get("novy_prov_adresa", "")
         prov_psc    = data.get("novy_prov_psc", "")
     else:
-        prov_jmeno  = data.get("novy_jmeno", "")
-        prov_rc_1   = data.get("novy_rc_1", "")
-        prov_rc_2   = data.get("novy_rc_2", "")
-        prov_ico    = data.get("novy_ico", "")
-        prov_adresa = data.get("novy_adresa", "")
-        prov_psc    = data.get("novy_psc", "")
+        # Provozovatel blank when same as vlastník (form text: "vyplnit jen, když...").
+        prov_jmeno = prov_rc_1 = prov_rc_2 = prov_ico = prov_adresa = prov_psc = ""
 
     fields = {
         # Vlastník (nový / kupující)
@@ -669,9 +659,9 @@ def build_zapis_fields(data: dict) -> dict:
         "toggle_3":             False,
         "vozidlo obecného užití": True,
 
-        # Podpis page 2 
+        # Podpis page 2
         "V_2":   misto,
-        "dne_2": tomorrow,
+        "dne_2": "",  # last page date intentionally left blank — user fills by hand at úřad
     }
     return fields
 
@@ -697,11 +687,9 @@ def build_zmena_fields(data: dict) -> dict:
         prov_adresa = data.get("novy_prov_adresa", "")
         prov_psc    = data.get("novy_prov_psc", "")
     else:
-        prov_jmeno  = data.get("novy_jmeno", "")
-        prov_rc     = rc_combined
-        prov_ico    = data.get("novy_ico", "")
-        prov_adresa = data.get("novy_adresa", "")
-        prov_psc    = data.get("novy_psc", "")
+        # Provozovatel blank when same as vlastník (form text:
+        # "Vyplnit jen, když je provozovatel odlišný od vlastníka").
+        prov_jmeno = prov_rc = prov_ico = prov_adresa = prov_psc = ""
 
     addr_key_v  = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"
     addr_key_v2 = "Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 2"
@@ -751,10 +739,11 @@ def build_zmena_fields(data: dict) -> dict:
         "fill_4":   data.get("osvedceni_cislo", ""),
 
         # Page 2 — Potvrzení o převzetí dokladů žadatelem (bottom section)
-        # Same as prevod: only V + dne. Tabulka(y), Technický průkaz,
-        # Osvědčení, Jiné doklady all stay blank (úřednice doplní při převzetí).
+        # Only místo (V_2 = "Brně"). Tabulka(y), Technický průkaz, Osvědčení,
+        # Jiné doklady stay blank (úřednice doplní při převzetí). Date
+        # intentionally blank — user fills by hand at úřad on the pickup day.
         "V_2":      misto,
-        "dne_2":    tomorrow,
+        "dne_2":    "",
     }
 
 # ── Auth (conditional login gate) ─────────────────────────────────────────────
@@ -986,22 +975,21 @@ def api_generate():
     def _id_text(val):
         return f"ID: {val}" if val else None
 
+    # ID overlay rule: print at the provozovatel position ONLY when 'jiný
+    # provozovatel' is checked (i.e., the provozovatel block in the PDF is
+    # populated). When same as vlastník, the provozovatel section is blank,
+    # so an ID floating over an empty field would look wrong — suppress it.
     zmeny_overlays, zapis_overlays = [], []
     if _id_text(data.get("puvodni_id")):
         zmeny_overlays.append((0, 554, 628, _id_text(data["puvodni_id"])))
     if data.get("puvodni_prov_jiny") and _id_text(data.get("puvodni_prov_id")):
         zmeny_overlays.append((0, 554, 420, _id_text(data["puvodni_prov_id"])))
-    elif not data.get("puvodni_prov_jiny") and _id_text(data.get("puvodni_id")):
-        zmeny_overlays.append((0, 554, 420, _id_text(data["puvodni_id"])))
     if _id_text(data.get("novy_id")):
         zmeny_overlays.append((1, 554, 545, _id_text(data["novy_id"])))
         zapis_overlays.append((0, 554, 683, _id_text(data["novy_id"])))
     if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
         zmeny_overlays.append((1, 554, 350, _id_text(data["novy_prov_id"])))
         zapis_overlays.append((0, 554, 533, _id_text(data["novy_prov_id"])))
-    elif not data.get("novy_prov_jiny") and _id_text(data.get("novy_id")):
-        zmeny_overlays.append((1, 554, 350, _id_text(data["novy_id"])))
-        zapis_overlays.append((0, 554, 533, _id_text(data["novy_id"])))
 
     if mode == "prevod":
         zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))

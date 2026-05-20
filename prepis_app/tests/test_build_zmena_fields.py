@@ -29,13 +29,13 @@ def test_vlastnik_only_no_jiny_provozovatel():
     assert f["Adresa místa pobytu fyzické osoby nebo sídlo právnické osoby  místo podnikání fyzické osoby 1"] == "HLAVNI 5, BRNO"
     assert f["fill_6"] == "60200"
 
-    # Provozovatel — mirrors Vlastník when not jiný (per user feedback —
-    # form text says "Vyplnit jen, když...", but in practice the bureau prefers
-    # the section visibly populated). ID overlay is suppressed for this case.
-    assert f["fill_7"] == "JAN NOVAK"
-    assert f["comb_5"] == "850101/1234"
+    # Provozovatel — blank when same as vlastník (matches form text
+    # "Vyplnit jen, když je provozovatel odlišný"). Reverted from mirroring
+    # per user feedback once the web version went live.
+    assert f["fill_7"] == ""
+    assert f["comb_5"] == ""
     assert f["comb_6"] == ""
-    assert f["fill_11"] == "60200"
+    assert f["fill_11"] == ""
 
     # Žádá o provedení změny
     assert f["fill_12"] == "zápis A50-X"

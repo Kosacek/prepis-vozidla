@@ -1,0 +1,203 @@
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows                              
+-------------------------------------------------------------------------------
+
+  Started : Thursday, March 26, 2026 4:12:26 PM
+   Source : D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\
+     Dest : \\192.168.1.18\Petr\PrepisVozidla\
+
+    Files : *.*
+	    
+  Options : *.* /S /E /DCOPY:DA /COPY:DAT /IS /IT /R:1000000 /W:30 
+
+------------------------------------------------------------------------------
+
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\
+	*EXTRA Dir        -1	\\192.168.1.18\Petr\PrepisVozidla\data\
+	    Newer     		   9.0 m	PrepisVozidla.exe 11.0% 22.1% 33.1% 44.2% 55.2% 66.3% 77.3% 88.4% 99.4%100%  
+	                  67	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\
+	  *EXTRA File 		     127	.env
+	  *EXTRA File 		   69464	.msys835a5ddbd3ddb9b40db799378a2b9b09
+	  *EXTRA File 		   49776	.msys8aa4d4f91b505bc0ca05b1a5135d1c0e
+	  *EXTRA File 		   6.4 m	.msys945557e26261368cab99367407c3f94c
+	  *EXTRA File 		  290648	.msys9761107d76e13fd02fff8077f29cda43
+	  *EXTRA File 		  142680	.msys9cd2d4e608f080409ff1b626062520fe
+	  *EXTRA File 		  120400	.msys9fde8d81609140544ba3a195ecef697c
+	  *EXTRA File 		   4.9 m	.msys9fde8d8163d81e5450cc8e9e989971de
+	  *EXTRA File 		  794992	.msysa41d4c0332dac834bed81b973d27f8a7
+	  *EXTRA File 		  138584	.msysab67c31f8a5e9c142b375a8578f8b6ec
+	  *EXTRA File 		   87384	.msysb3e54022891edd00e51db4100da0fefb
+	  *EXTRA File 		  503640	.msysbd95c30ca45f47806d3155a70f3cce91
+	  *EXTRA File 		  161112	.msysbd95c30ca8162d94ea4935569875d5ea
+	  *EXTRA File 		  184664	.msysc4e03a2951547f5c8878023e404b71be
+	  *EXTRA File 		   1.0 m	.msysc6134010c4c82f68990332433d41427b
+	  *EXTRA File 		  758104	.msyscc2ab145e1bc87f49043b132a80614d0
+	  *EXTRA File 		  195584	.msysd19c75aec5d48fb44f2f6a085b4963d6
+	  *EXTRA File 		   36696	.msysd4a82e494fa4ec28e9b8cd1a3d2d5063
+	  *EXTRA File 		   28504	.msyse2976fb582b6d8dc4551e11098520523
+	  *EXTRA File 		   33624	.msyse5a328500395545463e1cc8db802c84d
+	  *EXTRA File 		  218968	.msysf39269bbeef56eb8efc8e0a82a4cce10
+	  *EXTRA File 		   39696	.msysf39269bc8a996740d46fdf6c0e105b69
+	  *EXTRA File 		   40280	.msysf56b1c7010687c38566db2354827c745
+	  *EXTRA File 		   87384	.msysf69e2256bb4821d87ff58e86bca69dcc
+	  *EXTRA File 		    8470	firmy.xlsx
+	    Newer     		  195584	81d243bd2c585b0f4821__mypyc.cp314-win_amd64.pyd100%  
+	    Newer     		   22568	api-ms-win-core-console-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-datetime-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-core-debug-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-errorhandling-l1-1-0.dll100%  
+	    Newer     		   22568	api-ms-win-core-fibers-l1-1-0.dll100%  
+	    Newer     		   26648	api-ms-win-core-file-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-file-l1-2-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-file-l2-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-handle-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-heap-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-interlocked-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-libraryloader-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-localization-l1-2-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-memory-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-core-namedpipe-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-core-processenvironment-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-processthreads-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-processthreads-l1-1-1.dll100%  
+	    Newer     		   22560	api-ms-win-core-profile-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-rtlsupport-l1-1-0.dll100%  
+	    Newer     		   22568	api-ms-win-core-string-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-synch-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-synch-l1-2-0.dll100%  
+	    Newer     		   22568	api-ms-win-core-sysinfo-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-timezone-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-core-util-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-crt-conio-l1-1-0.dll100%  
+	    Newer     		   26656	api-ms-win-crt-convert-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-crt-environment-l1-1-0.dll100%  
+	    Newer     		   22568	api-ms-win-crt-filesystem-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-crt-heap-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-crt-locale-l1-1-0.dll100%  
+	    Newer     		   30752	api-ms-win-crt-math-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-crt-process-l1-1-0.dll100%  
+	    Newer     		   26656	api-ms-win-crt-runtime-l1-1-0.dll100%  
+	    Newer     		   26664	api-ms-win-crt-stdio-l1-1-0.dll100%  
+	    Newer     		   26656	api-ms-win-crt-string-l1-1-0.dll100%  
+	    Newer     		   22576	api-ms-win-crt-time-l1-1-0.dll100%  
+	    Newer     		   22560	api-ms-win-crt-utility-l1-1-0.dll100%  
+	    Newer     		   1.3 m	base_library.zip 75%  100%  
+	    Newer     		   4.9 m	libcrypto-3.dll 20%   40%   60%   80%  100%  
+	    Newer     		   39696	libffi-8.dll100%  
+	    Newer     		  794992	libssl-3.dll100%  
+	    Newer     		  218968	pyexpat.pyd100%  
+	    Newer     		   6.4 m	python314.dll 15.5% 31.0% 46.5% 62.1% 77.6% 93.1%100%  
+	    Newer     		   33624	select.pyd100%  
+	    Newer     		   1.0 m	ucrtbase.dll 93%  100%  
+	    Newer     		  758104	unicodedata.pyd100%  
+	    Newer     		  120400	VCRUNTIME140.dll100%  
+	    Newer     		   49776	VCRUNTIME140_1.dll100%  
+	    Newer     		       7	VERSION100%  
+	    Newer     		   78168	_asyncio.pyd100%  
+	    Newer     		   87384	_bz2.pyd100%  
+	    Newer     		  142680	_ctypes.pyd100%  
+	    Newer     		  290648	_decimal.pyd100%  
+	    Newer     		  138584	_elementtree.pyd100%  
+	    Newer     		   69464	_hashlib.pyd100%  
+	    Newer     		  161112	_lzma.pyd100%  
+	    Newer     		   38744	_multiprocessing.pyd100%  
+	    Newer     		   58200	_overlapped.pyd100%  
+	    Newer     		   36696	_queue.pyd100%  
+	    Newer     		   87384	_socket.pyd100%  
+	    Newer     		  184664	_ssl.pyd100%  
+	    Newer     		   28504	_uuid.pyd100%  
+	    Newer     		   40280	_wmi.pyd100%  
+	    Newer     		  503640	_zstd.pyd100%  
+	                   2	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\certifi\
+	    Newer     		  272441	cacert.pem100%  
+	    Newer     		       0	py.typed
+	                   2	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\charset_normalizer\
+	  *EXTRA File 		   10752	.msysb0d987880fb3f114c475fdc04fde006f
+	  *EXTRA File 		   10752	.msysff1b9f5a961b2ae075c60e757bfcf4e5
+	    Newer     		   10752	cd.cp314-win_amd64.pyd100%  
+	    Newer     		   10752	md.cp314-win_amd64.pyd100%  
+	                   4	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\click-8.3.1.dist-info\
+	    Newer     		       4	INSTALLER100%  
+	    Newer     		    2621	METADATA100%  
+	    Newer     		    2531	RECORD100%  
+	    Newer     		      82	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\click-8.3.1.dist-info\licenses\
+	    Newer     		    1475	LICENSE.txt100%  
+	                   6	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\flask-3.1.3.dist-info\
+	    Newer     		      40	entry_points.txt100%  
+	    Newer     		       4	INSTALLER100%  
+	    Newer     		    3167	METADATA100%  
+	    Newer     		    3729	RECORD100%  
+	    Newer     		       0	REQUESTED
+	    Newer     		      82	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\flask-3.1.3.dist-info\licenses\
+	    Newer     		    1475	LICENSE.txt100%  
+	                   5	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\itsdangerous-2.2.0.dist-info\
+	    Newer     		       4	INSTALLER100%  
+	    Newer     		    1475	LICENSE.txt100%  
+	    Newer     		    1924	METADATA100%  
+	    Newer     		    1549	RECORD100%  
+	    Newer     		      81	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\markupsafe\
+	  *EXTRA File 		   13312	.msysa85c0a84a6b6f7d0b713bfdacb21043b
+	    Newer     		   13312	_speedups.cp314-win_amd64.pyd100%  
+	                   5	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\markupsafe-3.0.3.dist-info\
+	    Newer     		       4	INSTALLER100%  
+	    Newer     		    2764	METADATA100%  
+	    Newer     		    1104	RECORD100%  
+	    Newer     		      11	top_level.txt100%  
+	    Newer     		     101	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\markupsafe-3.0.3.dist-info\licenses\
+	    Newer     		    1503	LICENSE.txt100%  
+	                   2	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\pdfs\
+	    Newer     		  683153	zapis.pdf100%  
+	    Newer     		  159311	zmeny.pdf100%  
+	                   6	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\PIL\
+	  *EXTRA File 		   2.4 m	.msyse6d62e371e887098d6b9afc267f07cb4
+	    Newer     		   7.4 m	_avif.cp314-win_amd64.pyd 13.3% 26.7% 40.1% 53.5% 66.9% 80.3% 93.7%100%  
+	    Newer     		   2.4 m	_imaging.cp314-win_amd64.pyd 40%   81%  100%  
+	    Newer     		  269824	_imagingcms.cp314-win_amd64.pyd100%  
+	    Newer     		   25600	_imagingmath.cp314-win_amd64.pyd100%  
+	    Newer     		   14848	_imagingtk.cp314-win_amd64.pyd100%  
+	    Newer     		  410112	_webp.cp314-win_amd64.pyd100%  
+	                   0	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\
+	                   0	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\_vendor\
+	                   6	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\_vendor\importlib_metadata-8.7.1.dist-info\
+	    Newer     		       2	INSTALLER100%  
+	    Newer     		    4670	METADATA100%  
+	    Newer     		    1868	RECORD100%  
+	    Newer     		       0	REQUESTED
+	    Newer     		      19	top_level.txt100%  
+	    Newer     		      91	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\_vendor\importlib_metadata-8.7.1.dist-info\licenses\
+	    Newer     		   10278	LICENSE100%  
+	                   0	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\_vendor\jaraco\
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\setuptools\_vendor\jaraco\text\
+	    Newer     		    1335	Lorem ipsum.txt100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\templates\
+	    Newer     		   77037	index.html100%  
+	                   4	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\werkzeug-3.1.6.dist-info\
+	    Newer     		       4	INSTALLER100%  
+	    Newer     		    4029	METADATA100%  
+	    Newer     		    8318	RECORD100%  
+	    Newer     		      82	WHEEL100%  
+	                   1	D:\Claude Code\prepis_vozidla_app\prepis_app\dist\PrepisVozidla\_internal\werkzeug-3.1.6.dist-info\licenses\
+	    Newer     		    1475	LICENSE.txt100%  
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :        23         0        23         0         0         1
+   Files :       118       118         0         0         0        29
+   Bytes :   39.54 m   39.54 m         0         0         0   18.80 m
+   Times :   0:00:07   0:00:06                       0:00:00   0:00:00
+
+
+   Speed :           6,046,815 Bytes/sec.
+   Speed :             346.002 MegaBytes/min.
+   Ended : Thursday, March 26, 2026 4:12:34 PM
+
+        1 file(s) copied.
+VERSION: 
+1.0.15

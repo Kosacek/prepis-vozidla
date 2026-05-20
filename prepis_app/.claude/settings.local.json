@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node screenshot.mjs http://localhost:3000/personal-finance-sankey/ wallet-data)",
+      "Bash(node screenshot.mjs http://localhost:3000/personal-finance-sankey/index.html wallet-data2)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3001)",
+      "Bash(taskkill /PID 52860 /F)",
+      "Bash(cmd //c \"taskkill /PID 52860 /F\")",
+      "mcp__2c86c180-cdd8-469d-8e3c-dc17eeacf134__search_files",
+      "mcp__2c86c180-cdd8-469d-8e3c-dc17eeacf134__create_file",
+      "Bash(cp 'C:\\\\Users\\\\David\\\\.claude\\\\projects\\\\D--Claude-Code-prepis-vozidla-app-prepis-app\\\\79f347e3-38dc-4d56-9ca9-5a9ba7056e02\\\\tool-results\\\\webfetch-1777166636124-sn1b4i.bin' /tmp/design.zip)",
+      "Bash(unzip -l /tmp/design.zip)"
+    ]
+  }
+}
