@@ -7,3 +7,19 @@ build/
 *.egg-info/
 scans/
 firmy.xlsx
+
+# IDE / editor settings
+.claude/
+CLAUDE.md
+.vscode/
+
+# Old desktop deploy helpers (web-only since v1.1.8)
+*.bat
+deploy_output.txt
+
+# Ad-hoc deploy scripts (use scripts/nas_deploy.py + nas-phase3-nginx.sh instead)
+scripts/_*.sh
+scripts/_*.pdf
+
+# Personal / unrelated content that ended up in the folder
+tahaky/
