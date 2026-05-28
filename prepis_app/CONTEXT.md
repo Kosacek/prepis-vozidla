@@ -244,6 +244,35 @@ These are intentional and should NOT be changed without user confirmation:
 
 ---
 
+## Rejected ideas (don't re-litigate)
+
+### Automated insurance check before transfer — NOT FEASIBLE (2026-05-28)
+
+**Idea:** When processing a převod, automatically check whether the vehicle
+has valid `povinné ručení` (mandatory liability insurance), so Petr can
+turn away customers with uninsured vehicles before wasting a trip to the úřad.
+
+**Why we dropped it:** No legitimate free automated source exists in CZ.
+
+| Source | Why it doesn't work |
+| --- | --- |
+| `dataovozidlech.cz` (Ministry of Transport API we already use for ORV) | Has only one endpoint `/api/vehicletechnicaldata/v2`; returns registration + technical data only. No insurance fields. Confirmed against the official spec PDF. |
+| **ČKP** — `ic.ckp.cz/ICwww/servlet?_page=searchSPZ` (the only official CZ insurance database) | Form gates the lookup behind (a) a mandatory checkbox declaring you are an accident victim of the queried vehicle, and (b) Google reCAPTCHA v2. Pre-transfer due diligence is NOT a legitimate use of this form — checking the box programmatically would be lying about access reason. |
+| `api.srovnavac.cz` (`Pojištění vozidel API`) | Calculator for NEW insurance quotes (powers srovnavac.cz price comparison). Endpoints are `/produkty`, `/kalkulace`, `/vypocet/...`. No lookup of existing policies. |
+| Paid aggregators (autoes.cz, kontrola-vozidla.cz, autotracer.cz) | Tens of Kč per query, would cost thousands per month at Petr's volume. Rejected on cost. |
+
+**Workaround in practice:** Petr asks the seller for a paper `zelená karta`
+or `potvrzení o pojištění` before initiating paperwork. Free for the
+seller to obtain from their insurer, takes minutes. No code in this app
+needs to do anything.
+
+**If you (future Claude) get asked again,** check whether the legal
+landscape has changed (new ministry API, ČKP opening a public endpoint).
+Otherwise this stays rejected — please point the user at this section
+instead of re-running the same dead-end research.
+
+---
+
 ## Tech Stack
 
 - Python 3.x
