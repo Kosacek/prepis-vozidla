@@ -246,13 +246,26 @@ These are intentional and should NOT be changed without user confirmation:
 
 ## Rejected ideas (don't re-litigate)
 
-### Automated insurance check before transfer — NOT FEASIBLE (2026-05-28)
+### FULLY-automated insurance check — NOT FEASIBLE, but see the shipped deep-link below (2026-05-28)
 
-**Idea:** When processing a převod, automatically check whether the vehicle
-has valid `povinné ručení` (mandatory liability insurance), so Petr can
-turn away customers with uninsured vehicles before wasting a trip to the úřad.
+> **UPDATE (shipped in v1.1.9):** The *fully automated* lookup below stays
+> rejected, BUT a **human-in-the-loop deep-link** version shipped instead.
+> The results page has a "🛡️ Zkontrolovat pojištění (ČKP)" button
+> (`checkInsurance()` in index.html) that opens `ic.ckp.cz` with the SPZ
+> (or VIN) + today's date pre-filled via URL params — the ČKP servlet
+> reflects `rpn`/`vin`/`date` GET params into the form (verified live).
+> The user ticks the accident-victim declaration and solves the reCAPTCHA
+> themselves. We never submit, never solve the CAPTCHA, never tick the
+> declaration — just deep-link to the public form. That's the legitimate
+> way to do this and it's live. Don't try to "improve" it into a fully
+> automated lookup — that reintroduces the problems below.
 
-**Why we dropped it:** No legitimate free automated source exists in CZ.
+**Idea (the rejected part):** When processing a převod, automatically AND
+without any user interaction check whether the vehicle has valid
+`povinné ručení`, returning the answer inside our app.
+
+**Why the fully-automated version is dropped:** No legitimate free automated
+source exists in CZ.
 
 | Source | Why it doesn't work |
 | --- | --- |
