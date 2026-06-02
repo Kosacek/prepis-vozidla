@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1041,9 +1041,9 @@ def api_generate():
     try:
         amount_raw = str(data.get("ppd_castka") or "").strip()
         try:
-            amount = int(float(amount_raw)) if amount_raw else 1300
+            amount = int(float(amount_raw)) if amount_raw else 0
         except ValueError:
-            amount = 1300
+            amount = 0
         if amount > 0:
             rz = data.get("registracni_znacka", "")
             vin = data.get("vin", "")
