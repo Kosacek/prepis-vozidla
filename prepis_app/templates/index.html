@@ -653,20 +653,32 @@
       <div class="card-title">Shrnutí před generováním</div>
       <div id="summary-content"></div>
     </div>
+    <div class="card" id="ppd-card">
+      <div class="card-title">Doklad (PPD)</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Částka za vyřízení (Kč)</label>
+          <input type="number" id="ppd_castka" value="1300" min="0" step="50" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Přijato od</label>
+          <input type="text" id="ppd_prijato_od" placeholder="(automaticky vlastník / provozovatel)">
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vygeneruje s žádostí. Když částku necháš 0, doklad se nevystaví.</p>
+    </div>
     <div class="card output-card" id="output-card" style="display:none;">
       <div class="check">✅</div>
       <h2>Formuláře vygenerovány!</h2>
-      <p>Žádosti jsou připraveny k tisku nebo stažení.</p>
+      <p>Připraveno k tisku.</p>
       <div class="download-btns">
-        <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
-        <a id="btn-zapis" class="btn-download" target="_blank" style="display:none;">📄 Žádost o zápis do registru</a>
-        <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
+        <button class="btn-download btn-print" onclick="printAll()">🖨️ Vytisknout žádost</button>
+        <button id="btn-ppd" class="btn-download" onclick="printPpd()" style="display:none;background:#7c3aed;">🧾 Vytisknout PPD</button>
         <button id="btn-pojisteni" class="btn-download" onclick="checkInsurance()" style="display:none;background:#0e9f6e;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
-        <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
       <div style="margin-top:18px;">
-        <button class="btn btn-secondary" onclick="resetForm()">Nový přepis</button>
+        <button class="btn btn-secondary" onclick="resetForm()">Nová žádost</button>
       </div>
     </div>
     <div class="loading" id="loading">
@@ -730,7 +742,7 @@ document.addEventListener('keydown', e => {
 
   if (e.key === 'Enter' && e.ctrlKey) {
     e.preventDefault();
-    generatePDFs().then(() => printAll());
+    generatePDFs();   // show results card; user presses the print buttons
     return;
   }
   if (e.key === 'Enter') {
@@ -771,6 +783,7 @@ function navBack() {
     outputCard.style.display = 'none';
     document.getElementById('plne-moce-links').style.display = 'none';
     document.getElementById('summary-card').style.display = 'block';
+    document.getElementById('ppd-card').style.display = 'block';
     document.getElementById('nav-next').style.display = '';
     document.getElementById('nav-next').disabled = false;
     document.getElementById('nav-back').textContent = '← Zpět';
@@ -1237,6 +1250,14 @@ function buildSummary() {
   html += row('Místo podpisu', 'Brno');
 
   document.getElementById('summary-content').innerHTML = html;
+
+  // Prefill PPD "Přijato od" = buyer side (jiný provozovatel if checked, else
+  // nový vlastník). Only when the field is empty so a manual edit survives a
+  // back-and-forth. Same rule as the backend resolve_payer().
+  const ppdField = document.getElementById('ppd_prijato_od');
+  if (ppdField && !ppdField.value.trim()) {
+    ppdField.value = cb('novy_prov_jiny') ? (v('novy_prov_jmeno') || v('novy_jmeno')) : v('novy_jmeno');
+  }
 }
 
 // ── Generate PDFs ─────────────────────────────────────────────────────────────
@@ -1291,26 +1312,25 @@ async function generatePDFs() {
     zmena_vlastnika:     zmenaTyp ? zmenaTyp.value === 'vlastnika'     : false,
     zmena_provozovatele: zmenaTyp ? zmenaTyp.value === 'provozovatele' : false,
     zmena_oboji:         zmenaTyp ? zmenaTyp.value === 'oboji'         : true,
+    ppd_castka:          v('ppd_castka'),
+    ppd_prijato_od:      v('ppd_prijato_od'),
   };
 
   document.getElementById('nav-next').disabled = true;
   document.getElementById('loading').style.display = 'block';
   document.getElementById('summary-card').style.display = 'none';
+  document.getElementById('ppd-card').style.display = 'none';
 
   try {
     const res    = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, plne_moce: result.plne_moce || [],
+      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, ppd: result.ppd, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '' };
-      for (const [key, btnId] of [['zmeny','btn-zmeny'], ['zapis','btn-zapis'], ['zmena','btn-zmena']]) {
-        const url = result[key];
-        const btn = document.getElementById(btnId);
-        if (!btn) continue;
-        if (url) { btn.href = url; btn.style.display = ''; }
-        else     { btn.style.display = 'none'; }
-      }
+      // PPD print button — shown only when a receipt was generated
+      const ppdBtn = document.getElementById('btn-ppd');
+      if (ppdBtn) ppdBtn.style.display = result.ppd ? '' : 'none';
       // Insurance-check button: shown when we have an SPZ or VIN to look up
       const insBtn = document.getElementById('btn-pojisteni');
       if (insBtn) insBtn.style.display = (generatedUrls.spz || generatedUrls.vin) ? '' : 'none';
@@ -1360,6 +1380,11 @@ function checkInsurance() {
 function printAll() {
   ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
+}
+
+// PPD prints on A5 — opened separately from the A4 žádosti.
+function printPpd() {
+  if (generatedUrls.ppd) window.open(generatedUrls.ppd, '_blank');
 }
 
 // ── Camera ────────────────────────────────────────────────────────────────────

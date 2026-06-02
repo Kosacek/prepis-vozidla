@@ -1,5 +1,3 @@
-# Production runtime deps for the web container.
-# (Local desktop installs these ad-hoc; PyInstaller bundles them.)
 Flask>=3.0
 Werkzeug>=3.0
 python-dotenv>=1.0
@@ -8,4 +6,5 @@ pypdf>=4.0
 requests>=2.31
 Pillow>=10.0
 reportlab>=4.0
+num2words>=0.5
 gunicorn>=21.2

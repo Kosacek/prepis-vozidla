@@ -12,6 +12,7 @@ from PIL import Image
 from datetime import datetime
 from pypdf import PdfReader, PdfWriter
 import openpyxl
+import ppd  # PPD (cash-receipt) generation — see ppd.py
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -28,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.1.10"
+__version__ = "1.2.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -953,6 +954,16 @@ def api_orv():
     body = request.json or {}
     return jsonify(lookup_orv(body.get("serie", ""), body.get("cislo", "")))
 
+def resolve_payer(data: dict) -> str:
+    """Who pays ALSETA for the service = the buyer / new-owner side, uniformly
+    across all modes: the jiný provozovatel if that box is checked, else the
+    nový vlastník. Never the seller (puvodni_*) — for a převod the new owner
+    pays. Used as the fallback when the client didn't send ppd_prijato_od."""
+    if data.get("novy_prov_jiny"):
+        return (data.get("novy_prov_jmeno") or "").strip() or (data.get("novy_jmeno") or "").strip()
+    return (data.get("novy_jmeno") or "").strip()
+
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     raw = request.json or {}
@@ -1020,6 +1031,38 @@ def api_generate():
         fname_zapis = os.path.join(out_dir, f"zapis_{ts}.pdf")
         with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/zapis_{ts}.pdf"
+
+    # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
+    try:
+        amount_raw = str(data.get("ppd_castka") or "").strip()
+        try:
+            amount = int(float(amount_raw)) if amount_raw else 1300
+        except ValueError:
+            amount = 1300
+        if amount > 0:
+            rz = data.get("registracni_znacka", "")
+            vin = data.get("vin", "")
+            if mode == "prevod":
+                purpose = f"Za vyřízení přepisu vozidla RZ {rz}".strip()
+            elif mode == "zmena":
+                purpose = f"Za vyřízení změny údajů vozidla RZ {rz}".strip()
+            else:
+                purpose = f"Za vyřízení registrace vozidla {rz or vin}".strip()
+            payer = (data.get("ppd_prijato_od") or "").strip() or resolve_payer(data)
+            today = datetime.now().strftime("%d.%m.%Y")
+            number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
+                "date": today, "payer": payer, "amount": amount,
+                "purpose": purpose, "vehicle": rz or vin,
+            })
+            ppd_bytes = ppd.build_ppd_pdf({
+                "number": number, "date": today, "payer": payer,
+                "amount": amount, "purpose": purpose,
+            })
+            with open(os.path.join(out_dir, f"ppd_{ts}.pdf"), "wb") as f:
+                f.write(ppd_bytes)
+            result["ppd"] = f"/download/ppd_{ts}.pdf"
+    except Exception as e:
+        _log.warning("PPD generation failed: %s", e)
 
     # Attach plné moci for any party whose firm has one stored
     plne_moce = []
