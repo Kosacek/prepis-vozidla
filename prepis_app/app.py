@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.2.5"
+__version__ = "1.3.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1067,9 +1067,12 @@ def api_generate():
                 "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
                 "amount": amount, "purpose": purpose,
             })
-            with open(os.path.join(out_dir, f"ppd_{ts}.pdf"), "wb") as f:
+            # Name the PDF by receipt number (numbers never repeat) so the
+            # Doklady browser can link to it deterministically.
+            ppd_name = f"ppd_{number}.pdf"
+            with open(os.path.join(out_dir, ppd_name), "wb") as f:
                 f.write(ppd_bytes)
-            result["ppd"] = f"/download/ppd_{ts}.pdf"
+            result["ppd"] = f"/download/{ppd_name}"
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 
@@ -1087,6 +1090,11 @@ def api_generate():
         result["plne_moce"] = plne_moce
 
     return jsonify(result)
+
+@app.route("/api/ppd-list", methods=["GET"])
+def api_ppd_list():
+    """Issued cash receipts (newest first) for the in-app Doklady browser."""
+    return jsonify(ppd.read_ppd_log(DATA_DIR))
 
 @app.route("/api/scan", methods=["POST"])
 def api_scan():

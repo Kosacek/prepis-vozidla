@@ -134,6 +134,11 @@
   .modal-header h3 { font-size: 16px; font-weight: 700; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
   .modal-body { padding: 16px 22px; overflow-y: auto; }
+  /* Doklady (PPD) table */
+  .doklady-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .doklady-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: #fff; }
+  .doklady-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  .doklady-table tr:hover td { background: #f9fafb; }
   .firm-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .firm-row:last-child { border-bottom: none; }
   .firm-row-info { flex: 1; min-width: 0; }
@@ -249,6 +254,7 @@
     <div class="subtitle">Automatické vyplnění žádosti</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
+    <button onclick="openDokladyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🧾 Doklady</button>
     <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
   </div>
 </header>
@@ -267,6 +273,20 @@
       <button class="modal-close" onclick="closeFirmyModal()">✕</button>
     </div>
     <div class="modal-body" id="firmy-modal-body">Načítám...</div>
+  </div>
+</div>
+
+<!-- Doklady (vystavené PPD) modal -->
+<div class="modal-overlay" id="doklady-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🧾 Vystavené doklady (PPD)</h3>
+      <button class="modal-close" onclick="closeDokladyModal()">✕</button>
+    </div>
+    <div style="padding:12px 16px 0;">
+      <input type="text" id="doklady-search" placeholder="Hledat (číslo, jméno, IČO, datum…)" oninput="renderDoklady()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    </div>
+    <div class="modal-body" id="doklady-modal-body">Načítám…</div>
   </div>
 </div>
 
@@ -1084,8 +1104,53 @@ function closeFirmyModal() {
   document.getElementById('firmy-modal').style.display = 'none';
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeFirmyModal();
+  if (e.key === 'Escape') { closeFirmyModal(); closeDokladyModal(); }
 });
+
+// ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
+let _dokladyCache = [];
+async function openDokladyModal() {
+  document.getElementById('doklady-modal').style.display = 'flex';
+  document.getElementById('doklady-modal-body').innerHTML = 'Načítám…';
+  try {
+    const res = await fetch('/api/ppd-list');
+    _dokladyCache = await res.json();
+  } catch { _dokladyCache = []; }
+  document.getElementById('doklady-search').value = '';
+  renderDoklady();
+}
+function closeDokladyModal() {
+  const m = document.getElementById('doklady-modal');
+  if (m) m.style.display = 'none';
+}
+function renderDoklady() {
+  const q = (document.getElementById('doklady-search').value || '').toLowerCase().trim();
+  const body = document.getElementById('doklady-modal-body');
+  let rows = _dokladyCache;
+  if (q) rows = rows.filter(d =>
+    String(d.cislo).includes(q) ||
+    String(d.prijato_od || '').toLowerCase().includes(q) ||
+    String(d.datum || '').toLowerCase().includes(q) ||
+    String(d.ucel || '').toLowerCase().includes(q) ||
+    String(d.vozidlo || '').toLowerCase().includes(q));
+  if (!rows.length) {
+    body.innerHTML = '<p style="color:var(--muted);padding:16px">' +
+      (_dokladyCache.length ? 'Nic nenalezeno.' : 'Zatím žádné vystavené doklady.') + '</p>';
+    return;
+  }
+  body.innerHTML = `<table class="doklady-table">
+    <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th>Účel</th><th></th></tr></thead>
+    <tbody>${rows.map(d => `
+      <tr>
+        <td><b>${esc(String(d.cislo))}</b></td>
+        <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
+        <td>${esc(String(d.prijato_od || ''))}</td>
+        <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
+        <td>${esc(String(d.ucel || ''))}</td>
+        <td><a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;white-space:nowrap">🧾 PDF</a></td>
+      </tr>`).join('')}</tbody>
+  </table>`;
+}
 
 function _renderFirmyBody() {
   const body = document.getElementById('firmy-modal-body');

@@ -36,6 +36,17 @@ def test_numbering_increments_and_persists(tmp_path):
     assert [r[0] for r in rows] == [1, 2, 3]
 
 
+def test_read_ppd_log(tmp_path):
+    d = str(tmp_path)
+    assert ppd.read_ppd_log(d) == []   # empty before any receipt
+    ppd.reserve_ppd_number_and_log(d, {"date": "01.06.2026", "payer": "A", "amount": 1300, "purpose": "p", "vehicle": "1AB2345"})
+    ppd.reserve_ppd_number_and_log(d, {"date": "02.06.2026", "payer": "B s.r.o.", "amount": 800, "purpose": "p", "vehicle": "2CD"})
+    log = ppd.read_ppd_log(d)
+    assert [r["cislo"] for r in log] == [2, 1]          # newest first
+    assert log[0]["prijato_od"] == "B s.r.o."
+    assert log[1]["castka"] == 1300
+
+
 def test_numbering_derives_from_ledger_max(tmp_path):
     d = str(tmp_path)
     rec = {"date": "x", "payer": "X", "amount": 800, "purpose": "p", "vehicle": ""}

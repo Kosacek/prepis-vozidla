@@ -151,6 +151,34 @@ def reserve_ppd_number_and_log(data_dir: str, record: dict) -> int:
             lock_fd.close()
 
 
+def read_ppd_log(data_dir: str) -> list:
+    """Read the evidence ledger → list of dicts (newest first) for the
+    in-app "Doklady" browser. Each PDF is named ppd_<number>.pdf, so the
+    frontend can link to /download/ppd_<number>.pdf without storing a path."""
+    path = _evidence_path(data_dir)
+    if not (os.path.exists(path) and os.path.getsize(path) > 0):
+        return []
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True)
+        ws = wb.active
+    except Exception:
+        return []
+    rows = []
+    for r in ws.iter_rows(min_row=2, values_only=True):
+        if not r or r[0] is None:
+            continue
+        rows.append({
+            "cislo":   r[0],
+            "datum":   r[1] if len(r) > 1 else "",
+            "prijato_od": r[2] if len(r) > 2 else "",
+            "castka":  r[3] if len(r) > 3 else "",
+            "ucel":    r[4] if len(r) > 4 else "",
+            "vozidlo": r[5] if len(r) > 5 else "",
+        })
+    rows.sort(key=lambda x: (x["cislo"] if isinstance(x["cislo"], int) else 0), reverse=True)
+    return rows
+
+
 # ── A5 receipt PDF ──────────────────────────────────────────────────────────
 def build_ppd_pdf(record: dict) -> bytes:
     """Draw an A5 portrait příjmový pokladní doklad.
