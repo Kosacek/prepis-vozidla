@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1042,12 +1042,7 @@ def api_generate():
         if amount > 0:
             rz = data.get("registracni_znacka", "")
             vin = data.get("vin", "")
-            if mode == "prevod":
-                purpose = f"Za vyřízení přepisu vozidla RZ {rz}".strip()
-            elif mode == "zmena":
-                purpose = f"Za vyřízení změny údajů vozidla RZ {rz}".strip()
-            else:
-                purpose = f"Za vyřízení registrace vozidla {rz or vin}".strip()
+            purpose = "Zastupování na MMB"  # fixed — ALSETA represents the client at Magistrát města Brna
             payer = (data.get("ppd_prijato_od") or "").strip() or resolve_payer(data)
             today = datetime.now().strftime("%d.%m.%Y")
             number = ppd.reserve_ppd_number_and_log(DATA_DIR, {

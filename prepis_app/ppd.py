@@ -191,9 +191,9 @@ def build_ppd_pdf(record: dict) -> bytes:
         c.drawString(left, y - 5.5 * mm, str(value))
         y -= line_h + (3 * mm if big else 0)
 
-    # Issuer
+    # Issuer (DPH status intentionally not printed)
     c.setFont(font, 10)
-    c.drawString(left, y, f"Příjemce: {ISSUER_NAME}   IČO: {ISSUER_ICO}   ({ISSUER_NOTE})")
+    c.drawString(left, y, f"Příjemce: {ISSUER_NAME}   IČO: {ISSUER_ICO}")
     y -= line_h
     c.setFont(font, 10)
     c.drawString(left, y, f"Datum: {date}")
