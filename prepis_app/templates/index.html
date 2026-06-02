@@ -673,7 +673,10 @@
         </div>
         <div class="field">
           <label>Přijato od</label>
-          <input type="text" id="ppd_prijato_od" placeholder="(automaticky vlastník / provozovatel)">
+          <div style="position:relative">
+            <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest()" style="width:100%">
+            <div class="firm-dropdown" id="ppd-payer-firms"></div>
+          </div>
         </div>
       </div>
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vygeneruje s žádostí. Když částku necháš 0, doklad se nevystaví.</p>
@@ -1023,6 +1026,50 @@ document.addEventListener('click', e => {
     if (!d.parentElement.contains(e.target)) d.classList.remove('open');
   });
 });
+
+// ── PPD "Přijato od" autocomplete (saved firms + IČO→ARES) ───────────────────
+// Single name field: suggest saved firms by name or IČO, and if you type an
+// 8-digit IČO that isn't saved, look the name up in ARES. Only the name is
+// written into the field (the receipt needs just the payer name).
+let _ppdAresTimer = null;
+async function ppdPayerSuggest() {
+  const inp = document.getElementById('ppd_prijato_od');
+  const dd  = document.getElementById('ppd-payer-firms');
+  const q = inp.value.trim();
+  if (!q) { dd.classList.remove('open'); return; }
+  const firms = await getSavedFirms();
+  const filtered = firms
+    .filter(f => f.nazev.toLowerCase().includes(q.toLowerCase()) || f.ico.includes(q))
+    .slice(0, 8);
+  dd.innerHTML = filtered.map(f => `
+    <div class="firm-option" onclick="ppdPayerPick('${esc(f.nazev)}')">
+      <div class="firm-name">${esc(f.nazev)}</div>
+      <div class="firm-sub">IČO: ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}</div>
+    </div>`).join('');
+  dd.classList.toggle('open', filtered.length > 0);
+  // 8-digit IČO not among saved firms → ARES lookup (debounced)
+  if (/^\d{8}$/.test(q) && !firms.find(f => f.ico === q)) {
+    clearTimeout(_ppdAresTimer);
+    _ppdAresTimer = setTimeout(() => ppdPayerAres(q), 400);
+  }
+}
+function ppdPayerPick(name) {
+  document.getElementById('ppd_prijato_od').value = name;
+  document.getElementById('ppd-payer-firms').classList.remove('open');
+}
+async function ppdPayerAres(ico) {
+  try {
+    const res = await fetch('/api/ico', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ico}) });
+    const d = await res.json();
+    if (d && d.success && d.nazev) {
+      const dd = document.getElementById('ppd-payer-firms');
+      dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(d.nazev)}')">
+        <div class="firm-name">${esc(d.nazev)}</div>
+        <div class="firm-sub">ARES · IČO ${esc(ico)}</div></div>`;
+      dd.classList.add('open');
+    }
+  } catch (e) { /* ignore — ARES optional */ }
+}
 
 // ── Firma modal (Správa firem + plné moci) ───────────────────────────────────
 function openFirmyModal() {
