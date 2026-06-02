@@ -204,14 +204,12 @@ def build_ppd_pdf(record: dict) -> bytes:
     field("Slovy:", words)
     field("Účel platby:", purpose)
 
-    # Signature lines near the bottom
+    # Single signature line, bottom-right, labeled "Vystavil" (no "Podpis")
     sy = 30 * mm
     c.setLineWidth(0.5)
-    c.line(left, sy, left + 55 * mm, sy)
     c.line(W - left - 55 * mm, sy, W - left, sy)
     c.setFont(font, 8)
-    c.drawString(left, sy - 5 * mm, "Vystavil")
-    c.drawString(W - left - 55 * mm, sy - 5 * mm, "Podpis")
+    c.drawString(W - left - 55 * mm, sy - 5 * mm, "Vystavil")
 
     c.showPage()
     c.save()
