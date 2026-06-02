@@ -1147,9 +1147,25 @@ function renderDoklady() {
         <td>${esc(String(d.prijato_od || ''))}</td>
         <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
         <td>${esc(String(d.ucel || ''))}</td>
-        <td><a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;white-space:nowrap">🧾 PDF</a></td>
+        <td style="white-space:nowrap">
+          <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
+          <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
+        </td>
       </tr>`).join('')}</tbody>
   </table>`;
+}
+async function deleteDoklad(cislo) {
+  if (!confirm('Opravdu smazat doklad č. ' + cislo + '?\nTato akce je nevratná.')) return;
+  try {
+    const res = await fetch('/api/ppd/' + encodeURIComponent(cislo), { method: 'DELETE' });
+    const d = await res.json();
+    if (d.success) {
+      _dokladyCache = _dokladyCache.filter(x => String(x.cislo) !== String(cislo));
+      renderDoklady();
+    } else {
+      alert('Smazání se nezdařilo.');
+    }
+  } catch { alert('Chyba při mazání dokladu.'); }
 }
 
 function _renderFirmyBody() {

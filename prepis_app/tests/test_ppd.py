@@ -47,6 +47,17 @@ def test_read_ppd_log(tmp_path):
     assert log[1]["castka"] == 1300
 
 
+def test_delete_ppd(tmp_path):
+    d = str(tmp_path)
+    ppd.reserve_ppd_number_and_log(d, {"date": "x", "payer": "A", "amount": 1300, "purpose": "p", "vehicle": ""})  # 1
+    ppd.reserve_ppd_number_and_log(d, {"date": "x", "payer": "B", "amount": 800, "purpose": "p", "vehicle": ""})   # 2
+    assert ppd.delete_ppd(d, 1) is True
+    assert [r["cislo"] for r in ppd.read_ppd_log(d)] == [2]
+    assert ppd.delete_ppd(d, 99) is False                      # non-existent → no-op
+    # numbers are never reused — next allocation is max(remaining)+1 = 3, not 1
+    assert ppd.reserve_ppd_number_and_log(d, {"date": "x", "payer": "C", "amount": 1, "purpose": "p", "vehicle": ""}) == 3
+
+
 def test_numbering_derives_from_ledger_max(tmp_path):
     d = str(tmp_path)
     rec = {"date": "x", "payer": "X", "amount": 800, "purpose": "p", "vehicle": ""}

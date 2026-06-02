@@ -151,6 +151,50 @@ def reserve_ppd_number_and_log(data_dir: str, record: dict) -> int:
             lock_fd.close()
 
 
+def delete_ppd(data_dir: str, number: int) -> bool:
+    """Remove a receipt's row(s) from the evidence ledger, under the same
+    exclusive lock as allocation so a concurrent generate can't corrupt it.
+    Returns True if a row was removed. The PDF file is removed by the caller.
+    (Numbers are never reused, so a delete just leaves a gap — fine.)"""
+    path = _evidence_path(data_dir)
+    if not (os.path.exists(path) and os.path.getsize(path) > 0):
+        return False
+    lock_fd = open(os.path.join(data_dir, _LOCK_NAME), "a+")
+    try:
+        if _HAVE_FCNTL:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+        wb = openpyxl.load_workbook(path)
+        ws = wb.active
+        to_delete = []
+        for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+            try:
+                if int(row[0].value) == int(number):
+                    to_delete.append(i)
+            except (TypeError, ValueError):
+                continue
+        if not to_delete:
+            return False
+        for idx in reversed(to_delete):
+            ws.delete_rows(idx, 1)
+        tmp = path + ".tmp"
+        wb.save(tmp)
+        with open(tmp, "rb+") as f:
+            os.fsync(f.fileno())
+        try:
+            import shutil
+            shutil.copyfile(path, path + ".bak")
+        except Exception:
+            pass
+        os.replace(tmp, path)
+        return True
+    finally:
+        try:
+            if _HAVE_FCNTL:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fd.close()
+
+
 def read_ppd_log(data_dir: str) -> list:
     """Read the evidence ledger → list of dicts (newest first) for the
     in-app "Doklady" browser. Each PDF is named ppd_<number>.pdf, so the
@@ -160,21 +204,24 @@ def read_ppd_log(data_dir: str) -> list:
         return []
     try:
         wb = openpyxl.load_workbook(path, read_only=True)
-        ws = wb.active
     except Exception:
         return []
     rows = []
-    for r in ws.iter_rows(min_row=2, values_only=True):
-        if not r or r[0] is None:
-            continue
-        rows.append({
-            "cislo":   r[0],
-            "datum":   r[1] if len(r) > 1 else "",
-            "prijato_od": r[2] if len(r) > 2 else "",
-            "castka":  r[3] if len(r) > 3 else "",
-            "ucel":    r[4] if len(r) > 4 else "",
-            "vozidlo": r[5] if len(r) > 5 else "",
-        })
+    try:
+        ws = wb.active
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            if not r or r[0] is None:
+                continue
+            rows.append({
+                "cislo":   r[0],
+                "datum":   r[1] if len(r) > 1 else "",
+                "prijato_od": r[2] if len(r) > 2 else "",
+                "castka":  r[3] if len(r) > 3 else "",
+                "ucel":    r[4] if len(r) > 4 else "",
+                "vozidlo": r[5] if len(r) > 5 else "",
+            })
+    finally:
+        wb.close()  # read_only mode leaks the file handle until closed
     rows.sort(key=lambda x: (x["cislo"] if isinstance(x["cislo"], int) else 0), reverse=True)
     return rows
 

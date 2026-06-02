@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1095,6 +1095,18 @@ def api_generate():
 def api_ppd_list():
     """Issued cash receipts (newest first) for the in-app Doklady browser."""
     return jsonify(ppd.read_ppd_log(DATA_DIR))
+
+@app.route("/api/ppd/<int:number>", methods=["DELETE"])
+def api_ppd_delete(number):
+    """Delete a receipt — its ledger row + its PDF file."""
+    removed = ppd.delete_ppd(DATA_DIR, number)
+    pdf_path = os.path.join(DATA_DIR, "output", f"ppd_{number}.pdf")
+    try:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+    except OSError:
+        pass
+    return jsonify({"success": True, "removed": removed})
 
 @app.route("/api/scan", methods=["POST"])
 def api_scan():
