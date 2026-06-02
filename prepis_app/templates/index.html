@@ -183,10 +183,21 @@
   .output-card h2 { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
   .output-card p { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
   .download-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-  .btn-download { display: flex; align-items: center; gap: 8px; padding: 11px 20px; background: var(--primary); color: #fff; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: background .15s; }
+  .btn-download { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; background: var(--primary); color: #fff; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: background .15s, transform .05s; }
   .btn-download:hover { background: var(--primary-dark); }
+  .btn-download:active { transform: translateY(1px); }
   .btn-print { background: var(--success); }
   .btn-print:hover { background: #047857; }
+  /* Results-page action layout: two print buttons side by side (PPD left,
+     žádost right), ČKP full-width below, reset at the bottom. */
+  .out-actions { display: flex; flex-direction: column; gap: 10px; max-width: 460px; margin: 0 auto; }
+  .out-row { display: flex; gap: 10px; }
+  .out-row > .btn-download { flex: 1; }
+  .btn-ppd  { background: #7c3aed; }
+  .btn-ppd:hover  { background: #6d28d9; }
+  .btn-ckp  { background: #0e9f6e; }
+  .btn-ckp:hover  { background: #0b8457; }
+  .out-reset { margin-top: 20px; }
 
   /* Loading */
   .loading { display: none; text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
@@ -669,15 +680,17 @@
     </div>
     <div class="card output-card" id="output-card" style="display:none;">
       <div class="check">✅</div>
-      <h2>Formuláře vygenerovány!</h2>
+      <h2>Hotovo!</h2>
       <p>Připraveno k tisku.</p>
-      <div class="download-btns">
-        <button class="btn-download btn-print" onclick="printAll()">🖨️ Vytisknout žádost</button>
-        <button id="btn-ppd" class="btn-download" onclick="printPpd()" style="display:none;background:#7c3aed;">🧾 Vytisknout PPD</button>
-        <button id="btn-pojisteni" class="btn-download" onclick="checkInsurance()" style="display:none;background:#0e9f6e;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
+      <div class="out-actions">
+        <div class="out-row">
+          <button id="btn-ppd" class="btn-download btn-ppd" onclick="printPpd()" style="display:none;">🧾 Vytisknout PPD</button>
+          <button class="btn-download btn-print" onclick="printAll()">🖨️ Vytisknout žádost</button>
+        </div>
+        <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
-      <div style="margin-top:18px;">
+      <div class="out-reset">
         <button class="btn btn-secondary" onclick="resetForm()">Nová žádost</button>
       </div>
     </div>
