@@ -661,7 +661,7 @@
         <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
         <a id="btn-zapis" class="btn-download" target="_blank" style="display:none;">📄 Žádost o zápis do registru</a>
         <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
-        <button id="btn-pojisteni" class="btn-download" onclick="checkInsurance()" style="display:none;background:#0e9f6e;" title="Otevře ČKP s předvyplněnou SPZ — zaškrtni prohlášení a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
+        <button id="btn-pojisteni" class="btn-download" onclick="checkInsurance()" style="display:none;background:#0e9f6e;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
         <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
@@ -1351,7 +1351,8 @@ function checkInsurance() {
   if (!spz && !vin) { alert('Není vyplněná SPZ ani VIN.'); return; }
   const d = new Date();
   const date = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-  const idParam = spz ? ('rpn=' + encodeURIComponent(spz)) : ('vin=' + encodeURIComponent(vin));
+  // VIN preferred — it's the reliable identifier; SPZ can carry scan typos.
+  const idParam = vin ? ('vin=' + encodeURIComponent(vin)) : ('rpn=' + encodeURIComponent(spz));
   const url = `https://ic.ckp.cz/ICwww/servlet?_page=searchSPZ&lngID=1&${idParam}&date=${encodeURIComponent(date)}`;
   window.open(url, '_blank');
 }
