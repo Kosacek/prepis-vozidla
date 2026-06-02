@@ -661,6 +661,7 @@
         <a id="btn-zmeny" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu vlastníka</a>
         <a id="btn-zapis" class="btn-download" target="_blank" style="display:none;">📄 Žádost o zápis do registru</a>
         <a id="btn-zmena" class="btn-download" target="_blank" style="display:none;">📄 Žádost o změnu údajů</a>
+        <button id="btn-pojisteni" class="btn-download" onclick="checkInsurance()" style="display:none;background:#0e9f6e;" title="Otevře ČKP s předvyplněnou SPZ — zaškrtni prohlášení a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
         <button class="btn-download btn-print" onclick="printAll()">Vytisknout vše</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
@@ -1301,7 +1302,8 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, plne_moce: result.plne_moce || [] };
+      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, plne_moce: result.plne_moce || [],
+                        spz: data.registracni_znacka || '', vin: data.vin || '' };
       for (const [key, btnId] of [['zmeny','btn-zmeny'], ['zapis','btn-zapis'], ['zmena','btn-zmena']]) {
         const url = result[key];
         const btn = document.getElementById(btnId);
@@ -1309,6 +1311,9 @@ async function generatePDFs() {
         if (url) { btn.href = url; btn.style.display = ''; }
         else     { btn.style.display = 'none'; }
       }
+      // Insurance-check button: shown when we have an SPZ or VIN to look up
+      const insBtn = document.getElementById('btn-pojisteni');
+      if (insBtn) insBtn.style.display = (generatedUrls.spz || generatedUrls.vin) ? '' : 'none';
       // Show plné moci links
       const pmDiv = document.getElementById('plne-moce-links');
       if (generatedUrls.plne_moce.length) {
@@ -1335,6 +1340,20 @@ async function generatePDFs() {
     document.getElementById('nav-next').disabled = false;
     alert('Chyba při generování PDF.');
   }
+}
+
+// Open ČKP insurance lookup with the vehicle's SPZ (or VIN) + today's date
+// pre-filled via URL params. The user ticks the declaration + solves the
+// CAPTCHA themselves — we only deep-link to the public form, never submit.
+function checkInsurance() {
+  const spz = (generatedUrls.spz || '').trim();
+  const vin = (generatedUrls.vin || '').trim();
+  if (!spz && !vin) { alert('Není vyplněná SPZ ani VIN.'); return; }
+  const d = new Date();
+  const date = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  const idParam = spz ? ('rpn=' + encodeURIComponent(spz)) : ('vin=' + encodeURIComponent(vin));
+  const url = `https://ic.ckp.cz/ICwww/servlet?_page=searchSPZ&lngID=1&${idParam}&date=${encodeURIComponent(date)}`;
+  window.open(url, '_blank');
 }
 
 function printAll() {
