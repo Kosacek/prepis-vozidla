@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.2.1"
+__version__ = "1.2.5"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -954,14 +954,19 @@ def api_orv():
     body = request.json or {}
     return jsonify(lookup_orv(body.get("serie", ""), body.get("cislo", "")))
 
-def resolve_payer(data: dict) -> str:
+def resolve_payer(data: dict) -> tuple:
     """Who pays ALSETA for the service = the buyer / new-owner side, uniformly
     across all modes: the jiný provozovatel if that box is checked, else the
     nový vlastník. Never the seller (puvodni_*) — for a převod the new owner
-    pays. Used as the fallback when the client didn't send ppd_prijato_od."""
+    pays. Returns (name, ico). Used as the fallback when the client didn't
+    send ppd_prijato_od."""
     if data.get("novy_prov_jiny"):
-        return (data.get("novy_prov_jmeno") or "").strip() or (data.get("novy_jmeno") or "").strip()
-    return (data.get("novy_jmeno") or "").strip()
+        name = (data.get("novy_prov_jmeno") or "").strip() or (data.get("novy_jmeno") or "").strip()
+        ico = (data.get("novy_prov_ico") or "").strip() or (data.get("novy_ico") or "").strip()
+    else:
+        name = (data.get("novy_jmeno") or "").strip()
+        ico = (data.get("novy_ico") or "").strip()
+    return name, ico
 
 
 @app.route("/api/generate", methods=["POST"])
@@ -1043,14 +1048,23 @@ def api_generate():
             rz = data.get("registracni_znacka", "")
             vin = data.get("vin", "")
             purpose = "Zastupování na MMB"  # fixed — ALSETA represents the client at Magistrát města Brna
-            payer = (data.get("ppd_prijato_od") or "").strip() or resolve_payer(data)
+            # Explicit payer (from the field) keeps only its explicit IČO (set
+            # when a saved firm / ARES result was picked; empty for a hand-typed
+            # name or private person). Only when the field is empty do we fall
+            # back to the buyer side — name AND its IČO together.
+            explicit_name = (data.get("ppd_prijato_od") or "").strip()
+            if explicit_name:
+                payer = explicit_name
+                payer_ico = (data.get("ppd_prijato_ico") or "").strip()
+            else:
+                payer, payer_ico = resolve_payer(data)
             today = datetime.now().strftime("%d.%m.%Y")
             number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
-                "date": today, "payer": payer, "amount": amount,
-                "purpose": purpose, "vehicle": rz or vin,
+                "date": today, "payer": payer, "payer_ico": payer_ico,
+                "amount": amount, "purpose": purpose, "vehicle": rz or vin,
             })
             ppd_bytes = ppd.build_ppd_pdf({
-                "number": number, "date": today, "payer": payer,
+                "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
                 "amount": amount, "purpose": purpose,
             })
             with open(os.path.join(out_dir, f"ppd_{ts}.pdf"), "wb") as f:

@@ -165,6 +165,7 @@ def build_ppd_pdf(record: dict) -> bytes:
     number = record.get("number", "")
     date = record.get("date", "")
     payer = record.get("payer", "")
+    payer_ico = str(record.get("payer_ico", "") or "").strip()
     amount = record.get("amount", "")
     purpose = record.get("purpose", "")
     words = amount_to_words_cs(amount) if isinstance(amount, int) else amount_to_words_cs(int(amount or 0))
@@ -177,29 +178,33 @@ def build_ppd_pdf(record: dict) -> bytes:
     c.setFont(font, 15)
     c.drawCentredString(W / 2, H - 26 * mm, "PŘÍJMOVÝ POKLADNÍ DOKLAD")
     c.setFont(font, 12)
-    c.drawCentredString(W / 2, H - 33 * mm, f"č. {number}")
+    c.drawCentredString(W / 2, H - 34 * mm, f"č. {number}")
 
     left = 18 * mm
-    y = H - 48 * mm
-    line_h = 9 * mm
+    y = H - 54 * mm
+    GAP_LABEL_VAL = 6 * mm     # label baseline → value baseline
+    GAP_BLOCK = 14 * mm        # value baseline → next label baseline
+
+    def line(text, size=10, gap=10 * mm):
+        nonlocal y
+        c.setFont(font, size)
+        c.drawString(left, y, text)
+        y -= gap
 
     def field(label, value, big=False):
         nonlocal y
         c.setFont(font, 9)
         c.drawString(left, y, label)
-        c.setFont(font, 13 if big else 11)
-        c.drawString(left, y - 5.5 * mm, str(value))
-        y -= line_h + (3 * mm if big else 0)
+        c.setFont(font, 14 if big else 11.5)
+        c.drawString(left, y - GAP_LABEL_VAL, str(value))
+        y -= GAP_LABEL_VAL + GAP_BLOCK
 
     # Issuer (DPH status intentionally not printed)
-    c.setFont(font, 10)
-    c.drawString(left, y, f"Příjemce: {ISSUER_NAME}   IČO: {ISSUER_ICO}")
-    y -= line_h
-    c.setFont(font, 10)
-    c.drawString(left, y, f"Datum: {date}")
-    y -= line_h + 2 * mm
+    line(f"Příjemce: {ISSUER_NAME}   IČO: {ISSUER_ICO}", 10, 9 * mm)
+    line(f"Datum: {date}", 10, 13 * mm)
 
-    field("Přijato od:", payer)
+    payer_value = f"{payer}   IČO: {payer_ico}" if payer_ico else payer
+    field("Přijato od:", payer_value)
     field("Částka:", f"{amount} Kč", big=True)
     field("Slovy:", words)
     field("Účel platby:", purpose)

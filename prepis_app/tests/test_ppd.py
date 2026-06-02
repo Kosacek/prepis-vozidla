@@ -50,15 +50,17 @@ def test_pdf_renders_with_czech_text():
     pdf = ppd.build_ppd_pdf({
         "number": 7,
         "date": "02.06.2026",
-        "payer": "PETR KUPUJÍCÍ",
+        "payer": "AUTO CARDION s.r.o.",
+        "payer_ico": "04156854",
         "amount": 1300,
-        "purpose": "Za vyřízení přepisu vozidla RZ 1AB2345",
+        "purpose": "Zastupování na MMB",
     })
     assert pdf[:4] == b"%PDF"
     text = PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
     assert "PŘÍJMOVÝ POKLADNÍ DOKLAD" in text
     assert "7" in text
-    assert "PETR KUPUJÍCÍ" in text
+    assert "AUTO CARDION s.r.o." in text
+    assert "04156854" in text       # payer IČO rendered
     assert "1300" in text
     assert "korun" in text          # amount-in-words rendered (TTF works)
     assert "07133880" in text       # issuer IČO
