@@ -33,6 +33,7 @@ ARG CACHEBUST=2026-06-02-zadosti-5
 
 # App code (read-only assets baked into the image; writable state lives on /data)
 COPY app.py ./app.py
+COPY ppd.py ./ppd.py
 COPY version.py ./version.py
 COPY VERSION ./VERSION
 COPY templates ./templates
