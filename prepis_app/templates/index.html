@@ -1475,7 +1475,7 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, ppd: result.ppd, plne_moce: result.plne_moce || [],
+      generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, ppd: result.ppd, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '' };
       // PPD print button — shown only when a receipt was generated
       const ppdBtn = document.getElementById('btn-ppd');
@@ -1527,7 +1527,17 @@ function checkInsurance() {
 }
 
 function printAll() {
-  ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
+  // Open ONLY the žádost the user actually filled out. A převod prints just
+  // the přepis (zmeny.pdf) — not the zápis form. Plné moci always print too.
+  const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena' };
+  const key = primaryByMode[generatedUrls.mode];
+  if (key && generatedUrls[key]) {
+    window.open(generatedUrls[key], '_blank');
+  } else {
+    // Defensive fallback if the mode wasn't recorded: open whatever single
+    // žádost exists (shouldn't happen in normal flow).
+    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
+  }
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
