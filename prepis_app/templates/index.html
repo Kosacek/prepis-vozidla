@@ -1511,7 +1511,7 @@ async function generatePDFs() {
   }
 }
 
-// Open ČKP insurance lookup with the vehicle's SPZ (or VIN) + today's date
+// Open ČKP insurance lookup with the vehicle's SPZ (or VIN) + tomorrow's date
 // pre-filled via URL params. The user ticks the declaration + solves the
 // CAPTCHA themselves — we only deep-link to the public form, never submit.
 function checkInsurance() {
@@ -1519,6 +1519,7 @@ function checkInsurance() {
   const vin = (generatedUrls.vin || '').trim();
   if (!spz && !vin) { alert('Není vyplněná SPZ ani VIN.'); return; }
   const d = new Date();
+  d.setDate(d.getDate() + 1);  // ČKP kontrolujeme vždy na zítřejší datum (jako datum na žádosti)
   const date = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
   // VIN preferred — it's the reliable identifier; SPZ can carry scan typos.
   const idParam = vin ? ('vin=' + encodeURIComponent(vin)) : ('rpn=' + encodeURIComponent(spz));
