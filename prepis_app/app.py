@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.3"
+__version__ = "1.3.4"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1008,16 +1008,13 @@ def api_generate():
         zapis_overlays.append((0, 554, 533, _id_text(data["novy_prov_id"])))
 
     if mode == "prevod":
+        # Převod vlastnictví = JEN žádost o změnu vlastníka (zmeny.pdf).
+        # Zápis do registru (zapis.pdf) se u převodu NEgeneruje.
         zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))
-        zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zmeny_overlays: zmeny_bytes = add_id_overlay(zmeny_bytes, zmeny_overlays)
-        if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
         fname_zmeny = os.path.join(out_dir, f"zmeny_{ts}.pdf")
-        fname_zapis = os.path.join(out_dir, f"zapis_{ts}.pdf")
         with open(fname_zmeny, "wb") as f: f.write(zmeny_bytes)
-        with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
         result["zmeny"] = f"/download/zmeny_{ts}.pdf"
-        result["zapis"] = f"/download/zapis_{ts}.pdf"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
