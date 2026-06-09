@@ -1,0 +1,81 @@
+"""Aggregation queries for the dashboard and reports."""
+from sqlite3 import Connection
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _period_clause(year: int, month: int | None) -> tuple[str, str]:
+    """Return (WHERE fragment, bind value) for the given period."""
+    if month:
+        return "substr(datum,1,7)=?", f"{year:04d}-{month:02d}"
+    return "substr(datum,1,4)=?", f"{year:04d}"
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def mesicni_souhrn(conn: Connection, year: int, month: int) -> dict:
+    """Return total count and revenue for a single calendar month."""
+    r = conn.execute(
+        "SELECT COUNT(*) n, COALESCE(SUM(celkem),0) s FROM ukony "
+        "WHERE substr(datum,1,7)=?",
+        (f"{year:04d}-{month:02d}",),
+    ).fetchone()
+    return {"pocet": r["n"], "trzby": r["s"]}
+
+
+def rocni_souhrn(conn: Connection, year: int) -> dict:
+    """Return total count and revenue for a full calendar year."""
+    r = conn.execute(
+        "SELECT COUNT(*) n, COALESCE(SUM(celkem),0) s FROM ukony "
+        "WHERE substr(datum,1,4)=?",
+        (f"{year:04d}",),
+    ).fetchone()
+    return {"pocet": r["n"], "trzby": r["s"]}
+
+
+def rocni_trend(conn: Connection, year: int) -> list[dict]:
+    """Return a 12-element list (one entry per month) with pocet and trzby."""
+    rows = conn.execute(
+        "SELECT substr(datum,6,2) m, COUNT(*) n, COALESCE(SUM(celkem),0) s "
+        "FROM ukony WHERE substr(datum,1,4)=? GROUP BY m",
+        (f"{year:04d}",),
+    ).fetchall()
+    by_month = {r["m"]: (r["n"], r["s"]) for r in rows}
+    out: list[dict] = []
+    for mo in range(1, 13):
+        n, s = by_month.get(f"{mo:02d}", (0, 0))
+        out.append({"month": mo, "pocet": n, "trzby": s})
+    return out
+
+
+def podle_firmy(conn: Connection, year: int, month: int | None = None) -> list:
+    """Revenue and count per firma for the given period, ordered by revenue desc."""
+    cl, arg = _period_clause(year, month)
+    return conn.execute(
+        f"SELECT f.zkratka, COUNT(*) pocet, COALESCE(SUM(u.celkem),0) trzby "
+        f"FROM ukony u JOIN firmy f ON f.id=u.firma_id WHERE {cl} "
+        f"GROUP BY f.id ORDER BY trzby DESC",
+        (arg,),
+    ).fetchall()
+
+
+def podle_typu(conn: Connection, year: int, month: int | None = None) -> list:
+    """Revenue and count per úkon type for the given period, ordered by count desc."""
+    cl, arg = _period_clause(year, month)
+    return conn.execute(
+        f"SELECT typ_kod, COUNT(*) pocet, COALESCE(SUM(celkem),0) trzby "
+        f"FROM ukony WHERE {cl} GROUP BY typ_kod ORDER BY pocet DESC",
+        (arg,),
+    ).fetchall()
+
+
+def nezaplaceno_celkem(conn: Connection) -> float:
+    """Return the total outstanding balance across all úkony (celkem - zaplaceno_kc)."""
+    r = conn.execute(
+        "SELECT COALESCE(SUM(celkem - zaplaceno_kc),0) d FROM ukony"
+    ).fetchone()
+    return r["d"]
