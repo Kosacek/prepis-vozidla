@@ -904,7 +904,33 @@ ul.list li > span:last-child {
 }
 
 /* ------------------------------------------------------------
-   20. Responsive tweaks
+   20. Login page
+   ------------------------------------------------------------ */
+.login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.login-card {
+  max-width: 360px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.login-card h2 {
+  margin-bottom: var(--sp-5);
+}
+
+.login-card .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: var(--sp-2);
+}
+
+/* ------------------------------------------------------------
+   21. Responsive tweaks
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .topnav {

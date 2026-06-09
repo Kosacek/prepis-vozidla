@@ -31,3 +31,5 @@ ukony_tracker/scripts/seed_data/
 ukony_tracker/.coverage
 ukony_tracker/.pytest_cache/
 ukony_tracker/**/__pycache__/
+
+ukony_tracker/.env
