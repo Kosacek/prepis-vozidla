@@ -29,6 +29,13 @@
           <option value="12" {% if month == 12 %}selected{% endif %}>Prosinec</option>
         </select>
       </div>
+      <div class="field">
+        <label for="excel-firma">Firma</label>
+        <select id="excel-firma" name="firma">
+          <option value="">— všechny firmy —</option>
+          {% for f in firmy %}<option value="{{ f.id }}">{{ f.zkratka }}</option>{% endfor %}
+        </select>
+      </div>
     </div>
     <button type="submit" class="btn btn-primary">Stáhnout Excel</button>
   </form>

@@ -2,6 +2,7 @@ import io
 from datetime import date
 from flask import Blueprint, render_template, request, send_file
 import db
+from repositories import firmy_repo
 from services import export_service
 
 bp = Blueprint("export", __name__)
@@ -10,7 +11,8 @@ bp = Blueprint("export", __name__)
 @bp.get("/export")
 def index():
     t = date.today()
-    return render_template("export.html", year=t.year, month=t.month)
+    return render_template("export.html", year=t.year, month=t.month,
+                           firmy=firmy_repo.list_all(db.get_db()))
 
 
 @bp.get("/export/excel")
@@ -18,8 +20,14 @@ def excel():
     conn = db.get_db()
     year = request.args.get("year", type=int) or date.today().year
     month = request.args.get("month", type=int) or None
-    data = export_service.export_excel(conn, year, month)
-    name = f"ukony_{year}" + (f"-{month:02d}" if month else "") + ".xlsx"
+    firma_id = request.args.get("firma", type=int) or None
+    data = export_service.export_excel(conn, year, month, firma_id=firma_id)
+    suffix = ""
+    if firma_id:
+        f = firmy_repo.get(conn, firma_id)
+        if f:
+            suffix = "_" + (f["zkratka"] or f["nazev"]).replace(" ", "_")
+    name = f"ukony_{year}" + (f"-{month:02d}" if month else "") + suffix + ".xlsx"
     return send_file(
         io.BytesIO(data),
         as_attachment=True,

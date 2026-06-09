@@ -11,16 +11,22 @@ from repositories import firmy_repo, ukony_repo
 HEAD = ["Datum", "RZ", "Úkon", "Celkem", "VIN", "Poznámka", "Zaplaceno", "Zaplaceno Kč"]
 
 
-def export_excel(conn: Connection, year: int, month: int | None = None) -> bytes:
+def export_excel(conn: Connection, year: int, month: int | None = None,
+                 firma_id: int | None = None) -> bytes:
     """Return an Excel workbook (.xlsx) as raw bytes.
 
     One sheet per firma that has úkony in the requested period.  The last row
-    of each sheet is a CELKEM totals row.
+    of each sheet is a CELKEM totals row.  If ``firma_id`` is given, only that
+    firma is exported.
     """
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # remove the default empty sheet
 
-    for f in firmy_repo.list_all(conn):
+    firmy = firmy_repo.list_all(conn)
+    if firma_id is not None:
+        firmy = [f for f in firmy if f["id"] == firma_id]
+
+    for f in firmy:
         rows = ukony_repo.list(conn, firma_id=f["id"], year=year, month=month)
         if not rows:
             continue

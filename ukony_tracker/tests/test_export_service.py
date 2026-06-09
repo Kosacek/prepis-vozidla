@@ -32,3 +32,12 @@ def test_csv_flat(conn):
     csv = ex.export_csv(conn, "2026-05-01", "2026-05-31")
     assert "firma" in csv.splitlines()[0]
     assert csv.count("\n") >= 3
+
+
+def test_excel_single_firma_only(conn):
+    c = firmy_repo.create(conn, nazev="Cardion", zkratka="Cardion", ico="1")
+    a = firmy_repo.create(conn, nazev="Albion", zkratka="Albion", ico="2")
+    ing.pridat_ukon(conn, firma_id=c, datum="2026-05-04", typ_kod="PŘEVOD", celkem=1300)
+    ing.pridat_ukon(conn, firma_id=a, datum="2026-05-05", typ_kod="DOVOZ", celkem=2000)
+    wb = openpyxl.load_workbook(io.BytesIO(ex.export_excel(conn, 2026, 5, firma_id=c)))
+    assert wb.sheetnames == ["Cardion"]  # only the chosen firma, not Albion
