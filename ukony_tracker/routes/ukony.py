@@ -119,9 +119,17 @@ def edit_save(uid):
     conn = db.get_db()
     if not ukony_repo.get(conn, uid):
         abort(404)
+    u = ukony_repo.get(conn, uid)
     f = request.form
     try:
+        date.fromisoformat(f.get("datum") or "")  # validate date format
         celkem = float(f.get("celkem") or 0)
+        if celkem < 0:
+            raise ValueError("záporná cena")
+        # Re-derive payment state against the (possibly changed) celkem so the
+        # table badge and the dashboard 'Nezaplaceno' KPI can never disagree.
+        zaplaceno = min(float(u["zaplaceno_kc"]), celkem)
+        stav = ing.derive_stav(celkem, zaplaceno)
         ukony_repo.update(
             conn, uid,
             datum=f.get("datum"),
@@ -130,10 +138,12 @@ def edit_save(uid):
             celkem=celkem,
             vin=f.get("vin") or None,
             poznamka=f.get("poznamka") or None,
+            zaplaceno_kc=zaplaceno,
+            stav_platby=stav,
         )
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):
-        flash("Neplatné hodnoty (zkontroluj cenu).", "error")
+        flash("Neplatné hodnoty (zkontroluj datum a cenu).", "error")
     return redirect(f.get("back") or url_for("ukony.table"))
 
 
@@ -157,7 +167,7 @@ def mark_paid(uid):
     except ValueError:
         z = float(u["celkem"])
     z = max(0.0, min(z, float(u["celkem"])))
-    stav = "zaplaceno" if z >= u["celkem"] else ("castecne" if z > 0 else "nezaplaceno")
+    stav = ing.derive_stav(float(u["celkem"]), z)
     ukony_repo.update(conn, uid, zaplaceno_kc=z, stav_platby=stav)
     flash("Platba zaznamenána.", "success")
     return redirect(request.form.get("back") or url_for("ukony.table"))

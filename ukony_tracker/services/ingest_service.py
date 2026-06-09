@@ -43,12 +43,18 @@ def _resolve_firma(conn: Connection, firma_id: int | None, ico: str | None) -> i
     raise UnknownFirmaError("firmu nelze určit (chybí firma_id i platné IČO)")
 
 
-def _derive_stav(celkem: float, zaplaceno_kc: float) -> str:
+def derive_stav(celkem: float, zaplaceno_kc: float) -> str:
+    """Derive payment state from the amount received. The single source of truth
+    for ``stav_platby`` — used by the create path AND by edit/mark-paid routes."""
     if zaplaceno_kc <= 0:
         return config.STAV_NEZAPLACENO
     if zaplaceno_kc >= celkem:
         return config.STAV_ZAPLACENO
     return config.STAV_CASTECNE
+
+
+# Backward-compatible alias (existing imports/tests may reference the old name).
+_derive_stav = derive_stav
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +105,7 @@ def pridat_ukon(
     fid = _resolve_firma(conn, firma_id, ico)
 
     # --- derive payment state (single source of truth) ---
-    stav = _derive_stav(celkem, zaplaceno_kc)
+    stav = derive_stav(celkem, zaplaceno_kc)
 
     return ukony_repo.create(
         conn,

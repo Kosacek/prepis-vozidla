@@ -142,3 +142,31 @@ def test_edit_form_renders(client_fid):
     r = c.get(f"/ukony/{uid}/upravit")
     assert r.status_code == 200
     assert "EDIT123" in r.get_data(as_text=True)
+
+
+def test_edit_raising_celkem_rederives_to_castecne(client_fid):
+    """Editing celkem ABOVE a fully-paid amount must drop stav to 'castecne'."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    with c.application.app_context():
+        ukony_repo.update(db.get_db(), uid, zaplaceno_kc=1300, stav_platby="zaplaceno")
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "2000"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert float(row["celkem"]) == 2000.0
+    assert float(row["zaplaceno_kc"]) == 1300.0
+    assert row["stav_platby"] == "castecne"
+
+
+def test_edit_lowering_celkem_to_paid_rederives_to_zaplaceno(client_fid):
+    """Lowering celkem down to the amount already received must become 'zaplaceno'."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    with c.application.app_context():
+        ukony_repo.update(db.get_db(), uid, zaplaceno_kc=800, stav_platby="castecne")
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "800"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert float(row["celkem"]) == 800.0
+    assert float(row["zaplaceno_kc"]) == 800.0
+    assert row["stav_platby"] == "zaplaceno"
