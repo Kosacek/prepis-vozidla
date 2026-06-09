@@ -26,3 +26,8 @@ Thumbs.db
 # personal income data — keep out of git
 ukony_tracker/data/
 ukony_tracker/scripts/seed_data/
+
+# ukony_tracker test/coverage artefacts
+ukony_tracker/.coverage
+ukony_tracker/.pytest_cache/
+ukony_tracker/**/__pycache__/
