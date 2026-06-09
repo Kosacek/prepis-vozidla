@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Úkony — přehled{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Úkony</h1>
+</div>
+
+{# ── Filter bar ── #}
+<div class="card" style="margin-bottom: var(--sp-5);">
+  <form method="get" action="/ukony/vse" class="filter-bar">
+    <div class="filter-bar__fields">
+      <select name="firma" class="filter-select">
+        <option value="">Všechny firmy</option>
+        {% for f in firmy %}
+          <option value="{{ f.id }}" {{ 'selected' if sel.firma == f.id }}>{{ f.zkratka }}</option>
+        {% endfor %}
+      </select>
+
+      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month">
+
+      <select name="typ" class="filter-select">
+        <option value="">Všechny typy</option>
+        {% for t in typy %}
+          <option value="{{ t.kod }}" {{ 'selected' if sel.typ == t.kod }}>{{ t.kod }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="stav" class="filter-select">
+        <option value="">Vše</option>
+        <option value="nezaplaceno" {{ 'selected' if sel.stav == 'nezaplaceno' }}>Nezaplaceno</option>
+        <option value="zaplaceno"   {{ 'selected' if sel.stav == 'zaplaceno'   }}>Zaplaceno</option>
+        <option value="castecne"    {{ 'selected' if sel.stav == 'castecne'    }}>Částečně</option>
+      </select>
+
+      <button type="submit" class="btn btn-primary btn-sm">Filtrovat</button>
+      <a href="/ukony/vse" class="btn btn-sm">Vše</a>
+    </div>
+    <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
+      {{ ukony|length }} úkonů · {{ total|int }} Kč
+    </div>
+  </form>
+</div>
+
+{# ── Table ── #}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Firma</th>
+        <th>RZ</th>
+        <th>Úkon</th>
+        <th class="right">Kč</th>
+        <th>VIN</th>
+        <th>Poznámka</th>
+        <th>Platba</th>
+        <th>Akce</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in ukony %}
+      <tr>
+        <td class="muted" style="white-space:nowrap;">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</td>
+        <td style="white-space:nowrap;">{{ u.firma_zkratka }}</td>
+        <td><b>{{ u.rz or '—' }}</b></td>
+        <td>{{ u.typ_kod }}</td>
+        <td class="right">{{ u.celkem|int }}</td>
+        <td class="muted small">{{ u.vin or '' }}</td>
+        <td class="muted small">{{ u.poznamka or '' }}</td>
+        <td>
+          {% if u.stav_platby == 'zaplaceno' %}
+            <span class="badge ok">zapl.</span>
+          {% elif u.stav_platby == 'castecne' %}
+            <span class="badge warn">část. {{ u.zaplaceno_kc|int }} Kč</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="actions">
+          {# Full pay button #}
+          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" style="display:inline;">
+            <input type="hidden" name="back" value="{{ request.full_path }}">
+            <button type="submit" class="btn btn-sm" title="Označit zaplaceno">✓ zapl.</button>
+          </form>
+
+          {# Partial pay #}
+          <details class="partial-pay">
+            <summary class="btn btn-sm">část.</summary>
+            <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="partial-pay__form">
+              <input type="hidden" name="back" value="{{ request.full_path }}">
+              <input type="number" name="castka" inputmode="numeric" placeholder="část. Kč"
+                     min="0" max="{{ u.celkem }}" class="partial-pay__input">
+              <button type="submit" class="btn btn-sm btn-primary">OK</button>
+            </form>
+          </details>
+
+          {# Edit link #}
+          <a href="/ukony/{{ u.id }}/upravit?back={{ request.full_path | urlencode }}"
+             class="btn btn-sm">upravit</a>
+
+          {# Delete #}
+          <form method="post" action="/ukony/{{ u.id }}/smazat" style="display:inline;"
+                onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
+            <input type="hidden" name="back" value="{{ request.full_path }}">
+            <button type="submit" class="btn btn-sm btn-danger">smazat</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" class="center muted" style="padding: var(--sp-6);">
+          Žádné úkony neodpovídají filtru.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if ukony %}
+    <tfoot>
+      <tr>
+        <td colspan="4" class="muted">{{ ukony|length }} úkonů</td>
+        <td class="right"><b>{{ total|int }} Kč</b></td>
+        <td colspan="4"></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+
+{% endblock %}

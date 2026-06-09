@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Upravit úkon{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Upravit úkon</h1>
+</div>
+
+<div class="card" style="max-width: 600px;">
+  <div class="card-title">Úkon #{{ u.id }}</div>
+  <form method="post" action="/ukony/{{ u.id }}/upravit">
+    <input type="hidden" name="back" value="{{ request.args.get('back', '') }}">
+
+    <div class="form-row">
+      <div class="field">
+        <label>Datum</label>
+        <input type="date" name="datum" value="{{ u.datum }}" required>
+      </div>
+      <div class="field">
+        <label>RZ / SPZ</label>
+        <input name="rz" value="{{ u.rz or '' }}" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Typ úkonu</label>
+      <select name="typ_kod">
+        {% for t in typy %}
+          <option value="{{ t.kod }}" {{ 'selected' if u.typ_kod == t.kod }}>{{ t.kod }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Cena (Kč)</label>
+        <input name="celkem" inputmode="numeric" value="{{ u.celkem|int }}" required>
+      </div>
+      <div class="field">
+        <label>VIN</label>
+        <input name="vin" value="{{ u.vin or '' }}">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Poznámka</label>
+      <input name="poznamka" value="{{ u.poznamka or '' }}">
+    </div>
+
+    <div style="display:flex; gap: var(--sp-3); align-items:center; margin-top: var(--sp-2);">
+      <button type="submit" class="btn btn-primary">Uložit</button>
+      <a href="{{ request.args.get('back') or '/ukony/vse' }}" class="btn">Zpět</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

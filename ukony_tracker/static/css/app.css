@@ -698,7 +698,118 @@ ul.list li > span:last-child {
 .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
 
 /* ------------------------------------------------------------
-   18. Responsive tweaks
+   18. Table filter bar
+   ------------------------------------------------------------ */
+.filter-bar__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  padding: 6px 28px 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236e6e73'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
+
+.filter-month {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-month:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
+
+/* Actions cell — inline wrapping flex */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+  white-space: nowrap;
+}
+
+.actions form { display: inline; }
+
+/* Partial-pay disclosure widget */
+.partial-pay {
+  display: inline-block;
+  position: relative;
+}
+
+.partial-pay summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.partial-pay summary::-webkit-details-marker { display: none; }
+
+.partial-pay__form {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: var(--sp-2) var(--sp-3);
+  min-width: 200px;
+}
+
+.partial-pay__input {
+  flex: 1;
+  min-width: 80px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.8125rem;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.partial-pay__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
+
+/* ------------------------------------------------------------
+   19. Responsive tweaks
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .topnav {

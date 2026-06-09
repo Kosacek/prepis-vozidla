@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import date
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 import db
@@ -75,3 +76,88 @@ def add(firma_id):
     except ing.IngestError as e:
         flash(str(e), "error")
     return redirect(url_for("ukony.entry", firma_id=firma_id, mesic=f.get("mesic")))
+
+
+@bp.get("/ukony/vse")
+def table():
+    conn = db.get_db()
+    firma_id = request.args.get("firma", type=int)
+    mesic = request.args.get("mesic") or ""
+    typ = request.args.get("typ") or None
+    stav = request.args.get("stav") or None
+    year = month = None
+    if mesic:
+        year, month = (int(x) for x in mesic.split("-"))
+    rows = ukony_repo.list(conn, firma_id=firma_id, year=year, month=month, typ_kod=typ, stav=stav)
+    total = sum(r["celkem"] for r in rows)
+    return render_template(
+        "ukony_table.html",
+        ukony=rows,
+        firmy=firmy_repo.list_all(conn),
+        typy=typy_repo.list_active(conn),
+        total=total,
+        sel={"firma": firma_id, "mesic": mesic, "typ": typ, "stav": stav},
+    )
+
+
+@bp.get("/ukony/<int:uid>/upravit")
+def edit_form(uid):
+    conn = db.get_db()
+    u = ukony_repo.get(conn, uid)
+    if not u:
+        abort(404)
+    return render_template(
+        "ukony_edit.html",
+        u=u,
+        typy=typy_repo.list_active(conn),
+        firmy=firmy_repo.list_all(conn),
+    )
+
+
+@bp.post("/ukony/<int:uid>/upravit")
+def edit_save(uid):
+    conn = db.get_db()
+    if not ukony_repo.get(conn, uid):
+        abort(404)
+    f = request.form
+    try:
+        celkem = float(f.get("celkem") or 0)
+        ukony_repo.update(
+            conn, uid,
+            datum=f.get("datum"),
+            rz=f.get("rz") or None,
+            typ_kod=f.get("typ_kod"),
+            celkem=celkem,
+            vin=f.get("vin") or None,
+            poznamka=f.get("poznamka") or None,
+        )
+        flash("Úkon upraven.", "success")
+    except (ValueError, sqlite3.IntegrityError):
+        flash("Neplatné hodnoty (zkontroluj cenu).", "error")
+    return redirect(f.get("back") or url_for("ukony.table"))
+
+
+@bp.post("/ukony/<int:uid>/smazat")
+def delete(uid):
+    conn = db.get_db()
+    ukony_repo.delete(conn, uid)
+    flash("Úkon smazán.", "success")
+    return redirect(request.form.get("back") or url_for("ukony.table"))
+
+
+@bp.post("/ukony/<int:uid>/zaplaceno")
+def mark_paid(uid):
+    conn = db.get_db()
+    u = ukony_repo.get(conn, uid)
+    if not u:
+        abort(404)
+    castka = request.form.get("castka")
+    try:
+        z = float(castka) if castka else float(u["celkem"])
+    except ValueError:
+        z = float(u["celkem"])
+    z = max(0.0, min(z, float(u["celkem"])))
+    stav = "zaplaceno" if z >= u["celkem"] else ("castecne" if z > 0 else "nezaplaceno")
+    ukony_repo.update(conn, uid, zaplaceno_kc=z, stav_platby=stav)
+    flash("Platba zaznamenána.", "success")
+    return redirect(request.form.get("back") or url_for("ukony.table"))
