@@ -809,7 +809,96 @@ ul.list li > span:last-child {
 }
 
 /* ------------------------------------------------------------
-   19. Responsive tweaks
+   19. Dashboard layout
+   ------------------------------------------------------------ */
+
+/* Two-column grid, collapses to 1 col on narrow screens */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+@media (max-width: 760px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card header row: title left, segmented control right */
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.card-head h2 {
+  margin-bottom: 0;
+}
+
+/* KPI value and label (used in .kpi blocks) */
+.kpi-v {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.kpi-l {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+/* Horizontal bar rows for per-firma breakdown */
+.bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 64px;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.bar-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-track {
+  height: 8px;
+  background: var(--line);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.bar-amt {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------
+   20. Responsive tweaks
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .topnav {

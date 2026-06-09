@@ -1,5 +1,59 @@
 {% extends "base.html" %}
+{% block title %}Přehled{% endblock %}
 {% block content %}
-<h1>Přehled</h1>
-<p class="muted">Dashboard — doplní se (Task 14).</p>
+<div class="page-header">
+  <h1>Přehled</h1>
+  <form method="get">
+    <select name="rok" onchange="this.form.submit()" class="filter-select">
+      {% for y in roky %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-v">{{ mesic.pocet }}</div><div class="kpi-l">Úkonů tento měsíc</div></div>
+  <div class="kpi"><div class="kpi-v">{{ mesic.trzby|int }} Kč</div><div class="kpi-l">Tržby tento měsíc</div></div>
+  <div class="kpi"><div class="kpi-v">{{ rok.trzby|int }} Kč</div><div class="kpi-l">Tržby {{ year }}</div></div>
+  <div class="kpi"><div class="kpi-v">{{ nezaplaceno|int }} Kč</div><div class="kpi-l">Nezaplaceno</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Měsíční tržby</h2>
+      <div class="seg" id="metric-seg"><span class="on" data-metric="trzby">Kč</span><span data-metric="pocet">Počet</span></div>
+    </div>
+    <canvas id="trendChart" height="120"></canvas>
+  </div>
+  <div class="card">
+    <h2>Typy úkonů</h2>
+    <canvas id="typChart" height="160"></canvas>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Podle firmy</h2>
+    {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
+    {% for r in per_firma %}
+    <div class="bar-row">
+      <span class="bar-label">{{ r.zkratka }}</span>
+      <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
+      <span class="bar-amt">{{ r.trzby|int }}</span>
+    </div>
+    {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+  </div>
+  <div class="card">
+    <h2>Poslední úkony</h2>
+    <ul class="list">
+      {% for u in recent %}
+      <li><span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+        <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.firma_zkratka }} · {{ u.typ_kod }}</span></span>
+        <span>{{ u.celkem|int }} Kč</span></li>
+      {% else %}<li class="muted">Žádné úkony.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<script>window.TREND = {{ trend_json|safe }}; window.TYP = {{ typ_json|safe }};</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}
