@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Úkony — {{ firma.zkratka if firma else '' }}{% endblock %}
+{% block content %}
+<div class="pills">
+  {% for f in firmy %}
+    <a class="pill {{ 'on' if firma and f.id==firma.id }}" href="/ukony/{{ f.id }}?mesic={{ mesic }}">{{ f.zkratka }}</a>
+  {% endfor %}
+  <a class="pill more" href="/firmy">+ firma</a>
+</div>
+
+{% if not firma %}
+  <div class="card"><p class="muted">Zatím nemáš žádnou aktivní firmu. <a href="/firmy">Přidej firmu →</a></p></div>
+{% else %}
+<div class="month-line">
+  <form method="get" action="/ukony/{{ firma.id }}">
+    <input type="month" name="mesic" value="{{ mesic }}" onchange="this.form.submit()">
+  </form>
+  <div class="muted"><b>{{ pocet }}</b> úkonů · <b>{{ total|int }} Kč</b></div>
+</div>
+
+<div class="card">
+  <h2>Nový úkon</h2>
+  <form method="post" action="/ukony/{{ firma.id }}">
+    <input type="hidden" name="mesic" value="{{ mesic }}">
+    <div class="form-row">
+      <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
+      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off"></div>
+    </div>
+    <div class="field">
+      <label>Typ úkonu</label>
+      <div class="seg" id="typ-seg">
+        {% for t in typy %}
+        <span data-kod="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" class="{{ 'on' if loop.first }}">{{ t.kod }}</span>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="typ_kod" id="typ_kod" value="{{ typy[0].kod if typy }}">
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ (typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '' }}"></div>
+      <div class="field"><label>VIN</label><input name="vin"></div>
+    </div>
+    <div class="field">
+      <label>Poznámka</label>
+      <input name="poznamka" id="poznamka">
+      <div class="chips">
+        <span class="chip" data-tag="TZ">+ TZ</span>
+        <span class="chip" data-tag="PM">+ PM</span>
+        <span class="chip" data-tag="RZ">+ RZ</span>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Přidat úkon</button>
+  </form>
+</div>
+
+<div class="divider">Tento měsíc</div>
+<ul class="list">
+  {% for u in ukony %}
+  <li>
+    <span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+    <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.typ_kod }}{% if u.poznamka %} · {{ u.poznamka }}{% endif %}</span></span>
+    <span>{{ u.celkem|int }} Kč {% if u.stav_platby=='zaplaceno' %}<span class="badge ok">zapl.</span>{% elif u.stav_platby=='castecne' %}<span class="badge warn">část.</span>{% endif %}</span>
+  </li>
+  {% else %}
+  <li class="muted">Zatím žádné úkony v tomto měsíci.</li>
+  {% endfor %}
+</ul>
+<a class="muted" href="/ukony/vse?firma={{ firma.id }}">Zobrazit všechny úkony →</a>
+{% endif %}
+
+<script>
+(function(){
+  var seg=document.getElementById('typ-seg');
+  if(seg){ seg.addEventListener('click',function(e){
+    var s=e.target.closest('span[data-kod]'); if(!s)return;
+    seg.querySelectorAll('span').forEach(x=>x.classList.remove('on'));
+    s.classList.add('on');
+    document.getElementById('typ_kod').value=s.dataset.kod;
+    if(s.dataset.cena) document.getElementById('celkem').value=s.dataset.cena;
+  });}
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click',function(){
+      var p=document.getElementById('poznamka'); p.value=(p.value?p.value+' ':'')+c.dataset.tag;
+    });
+  });
+  var rz=document.getElementById('rz'); if(rz) rz.focus();
+})();
+</script>
+{% endblock %}

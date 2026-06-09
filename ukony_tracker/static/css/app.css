@@ -564,7 +564,141 @@ tfoot td {
 }
 
 /* ------------------------------------------------------------
-   17. Responsive tweaks
+   17. Entry-screen components
+   ------------------------------------------------------------ */
+
+/* .pill.more — transparent, accent-coloured "add" pill */
+.pill.more {
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px dashed var(--accent);
+}
+
+.pill.more:hover {
+  background: rgba(0, 113, 227, .07);
+  color: var(--accent-dark);
+  text-decoration: none;
+}
+
+/* Month line — date picker + running total side by side */
+.month-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.month-line input[type="month"] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.month-line input[type="month"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
+
+/* Inline form row for entry card */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* Tag chips below the poznámka field */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chip:hover {
+  background: #d1d1d6;
+  color: var(--ink);
+}
+
+/* Section divider with hairlines */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-5) 0 var(--sp-4);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* .list used as <ul> with inline <li> rows */
+ul.list {
+  list-style: none;
+  padding: 0;
+}
+
+ul.list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9375rem;
+}
+
+ul.list li:last-child {
+  border-bottom: none;
+}
+
+ul.list li:hover {
+  background: var(--bg);
+}
+
+ul.list li > span:last-child {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Status badge variants for payment state */
+.badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
+
+/* ------------------------------------------------------------
+   18. Responsive tweaks
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .topnav {

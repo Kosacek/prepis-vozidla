@@ -26,7 +26,10 @@ def create_app():
 
     from routes.dashboard import bp as dashboard_bp
     app.register_blueprint(dashboard_bp)
-    # NOTE: later tasks (12-18) each add their own `app.register_blueprint(...)` line here.
+
+    from routes.ukony import bp as ukony_bp
+    app.register_blueprint(ukony_bp)
+    # NOTE: later tasks (13-18) each add their own `app.register_blueprint(...)` line here.
 
     @app.get("/health")
     def health():
