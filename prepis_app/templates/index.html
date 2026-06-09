@@ -1112,14 +1112,24 @@ document.addEventListener('keydown', e => {
 
 // ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
 let _dokladyCache = [];
+let _dokladyDeletedCache = [];
 async function openDokladyModal() {
   document.getElementById('doklady-modal').style.display = 'flex';
   document.getElementById('doklady-modal-body').innerHTML = 'Načítám…';
-  try {
-    const res = await fetch('/api/ppd-list');
-    _dokladyCache = await res.json();
-  } catch { _dokladyCache = []; }
   document.getElementById('doklady-search').value = '';
+  await reloadDoklady();
+}
+async function reloadDoklady() {
+  // Live ledger + the deleted (backup-only) rows, fetched from the server so
+  // the view always matches the write-only backup truth.
+  try {
+    const [live, del] = await Promise.all([
+      fetch('/api/ppd-list').then(r => r.json()),
+      fetch('/api/ppd-deleted').then(r => r.json()),
+    ]);
+    _dokladyCache = live || [];
+    _dokladyDeletedCache = del || [];
+  } catch { _dokladyCache = []; _dokladyDeletedCache = []; }
   renderDoklady();
 }
 function closeDokladyModal() {
@@ -1136,39 +1146,68 @@ function renderDoklady() {
     String(d.datum || '').toLowerCase().includes(q) ||
     String(d.ucel || '').toLowerCase().includes(q) ||
     String(d.vozidlo || '').toLowerCase().includes(q));
+
+  let html = '';
   if (!rows.length) {
-    body.innerHTML = '<p style="color:var(--muted);padding:16px">' +
+    html += '<p style="color:var(--muted);padding:16px">' +
       (_dokladyCache.length ? 'Nic nenalezeno.' : 'Zatím žádné vystavené doklady.') + '</p>';
-    return;
+  } else {
+    html += `<table class="doklady-table">
+      <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th>Účel</th><th></th></tr></thead>
+      <tbody>${rows.map(d => `
+        <tr>
+          <td><b>${esc(String(d.cislo))}</b></td>
+          <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
+          <td>${esc(String(d.prijato_od || ''))}</td>
+          <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
+          <td>${esc(String(d.ucel || ''))}</td>
+          <td style="white-space:nowrap">
+            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
+            <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
+          </td>
+        </tr>`).join('')}</tbody>
+    </table>`;
   }
-  body.innerHTML = `<table class="doklady-table">
-    <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th>Účel</th><th></th></tr></thead>
-    <tbody>${rows.map(d => `
-      <tr>
-        <td><b>${esc(String(d.cislo))}</b></td>
-        <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
-        <td>${esc(String(d.prijato_od || ''))}</td>
-        <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
-        <td>${esc(String(d.ucel || ''))}</td>
-        <td style="white-space:nowrap">
-          <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
-          <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
-        </td>
-      </tr>`).join('')}</tbody>
-  </table>`;
+
+  // Deleted receipts live in the append-only backup and can be restored.
+  const del = _dokladyDeletedCache || [];
+  if (del.length) {
+    html += `<details class="doklady-deleted" style="margin-top:16px">
+      <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 4px;user-select:none">🗑 Smazané doklady — záloha (${del.length}) · lze obnovit</summary>
+      <table class="doklady-table" style="margin-top:6px">
+        <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th></th></tr></thead>
+        <tbody>${del.map(d => `
+          <tr style="opacity:.75">
+            <td><b>${esc(String(d.cislo))}</b></td>
+            <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
+            <td>${esc(String(d.prijato_od || ''))}</td>
+            <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
+            <td style="white-space:nowrap">
+              <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
+              <button onclick="restoreDoklad('${esc(String(d.cislo))}')" title="Obnovit doklad" class="btn-sm" style="margin-left:6px;color:#059669;border-color:#059669;font-weight:700">↩︎ Obnovit</button>
+            </td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </details>`;
+  }
+  body.innerHTML = html;
 }
 async function deleteDoklad(cislo) {
-  if (!confirm('Opravdu smazat doklad č. ' + cislo + '?\nTato akce je nevratná.')) return;
+  if (!confirm('Opravdu smazat doklad č. ' + cislo + '?\nZůstane v záloze a půjde kdykoliv obnovit.')) return;
   try {
     const res = await fetch('/api/ppd/' + encodeURIComponent(cislo), { method: 'DELETE' });
     const d = await res.json();
-    if (d.success) {
-      _dokladyCache = _dokladyCache.filter(x => String(x.cislo) !== String(cislo));
-      renderDoklady();
-    } else {
-      alert('Smazání se nezdařilo.');
-    }
+    if (d.success) { await reloadDoklady(); }
+    else alert('Smazání se nezdařilo.');
   } catch { alert('Chyba při mazání dokladu.'); }
+}
+async function restoreDoklad(cislo) {
+  try {
+    const res = await fetch('/api/ppd/' + encodeURIComponent(cislo) + '/restore', { method: 'POST' });
+    const d = await res.json();
+    if (d.success) { await reloadDoklady(); }
+    else alert(d.error || 'Obnovení se nezdařilo.');
+  } catch { alert('Chyba při obnovování dokladu.'); }
 }
 
 function _renderFirmyBody() {

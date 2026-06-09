@@ -77,9 +77,36 @@ EVIDENCE_NAME = "ppd_evidence.xlsx"
 _LOCK_NAME = "ppd.lock"
 _HEADER = ["Číslo", "Datum", "Přijato od", "Částka (Kč)", "Účel", "Vozidlo"]
 
+# Append-only backup ("write but never delete"): a row is added for every
+# issued receipt and is NEVER removed — even when the receipt is deleted from
+# the live ledger. This is the recovery source for an accidental delete.
+BACKUP_NAME = "ppd_backup.xlsx"
+_BACKUP_HEADER = ["Číslo", "Vystaveno", "Datum", "Přijato od", "IČO",
+                  "Adresa", "Částka (Kč)", "Účel", "SPZ", "VIN"]
+
 
 def _evidence_path(data_dir: str) -> str:
     return os.path.join(data_dir, EVIDENCE_NAME)
+
+
+def _backup_path(data_dir: str) -> str:
+    return os.path.join(data_dir, BACKUP_NAME)
+
+
+def _atomic_save(wb, path: str) -> None:
+    """Write a workbook to `path` crash-safely: temp file → fsync → keep a
+    .bak of the previous version → atomic os.replace."""
+    tmp = path + ".tmp"
+    wb.save(tmp)
+    with open(tmp, "rb+") as f:
+        os.fsync(f.fileno())
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        try:
+            import shutil
+            shutil.copyfile(path, path + ".bak")
+        except Exception:
+            pass
+    os.replace(tmp, path)
 
 
 def _max_number(ws) -> int:
@@ -120,7 +147,9 @@ def reserve_ppd_number_and_log(data_dir: str, record: dict) -> int:
             ws.title = "PPD"
             ws.append(_HEADER)
 
-        number = _max_number(ws) + 1
+        # Never reuse a number: take the high-water mark across BOTH the live
+        # ledger and the append-only backup (which retains deleted numbers).
+        number = max(_max_number(ws), _max_backup_number(data_dir)) + 1
         ws.append([
             number,
             record.get("date", ""),
@@ -129,19 +158,7 @@ def reserve_ppd_number_and_log(data_dir: str, record: dict) -> int:
             record.get("purpose", ""),
             record.get("vehicle", ""),
         ])
-
-        # Atomic save: write temp, fsync, keep .bak, replace.
-        tmp = path + ".tmp"
-        wb.save(tmp)
-        with open(tmp, "rb+") as f:
-            os.fsync(f.fileno())
-        if os.path.exists(path) and os.path.getsize(path) > 0:
-            try:
-                import shutil
-                shutil.copyfile(path, path + ".bak")
-            except Exception:
-                pass
-        os.replace(tmp, path)
+        _atomic_save(wb, path)
         return number
     finally:
         try:
@@ -152,9 +169,11 @@ def reserve_ppd_number_and_log(data_dir: str, record: dict) -> int:
 
 
 def delete_ppd(data_dir: str, number: int) -> bool:
-    """Remove a receipt's row(s) from the evidence ledger, under the same
+    """Remove a receipt's row(s) from the LIVE evidence ledger, under the same
     exclusive lock as allocation so a concurrent generate can't corrupt it.
-    Returns True if a row was removed. The PDF file is removed by the caller.
+    Returns True if a row was removed. The append-only backup keeps its copy,
+    so a deleted receipt stays recoverable. The PDF file is intentionally kept
+    by the caller (recovery), not removed.
     (Numbers are never reused, so a delete just leaves a gap — fine.)"""
     path = _evidence_path(data_dir)
     if not (os.path.exists(path) and os.path.getsize(path) > 0):
@@ -176,16 +195,7 @@ def delete_ppd(data_dir: str, number: int) -> bool:
             return False
         for idx in reversed(to_delete):
             ws.delete_rows(idx, 1)
-        tmp = path + ".tmp"
-        wb.save(tmp)
-        with open(tmp, "rb+") as f:
-            os.fsync(f.fileno())
-        try:
-            import shutil
-            shutil.copyfile(path, path + ".bak")
-        except Exception:
-            pass
-        os.replace(tmp, path)
+        _atomic_save(wb, path)
         return True
     finally:
         try:
@@ -224,6 +234,156 @@ def read_ppd_log(data_dir: str) -> list:
         wb.close()  # read_only mode leaks the file handle until closed
     rows.sort(key=lambda x: (x["cislo"] if isinstance(x["cislo"], int) else 0), reverse=True)
     return rows
+
+
+# ── Append-only backup + restore ────────────────────────────────────────────
+def append_backup(data_dir: str, record: dict) -> None:
+    """Append one row to the write-only backup (BACKUP_NAME). Best-effort: never
+    raises, so a backup hiccup can't break receipt generation. Uses the ledger
+    lock so it can't interleave with other writers. NEVER removes rows."""
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        lock_fd = open(os.path.join(data_dir, _LOCK_NAME), "a+")
+        try:
+            if _HAVE_FCNTL:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+            path = _backup_path(data_dir)
+            if os.path.exists(path) and os.path.getsize(path) > 0:
+                wb = openpyxl.load_workbook(path)
+                ws = wb.active
+            else:
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "Záloha"
+                ws.append(_BACKUP_HEADER)
+            ws.append([
+                record.get("cislo", ""),
+                record.get("ts", ""),
+                record.get("date", ""),
+                record.get("payer", ""),
+                record.get("payer_ico", ""),
+                record.get("payer_address", ""),
+                record.get("amount", ""),
+                record.get("purpose", ""),
+                record.get("spz", ""),
+                record.get("vin", ""),
+            ])
+            _atomic_save(wb, path)
+        finally:
+            try:
+                if _HAVE_FCNTL:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+            finally:
+                lock_fd.close()
+    except Exception:
+        pass
+
+
+def read_backup(data_dir: str) -> list:
+    """All rows ever written to the backup (newest first). One dict per row."""
+    path = _backup_path(data_dir)
+    if not (os.path.exists(path) and os.path.getsize(path) > 0):
+        return []
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True)
+    except Exception:
+        return []
+    rows = []
+    try:
+        ws = wb.active
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            if not r or r[0] is None:
+                continue
+            rows.append({
+                "cislo":      r[0],
+                "vystaveno":  r[1] if len(r) > 1 else "",
+                "datum":      r[2] if len(r) > 2 else "",
+                "prijato_od": r[3] if len(r) > 3 else "",
+                "ico":        r[4] if len(r) > 4 else "",
+                "adresa":     r[5] if len(r) > 5 else "",
+                "castka":     r[6] if len(r) > 6 else "",
+                "ucel":       r[7] if len(r) > 7 else "",
+                "spz":        r[8] if len(r) > 8 else "",
+                "vin":        r[9] if len(r) > 9 else "",
+            })
+    finally:
+        wb.close()  # read_only mode leaks the file handle until closed
+    rows.sort(key=lambda x: (x["cislo"] if isinstance(x["cislo"], int) else 0), reverse=True)
+    return rows
+
+
+def _max_backup_number(data_dir: str) -> int:
+    """Highest číslo ever issued (from the append-only backup), so numbering
+    never reuses a value even after the top receipt is deleted from the live
+    ledger. 0 when the backup is empty/absent."""
+    mx = 0
+    for r in read_backup(data_dir):
+        try:
+            v = int(r["cislo"])
+            if v > mx:
+                mx = v
+        except (TypeError, ValueError):
+            continue
+    return mx
+
+
+def deleted_ppd(data_dir: str) -> list:
+    """Receipts present in the backup but no longer in the live ledger = the
+    ones that were deleted. Newest first. Feeds the in-app restore view."""
+    live = {r["cislo"] for r in read_ppd_log(data_dir)}
+    seen = {}
+    for r in read_backup(data_dir):       # newest-first → keep latest per číslo
+        if r["cislo"] not in seen:
+            seen[r["cislo"]] = r
+    out = [r for n, r in seen.items() if n not in live]
+    out.sort(key=lambda x: (x["cislo"] if isinstance(x["cislo"], int) else 0), reverse=True)
+    return out
+
+
+def restore_ppd_row(data_dir: str, record: dict) -> bool:
+    """Re-insert a deleted receipt into the LIVE ledger using its ORIGINAL číslo
+    (no re-allocation). Returns True if inserted, False if that číslo is already
+    live. Under the ledger lock.
+
+    record: {cislo, datum, prijato_od, castka, ucel, vozidlo}
+    """
+    number = int(record.get("cislo"))
+    os.makedirs(data_dir, exist_ok=True)
+    path = _evidence_path(data_dir)
+    lock_fd = open(os.path.join(data_dir, _LOCK_NAME), "a+")
+    try:
+        if _HAVE_FCNTL:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            wb = openpyxl.load_workbook(path)
+            ws = wb.active
+        else:
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "PPD"
+            ws.append(_HEADER)
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            try:
+                if int(row[0]) == number:
+                    return False          # already live → nothing to do
+            except (TypeError, ValueError):
+                continue
+        ws.append([
+            number,
+            record.get("datum", ""),
+            record.get("prijato_od", ""),
+            record.get("castka", ""),
+            record.get("ucel", ""),
+            record.get("vozidlo", ""),
+        ])
+        _atomic_save(wb, path)
+        return True
+    finally:
+        try:
+            if _HAVE_FCNTL:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fd.close()
 
 
 # ── A5 receipt PDF ──────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.6"
+__version__ = "1.3.7"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1087,6 +1087,15 @@ def api_generate():
             with open(os.path.join(out_dir, ppd_name), "wb") as f:
                 f.write(ppd_bytes)
             result["ppd"] = f"/download/{ppd_name}"
+            # Append-only backup — the write-only safety net. A row is written
+            # here for every receipt and is NEVER removed, so an accidental
+            # delete in the dashboard stays recoverable.
+            ppd.append_backup(DATA_DIR, {
+                "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
+                "date": today, "payer": payer, "payer_ico": payer_ico,
+                "payer_address": payer_address, "amount": amount, "purpose": purpose,
+                "spz": rz, "vin": vin,
+            })
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 
@@ -1112,15 +1121,32 @@ def api_ppd_list():
 
 @app.route("/api/ppd/<int:number>", methods=["DELETE"])
 def api_ppd_delete(number):
-    """Delete a receipt — its ledger row + its PDF file."""
+    """Remove a receipt from the LIVE ledger. The append-only backup keeps its
+    copy and the PDF file is left on disk, so the receipt can be restored."""
     removed = ppd.delete_ppd(DATA_DIR, number)
-    pdf_path = os.path.join(DATA_DIR, "output", f"ppd_{number}.pdf")
-    try:
-        if os.path.exists(pdf_path):
-            os.remove(pdf_path)
-    except OSError:
-        pass
     return jsonify({"success": True, "removed": removed})
+
+
+@app.route("/api/ppd-deleted", methods=["GET"])
+def api_ppd_deleted():
+    """Deleted receipts (in the backup, not in the live ledger) for the restore
+    view in the Doklady browser."""
+    return jsonify(ppd.deleted_ppd(DATA_DIR))
+
+
+@app.route("/api/ppd/<int:number>/restore", methods=["POST"])
+def api_ppd_restore(number):
+    """Put a deleted receipt back into the live ledger from the backup. The PDF
+    was never removed, so nothing to regenerate."""
+    rec = next((r for r in ppd.read_backup(DATA_DIR) if r.get("cislo") == number), None)
+    if not rec:
+        return jsonify({"success": False, "error": "V záloze není doklad s tímto číslem."}), 404
+    restored = ppd.restore_ppd_row(DATA_DIR, {
+        "cislo": number, "datum": rec.get("datum", ""),
+        "prijato_od": rec.get("prijato_od", ""), "castka": rec.get("castka", ""),
+        "ucel": rec.get("ucel", ""), "vozidlo": rec.get("spz") or rec.get("vin") or "",
+    })
+    return jsonify({"success": True, "restored": restored})
 
 @app.route("/api/scan", methods=["POST"])
 def api_scan():
