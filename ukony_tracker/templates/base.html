@@ -4,19 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
   <header class="topnav">
-    <div class="brand">Úkony Tracker</div>
-    <nav>
-      <a href="/">Přehled</a>
-      <a href="/ukony">Úkony</a>
-      <a href="/firmy">Firmy</a>
-      <a href="/nastaveni">Nastavení</a>
-      <a href="/export">Export</a>
-    </nav>
+    <div class="topnav-inner">
+      <div class="brand">Úkony Tracker</div>
+      {% if authed %}
+      <nav>
+        <a href="/">Přehled</a>
+        <a href="/ukony">Úkony</a>
+        <a href="/firmy">Firmy</a>
+        <a href="/nastaveni">Nastavení</a>
+        <a href="/export">Export</a>
+      </nav>
+      <form method="post" action="/logout" class="logout-form">
+        <button type="submit" class="btn-logout">Odhlásit</button>
+      </form>
+      {% endif %}
+    </div>
   </header>
   <main class="container">
     {% with msgs = get_flashed_messages(with_categories=true) %}

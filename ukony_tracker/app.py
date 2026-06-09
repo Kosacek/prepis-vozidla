@@ -9,6 +9,7 @@ def create_app():
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config["SECRET_KEY"] = config.SECRET_KEY
     app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # always revalidate static (no stale CSS/JS)
 
     app.teardown_appcontext(db.close_db)
 
@@ -30,11 +31,13 @@ def create_app():
 
     @app.context_processor
     def _nav_context():
+        from flask import session
         from repositories import firmy_repo, typy_repo
         conn = db.get_db()
         return {
             "nav_firmy": firmy_repo.list_all(conn, only_active=True),
             "nav_typy": typy_repo.list_active(conn),
+            "authed": (not config.ADMIN_PASSWORD) or bool(session.get("authed")),
         }
 
     from routes.dashboard import bp as dashboard_bp
