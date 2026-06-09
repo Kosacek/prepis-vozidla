@@ -30,6 +30,11 @@ def update(conn: sqlite3.Connection, fid: int, **fields) -> None:
     conn.commit()
 
 
+def delete(conn: sqlite3.Connection, fid: int) -> None:
+    conn.execute("DELETE FROM firmy WHERE id=?", (fid,))
+    conn.commit()
+
+
 def get(conn: sqlite3.Connection, fid: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM firmy WHERE id=?", (fid,)).fetchone()
 

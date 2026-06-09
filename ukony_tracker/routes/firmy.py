@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 import db
-from repositories import firmy_repo
+from repositories import firmy_repo, ukony_repo
 from services import ares_service
 
 bp = Blueprint("firmy", __name__)
@@ -8,7 +8,10 @@ bp = Blueprint("firmy", __name__)
 
 @bp.get("/firmy")
 def index():
-    return render_template("firmy.html", firmy=firmy_repo.list_all(db.get_db()))
+    conn = db.get_db()
+    firmy = firmy_repo.list_all(conn)
+    pocty = {f["id"]: ukony_repo.count_by_firma(conn, f["id"]) for f in firmy}
+    return render_template("firmy.html", firmy=firmy, pocty=pocty)
 
 
 @bp.post("/firmy")
@@ -49,6 +52,21 @@ def update(fid):
         return redirect(url_for("firmy.index"))
     firmy_repo.update(conn, fid, **fields)
     flash("Firma upravena.", "success")
+    return redirect(url_for("firmy.index"))
+
+
+@bp.post("/firmy/<int:fid>/smazat")
+def delete(fid):
+    conn = db.get_db()
+    firma = firmy_repo.get(conn, fid)
+    if not firma:
+        abort(404)
+    n = ukony_repo.count_by_firma(conn, fid)
+    if n > 0:
+        flash(f"Firmu „{firma['nazev']}“ nelze smazat — má {n} úkonů. Můžeš ji deaktivovat.", "error")
+        return redirect(url_for("firmy.index"))
+    firmy_repo.delete(conn, fid)
+    flash(f"Firma „{firma['nazev']}“ smazána.", "success")
     return redirect(url_for("firmy.index"))
 
 

@@ -40,6 +40,12 @@ def get(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM ukony WHERE id=?", (uid,)).fetchone()
 
 
+def count_by_firma(conn: sqlite3.Connection, firma_id: int) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) n FROM ukony WHERE firma_id=?", (firma_id,)
+    ).fetchone()["n"]
+
+
 def delete(conn: sqlite3.Connection, uid: int) -> None:
     conn.execute("DELETE FROM ukony WHERE id=?", (uid,))
     conn.commit()

@@ -19,3 +19,9 @@ def test_update_changes_fields_and_noop_is_safe(conn):
     # no-op edit (no fields) must not raise / corrupt the row
     firmy_repo.update(conn, fid)
     assert firmy_repo.get(conn, fid)["zkratka"] == "EV trans"
+
+
+def test_delete_removes_firma(conn):
+    fid = firmy_repo.create(conn, nazev="Smazat", zkratka="SM")
+    firmy_repo.delete(conn, fid)
+    assert firmy_repo.get(conn, fid) is None

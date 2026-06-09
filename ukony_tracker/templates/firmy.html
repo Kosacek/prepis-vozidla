@@ -52,6 +52,7 @@
         <th>IČO</th>
         <th>PSČ</th>
         <th>Aktivní</th>
+        <th>Úkonů</th>
         <th></th>
       </tr>
     </thead>
@@ -63,13 +64,20 @@
         <td class="muted">{{ firma.ico or '—' }}</td>
         <td class="muted">{{ firma.psc or '—' }}</td>
         <td>{% if firma.aktivni %}✓{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="muted">{{ pocty[firma.id] }}</td>
         <td class="actions">
           <button type="button" class="btn btn-sm"
             onclick="toggleEdit({{ firma.id }})">Upravit</button>
+          {% if pocty[firma.id] == 0 %}
+          <form method="post" action="/firmy/{{ firma.id }}/smazat" style="display:inline"
+            onsubmit="return confirm('Opravdu smazat firmu {{ firma.nazev }}? Tato akce je nevratná.')">
+            <button type="submit" class="btn btn-sm btn-danger">Smazat</button>
+          </form>
+          {% endif %}
         </td>
       </tr>
       <tr id="edit-row-{{ firma.id }}" style="display:none;">
-        <td colspan="6" style="padding: var(--sp-4);">
+        <td colspan="7" style="padding: var(--sp-4);">
           <form method="post" action="/firmy/{{ firma.id }}">
             <div class="fields-row">
               <div class="field">
@@ -119,7 +127,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" class="muted center" style="padding: var(--sp-5);">Zatím žádné firmy.</td>
+        <td colspan="7" class="muted center" style="padding: var(--sp-5);">Zatím žádné firmy.</td>
       </tr>
       {% endfor %}
     </tbody>
