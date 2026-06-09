@@ -20,3 +20,9 @@ prepis_app/output/
 # OS
 .DS_Store
 Thumbs.db
+
+.superpowers/
+
+# personal income data — keep out of git
+ukony_tracker/data/
+ukony_tracker/scripts/seed_data/
