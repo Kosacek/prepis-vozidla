@@ -29,7 +29,9 @@ def create_app():
 
     from routes.ukony import bp as ukony_bp
     app.register_blueprint(ukony_bp)
-    # NOTE: later tasks (13-18) each add their own `app.register_blueprint(...)` line here.
+
+    from routes.firmy import bp as firmy_bp
+    app.register_blueprint(firmy_bp)
 
     @app.get("/health")
     def health():

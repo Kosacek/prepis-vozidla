@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Firmy — Úkony Tracker{% endblock %}
+{% block content %}
+<h1 class="page-header">Firmy</h1>
+
+<div class="card">
+  <div class="card-title">Přidat firmu</div>
+  <form method="post" action="/firmy">
+    <div class="fields-row">
+      <div class="field">
+        <label for="new-ico">IČO</label>
+        <input type="text" id="new-ico" name="ico" maxlength="8" placeholder="12345678">
+      </div>
+      <div class="field" style="align-self:flex-end;">
+        <button type="button" class="btn btn-sm" onclick="aresFill(this)">Načíst z ARES</button>
+      </div>
+    </div>
+    <div class="fields-row">
+      <div class="field">
+        <label for="new-nazev">Název <span class="muted">*</span></label>
+        <input type="text" id="new-nazev" name="nazev" required placeholder="Název firmy">
+      </div>
+      <div class="field">
+        <label for="new-zkratka">Zkratka <span class="muted">*</span></label>
+        <input type="text" id="new-zkratka" name="zkratka" required placeholder="zkr">
+      </div>
+    </div>
+    <div class="fields-row">
+      <div class="field">
+        <label for="new-adresa">Adresa</label>
+        <input type="text" id="new-adresa" name="adresa" placeholder="Ulice 1, Město">
+      </div>
+      <div class="field">
+        <label for="new-psc">PSČ</label>
+        <input type="text" id="new-psc" name="psc" maxlength="10" placeholder="100 00">
+      </div>
+      <div class="field">
+        <label for="new-poradi">Pořadí</label>
+        <input type="number" id="new-poradi" name="poradi" value="0" min="0">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Přidat firmu</button>
+  </form>
+</div>
+
+<div class="table-wrap" style="margin-top: var(--sp-5);">
+  <table>
+    <thead>
+      <tr>
+        <th>Název</th>
+        <th>Zkratka</th>
+        <th>IČO</th>
+        <th>PSČ</th>
+        <th>Aktivní</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for firma in firmy %}
+      <tr>
+        <td>{{ firma.nazev }}</td>
+        <td>{{ firma.zkratka }}</td>
+        <td class="muted">{{ firma.ico or '—' }}</td>
+        <td class="muted">{{ firma.psc or '—' }}</td>
+        <td>{% if firma.aktivni %}✓{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="actions">
+          <button type="button" class="btn btn-sm"
+            onclick="toggleEdit({{ firma.id }})">Upravit</button>
+        </td>
+      </tr>
+      <tr id="edit-row-{{ firma.id }}" style="display:none;">
+        <td colspan="6" style="padding: var(--sp-4);">
+          <form method="post" action="/firmy/{{ firma.id }}">
+            <div class="fields-row">
+              <div class="field">
+                <label>IČO</label>
+                <input type="text" name="ico" value="{{ firma.ico or '' }}" maxlength="8">
+              </div>
+              <div class="field" style="align-self:flex-end;">
+                <button type="button" class="btn btn-sm" onclick="aresFill(this)">Načíst z ARES</button>
+              </div>
+            </div>
+            <div class="fields-row">
+              <div class="field">
+                <label>Název *</label>
+                <input type="text" name="nazev" value="{{ firma.nazev }}" required>
+              </div>
+              <div class="field">
+                <label>Zkratka *</label>
+                <input type="text" name="zkratka" value="{{ firma.zkratka }}" required>
+              </div>
+            </div>
+            <div class="fields-row">
+              <div class="field">
+                <label>Adresa</label>
+                <input type="text" name="adresa" value="{{ firma.adresa or '' }}">
+              </div>
+              <div class="field">
+                <label>PSČ</label>
+                <input type="text" name="psc" value="{{ firma.psc or '' }}" maxlength="10">
+              </div>
+              <div class="field">
+                <label>Pořadí</label>
+                <input type="number" name="poradi" value="{{ firma.poradi }}" min="0">
+              </div>
+            </div>
+            <div class="field" style="flex-direction:row; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-4);">
+              <input type="checkbox" name="aktivni" id="aktivni-{{ firma.id }}"
+                {% if firma.aktivni %}checked{% endif %}
+                style="width:auto;">
+              <label for="aktivni-{{ firma.id }}" style="font-size:0.9375rem; font-weight:400;">Aktivní</label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn btn-primary btn-sm">Uložit</button>
+              <button type="button" class="btn btn-sm" onclick="toggleEdit({{ firma.id }})">Zrušit</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="muted center" style="padding: var(--sp-5);">Zatím žádné firmy.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function toggleEdit(id) {
+  var row = document.getElementById('edit-row-' + id);
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function aresFill(btn) {
+  var ico = btn.closest('form').querySelector('[name=ico]').value;
+  fetch('/firmy/ares?ico=' + encodeURIComponent(ico))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { alert('IČO nenalezeno v ARES'); return; }
+      var fm = btn.closest('form');
+      if (!fm.nazev.value) fm.nazev.value = d.nazev;
+      fm.adresa.value = d.adresa;
+      fm.psc.value = d.psc;
+    });
+}
+</script>
+{% endblock %}
