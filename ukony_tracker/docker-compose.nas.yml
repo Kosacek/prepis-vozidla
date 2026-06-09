@@ -1,0 +1,27 @@
+services:
+  ukony:
+    build:
+      context: /share/Container/ukony/source
+      dockerfile: Dockerfile
+    image: ukony:latest
+    container_name: ukony-app
+    networks:
+      - spznaklic-web_default
+    volumes:
+      - /share/Container/ukony/data:/data
+    environment:
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set in .env}"
+      SECRET_KEY: "${SECRET_KEY:?SECRET_KEY must be set in .env}"
+      DATA_DIR: "/data"
+      HTTP_PORT: "8090"
+      TZ: "Europe/Prague"
+    user: "0:0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  spznaklic-web_default:
+    external: true
