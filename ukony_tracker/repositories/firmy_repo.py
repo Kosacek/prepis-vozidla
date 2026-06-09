@@ -23,6 +23,8 @@ def create(
 
 
 def update(conn: sqlite3.Connection, fid: int, **fields) -> None:
+    if not fields:
+        return  # no-op edit: avoid building malformed "UPDATE firmy SET  WHERE id=?"
     cols = ", ".join(f"{k}=?" for k in fields)
     conn.execute(f"UPDATE firmy SET {cols} WHERE id=?", (*fields.values(), fid))
     conn.commit()
