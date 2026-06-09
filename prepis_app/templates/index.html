@@ -696,6 +696,7 @@
           <div style="position:relative">
             <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest()" style="width:100%">
             <input type="hidden" id="ppd_prijato_ico">
+            <input type="hidden" id="ppd_prijato_adresa">
             <div class="firm-dropdown" id="ppd-payer-firms"></div>
           </div>
         </div>
@@ -1057,15 +1058,16 @@ async function ppdPayerSuggest() {
   const inp = document.getElementById('ppd_prijato_od');
   const dd  = document.getElementById('ppd-payer-firms');
   const q = inp.value.trim();
-  // User is typing → the previously-picked IČO no longer applies.
+  // User is typing → the previously-picked IČO/adresa no longer apply.
   document.getElementById('ppd_prijato_ico').value = '';
+  document.getElementById('ppd_prijato_adresa').value = '';
   if (!q) { dd.classList.remove('open'); return; }
   const firms = await getSavedFirms();
   const filtered = firms
     .filter(f => f.nazev.toLowerCase().includes(q.toLowerCase()) || f.ico.includes(q))
     .slice(0, 8);
   dd.innerHTML = filtered.map(f => `
-    <div class="firm-option" onclick="ppdPayerPick('${esc(f.nazev)}','${esc(f.ico)}')">
+    <div class="firm-option" onclick="ppdPayerPick('${esc(f.nazev)}','${esc(f.ico)}','${esc(f.adresa||'')}')">
       <div class="firm-name">${esc(f.nazev)}</div>
       <div class="firm-sub">IČO: ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}</div>
     </div>`).join('');
@@ -1076,9 +1078,10 @@ async function ppdPayerSuggest() {
     _ppdAresTimer = setTimeout(() => ppdPayerAres(q), 400);
   }
 }
-function ppdPayerPick(name, ico) {
+function ppdPayerPick(name, ico, adresa) {
   document.getElementById('ppd_prijato_od').value = name;
   document.getElementById('ppd_prijato_ico').value = ico || '';
+  document.getElementById('ppd_prijato_adresa').value = adresa || '';
   document.getElementById('ppd-payer-firms').classList.remove('open');
 }
 async function ppdPayerAres(ico) {
@@ -1087,9 +1090,9 @@ async function ppdPayerAres(ico) {
     const d = await res.json();
     if (d && d.success && d.nazev) {
       const dd = document.getElementById('ppd-payer-firms');
-      dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(d.nazev)}','${esc(ico)}')">
+      dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(d.nazev)}','${esc(ico)}','${esc(d.adresa||'')}')">
         <div class="firm-name">${esc(d.nazev)}</div>
-        <div class="firm-sub">ARES · IČO ${esc(ico)}</div></div>`;
+        <div class="firm-sub">ARES · IČO ${esc(ico)}${d.adresa ? ' · ' + esc(d.adresa) : ''}</div></div>`;
       dd.classList.add('open');
     }
   } catch (e) { /* ignore — ARES optional */ }
@@ -1405,6 +1408,12 @@ function buildSummary() {
     ppdField.value = jiny ? (v('novy_prov_jmeno') || v('novy_jmeno')) : v('novy_jmeno');
     const icoEl = document.getElementById('ppd_prijato_ico');
     if (icoEl) icoEl.value = jiny ? (v('novy_prov_ico') || v('novy_ico')) : v('novy_ico');
+    const adrEl = document.getElementById('ppd_prijato_adresa');
+    if (adrEl) {
+      const a = jiny ? v('novy_prov_adresa') : v('novy_adresa');
+      const p = jiny ? v('novy_prov_psc')    : v('novy_psc');
+      adrEl.value = a ? (a + (p ? ', ' + p : '')) : p;
+    }
   }
 }
 
@@ -1463,6 +1472,7 @@ async function generatePDFs() {
     ppd_castka:          v('ppd_castka'),
     ppd_prijato_od:      v('ppd_prijato_od'),
     ppd_prijato_ico:     v('ppd_prijato_ico'),
+    ppd_prijato_adresa:  v('ppd_prijato_adresa'),
   };
 
   document.getElementById('nav-next').disabled = true;

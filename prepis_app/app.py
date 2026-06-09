@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.5"
+__version__ = "1.3.6"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -969,6 +969,21 @@ def resolve_payer(data: dict) -> tuple:
     return name, ico
 
 
+def resolve_payer_full(data: dict) -> tuple:
+    """Like resolve_payer but also returns the payer's address (street + PSČ),
+    sourced from the same buyer side. Returns (name, ico, address). Used as the
+    fallback for the PPD when the client didn't send an explicit payer."""
+    name, ico = resolve_payer(data)
+    if data.get("novy_prov_jiny"):
+        adresa = (data.get("novy_prov_adresa") or "").strip()
+        psc = (data.get("novy_prov_psc") or "").strip()
+    else:
+        adresa = (data.get("novy_adresa") or "").strip()
+        psc = (data.get("novy_psc") or "").strip()
+    address = adresa + (", " + psc if psc else "") if adresa else psc
+    return name, ico, address
+
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     raw = request.json or {}
@@ -1053,8 +1068,9 @@ def api_generate():
             if explicit_name:
                 payer = explicit_name
                 payer_ico = (data.get("ppd_prijato_ico") or "").strip()
+                payer_address = (data.get("ppd_prijato_adresa") or "").strip()
             else:
-                payer, payer_ico = resolve_payer(data)
+                payer, payer_ico, payer_address = resolve_payer_full(data)
             today = datetime.now().strftime("%d.%m.%Y")
             number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
                 "date": today, "payer": payer, "payer_ico": payer_ico,
@@ -1062,6 +1078,7 @@ def api_generate():
             })
             ppd_bytes = ppd.build_ppd_pdf({
                 "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
+                "payer_address": payer_address, "spz": rz, "vin": vin,
                 "amount": amount, "purpose": purpose,
             })
             # Name the PDF by receipt number (numbers never repeat) so the

@@ -86,3 +86,27 @@ def test_pdf_renders_with_czech_text():
     assert "1300" in text
     assert "korun" in text          # amount-in-words rendered (TTF works)
     assert "07133880" in text       # issuer IČO
+
+
+def test_pdf_renders_address_and_spz():
+    pdf = ppd.build_ppd_pdf({
+        "number": 9, "date": "02.06.2026",
+        "payer": "AUTO CARDION s.r.o.", "payer_ico": "04156854",
+        "payer_address": "Hlavní 456, 60200 Brno",
+        "spz": "1AB2345", "vin": "TMBxyz123",
+        "amount": 1300, "purpose": "Zastupování na MMB",
+    })
+    text = PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
+    assert "Hlavní 456, 60200 Brno" in text   # payer address rendered
+    assert "1AB2345" in text                   # SPZ rendered
+    assert "TMBxyz123" not in text             # VIN suppressed when SPZ present
+
+
+def test_pdf_vin_fallback_when_no_spz():
+    pdf = ppd.build_ppd_pdf({
+        "number": 10, "date": "02.06.2026", "payer": "Jan Novák",
+        "spz": "", "vin": "TMBVIN0001",
+        "amount": 800, "purpose": "Zastupování na MMB",
+    })
+    text = PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
+    assert "TMBVIN0001" in text                # VIN shown when there's no plate

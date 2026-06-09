@@ -230,7 +230,8 @@ def read_ppd_log(data_dir: str) -> list:
 def build_ppd_pdf(record: dict) -> bytes:
     """Draw an A5 portrait příjmový pokladní doklad.
 
-    record: {number, date, payer, amount, purpose}
+    record: {number, date, payer, payer_ico, payer_address, spz, vin,
+             amount, purpose}
     """
     font = _ensure_font()
     buf = io.BytesIO()
@@ -241,6 +242,9 @@ def build_ppd_pdf(record: dict) -> bytes:
     date = record.get("date", "")
     payer = record.get("payer", "")
     payer_ico = str(record.get("payer_ico", "") or "").strip()
+    payer_address = str(record.get("payer_address", "") or "").strip()
+    spz = str(record.get("spz", "") or "").strip()
+    vin = str(record.get("vin", "") or "").strip()
     amount = record.get("amount", "")
     purpose = record.get("purpose", "")
     words = amount_to_words_cs(amount) if isinstance(amount, int) else amount_to_words_cs(int(amount or 0))
@@ -258,7 +262,8 @@ def build_ppd_pdf(record: dict) -> bytes:
     left = 18 * mm
     y = H - 54 * mm
     GAP_LABEL_VAL = 6 * mm     # label baseline → value baseline
-    GAP_BLOCK = 14 * mm        # value baseline → next label baseline
+    GAP_BLOCK = 12 * mm        # value baseline → next label baseline
+    GAP_SUB = 5.5 * mm         # value baseline → sub-line (e.g. address)
 
     def line(text, size=10, gap=10 * mm):
         nonlocal y
@@ -266,20 +271,31 @@ def build_ppd_pdf(record: dict) -> bytes:
         c.drawString(left, y, text)
         y -= gap
 
-    def field(label, value, big=False):
+    def field(label, value, big=False, sub=""):
         nonlocal y
         c.setFont(font, 9)
         c.drawString(left, y, label)
         c.setFont(font, 14 if big else 11.5)
         c.drawString(left, y - GAP_LABEL_VAL, str(value))
-        y -= GAP_LABEL_VAL + GAP_BLOCK
+        extra = 0
+        if sub:
+            c.setFont(font, 10.5)
+            c.drawString(left, y - GAP_LABEL_VAL - GAP_SUB, str(sub))
+            extra = GAP_SUB
+        y -= GAP_LABEL_VAL + extra + GAP_BLOCK
 
     # Issuer (DPH status intentionally not printed)
     line(f"Příjemce: {ISSUER_NAME}   IČO: {ISSUER_ICO}", 10, 9 * mm)
     line(f"Datum: {date}", 10, 13 * mm)
 
+    # Payer name (+ IČO) with the address on the line right below it.
     payer_value = f"{payer}   IČO: {payer_ico}" if payer_ico else payer
-    field("Přijato od:", payer_value)
+    field("Přijato od:", payer_value, sub=payer_address)
+    # Vehicle identifier — SPZ preferred; VIN only when there's no plate yet.
+    if spz:
+        field("SPZ:", spz)
+    elif vin:
+        field("VIN:", vin)
     field("Částka:", f"{amount} Kč", big=True)
     field("Slovy:", words)
     field("Účel platby:", purpose)
