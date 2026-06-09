@@ -39,6 +39,9 @@ def create_app():
     from routes.export import bp as export_bp
     app.register_blueprint(export_bp)
 
+    from routes.api import bp as api_bp
+    app.register_blueprint(api_bp)
+
     @app.get("/health")
     def health():
         return jsonify(status="ok")
