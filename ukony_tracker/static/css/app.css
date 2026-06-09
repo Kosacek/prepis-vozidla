@@ -563,6 +563,12 @@ tfoot td {
   margin-bottom: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
 /* ------------------------------------------------------------
    17. Entry-screen components
    ------------------------------------------------------------ */

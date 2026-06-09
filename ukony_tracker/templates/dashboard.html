@@ -3,11 +3,14 @@
 {% block content %}
 <div class="page-header">
   <h1>Přehled</h1>
-  <form method="get">
-    <select name="rok" onchange="this.form.submit()" class="filter-select">
-      {% for y in roky %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}
-    </select>
-  </form>
+  <div class="header-actions">
+    <a href="/ukony" class="btn btn-primary">+ Úkon</a>
+    <form method="get">
+      <select name="rok" onchange="this.form.submit()" class="filter-select">
+        {% for y in roky %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 </div>
 
 <div class="kpis">
