@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Export — Úkony Tracker{% endblock %}
+{% block content %}
+<h1 class="page-header">Export</h1>
+
+<div class="card">
+  <div class="card-title">Excel (po firmách)</div>
+  <form method="get" action="/export/excel">
+    <div class="fields-row">
+      <div class="field">
+        <label for="excel-year">Rok</label>
+        <input type="number" id="excel-year" name="year" value="{{ year }}" min="2000" max="2099" required>
+      </div>
+      <div class="field">
+        <label for="excel-month">Měsíc</label>
+        <select id="excel-month" name="month">
+          <option value="">— celý rok —</option>
+          <option value="1"  {% if month == 1  %}selected{% endif %}>Leden</option>
+          <option value="2"  {% if month == 2  %}selected{% endif %}>Únor</option>
+          <option value="3"  {% if month == 3  %}selected{% endif %}>Březen</option>
+          <option value="4"  {% if month == 4  %}selected{% endif %}>Duben</option>
+          <option value="5"  {% if month == 5  %}selected{% endif %}>Květen</option>
+          <option value="6"  {% if month == 6  %}selected{% endif %}>Červen</option>
+          <option value="7"  {% if month == 7  %}selected{% endif %}>Červenec</option>
+          <option value="8"  {% if month == 8  %}selected{% endif %}>Srpen</option>
+          <option value="9"  {% if month == 9  %}selected{% endif %}>Září</option>
+          <option value="10" {% if month == 10 %}selected{% endif %}>Říjen</option>
+          <option value="11" {% if month == 11 %}selected{% endif %}>Listopad</option>
+          <option value="12" {% if month == 12 %}selected{% endif %}>Prosinec</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Stáhnout Excel</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">CSV (plochý)</div>
+  <form method="get" action="/export/csv">
+    <div class="fields-row">
+      <div class="field">
+        <label for="csv-from">Od</label>
+        <input type="date" id="csv-from" name="from" value="{{ year }}-01-01" required>
+      </div>
+      <div class="field">
+        <label for="csv-to">Do</label>
+        <input type="date" id="csv-to" name="to" value="{{ year }}-12-31" required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Stáhnout CSV</button>
+  </form>
+</div>
+{% endblock %}

@@ -36,6 +36,9 @@ def create_app():
     from routes.nastaveni import bp as nastaveni_bp
     app.register_blueprint(nastaveni_bp)
 
+    from routes.export import bp as export_bp
+    app.register_blueprint(export_bp)
+
     @app.get("/health")
     def health():
         return jsonify(status="ok")
