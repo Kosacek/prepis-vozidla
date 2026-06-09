@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Nastavení — Úkony Tracker{% endblock %}
+{% block content %}
+<h1 class="page-header">Nastavení — typy úkonů</h1>
+
+{% if typy %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Kód</th>
+        <th>Výchozí cena (Kč)</th>
+        <th>Pořadí</th>
+        <th>Aktivní</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for typ in typy %}
+      <tr>
+        <td>
+          <form method="post" action="/nastaveni" id="form-typ-{{ loop.index }}">
+            <input type="hidden" name="kod" value="{{ typ.kod }}">
+            <span class="strong">{{ typ.kod }}</span>
+        </td>
+        <td>
+            <div class="field" style="margin-bottom:0;">
+              <input type="number" name="vychozi_cena" value="{{ typ.vychozi_cena if typ.vychozi_cena is not none else '' }}"
+                min="0" step="0.01" placeholder="—" style="width:120px;">
+            </div>
+        </td>
+        <td>
+            <div class="field" style="margin-bottom:0;">
+              <input type="number" name="poradi" value="{{ typ.poradi }}" min="0" style="width:80px;">
+            </div>
+        </td>
+        <td>
+            <input type="checkbox" name="aktivni" {% if typ.aktivni %}checked{% endif %}
+              style="width:auto; cursor:pointer;">
+        </td>
+        <td class="actions">
+            <button type="submit" class="btn btn-primary btn-sm">Uložit</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted" style="margin-bottom: var(--sp-5);">Zatím žádné typy úkonů.</p>
+{% endif %}
+
+<div class="card" style="margin-top: var(--sp-5);">
+  <div class="card-title">Přidat typ úkonu</div>
+  <form method="post" action="/nastaveni">
+    <div class="fields-row">
+      <div class="field">
+        <label for="new-kod">Kód <span class="muted">*</span></label>
+        <input type="text" id="new-kod" name="kod" required placeholder="PŘEVOD">
+      </div>
+      <div class="field">
+        <label for="new-cena">Výchozí cena (Kč)</label>
+        <input type="number" id="new-cena" name="vychozi_cena" min="0" step="0.01" placeholder="1300">
+      </div>
+      <div class="field">
+        <label for="new-poradi">Pořadí</label>
+        <input type="number" id="new-poradi" name="poradi" value="0" min="0">
+      </div>
+    </div>
+    <div class="field" style="flex-direction:row; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-4);">
+      <input type="checkbox" name="aktivni" id="new-aktivni" checked style="width:auto;">
+      <label for="new-aktivni" style="font-size:0.9375rem; font-weight:400;">Aktivní</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Přidat typ</button>
+  </form>
+</div>
+{% endblock %}
