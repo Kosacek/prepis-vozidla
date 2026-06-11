@@ -225,9 +225,14 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
    ------------------------------------------------------------ */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--sp-4);
   margin-bottom: var(--sp-5);
+}
+
+/* 2×2 on narrow screens — never the ugly 3+1 orphan wrap */
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
 }
 
 .kpi {
