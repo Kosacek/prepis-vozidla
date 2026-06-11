@@ -1,6 +1,7 @@
-"""'v z.' (v zastoupení) must be pre-printed on every APPLICANT signature line
-of each generated žádost — Petr signs on behalf of the client. The clerk's
-lines (podpis oprávněné úřední osoby) must stay untouched."""
+"""'v z.' (v zastoupení) must be pre-filled on the applicant signature line at
+the END of each page — as real, EDITABLE AcroForm text fields (deletable in a
+PDF viewer), regular weight. The clerk's lines and the rarely-used 'Mezitímní
+vlastník' line stay untouched."""
 import io
 import os
 
@@ -26,22 +27,39 @@ def _gen(client, tmp_path, monkeypatch, mode, **extra):
         return PdfReader(io.BytesIO(f.read()))
 
 
-def _vz_count(reader):
-    return sum(p.extract_text().count("v z.") for p in reader.pages)
+def _vz_fields(reader):
+    flds = reader.get_fields() or {}
+    return {k: v for k, v in flds.items() if k.startswith("vz_podpis_")}
 
 
-def test_prevod_has_vz_on_all_4_signature_lines(client, tmp_path, monkeypatch):
+def test_prevod_has_3_editable_vz_fields(client, tmp_path, monkeypatch):
+    # End-of-page lines only: p1 bottom, p2 bottom, p3 převzetí dokladů.
+    # NOT the mid-page 'Mezitímní vlastník' line.
     rdr = _gen(client, tmp_path, monkeypatch, "prevod")
-    assert _vz_count(rdr) == 4          # p1: 1, p2: 2 (mezitímní + závěr), p3: 1
+    vz = _vz_fields(rdr)
+    assert len(vz) == 3
+    assert all(f.get("/V") == "v z." for f in vz.values())
+    assert all(f.get("/FT") == "/Tx" for f in vz.values())   # editable text field
 
 
-def test_zapis_has_vz_on_both_signature_lines(client, tmp_path, monkeypatch):
+def test_zapis_has_2_editable_vz_fields(client, tmp_path, monkeypatch):
     rdr = _gen(client, tmp_path, monkeypatch, "zapis",
                vin_z="TMBJJ7NE1L0123456", druh_vozidla_z="osobni")
-    assert _vz_count(rdr) == 2
+    vz = _vz_fields(rdr)
+    assert len(vz) == 2
+    assert all(f.get("/V") == "v z." for f in vz.values())
 
 
-def test_zmena_has_vz_on_both_signature_lines(client, tmp_path, monkeypatch):
+def test_zmena_has_2_editable_vz_fields(client, tmp_path, monkeypatch):
     rdr = _gen(client, tmp_path, monkeypatch, "zmena",
                zadost_zmena="zmena barvy na modrou")
-    assert _vz_count(rdr) == 2
+    vz = _vz_fields(rdr)
+    assert len(vz) == 2
+    assert all(f.get("/V") == "v z." for f in vz.values())
+
+
+def test_vz_is_field_not_page_content(client, tmp_path, monkeypatch):
+    # The old approach drew 'v z.' into the page content (bold, undeletable).
+    # Now it must NOT be baked into the content stream.
+    rdr = _gen(client, tmp_path, monkeypatch, "prevod")
+    assert all("v z." not in (p.extract_text() or "") for p in rdr.pages)

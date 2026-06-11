@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.9"
+__version__ = "1.3.10"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -458,25 +458,68 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
     return out.read()
 
 
-# "v z." (v zastoupení) pre-printed on every APPLICANT signature line — Petr
-# signs on behalf of the client, so the prefix saves writing it by hand each
-# time. The clerk's lines ("podpis oprávněné úřední osoby") are untouched.
-# y = baseline of each 'Podpis žadatele' dotted line (measured from the PDFs
-# via PyMuPDF label rects); x right-aligned (add_id_overlay) so the text sits
-# on the dots right after the label, leaving room for the signature itself.
+# "v z." (v zastoupení) pre-filled on the APPLICANT signature line at the end
+# of each page — Petr signs on behalf of the client. Added as real, editable
+# AcroForm text fields (NOT drawn into the page), so the text is regular
+# weight and can be deleted/edited in any PDF viewer if a client signs in
+# person. The clerk's lines and the rarely-used 'Mezitímní vlastník' line are
+# untouched. y = baseline of each 'Podpis žadatele' dotted line (measured from
+# the PDFs via the label rects).
 VZ_TEXT = "v z."
-VZ_X = 425
+VZ_X = 400
 VZ_SIGNATURE_YS = {
-    "zmeny": [(0, 95), (1, 604), (1, 37), (2, 163)],
+    "zmeny": [(0, 95), (1, 37), (2, 163)],
     "zapis": [(0, 53), (1, 105)],
     "zmena": [(0, 52), (1, 143)],
 }
 
 
-def vz_overlays(doc: str) -> list:
-    """Overlay tuples (page, x, y, text) pre-printing 'v z.' on the applicant
-    signature lines of the given form."""
-    return [(page, VZ_X, y, VZ_TEXT) for page, y in VZ_SIGNATURE_YS[doc]]
+def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
+    """Insert an editable text field valued 'v z.' on each applicant signature
+    line of the given form. Regular Helvetica via the form's own /Helv resource;
+    NeedAppearances (already required for Czech diacritics) makes viewers render
+    the value. Best-effort: returns the input unchanged on any failure."""
+    import io as _io
+    from pypdf import PdfReader as _R, PdfWriter as _W
+    from pypdf.generic import (
+        ArrayObject, BooleanObject, DictionaryObject, FloatObject,
+        NameObject, NumberObject, TextStringObject,
+    )
+    try:
+        writer = _W()
+        writer.append(_R(stream=_io.BytesIO(pdf_bytes)))
+        acro = writer._root_object.get("/AcroForm")
+        if acro is None:
+            return pdf_bytes
+        acro = acro.get_object()
+        fields = acro.setdefault(NameObject("/Fields"), ArrayObject())
+        for i, (page_idx, y) in enumerate(VZ_SIGNATURE_YS[doc], start=1):
+            field = DictionaryObject({
+                NameObject("/Type"): NameObject("/Annot"),
+                NameObject("/Subtype"): NameObject("/Widget"),
+                NameObject("/FT"): NameObject("/Tx"),
+                NameObject("/T"): TextStringObject(f"vz_podpis_{i}"),
+                NameObject("/V"): TextStringObject(VZ_TEXT),
+                NameObject("/DA"): TextStringObject("/Helv 11 Tf 0 g"),
+                NameObject("/Rect"): ArrayObject([
+                    FloatObject(VZ_X), FloatObject(y - 3),
+                    FloatObject(VZ_X + 80), FloatObject(y + 11),
+                ]),
+                NameObject("/Ff"): NumberObject(0),     # editable text field
+                NameObject("/F"): NumberObject(4),      # print flag
+            })
+            ref = writer._add_object(field)
+            page = writer.pages[page_idx]
+            field[NameObject("/P")] = page.indirect_reference
+            annots = page.setdefault(NameObject("/Annots"), ArrayObject())
+            annots.append(ref)
+            fields.append(ref)
+        acro[NameObject("/NeedAppearances")] = BooleanObject(True)
+        out = _io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception:
+        return pdf_bytes
 
 
 def _next_working_day() -> str:
@@ -1047,28 +1090,29 @@ def api_generate():
     if mode == "prevod":
         # Převod vlastnictví = JEN žádost o změnu vlastníka (zmeny.pdf).
         # Zápis do registru (zapis.pdf) se u převodu NEgeneruje.
-        zmeny_overlays.extend(vz_overlays("zmeny"))
         zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))
         if zmeny_overlays: zmeny_bytes = add_id_overlay(zmeny_bytes, zmeny_overlays)
+        zmeny_bytes = add_vz_fields(zmeny_bytes, "zmeny")
         fname_zmeny = os.path.join(out_dir, f"zmeny_{ts}.pdf")
         with open(fname_zmeny, "wb") as f: f.write(zmeny_bytes)
         result["zmeny"] = f"/download/zmeny_{ts}.pdf"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
-        zmena_overlays = vz_overlays("zmena")
+        zmena_overlays = []
         if _id_text(data.get("novy_id")):
             zmena_overlays.append((0, 540, 630, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
             zmena_overlays.append((0, 540, 438, _id_text(data["novy_prov_id"])))
         if zmena_overlays:
             zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
+        zmena_bytes = add_vz_fields(zmena_bytes, "zmena")
         fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
         with open(fname, "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/zmena_{ts}.pdf"
     else:  # zapis noveho vozidla
-        zapis_overlays.extend(vz_overlays("zapis"))
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
+        zapis_bytes = add_vz_fields(zapis_bytes, "zapis")
         fname_zapis = os.path.join(out_dir, f"zapis_{ts}.pdf")
         with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/zapis_{ts}.pdf"
