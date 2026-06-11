@@ -951,12 +951,130 @@ ul.list li > span:last-child {
 }
 
 /* ------------------------------------------------------------
+   22. "Tento měsíc" rows (entry screen)
+   ------------------------------------------------------------ */
+.mesic-list {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--sp-2) var(--sp-5);
+}
+
+.ukon-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 110px 150px auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.ukon-row:last-child { border-bottom: none; }
+
+.u-datum { font-size: 0.8125rem; white-space: nowrap; }
+
+.u-main {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.u-main b { white-space: nowrap; }
+.u-pozn {
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.71rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.u-vin {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u-kc {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.u-kc .badge { background: var(--line); color: var(--muted); }
+.u-kc .badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.u-kc .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
+
+.u-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+/* Stacked two-line layout on phones */
+@media (max-width: 700px) {
+  .mesic-list { padding: var(--sp-1) var(--sp-4); }
+
+  .ukon-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "main kc"
+      "meta actions";
+    row-gap: var(--sp-2);
+  }
+  .u-main   { grid-area: main; }
+  .u-kc     { grid-area: kc; }
+  .u-datum  { display: none; }
+  .u-main::before {
+    content: attr(data-datum);
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+  .u-main .tag { display: none; }  /* shown in the meta line instead */
+  .u-vin    { grid-area: meta; }
+  .u-vin::before {
+    content: attr(data-typ) "\00a0\00b7\00a0";
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .u-actions { grid-area: actions; }
+}
+
+/* ------------------------------------------------------------
    21. Responsive tweaks
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .topnav {
+    height: auto;
+  }
+
+  .topnav-inner {
     padding: 0 var(--sp-4);
-    gap: var(--sp-4);
+    gap: var(--sp-3);
+    height: 52px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .topnav-inner::-webkit-scrollbar { display: none; }
+
+  .topnav nav {
+    flex-shrink: 0;
   }
 
   .topnav nav a {
@@ -964,15 +1082,47 @@ ul.list li > span:last-child {
     font-size: 0.8125rem;
   }
 
+  .logout-form { flex-shrink: 0; }
+
   .container {
-    padding: var(--sp-4) var(--sp-4);
+    padding: var(--sp-4) var(--sp-4) var(--sp-6);
   }
 
   .card {
     padding: var(--sp-4);
   }
 
-  .kpi__value {
+  h1 { font-size: 1.45rem; }
+
+  .kpi__value, .kpi-v {
     font-size: 1.375rem;
+  }
+
+  .kpi {
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  /* Segmented type picker: scroll horizontally instead of squishing */
+  .seg {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg span { flex-shrink: 0; }
+
+  .month-line {
+    flex-wrap: wrap;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Bigger touch targets for inline row actions */
+  .u-actions .btn-sm {
+    padding: 6px 10px;
   }
 }

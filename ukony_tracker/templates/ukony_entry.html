@@ -53,18 +53,42 @@
 </div>
 
 <div class="divider">Tento měsíc</div>
-<ul class="list">
+{% set back_url = '/ukony/' ~ firma.id ~ '?mesic=' ~ mesic %}
+<div class="mesic-list">
   {% for u in ukony %}
-  <li>
-    <span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
-    <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.typ_kod }}{% if u.poznamka %} · {{ u.poznamka }}{% endif %}</span></span>
-    <span>{{ u.celkem|int }} Kč {% if u.stav_platby=='zaplaceno' %}<span class="badge ok">zapl.</span>{% elif u.stav_platby=='castecne' %}<span class="badge warn">část.</span>{% endif %}</span>
-  </li>
+  <div class="ukon-row">
+    <span class="u-datum muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+    <span class="u-main" data-datum="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.">
+      <b>{{ u.rz or '—' }}</b>
+      <span class="tag">{{ u.typ_kod }}</span>
+      {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
+    </span>
+    <span class="u-vin muted" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}</span>
+    <span class="u-kc">
+      <b>{{ u.celkem|int }} Kč</b>
+      {% if u.stav_platby=='zaplaceno' %}<span class="badge ok">zapl.</span>
+      {% elif u.stav_platby=='castecne' %}<span class="badge warn">{{ u.zaplaceno_kc|int }} Kč</span>{% endif %}
+    </span>
+    <span class="u-actions">
+      {% if u.stav_platby != 'zaplaceno' %}
+      <form method="post" action="/ukony/{{ u.id }}/zaplaceno" style="display:inline">
+        <input type="hidden" name="back" value="{{ back_url }}">
+        <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
+      </form>
+      {% endif %}
+      <a class="btn btn-sm" href="/ukony/{{ u.id }}/upravit?back={{ back_url|urlencode }}">Upravit</a>
+      <form method="post" action="/ukony/{{ u.id }}/smazat" style="display:inline"
+        onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
+        <input type="hidden" name="back" value="{{ back_url }}">
+        <button type="submit" class="btn btn-sm btn-danger" title="Smazat">✕</button>
+      </form>
+    </span>
+  </div>
   {% else %}
-  <li class="muted">Zatím žádné úkony v tomto měsíci.</li>
+  <div class="muted" style="padding: var(--sp-4) 0;">Zatím žádné úkony v tomto měsíci.</div>
   {% endfor %}
-</ul>
-<a class="muted" href="/ukony/vse?firma={{ firma.id }}">Zobrazit všechny úkony →</a>
+</div>
+<a class="muted" style="display:inline-block; margin-top: var(--sp-3);" href="/ukony/vse?firma={{ firma.id }}">Zobrazit všechny úkony →</a>
 {% endif %}
 
 <script>
