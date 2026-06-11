@@ -36,3 +36,21 @@ def test_year_trend_has_12_months(conn):
     trend = st.rocni_trend(conn, 2026)
     assert len(trend) == 12
     assert trend[4]["trzby"] == 4600
+
+
+def test_denni_souhrn(conn):
+    _setup(conn)
+    s = st.denni_souhrn(conn, "2026-05-04")
+    assert s["pocet"] == 1 and s["trzby"] == 1300
+    empty = st.denni_souhrn(conn, "2026-01-01")
+    assert empty["pocet"] == 0 and empty["trzby"] == 0
+
+
+def test_nezaplaceno_podle_firmy(conn):
+    _setup(conn)
+    # Cardion: DOVOZ 2000 unpaid; Albion: PŘEVOD 1300 with 500 paid → 800 owed
+    rows = st.nezaplaceno_podle_firmy(conn)
+    by = {r["zkratka"]: (r["pocet"], r["dluh"]) for r in rows}
+    assert by["Cardion"] == (1, 2000)
+    assert by["Albion"] == (1, 800)
+    assert rows[0]["zkratka"] == "Cardion"  # ordered by dluh DESC

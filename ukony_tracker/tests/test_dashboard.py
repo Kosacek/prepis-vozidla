@@ -73,3 +73,12 @@ def test_dashboard_nezaplaceno(client):
     r = c.get("/?rok=2026")
     body = r.get_data(as_text=True)
     assert "45700" in body
+
+
+def test_dashboard_kdo_dluzi_links_to_unpaid_table(client):
+    """'Kdo dluží' panel lists the indebted firm with a link to its unpaid úkony."""
+    c, fid = client
+    body = c.get("/?rok=2026").get_data(as_text=True)
+    assert "Kdo dluží" in body
+    assert f"/ukony/vse?firma={fid}" in body
+    assert "stav=nezaplaceno" in body

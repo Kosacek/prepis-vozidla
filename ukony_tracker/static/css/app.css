@@ -924,6 +924,85 @@ ul.list li > span:last-child {
   white-space: nowrap;
 }
 
+/* --- Dashboard v2 --- */
+
+/* trend chart (wide) + "Kdo dluží" side panel */
+.grid-dash {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+@media (max-width: 900px) {
+  .grid-dash { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+}
+
+.kpi-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a.kpi-link {
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+a.kpi-link:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .10);
+}
+
+.kpi-warn .kpi-v { color: var(--flash-warning-ink); }
+
+/* Kdo dluží rows */
+.dluh-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+.dluh-row:last-of-type { border-bottom: none; }
+.dluh-row:hover { text-decoration: none; background: var(--bg); margin: 0 calc(-1 * var(--sp-3)); padding-left: var(--sp-3); padding-right: var(--sp-3); border-radius: var(--radius-sm); }
+.dluh-firma { font-weight: 600; }
+.dluh-kc {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--flash-warning-ink);
+}
+
+/* compact type rows */
+.typ-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  font-size: 0.875rem;
+}
+.typ-kc {
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 /* ------------------------------------------------------------
    20. Login page
    ------------------------------------------------------------ */

@@ -79,3 +79,24 @@ def nezaplaceno_celkem(conn: Connection) -> float:
         "SELECT COALESCE(SUM(celkem - zaplaceno_kc),0) d FROM ukony"
     ).fetchone()
     return r["d"]
+
+
+def denni_souhrn(conn: Connection, iso_date: str) -> dict:
+    """Count and revenue for a single day (ISO date string)."""
+    r = conn.execute(
+        "SELECT COUNT(*) n, COALESCE(SUM(celkem),0) s FROM ukony WHERE datum=?",
+        (iso_date,),
+    ).fetchone()
+    return {"pocet": r["n"], "trzby": r["s"]}
+
+
+def nezaplaceno_podle_firmy(conn: Connection) -> list:
+    """Outstanding balance per firm (only firms that are owed something),
+    ordered by debt descending. Rows: firma_id, zkratka, pocet, dluh."""
+    return conn.execute(
+        "SELECT f.id firma_id, f.zkratka, COUNT(*) pocet, "
+        "SUM(u.celkem - u.zaplaceno_kc) dluh "
+        "FROM ukony u JOIN firmy f ON f.id=u.firma_id "
+        "WHERE u.celkem > u.zaplaceno_kc "
+        "GROUP BY f.id ORDER BY dluh DESC",
+    ).fetchall()
