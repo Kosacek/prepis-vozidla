@@ -59,7 +59,7 @@
   <div class="ukon-row">
     <span class="u-datum muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
     <span class="u-main" data-datum="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.">
-      <b>{{ u.rz or '—' }}</b>
+      <b class="u-rz">{{ u.rz or '—' }}</b>
       <span class="tag">{{ u.typ_kod }}</span>
       {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
     </span>

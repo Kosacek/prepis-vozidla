@@ -982,6 +982,12 @@ ul.list li > span:last-child {
   min-width: 0;
 }
 .u-main b { white-space: nowrap; }
+
+/* RZ gets a fixed slot so rows WITHOUT a plate ("—") align identically */
+.u-rz {
+  display: inline-block;
+  min-width: 86px;
+}
 .u-pozn {
   font-size: 0.8125rem;
   overflow: hidden;
@@ -1011,6 +1017,16 @@ ul.list li > span:last-child {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Small "VIN" label in front of the number so the column is self-explanatory */
+.u-vin::before {
+  content: "VIN";
+  margin-right: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 
 .u-kc {
@@ -1074,8 +1090,10 @@ ul.list li > span:last-child {
   .u-main .tag { display: none; }  /* shown in the meta line instead */
   .u-vin    { grid-area: meta; }
   .u-vin::before {
-    content: attr(data-typ) "\00a0\00b7\00a0";
+    content: attr(data-typ) "\00a0\00b7\00a0VIN\00a0";
+    font-size: 0.8125rem;
     font-weight: 600;
+    letter-spacing: normal;
     color: var(--muted);
   }
   .u-actions { grid-area: actions; }
