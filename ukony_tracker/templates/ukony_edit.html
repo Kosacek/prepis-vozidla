@@ -13,12 +13,12 @@
 
     <div class="form-row">
       <div class="field">
-        <label>Datum</label>
-        <input type="date" name="datum" value="{{ u.datum }}" required>
+        <label>Datum <span class="muted">(datum zadání — nelze měnit)</span></label>
+        <input type="text" value="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}" readonly disabled>
       </div>
       <div class="field">
         <label>RZ / SPZ</label>
-        <input name="rz" value="{{ u.rz or '' }}" autocomplete="off">
+        <input name="rz" value="{{ u.rz or '' }}" autocomplete="off" class="input-upper">
       </div>
     </div>
 
@@ -38,7 +38,7 @@
       </div>
       <div class="field">
         <label>VIN</label>
-        <input name="vin" value="{{ u.vin or '' }}">
+        <input name="vin" value="{{ u.vin or '' }}" class="input-upper">
       </div>
     </div>
 

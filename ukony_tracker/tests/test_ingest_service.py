@@ -22,6 +22,15 @@ def test_resolve_by_exact_ico(conn):
     assert ukony_repo.get(conn, uid)["stav_platby"] == "nezaplaceno"
 
 
+def test_rz_and_vin_stored_uppercase(conn):
+    fid = _cardion(conn)
+    uid = ing.pridat_ukon(conn, firma_id=fid, datum="2026-05-04",
+                          typ_kod="PŘEVOD", celkem=1300, rz="3bk9696", vin="tmbjj7ns ")
+    row = ukony_repo.get(conn, uid)
+    assert row["rz"] == "3BK9696"
+    assert row["vin"] == "TMBJJ7NS"
+
+
 def test_unknown_firma_rejected(conn):
     with pytest.raises(UnknownFirmaError):
         ing.pridat_ukon(conn, ico="99999999", datum="2026-05-04",

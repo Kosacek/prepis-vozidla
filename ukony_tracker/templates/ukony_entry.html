@@ -24,7 +24,7 @@
     <input type="hidden" name="mesic" value="{{ mesic }}">
     <div class="form-row">
       <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
-      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off"></div>
+      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper"></div>
     </div>
     <div class="field">
       <label>Typ úkonu</label>
@@ -37,7 +37,7 @@
     </div>
     <div class="form-row">
       <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ (typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '' }}"></div>
-      <div class="field"><label>VIN</label><input name="vin"></div>
+      <div class="field"><label>VIN</label><input name="vin" class="input-upper"></div>
     </div>
     <div class="field">
       <label>Poznámka</label>
@@ -71,7 +71,7 @@
     </span>
     <span class="u-actions">
       {% if u.stav_platby != 'zaplaceno' %}
-      <form method="post" action="/ukony/{{ u.id }}/zaplaceno" style="display:inline">
+      <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form" style="display:inline">
         <input type="hidden" name="back" value="{{ back_url }}">
         <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
       </form>

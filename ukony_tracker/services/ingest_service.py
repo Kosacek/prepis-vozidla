@@ -101,6 +101,12 @@ def pridat_ukon(
     if not (0 <= zaplaceno_kc <= celkem):
         raise ValidationError("zaplaceno musí být mezi 0 a celkovou cenou")
 
+    # --- normalize RZ / VIN: always stored uppercase ---
+    if isinstance(rz, str):
+        rz = rz.strip().upper() or None
+    if isinstance(vin, str):
+        vin = vin.strip().upper() or None
+
     # --- firma resolution ---
     fid = _resolve_firma(conn, firma_id, ico)
 

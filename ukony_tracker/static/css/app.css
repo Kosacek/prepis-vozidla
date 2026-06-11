@@ -1026,6 +1026,9 @@ ul.list li > span:last-child {
   white-space: nowrap;
 }
 
+/* RZ / VIN inputs: shown (and stored) uppercase */
+.input-upper { text-transform: uppercase; }
+
 /* Stacked two-line layout on phones */
 @media (max-width: 700px) {
   .mesic-list { padding: var(--sp-1) var(--sp-4); }
@@ -1053,6 +1056,7 @@ ul.list li > span:last-child {
     color: var(--muted);
   }
   .u-actions { grid-area: actions; }
+  .u-actions .pay-form { display: none; }  /* mark-paid stays desktop-only */
 }
 
 /* ------------------------------------------------------------

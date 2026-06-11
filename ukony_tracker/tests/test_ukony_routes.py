@@ -158,6 +158,28 @@ def test_edit_raising_celkem_rederives_to_castecne(client_fid):
     assert row["stav_platby"] == "castecne"
 
 
+def test_edit_never_changes_datum(client_fid):
+    """The entry date is locked: even a different submitted datum is ignored."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)  # datum 2026-05-10
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-06-30", "typ_kod": "PŘEVOD",
+                                          "celkem": "1300", "rz": "NEW123"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["datum"] == "2026-05-10"  # unchanged
+    assert row["rz"] == "NEW123"         # but the edit itself applied
+
+
+def test_edit_uppercases_rz_and_vin(client_fid):
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    c.post(f"/ukony/{uid}/upravit", data={"typ_kod": "PŘEVOD", "celkem": "1300",
+                                          "rz": "3bk9696", "vin": "tmbjj7ns"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["rz"] == "3BK9696" and row["vin"] == "TMBJJ7NS"
+
+
 def test_edit_lowering_celkem_to_paid_rederives_to_zaplaceno(client_fid):
     """Lowering celkem down to the amount already received must become 'zaplaceno'."""
     c, fid = client_fid
