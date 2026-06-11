@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.7"
+__version__ = "1.3.8"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1087,6 +1087,7 @@ def api_generate():
             with open(os.path.join(out_dir, ppd_name), "wb") as f:
                 f.write(ppd_bytes)
             result["ppd"] = f"/download/{ppd_name}"
+            result["ppd_print"] = f"/ppd-print/{number}"   # A5-preset print page
             # Append-only backup — the write-only safety net. A row is written
             # here for every receipt and is NEVER removed, so an accidental
             # delete in the dashboard stays recoverable.
@@ -1125,6 +1126,24 @@ def api_ppd_delete(number):
     copy and the PDF file is left on disk, so the receipt can be restored."""
     removed = ppd.delete_ppd(DATA_DIR, number)
     return jsonify({"success": True, "removed": removed})
+
+
+@app.route("/ppd-print/<int:number>")
+def ppd_print(number):
+    """Print-ready HTML version of a receipt with @page{size:A5} — the browser's
+    print dialog then pre-selects A5 paper, so nobody has to switch it by hand.
+    Data comes from the append-only backup (it has the full record incl. address
+    and SPZ); the live ledger is the fallback if the backup write ever failed."""
+    rec = next((r for r in ppd.read_backup(DATA_DIR) if r.get("cislo") == number), None)
+    if rec is None:
+        live = next((r for r in ppd.read_ppd_log(DATA_DIR) if r.get("cislo") == number), None)
+        if live is not None:
+            rec = {**live, "ico": "", "adresa": "", "spz": live.get("vozidlo", ""), "vin": ""}
+    if rec is None:
+        return Response("Doklad nenalezen.", status=404, mimetype="text/plain")
+    words = ppd.amount_to_words_cs(rec.get("castka") or 0)
+    return render_template("ppd_print.html", r=rec, words=words,
+                           issuer_name=ppd.ISSUER_NAME, issuer_ico=ppd.ISSUER_ICO)
 
 
 @app.route("/api/ppd-deleted", methods=["GET"])

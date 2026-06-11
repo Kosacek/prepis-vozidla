@@ -387,6 +387,29 @@ def restore_ppd_row(data_dir: str, record: dict) -> bool:
 
 
 # ── A5 receipt PDF ──────────────────────────────────────────────────────────
+def _mark_a5_print(pdf_bytes: bytes) -> bytes:
+    """Stamp viewer preferences asking print software to match the paper to the
+    PDF's page size (A5) at 100% scale: /PickTrayByPDFSize + /PrintScaling None.
+    Acrobat honors these; viewers that don't simply ignore them. Best-effort —
+    on any failure the original bytes are returned unchanged."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        from pypdf.generic import BooleanObject, DictionaryObject, NameObject
+
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+        writer.append(reader)
+        writer._root_object[NameObject("/ViewerPreferences")] = DictionaryObject({
+            NameObject("/PickTrayByPDFSize"): BooleanObject(True),
+            NameObject("/PrintScaling"): NameObject("/None"),
+        })
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception:
+        return pdf_bytes
+
+
 def build_ppd_pdf(record: dict) -> bytes:
     """Draw an A5 portrait příjmový pokladní doklad.
 
@@ -469,4 +492,4 @@ def build_ppd_pdf(record: dict) -> bytes:
 
     c.showPage()
     c.save()
-    return buf.getvalue()
+    return _mark_a5_print(buf.getvalue())

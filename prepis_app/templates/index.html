@@ -1162,7 +1162,8 @@ function renderDoklady() {
           <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
           <td>${esc(String(d.ucel || ''))}</td>
           <td style="white-space:nowrap">
-            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
+            <a href="/ppd-print/${esc(String(d.cislo))}" target="_blank" class="btn-sm" style="text-decoration:none" title="Vytisknout na A5">🖨️ Tisk</a>
+            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;margin-left:4px">🧾 PDF</a>
             <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
           </td>
         </tr>`).join('')}</tbody>
@@ -1524,7 +1525,7 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, ppd: result.ppd, plne_moce: result.plne_moce || [],
+      generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, ppd: result.ppd, ppd_print: result.ppd_print, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '' };
       // PPD print button — shown only when a receipt was generated
       const ppdBtn = document.getElementById('btn-ppd');
@@ -1591,9 +1592,12 @@ function printAll() {
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
-// PPD prints on A5 — opened separately from the A4 žádosti.
+// PPD prints on A5 — the print page carries @page{size:A5}, so the browser's
+// print dialog pre-selects A5 paper (no manual switching). The A4 žádosti are
+// plain PDFs and stay on A4. Falls back to the raw PDF for old receipts.
 function printPpd() {
-  if (generatedUrls.ppd) window.open(generatedUrls.ppd, '_blank');
+  const u = generatedUrls.ppd_print || generatedUrls.ppd;
+  if (u) window.open(u, '_blank');
 }
 
 // ── Camera ────────────────────────────────────────────────────────────────────

@@ -112,6 +112,20 @@ def test_pdf_vin_fallback_when_no_spz():
     assert "TMBVIN0001" in text                # VIN shown when there's no plate
 
 
+def test_pdf_is_a5_and_requests_matching_tray():
+    pdf = ppd.build_ppd_pdf({
+        "number": 11, "date": "02.06.2026", "payer": "Jan Novák",
+        "amount": 1300, "purpose": "Zastupování na MMB",
+    })
+    rdr = PdfReader(io.BytesIO(pdf))
+    box = rdr.pages[0].mediabox                # A5 portrait = 420 x 595 pt
+    assert round(float(box.width)) == 420
+    assert round(float(box.height)) == 595
+    vp = rdr.trailer["/Root"]["/ViewerPreferences"]
+    assert vp["/PickTrayByPDFSize"] == True    # printer picks A5 by page size
+    assert vp["/PrintScaling"] == "/None"      # print at 100%, no fit-to-page
+
+
 # ── append-only backup + restore ────────────────────────────────────────────
 def _issue(d, payer="A s.r.o.", amount=1300):
     """Mimic app.py: reserve a live ledger number, then mirror it to the

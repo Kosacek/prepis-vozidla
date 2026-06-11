@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>PPD č. {{ r.cislo }}</title>
+<style>
+  /* A5 portrait — Chrome's print dialog switches the paper size to A5
+     automatically because of this rule, so nobody has to change it by hand.
+     The žádosti stay plain A4 PDFs and are unaffected. */
+  @page { size: A5 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: "DejaVu Sans", Arial, "Helvetica Neue", sans-serif; color: #000; }
+
+  /* Mirrors ppd.build_ppd_pdf: 12mm outer border, same font sizes/spacing. */
+  .sheet { width: 148mm; height: 209mm; padding: 12mm; }
+  .frame { border: 1.5px solid #000; height: 100%; position: relative; padding: 12mm 6mm 0; }
+  h1   { font-size: 15pt; font-weight: 400; text-align: center; margin: 0 0 5mm; }
+  .num { font-size: 12pt; text-align: center; margin: 0 0 13mm; }
+  .meta { font-size: 10pt; margin: 0 0 4.5mm; }
+  .meta.last { margin-bottom: 10mm; }
+  .block { margin-bottom: 8.5mm; }
+  .label { font-size: 9pt; margin-bottom: 2.2mm; }
+  .value { font-size: 11.5pt; }
+  .value.big { font-size: 14pt; }
+  .sub   { font-size: 10.5pt; margin-top: 1.8mm; }
+  .sign  { position: absolute; right: 6mm; bottom: 14mm; width: 55mm;
+           border-top: 0.5pt solid #000; padding-top: 2mm; font-size: 8pt; }
+
+  /* On-screen preview only (never printed): grey backdrop + paper shadow. */
+  @media screen {
+    body { background: #6b7280; }
+    .sheet { background: #fff; margin: 16px auto; box-shadow: 0 3px 16px rgba(0,0,0,.45); }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="frame">
+    <h1>PŘÍJMOVÝ POKLADNÍ DOKLAD</h1>
+    <div class="num">č. {{ r.cislo }}</div>
+
+    <div class="meta">Příjemce: {{ issuer_name }}&nbsp;&nbsp;&nbsp;IČO: {{ issuer_ico }}</div>
+    <div class="meta last">Datum: {{ r.datum }}</div>
+
+    <div class="block">
+      <div class="label">Přijato od:</div>
+      <div class="value">{{ r.prijato_od }}{% if r.ico %}&nbsp;&nbsp;&nbsp;IČO: {{ r.ico }}{% endif %}</div>
+      {% if r.adresa %}<div class="sub">{{ r.adresa }}</div>{% endif %}
+    </div>
+
+    {% if r.spz %}
+    <div class="block">
+      <div class="label">SPZ:</div>
+      <div class="value">{{ r.spz }}</div>
+    </div>
+    {% elif r.vin %}
+    <div class="block">
+      <div class="label">VIN:</div>
+      <div class="value">{{ r.vin }}</div>
+    </div>
+    {% endif %}
+
+    <div class="block">
+      <div class="label">Částka:</div>
+      <div class="value big">{{ r.castka }} Kč</div>
+    </div>
+
+    <div class="block">
+      <div class="label">Slovy:</div>
+      <div class="value">{{ words }}</div>
+    </div>
+
+    <div class="block">
+      <div class="label">Účel platby:</div>
+      <div class="value">{{ r.ucel }}</div>
+    </div>
+
+    <div class="sign">Vystavil</div>
+  </div>
+</div>
+<script>
+  // Auto-open the print dialog (paper pre-set to A5 via @page), then close the
+  // tab once the dialog is dismissed — the tab exists only to print.
+  window.addEventListener('load', function () {
+    setTimeout(function () { window.print(); }, 200);
+  });
+  window.addEventListener('afterprint', function () {
+    setTimeout(function () { window.close(); }, 400);
+  });
+</script>
+</body>
+</html>

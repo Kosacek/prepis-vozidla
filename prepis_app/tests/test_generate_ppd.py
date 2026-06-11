@@ -35,6 +35,28 @@ def test_generate_includes_ppd(client, tmp_path, monkeypatch):
     assert os.path.exists(os.path.join(str(tmp_path), "ppd_evidence.xlsx"))
 
 
+def test_ppd_print_page_is_a5(client, tmp_path, monkeypatch):
+    """The generate response links an HTML print page whose @page rule pre-sets
+    A5 paper in the browser's print dialog (the žádosti stay A4 PDFs)."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    r = client.post("/api/generate", json=_payload())
+    data = r.get_json()
+    assert data["ppd_print"].startswith("/ppd-print/")
+    page = client.get(data["ppd_print"])
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "size: A5" in html                       # @page pre-selects A5 paper
+    assert "PŘÍJMOVÝ POKLADNÍ DOKLAD" in html
+    assert "PETR KUPUJÍCÍ" in html
+    assert "1AB2345" in html                        # SPZ on the receipt
+    assert "window.print()" in html                 # auto-opens the dialog
+
+
+def test_ppd_print_unknown_number_404(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    assert client.get("/ppd-print/999").status_code == 404
+
+
 def test_zero_amount_skips_ppd(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     r = client.post("/api/generate", json=_payload(ppd_castka="0"))
