@@ -158,6 +158,18 @@ def test_edit_raising_celkem_rederives_to_castecne(client_fid):
     assert row["stav_platby"] == "castecne"
 
 
+def test_unmark_paid_via_castka_zero(client_fid):
+    """Clicking the zapl. badge posts castka=0 — payment must reset to nezaplaceno."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    c.post(f"/ukony/{uid}/zaplaceno", data={})              # mark fully paid
+    c.post(f"/ukony/{uid}/zaplaceno", data={"castka": "0"})  # undo
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["stav_platby"] == "nezaplaceno"
+    assert float(row["zaplaceno_kc"]) == 0.0
+
+
 def test_edit_never_changes_datum(client_fid):
     """The entry date is locked: even a different submitted datum is ignored."""
     c, fid = client_fid

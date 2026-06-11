@@ -961,8 +961,10 @@ ul.list li > span:last-child {
 }
 
 .ukon-row {
+  /* Fixed widths for vin/kč/stav/actions so columns NEVER shift between rows
+     (the actions cell varies — paid rows have no ✓ zapl. button). */
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 110px 150px auto;
+  grid-template-columns: 52px minmax(0, 1fr) 140px 90px 90px 168px;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
@@ -999,24 +1001,35 @@ ul.list li > span:last-child {
 }
 
 .u-vin {
-  font-size: 0.8125rem;
+  /* VIN is key info — keep it prominent, not meta-grey */
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .u-kc {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   justify-content: flex-end;
+  text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.u-kc .badge { background: var(--line); color: var(--muted); }
-.u-kc .badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
-.u-kc .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
+
+.u-stav { white-space: nowrap; }
+.u-stav .badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.u-stav .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
+
+/* Payment badge doubles as the undo button */
+.badge-btn {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.badge-btn:hover { filter: brightness(0.93); }
 
 .u-actions {
   display: flex;
@@ -1034,14 +1047,15 @@ ul.list li > span:last-child {
   .mesic-list { padding: var(--sp-1) var(--sp-4); }
 
   .ukon-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "main kc"
-      "meta actions";
+      "main main kc"
+      "meta stav actions";
     row-gap: var(--sp-2);
   }
   .u-main   { grid-area: main; }
   .u-kc     { grid-area: kc; }
+  .u-stav   { grid-area: stav; justify-self: end; }
   .u-datum  { display: none; }
   .u-main::before {
     content: attr(data-datum);
