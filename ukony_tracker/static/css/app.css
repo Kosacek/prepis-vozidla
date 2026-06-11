@@ -961,10 +961,11 @@ ul.list li > span:last-child {
 }
 
 .ukon-row {
-  /* Fixed widths for vin/kč/stav/actions so columns NEVER shift between rows
-     (the actions cell varies — paid rows have no ✓ zapl. button). */
+  /* Fixed widths for vin/kč/actions so columns NEVER shift between rows.
+     The pay button and the paid badge share ONE fixed slot inside actions,
+     so marking a row paid swaps button→badge in place — nothing jumps. */
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 140px 90px 90px 168px;
+  grid-template-columns: 52px minmax(0, 1fr) 140px 90px 200px;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
@@ -1019,9 +1020,17 @@ ul.list li > span:last-child {
   font-variant-numeric: tabular-nums;
 }
 
-.u-stav { white-space: nowrap; }
-.u-stav .badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
-.u-stav .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
+/* One fixed-width slot shared by the ✓ zapl. button AND the paid badge —
+   the indicator never changes position when toggled. */
+.stav-slot {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 72px;
+  flex-shrink: 0;
+}
+.stav-slot .badge.ok   { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.stav-slot .badge.warn { background: var(--flash-warning-bg); color: var(--flash-warning-ink); }
 
 /* Payment badge doubles as the undo button */
 .badge-btn {
@@ -1047,15 +1056,15 @@ ul.list li > span:last-child {
   .mesic-list { padding: var(--sp-1) var(--sp-4); }
 
   .ukon-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "main main kc"
-      "meta stav actions";
+      "main kc"
+      "meta actions";
     row-gap: var(--sp-2);
   }
   .u-main   { grid-area: main; }
   .u-kc     { grid-area: kc; }
-  .u-stav   { grid-area: stav; justify-self: end; }
+  .stav-slot { width: auto; }  /* paid badge shows; hidden pay-form collapses the slot */
   .u-datum  { display: none; }
   .u-main::before {
     content: attr(data-datum);

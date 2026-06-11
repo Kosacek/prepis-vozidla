@@ -65,29 +65,28 @@
     </span>
     <span class="u-vin" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}</span>
     <span class="u-kc"><b>{{ u.celkem|int }} Kč</b></span>
-    <span class="u-stav">
-      {% if u.stav_platby=='zaplaceno' %}
-      <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
-        <input type="hidden" name="castka" value="0">
-        <input type="hidden" name="back" value="{{ back_url }}">
-        <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
-      </form>
-      {% elif u.stav_platby=='castecne' %}
-      <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
-        onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
-        <input type="hidden" name="castka" value="0">
-        <input type="hidden" name="back" value="{{ back_url }}">
-        <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} Kč ✕</button>
-      </form>
-      {% endif %}
-    </span>
     <span class="u-actions">
-      {% if u.stav_platby != 'zaplaceno' %}
-      <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form" style="display:inline">
-        <input type="hidden" name="back" value="{{ back_url }}">
-        <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
-      </form>
-      {% endif %}
+      <span class="stav-slot">
+        {% if u.stav_platby == 'zaplaceno' %}
+        <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
+          <input type="hidden" name="castka" value="0">
+          <input type="hidden" name="back" value="{{ back_url }}">
+          <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
+        </form>
+        {% elif u.stav_platby == 'castecne' %}
+        <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
+          onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
+          <input type="hidden" name="castka" value="0">
+          <input type="hidden" name="back" value="{{ back_url }}">
+          <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
+        </form>
+        {% else %}
+        <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
+          <input type="hidden" name="back" value="{{ back_url }}">
+          <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
+        </form>
+        {% endif %}
+      </span>
       <a class="btn btn-sm" href="/ukony/{{ u.id }}/upravit?back={{ back_url|urlencode }}">Upravit</a>
       <form method="post" action="/ukony/{{ u.id }}/smazat" style="display:inline"
         onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
