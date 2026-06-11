@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.8"
+__version__ = "1.3.9"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -456,6 +456,28 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
     writer.write(out)
     out.seek(0)
     return out.read()
+
+
+# "v z." (v zastoupení) pre-printed on every APPLICANT signature line — Petr
+# signs on behalf of the client, so the prefix saves writing it by hand each
+# time. The clerk's lines ("podpis oprávněné úřední osoby") are untouched.
+# y = baseline of each 'Podpis žadatele' dotted line (measured from the PDFs
+# via PyMuPDF label rects); x right-aligned (add_id_overlay) so the text sits
+# on the dots right after the label, leaving room for the signature itself.
+VZ_TEXT = "v z."
+VZ_X = 425
+VZ_SIGNATURE_YS = {
+    "zmeny": [(0, 95), (1, 604), (1, 37), (2, 163)],
+    "zapis": [(0, 53), (1, 105)],
+    "zmena": [(0, 52), (1, 143)],
+}
+
+
+def vz_overlays(doc: str) -> list:
+    """Overlay tuples (page, x, y, text) pre-printing 'v z.' on the applicant
+    signature lines of the given form."""
+    return [(page, VZ_X, y, VZ_TEXT) for page, y in VZ_SIGNATURE_YS[doc]]
+
 
 def _next_working_day() -> str:
     from datetime import timedelta
@@ -1025,6 +1047,7 @@ def api_generate():
     if mode == "prevod":
         # Převod vlastnictví = JEN žádost o změnu vlastníka (zmeny.pdf).
         # Zápis do registru (zapis.pdf) se u převodu NEgeneruje.
+        zmeny_overlays.extend(vz_overlays("zmeny"))
         zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))
         if zmeny_overlays: zmeny_bytes = add_id_overlay(zmeny_bytes, zmeny_overlays)
         fname_zmeny = os.path.join(out_dir, f"zmeny_{ts}.pdf")
@@ -1032,7 +1055,7 @@ def api_generate():
         result["zmeny"] = f"/download/zmeny_{ts}.pdf"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
-        zmena_overlays = []
+        zmena_overlays = vz_overlays("zmena")
         if _id_text(data.get("novy_id")):
             zmena_overlays.append((0, 540, 630, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
@@ -1043,6 +1066,7 @@ def api_generate():
         with open(fname, "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/zmena_{ts}.pdf"
     else:  # zapis noveho vozidla
+        zapis_overlays.extend(vz_overlays("zapis"))
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
         fname_zapis = os.path.join(out_dir, f"zapis_{ts}.pdf")
