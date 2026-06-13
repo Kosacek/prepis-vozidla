@@ -170,23 +170,33 @@ def test_unmark_paid_via_castka_zero(client_fid):
     assert float(row["zaplaceno_kc"]) == 0.0
 
 
-def test_edit_never_changes_datum(client_fid):
-    """The entry date is locked: even a different submitted datum is ignored."""
+def test_edit_can_change_datum(client_fid):
+    """The date is editable on the edit form (deliberate change is allowed)."""
     c, fid = client_fid
     uid = _seed_ukon(c.application, fid, celkem=1300)  # datum 2026-05-10
     c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-06-30", "typ_kod": "PŘEVOD",
                                           "celkem": "1300", "rz": "NEW123"})
     with c.application.app_context():
         row = ukony_repo.get(db.get_db(), uid)
-    assert row["datum"] == "2026-05-10"  # unchanged
-    assert row["rz"] == "NEW123"         # but the edit itself applied
+    assert row["datum"] == "2026-06-30"  # changed as requested
+    assert row["rz"] == "NEW123"
+
+
+def test_edit_blank_datum_rejected(client_fid):
+    """A blank/invalid date is rejected so it can't wipe the stored date."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)  # datum 2026-05-10
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "", "typ_kod": "PŘEVOD", "celkem": "1300"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["datum"] == "2026-05-10"  # untouched
 
 
 def test_edit_uppercases_rz_and_vin(client_fid):
     c, fid = client_fid
     uid = _seed_ukon(c.application, fid)
-    c.post(f"/ukony/{uid}/upravit", data={"typ_kod": "PŘEVOD", "celkem": "1300",
-                                          "rz": "3bk9696", "vin": "tmbjj7ns"})
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD",
+                                          "celkem": "1300", "rz": "3bk9696", "vin": "tmbjj7ns"})
     with c.application.app_context():
         row = ukony_repo.get(db.get_db(), uid)
     assert row["rz"] == "3BK9696" and row["vin"] == "TMBJJ7NS"

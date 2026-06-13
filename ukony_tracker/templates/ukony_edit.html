@@ -13,8 +13,8 @@
 
     <div class="form-row">
       <div class="field">
-        <label>Datum <span class="muted">(datum zadání — nelze měnit)</span></label>
-        <input type="text" value="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}" readonly disabled>
+        <label>Datum</label>
+        <input type="date" name="datum" value="{{ u.datum }}" required>
       </div>
       <div class="field">
         <label>RZ / SPZ</label>

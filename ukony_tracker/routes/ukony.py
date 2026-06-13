@@ -122,6 +122,8 @@ def edit_save(uid):
     u = ukony_repo.get(conn, uid)
     f = request.form
     try:
+        datum = (f.get("datum") or "").strip()
+        date.fromisoformat(datum)  # reject blank/invalid so the date can't be wiped
         celkem = float(f.get("celkem") or 0)
         if celkem < 0:
             raise ValueError("záporná cena")
@@ -131,11 +133,9 @@ def edit_save(uid):
         stav = ing.derive_stav(celkem, zaplaceno)
         rz = (f.get("rz") or "").strip().upper() or None
         vin = (f.get("vin") or "").strip().upper() or None
-        # NOTE: datum is intentionally NOT updatable — it stays the date the
-        # úkon was first entered (protects against accidental date changes,
-        # especially fat-fingering the date input on mobile).
         ukony_repo.update(
             conn, uid,
+            datum=datum,
             rz=rz,
             typ_kod=f.get("typ_kod"),
             celkem=celkem,
@@ -146,7 +146,7 @@ def edit_save(uid):
         )
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):
-        flash("Neplatné hodnoty (zkontroluj cenu).", "error")
+        flash("Neplatné hodnoty (zkontroluj datum a cenu).", "error")
     return redirect(f.get("back") or url_for("ukony.table"))
 
 
