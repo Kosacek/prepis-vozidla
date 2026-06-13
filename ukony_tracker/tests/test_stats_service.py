@@ -64,3 +64,23 @@ def test_nezaplaceno_podle_firmy(conn):
     assert by["Cardion"] == (1, 2000)
     assert by["Albion"] == (1, 800)
     assert rows[0]["zkratka"] == "Cardion"  # ordered by dluh DESC
+
+
+def test_denni_trend(conn):
+    _setup(conn)  # May 2026: 5/4 (1300), 5/5 (2000), 5/6 (1300)
+    days = st.denni_trend(conn, 2026, 5, 6)
+    assert len(days) == 6
+    assert [d["d"] for d in days] == [1, 2, 3, 4, 5, 6]
+    assert days[0]["pocet"] == 0 and days[0]["trzby"] == 0   # day 1 empty
+    assert days[3]["pocet"] == 1 and days[3]["trzby"] == 1300  # day 4
+    assert days[4]["trzby"] == 2000                            # day 5
+
+
+def test_denni_trend_podle_firmy(conn):
+    _setup(conn)
+    rows = st.denni_trend_podle_firmy(conn, 2026, 5, 6)
+    by = {r["zkratka"]: r["pocty"] for r in rows}
+    assert len(by["Cardion"]) == 6
+    assert by["Cardion"][3] == 1 and by["Cardion"][4] == 1   # 5/4 and 5/5
+    assert by["Albion"][5] == 1                              # 5/6
+    assert rows[0]["zkratka"] == "Cardion"  # ordered by total count desc

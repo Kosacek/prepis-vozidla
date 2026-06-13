@@ -39,7 +39,7 @@
 <div class="dash-grid">
   <div class="dash-main">
     <div class="card">
-      <div class="card-head"><h2>Měsíční přehled</h2>
+      <div class="card-head"><h2>Tento měsíc <span class="muted small">{{ mesic_nazev }} {{ aktualni_rok }}</span></h2>
         <div class="seg" id="metric-seg">
           <span class="on" data-mode="trzby">Tržby</span>
           <span data-mode="pocet">Počet</span>
@@ -103,8 +103,8 @@
 </div>
 
 <script>
-  window.TREND = {{ trend_json|safe }};
-  window.TREND_FIRMY = {{ trend_firmy_json|safe }};
+  window.DAILY = {{ denni_json|safe }};
+  window.DAILY_FIRMY = {{ denni_firmy_json|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=5"></script>
 {% endblock %}

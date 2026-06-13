@@ -108,6 +108,47 @@ def denni_souhrn(conn: Connection, iso_date: str) -> dict:
     return {"pocet": r["n"], "trzby": r["s"]}
 
 
+def denni_trend(conn: Connection, year: int, month: int, days: int) -> list[dict]:
+    """Per-day count and revenue for a single month, day slots 1..days.
+
+    Powers the dashboard "this month, by day" chart. ``days`` is how many day
+    slots to emit (e.g. today's day-of-month for the current month), so the
+    chart runs from the 1st up to today with no trailing empty days."""
+    rows = conn.execute(
+        "SELECT substr(datum,9,2) d, COUNT(*) n, COALESCE(SUM(celkem),0) s "
+        "FROM ukony WHERE substr(datum,1,7)=? GROUP BY d",
+        (f"{year:04d}-{month:02d}",),
+    ).fetchall()
+    by_day = {r["d"]: (r["n"], r["s"]) for r in rows}
+    out: list[dict] = []
+    for dd in range(1, days + 1):
+        n, s = by_day.get(f"{dd:02d}", (0, 0))
+        out.append({"d": dd, "pocet": n, "trzby": s})
+    return out
+
+
+def denni_trend_podle_firmy(conn: Connection, year: int, month: int, days: int) -> list:
+    """Per-firm daily úkon counts for a single month, day slots 1..days.
+
+    Returns list of {zkratka, pocty: [days ints]}, ordered by total desc — the
+    daily counterpart of :func:`rocni_trend_podle_firmy` for the Firmy line."""
+    rows = conn.execute(
+        "SELECT f.zkratka, substr(u.datum,9,2) d, COUNT(*) n "
+        "FROM ukony u JOIN firmy f ON f.id=u.firma_id "
+        "WHERE substr(u.datum,1,7)=? GROUP BY f.id, d",
+        (f"{year:04d}-{month:02d}",),
+    ).fetchall()
+    by_firma: dict[str, list[int]] = {}
+    for r in rows:
+        arr = by_firma.setdefault(r["zkratka"], [0] * days)
+        idx = int(r["d"]) - 1
+        if 0 <= idx < days:
+            arr[idx] = r["n"]
+    out = [{"zkratka": z, "pocty": p} for z, p in by_firma.items()]
+    out.sort(key=lambda x: sum(x["pocty"]), reverse=True)
+    return out
+
+
 def nezaplaceno_podle_firmy(conn: Connection) -> list:
     """Outstanding balance per firm (only firms that are owed something),
     ordered by debt descending. Rows: firma_id, zkratka, pocet, dluh."""

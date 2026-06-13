@@ -1,14 +1,14 @@
 (function () {
-  var trend = window.TREND || [];
-  var firmy = window.TREND_FIRMY || [];
-  var MN = ["Led", "Úno", "Bře", "Dub", "Kvě", "Čvn", "Čvc", "Srp", "Zář", "Říj", "Lis", "Pro"];
+  // Current month, day by day (1 → today).
+  var daily = window.DAILY || [];
+  var firmy = window.DAILY_FIRMY || [];
   // Apple system colors — vivid but soft, in the iOS/macOS palette.
   var COLORS = ["#0a84ff", "#34c759", "#ff9f0a", "#bf5af2", "#ff375f",
                 "#5ac8fa", "#ffd60a", "#ff6482", "#64d2ff", "#30d158"];
   var tctx = document.getElementById("trendChart");
   if (!tctx) return;
 
-  var labels = trend.map(function (t) { return MN[t.m - 1]; });
+  var labels = daily.map(function (t) { return String(t.d); });
   var chart = null;
 
   function render(mode) {
@@ -72,7 +72,7 @@
         labels: labels,
         datasets: [{
           label: mode === "trzby" ? "Kč" : "Počet",
-          data: trend.map(function (t) { return t[mode]; }),
+          data: daily.map(function (t) { return t[mode]; }),
           backgroundColor: "#0071e3",
           borderRadius: 6
         }]
