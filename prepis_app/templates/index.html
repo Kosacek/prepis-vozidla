@@ -1635,32 +1635,43 @@ function printPpd() {
 // ── Camera ────────────────────────────────────────────────────────────────────
 let cameraStream = null;
 let _scanInFlight = false;
+let _camRetryArmed = false;   // a pointerdown retry is already waiting
 
-// Try to auto-open the camera silently. Browsers may block getUserMedia
-// without a user gesture even with cached permission — handled by attaching
-// a one-shot pointerdown listener that retries on the next user click.
-async function tryAutoOpenCamera() {
-  if (cameraStream) return;  // already open
+// Try to auto-open the camera silently — meant to be on whenever Step 1 is
+// showing (initial load, after "Nová žádost", and on Back to Step 1). Once the
+// site has camera permission, getUserMedia resolves with no user gesture, so
+// this opens by itself. Two fallbacks: a short retry for a transient device
+// hiccup (device still releasing right after a reload/scan), and a one-shot
+// click retry when the browser insists on a user gesture.
+async function tryAutoOpenCamera(attempt = 0) {
+  if (cameraStream) return;                                   // already open
+  if (typeof currentPanel === 'function' && currentPanel() !== 1) return;  // only on the scan step
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    // Permission granted and stream live — wire it up.
     cameraStream = stream;
+    _camRetryArmed = false;
     const video = document.getElementById('camera-video');
-    const container = document.getElementById('camera-container');
     video.srcObject = stream;
     try { await video.play(); } catch(_) { /* play may need user gesture later */ }
-    container.style.display = '';
+    document.getElementById('camera-container').style.display = '';
   } catch (e) {
-    // Browser blocked us — schedule a retry on next user click. Skip mode-card
-    // clicks because selectMode auto-advances away from Step 1 and would close
-    // the camera 150 ms later (visible on/off flash).
+    const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    if (!blocked && attempt < 3 && currentPanel() === 1) {
+      // Transient (device busy right after a reload) — retry shortly.
+      setTimeout(() => tryAutoOpenCamera(attempt + 1), 400);
+      return;
+    }
+    if (_camRetryArmed) return;     // don't stack handlers
+    _camRetryArmed = true;
+    // Browser wants a user gesture — retry on the next click. Skip mode-card
+    // clicks because selectMode auto-advances away from Step 1 (camera flash).
     const handler = (ev) => {
       if (ev.target.closest && ev.target.closest('.mode-card')) return;
       document.body.removeEventListener('pointerdown', handler);
-      // Retry only if still on Step 1
+      _camRetryArmed = false;
       if (currentPanel() === 1) tryAutoOpenCamera();
     };
-    document.body.addEventListener('pointerdown', handler, { once: false });
+    document.body.addEventListener('pointerdown', handler);
   }
 }
 
@@ -2031,6 +2042,9 @@ setInterval(checkForUpdate, 30000);
 renderStepper();
 document.getElementById('nav-back').style.display = 'none';
 setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (c) c.focus(); }, 100);
+// Step 1 is active on load (and after "Nová žádost" reloads the page), so open
+// the camera straight away — previously it only opened on Back-navigation.
+tryAutoOpenCamera();
 </script>
 <script>
   fetch('/api/version').then(r=>r.json()).then(d=>{ document.getElementById('app-version-bar').textContent = 'v' + d.version; });
