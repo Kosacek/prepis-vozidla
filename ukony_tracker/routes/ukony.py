@@ -51,7 +51,17 @@ def entry(firma_id):
         total=total,
         pocet=len(rows),
         mesic=mesic,
-        dnes=date.today().isoformat(),
+        # After adding an úkon we carry the typ/date/price/note back so the next
+        # car of the same kind can be added with only a fresh RZ/VIN. Absent on
+        # first load → defaults (today, first typ, that typ's price, empty).
+        dnes=request.args.get("datum") or date.today().isoformat(),
+        sel_typ=request.args.get("typ") or "",
+        sel_celkem=request.args.get("celkem"),
+        sel_pozn=request.args.get("poznamka") or "",
+        # RZ/VIN are only carried back on an error (so the input isn't lost);
+        # on a successful add they stay empty, ready for the next car.
+        sel_rz=request.args.get("rz") or "",
+        sel_vin=request.args.get("vin") or "",
     )
 
 
@@ -61,6 +71,12 @@ def add(firma_id):
     if not firmy_repo.get(conn, firma_id):
         abort(404)
     f = request.form
+    # Carry the typ/date/price/note back so the next car of the same kind can be
+    # added with just a new RZ/VIN — those two fields are the only ones cleared.
+    carry = {"mesic": f.get("mesic"), "datum": f.get("datum"),
+             "typ": f.get("typ_kod"), "celkem": f.get("celkem")}
+    if f.get("poznamka"):
+        carry["poznamka"] = f.get("poznamka")
     try:
         ing.pridat_ukon(
             conn,
@@ -75,7 +91,12 @@ def add(firma_id):
         flash("Úkon přidán.", "success")
     except ing.IngestError as e:
         flash(str(e), "error")
-    return redirect(url_for("ukony.entry", firma_id=firma_id, mesic=f.get("mesic")))
+        # Nothing was saved — also keep RZ/VIN so the typed input isn't lost.
+        if f.get("rz"):
+            carry["rz"] = f.get("rz")
+        if f.get("vin"):
+            carry["vin"] = f.get("vin")
+    return redirect(url_for("ukony.entry", firma_id=firma_id, **carry))
 
 
 @bp.get("/ukony/vse")

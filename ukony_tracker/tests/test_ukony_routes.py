@@ -44,6 +44,44 @@ def test_post_creates_ukon(client_fid):
     assert len(rows) == 1 and rows[0]["rz"] == "3BP3552"
 
 
+def test_add_repeats_typ_date_price_clears_plate(client_fid):
+    """After a successful add the redirect keeps typ/date/price (so the next car
+    of the same kind is one RZ away) but drops RZ/VIN."""
+    c, fid = client_fid
+    r = c.post(
+        f"/ukony/{fid}",
+        data={"datum": "2026-05-04", "typ_kod": "PŘEVOD", "celkem": "1300",
+              "rz": "3BP3552", "vin": "TMBABC1234567890", "mesic": "2026-05"},
+    )
+    assert r.status_code in (302, 303)
+    loc = r.headers["Location"]
+    assert "datum=2026-05-04" in loc      # date kept
+    assert "celkem=1300" in loc           # price kept
+    assert "typ=" in loc                  # typ kept (value url-encoded)
+    assert "rz=" not in loc               # plate cleared
+    assert "vin=" not in loc              # vin cleared
+    # The re-rendered form prefills the date and leaves the RZ field empty.
+    body = c.get(loc).get_data(as_text=True)
+    assert 'value="2026-05-04"' in body
+    assert 'name="rz" id="rz" autocomplete="off" class="input-upper" value=""' in body
+
+
+def test_add_error_preserves_rz_vin(client_fid):
+    """On a validation error nothing is saved, so RZ/VIN are carried back too."""
+    c, fid = client_fid
+    r = c.post(
+        f"/ukony/{fid}",
+        data={"datum": "2026-05-04", "typ_kod": "PŘEVOD", "celkem": "abc",
+              "rz": "3BP3552", "vin": "TMBABC1234567890", "mesic": "2026-05"},
+    )
+    assert r.status_code in (302, 303)
+    loc = r.headers["Location"]
+    assert "rz=3BP3552" in loc            # input not lost on error
+    assert "vin=" in loc
+    with c.application.app_context():
+        assert ukony_repo.list(db.get_db(), firma_id=fid) == []  # nothing saved
+
+
 # ── helpers ────────────────────────────────────────────────────────────────
 
 def _seed_ukon(app, fid, rz="1AA1111", celkem=1300):

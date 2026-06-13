@@ -24,24 +24,24 @@
     <input type="hidden" name="mesic" value="{{ mesic }}">
     <div class="form-row">
       <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
-      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper"></div>
+      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper" value="{{ sel_rz }}"></div>
     </div>
     <div class="field">
       <label>Typ úkonu</label>
       <div class="seg" id="typ-seg">
         {% for t in typy %}
-        <span data-kod="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" class="{{ 'on' if loop.first }}">{{ t.kod }}</span>
+        <span data-kod="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
         {% endfor %}
       </div>
-      <input type="hidden" name="typ_kod" id="typ_kod" value="{{ typy[0].kod if typy }}">
+      <input type="hidden" name="typ_kod" id="typ_kod" value="{{ sel_typ if sel_typ else (typy[0].kod if typy) }}">
     </div>
     <div class="form-row">
-      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ (typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '' }}"></div>
-      <div class="field"><label>VIN</label><input name="vin" class="input-upper"></div>
+      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else ((typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '') }}"></div>
+      <div class="field"><label>VIN</label><input name="vin" class="input-upper" value="{{ sel_vin }}"></div>
     </div>
     <div class="field">
       <label>Poznámka</label>
-      <input name="poznamka" id="poznamka">
+      <input name="poznamka" id="poznamka" value="{{ sel_pozn }}">
       <div class="chips">
         <span class="chip" data-tag="TZ">+ TZ</span>
         <span class="chip" data-tag="PM">+ PM</span>
