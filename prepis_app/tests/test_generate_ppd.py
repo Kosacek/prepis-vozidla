@@ -35,6 +35,18 @@ def test_generate_includes_ppd(client, tmp_path, monkeypatch):
     assert os.path.exists(os.path.join(str(tmp_path), "ppd_evidence.xlsx"))
 
 
+def test_ppd_payer_is_uppercased(client, tmp_path, monkeypatch):
+    """A hand-typed / autofilled payer is stored UPPERCASE on the receipt, like
+    the rest of the form. The receipt ledger row reflects it."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    r = client.post("/api/generate", json=_payload(
+        ppd_prijato_od="autodoprava novák s.r.o.", ppd_prijato_adresa="hlavní 5, brno"))
+    assert r.get_json()["success"] is True
+    import ppd as ppdmod
+    log = ppdmod.read_ppd_log(str(tmp_path))
+    assert log[0]["prijato_od"] == "AUTODOPRAVA NOVÁK S.R.O."
+
+
 def test_ppd_print_page_is_a5(client, tmp_path, monkeypatch):
     """The generate response links an HTML print page whose @page rule pre-sets
     A5 paper in the browser's print dialog (the žádosti stay A4 PDFs)."""

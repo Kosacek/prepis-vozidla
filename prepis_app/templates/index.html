@@ -105,6 +105,11 @@
     font-size: 14px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
   }
   input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
+  /* Úřední formuláře se vyplňují VELKÝMI písmeny — text v polích zobrazujeme
+     velkými hned při psaní (hodnotu zvelkáčťuje i JS, viz forceUppercase).
+     Opt-out třídou .no-uc (vyhledávací pole). Placeholdery necháme čitelné. */
+  input[type=text]:not(.no-uc) { text-transform: uppercase; }
+  input[type=text]:not(.no-uc)::placeholder { text-transform: none; }
 
   /* ICO row */
   .ico-row { display: flex; gap: 8px; }
@@ -284,7 +289,7 @@
       <button class="modal-close" onclick="closeDokladyModal()">✕</button>
     </div>
     <div style="padding:12px 16px 0;">
-      <input type="text" id="doklady-search" placeholder="Hledat (číslo, jméno, IČO, datum…)" oninput="renderDoklady()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <input type="text" id="doklady-search" class="no-uc" placeholder="Hledat (číslo, jméno, IČO, datum…)" oninput="renderDoklady()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
     </div>
     <div class="modal-body" id="doklady-modal-body">Načítám…</div>
   </div>
@@ -740,6 +745,33 @@
 </div>
 
 <script>
+// ── Force UPPERCASE in data fields ──────────────────────────────────────────
+// Vehicle-registry forms are filled in capitals. We uppercase the actual value
+// live as you type (caret preserved) so what you see in the app is what prints
+// — not just a PDF-side conversion. Czech toUpperCase keeps string length, so
+// the caret stays put. Search/utility inputs opt out via the .no-uc class.
+(function () {
+  function isUcTarget(el) {
+    return el && el.tagName === 'INPUT'
+      && (el.type === 'text' || el.type === 'search' || el.type === '')
+      && !el.classList.contains('no-uc');
+  }
+  function forceUppercase(el) {
+    const orig = el.value;
+    const up = orig.toUpperCase();
+    if (up === orig) return;
+    const s = el.selectionStart, e = el.selectionEnd;
+    el.value = up;
+    if (up.length === orig.length && s !== null) {  // same length → caret stays valid
+      try { el.setSelectionRange(s, e); } catch (_) { /* unsupported type */ }
+    }
+  }
+  // Capture phase: uppercase BEFORE the field's own oninput (ARES/firm/ORV) runs.
+  document.addEventListener('input', function (ev) {
+    if (isUcTarget(ev.target)) forceUppercase(ev.target);
+  }, true);
+})();
+
 let appMode = 'prevod';
 let flowIdx = 0;
 let generatedUrls = {};

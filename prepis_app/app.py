@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.10"
+__version__ = "1.3.11"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -882,13 +882,15 @@ def api_firmy_get():
 def api_firmy_add():
     f = request.json or {}
     ico = "".join(c for c in str(f.get("ico","")).strip() if c.isdigit())
-    nazev = str(f.get("nazev","")).strip()
+    # Saved firms are stored UPPERCASE so the ledger is consistent whether the
+    # name/adresa was typed (live-uppercased) or autofilled from ARES/scan.
+    nazev = str(f.get("nazev","")).strip().upper()
     if not ico or not nazev:
         return jsonify({"success": False, "error": "Chybí IČO nebo název"})
     firms = read_firmy()
     firm_id = _normalize_ids(f.get("id", ""))
     if not any(x["ico"] == ico for x in firms):
-        firms.append({"nazev": nazev, "ico": ico, "adresa": str(f.get("adresa","")).strip(), "psc": str(f.get("psc","")).strip(), "id": firm_id})
+        firms.append({"nazev": nazev, "ico": ico, "adresa": str(f.get("adresa","")).strip().upper(), "psc": str(f.get("psc","")).strip(), "id": firm_id})
         save_firmy(firms)
     return jsonify({"success": True})
 
@@ -911,9 +913,9 @@ def api_firmy_update(ico):
             if "id" in data:
                 f["id"] = _normalize_ids(data.get("id", ""))
             if "nazev" in data:
-                f["nazev"] = str(data.get("nazev", "")).strip()
+                f["nazev"] = str(data.get("nazev", "")).strip().upper()
             if "adresa" in data:
-                f["adresa"] = str(data.get("adresa", "")).strip()
+                f["adresa"] = str(data.get("adresa", "")).strip().upper()
             if "psc" in data:
                 f["psc"] = str(data.get("psc", "")).strip()
             found = f
@@ -1139,6 +1141,10 @@ def api_generate():
                 payer_address = (data.get("ppd_prijato_adresa") or "").strip()
             else:
                 payer, payer_ico, payer_address = resolve_payer_full(data)
+            # Receipt fields the user fills go UPPERCASE too, matching the žádosti
+            # (and the app's live-uppercase inputs). Issuer/účel are fixed → left.
+            payer = payer.upper()
+            payer_address = payer_address.upper()
             today = datetime.now().strftime("%d.%m.%Y")
             number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
                 "date": today, "payer": payer, "payer_ico": payer_ico,
