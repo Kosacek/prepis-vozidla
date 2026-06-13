@@ -37,62 +37,68 @@
 </div>
 
 <div class="dash-grid">
-  <div class="card span-2">
-    <div class="card-head"><h2>Měsíční přehled</h2>
-      <div class="seg" id="metric-seg">
-        <span class="on" data-mode="trzby">Tržby</span>
-        <span data-mode="pocet">Počet</span>
-        <span data-mode="firmy">Firmy</span>
+  <div class="dash-main">
+    <div class="card">
+      <div class="card-head"><h2>Měsíční přehled</h2>
+        <div class="seg" id="metric-seg">
+          <span class="on" data-mode="trzby">Tržby</span>
+          <span data-mode="pocet">Počet</span>
+          <span data-mode="firmy">Firmy</span>
+        </div>
+      </div>
+      <canvas id="trendChart" height="110"></canvas>
+    </div>
+
+    <div class="dash-breakdowns">
+      <div class="card">
+        <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
+        {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
+        {% for r in per_firma %}
+        <div class="bar-row">
+          <span class="bar-label">{{ r.zkratka }}</span>
+          <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
+          <span class="bar-amt">{{ r.trzby|int }}</span>
+        </div>
+        {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+      </div>
+
+      <div class="card">
+        <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
+        {% for t in per_typ %}
+        <div class="typ-row">
+          <span class="tag">{{ t.typ_kod }}</span>
+          <span class="muted">×{{ t.pocet }}</span>
+          <span class="typ-kc">{{ t.trzby|int }} Kč</span>
+        </div>
+        {% else %}<p class="muted">Žádná data.</p>{% endfor %}
       </div>
     </div>
-    <canvas id="trendChart" height="110"></canvas>
   </div>
 
-  <div class="card">
-    <h2>Kdo dluží</h2>
-    {% for d in dluhy %}
-    <a class="dluh-row" href="/ukony/vse?firma={{ d.firma_id }}&stav=nezaplaceno">
-      <span class="dluh-firma">{{ d.zkratka }}</span>
-      <span class="muted">{{ d.pocet }} úkonů</span>
-      <span class="dluh-kc">{{ d.dluh|int }} Kč</span>
-    </a>
-    {% else %}
-    <p class="muted">Vše zaplaceno ✓</p>
-    {% endfor %}
-  </div>
-
-  <div class="card">
-    <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
-    {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
-    {% for r in per_firma %}
-    <div class="bar-row">
-      <span class="bar-label">{{ r.zkratka }}</span>
-      <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
-      <span class="bar-amt">{{ r.trzby|int }}</span>
+  <div class="dash-side">
+    <div class="card">
+      <h2>Kdo dluží</h2>
+      {% for d in dluhy %}
+      <a class="dluh-row" href="/ukony/vse?firma={{ d.firma_id }}&stav=nezaplaceno">
+        <span class="dluh-firma">{{ d.zkratka }}</span>
+        <span class="muted">{{ d.pocet }} úkonů</span>
+        <span class="dluh-kc">{{ d.dluh|int }} Kč</span>
+      </a>
+      {% else %}
+      <p class="muted">Vše zaplaceno ✓</p>
+      {% endfor %}
     </div>
-    {% else %}<p class="muted">Žádná data.</p>{% endfor %}
-  </div>
 
-  <div class="card">
-    <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
-    {% for t in per_typ %}
-    <div class="typ-row">
-      <span class="tag">{{ t.typ_kod }}</span>
-      <span class="muted">×{{ t.pocet }}</span>
-      <span class="typ-kc">{{ t.trzby|int }} Kč</span>
+    <div class="card">
+      <h2>Poslední úkony</h2>
+      <ul class="list">
+        {% for u in recent %}
+        <li><span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+          <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.firma_zkratka }} · {{ u.typ_kod }}</span></span>
+          <span>{{ u.celkem|int }} Kč</span></li>
+        {% else %}<li class="muted">Žádné úkony.</li>{% endfor %}
+      </ul>
     </div>
-    {% else %}<p class="muted">Žádná data.</p>{% endfor %}
-  </div>
-
-  <div class="card">
-    <h2>Poslední úkony</h2>
-    <ul class="list">
-      {% for u in recent %}
-      <li><span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
-        <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.firma_zkratka }} · {{ u.typ_kod }}</span></span>
-        <span>{{ u.celkem|int }} Kč</span></li>
-      {% else %}<li class="muted">Žádné úkony.</li>{% endfor %}
-    </ul>
   </div>
 </div>
 
@@ -100,5 +106,5 @@
   window.TREND = {{ trend_json|safe }};
   window.TREND_FIRMY = {{ trend_firmy_json|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=4"></script>
 {% endblock %}

@@ -931,20 +931,35 @@ ul.list li > span:last-child {
 
 /* --- Dashboard v2 --- */
 
-/* One unified 3-column grid for the whole dashboard body so every card edge
-   lines up. The trend chart spans 2 columns; everything else spans 1. */
+/* Main + sidebar layout. The left column (chart + breakdowns) and the right
+   rail (Kdo dluží + Poslední úkony) flow independently, so a tall card in one
+   column never pushes the other column's cards down. */
 .dash-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 2fr 1fr;
   gap: var(--sp-4);
   margin-bottom: var(--sp-5);
   align-items: start;
 }
-.dash-grid .span-2 { grid-column: span 2; }
+.dash-main,
+.dash-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.dash-breakdowns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+/* The dashboard spaces cards with container `gap`, so the legacy
+   `.card + .card` stacking margin must not apply here. */
+.dash-grid .card + .card { margin-top: 0; }
 
 @media (max-width: 900px) {
   .dash-grid { grid-template-columns: 1fr; }
-  .dash-grid .span-2 { grid-column: span 1; }
+  .dash-breakdowns { grid-template-columns: 1fr; }
 }
 
 .kpi-sub {

@@ -2,8 +2,9 @@
   var trend = window.TREND || [];
   var firmy = window.TREND_FIRMY || [];
   var MN = ["Led", "Úno", "Bře", "Dub", "Kvě", "Čvn", "Čvc", "Srp", "Zář", "Říj", "Lis", "Pro"];
-  var COLORS = ["#0071e3", "#16a34a", "#ea580c", "#9333ea", "#dc2626",
-                "#0891b2", "#ca8a04", "#db2777", "#475569", "#65a30d"];
+  // Apple system colors — vivid but soft, in the iOS/macOS palette.
+  var COLORS = ["#0a84ff", "#34c759", "#ff9f0a", "#bf5af2", "#ff375f",
+                "#5ac8fa", "#ffd60a", "#ff6482", "#64d2ff", "#30d158"];
   var tctx = document.getElementById("trendChart");
   if (!tctx) return;
 
@@ -26,16 +27,39 @@
               data: f.pocty,
               borderColor: color,
               backgroundColor: color,
-              tension: 0.3,
-              pointRadius: 3,
-              borderWidth: 2
+              // soft, rounded Apple-style curves
+              tension: 0.45,
+              cubicInterpolationMode: "monotone",
+              borderWidth: 2.5,
+              borderCapStyle: "round",
+              borderJoinStyle: "round",
+              pointRadius: 0,
+              pointHoverRadius: 6,
+              pointBackgroundColor: color,
+              pointBorderColor: "#fff",
+              pointBorderWidth: 2,
+              pointHoverBorderWidth: 2
             };
           })
         },
         options: {
           interaction: { mode: "index", intersect: false },
-          plugins: { legend: { position: "bottom" } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: {
+                usePointStyle: true,
+                pointStyle: "circle",
+                boxWidth: 8,
+                boxHeight: 8,
+                padding: 16
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "rgba(0,0,0,0.05)" } },
+            x: { grid: { display: false } }
+          }
         }
       });
       return;
