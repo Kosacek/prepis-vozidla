@@ -38,6 +38,16 @@ def test_year_trend_has_12_months(conn):
     assert trend[4]["trzby"] == 4600
 
 
+def test_rocni_trend_podle_firmy(conn):
+    _setup(conn)  # Cardion: 2 úkony in May; Albion: 1 in May
+    rows = st.rocni_trend_podle_firmy(conn, 2026)
+    by = {r["zkratka"]: r["pocty"] for r in rows}
+    assert len(by["Cardion"]) == 12
+    assert by["Cardion"][4] == 2   # index 4 = May
+    assert by["Albion"][4] == 1
+    assert rows[0]["zkratka"] == "Cardion"  # ordered by total count desc
+
+
 def test_denni_souhrn(conn):
     _setup(conn)
     s = st.denni_souhrn(conn, "2026-05-04")

@@ -931,24 +931,20 @@ ul.list li > span:last-child {
 
 /* --- Dashboard v2 --- */
 
-/* trend chart (wide) + "Kdo dluží" side panel */
-.grid-dash {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-4);
-}
-
-.grid-3 {
+/* One unified 3-column grid for the whole dashboard body so every card edge
+   lines up. The trend chart spans 2 columns; everything else spans 1. */
+.dash-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--sp-4);
   margin-bottom: var(--sp-5);
+  align-items: start;
 }
+.dash-grid .span-2 { grid-column: span 2; }
 
 @media (max-width: 900px) {
-  .grid-dash { grid-template-columns: 1fr; }
-  .grid-3 { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .dash-grid .span-2 { grid-column: span 1; }
 }
 
 .kpi-sub {

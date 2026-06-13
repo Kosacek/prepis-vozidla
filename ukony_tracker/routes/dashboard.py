@@ -44,4 +44,8 @@ def index():
         trend_json=json.dumps(
             [{"m": t["month"], "trzby": t["trzby"], "pocet": t["pocet"]} for t in trend]
         ),
+        trend_firmy_json=json.dumps(
+            [{"zkratka": r["zkratka"], "pocty": r["pocty"]}
+             for r in st.rocni_trend_podle_firmy(conn, year)]
+        ),
     )

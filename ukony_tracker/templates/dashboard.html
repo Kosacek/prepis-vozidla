@@ -36,10 +36,14 @@
   </a>
 </div>
 
-<div class="grid-dash">
-  <div class="card">
-    <div class="card-head"><h2>Měsíční tržby</h2>
-      <div class="seg" id="metric-seg"><span class="on" data-metric="trzby">Kč</span><span data-metric="pocet">Počet</span></div>
+<div class="dash-grid">
+  <div class="card span-2">
+    <div class="card-head"><h2>Měsíční přehled</h2>
+      <div class="seg" id="metric-seg">
+        <span class="on" data-mode="trzby">Tržby</span>
+        <span data-mode="pocet">Počet</span>
+        <span data-mode="firmy">Firmy</span>
+      </div>
     </div>
     <canvas id="trendChart" height="110"></canvas>
   </div>
@@ -56,9 +60,7 @@
     <p class="muted">Vše zaplaceno ✓</p>
     {% endfor %}
   </div>
-</div>
 
-<div class="grid-3">
   <div class="card">
     <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
     {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
@@ -94,6 +96,9 @@
   </div>
 </div>
 
-<script>window.TREND = {{ trend_json|safe }};</script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=2"></script>
+<script>
+  window.TREND = {{ trend_json|safe }};
+  window.TREND_FIRMY = {{ trend_firmy_json|safe }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
 {% endblock %}

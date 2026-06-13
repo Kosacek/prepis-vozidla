@@ -81,6 +81,24 @@ def nezaplaceno_celkem(conn: Connection) -> float:
     return r["d"]
 
 
+def rocni_trend_podle_firmy(conn: Connection, year: int) -> list:
+    """Per-firm monthly úkon counts for the year, for comparing firms on a line
+    chart. Returns list of {zkratka, pocty: [12 ints]}, ordered by total desc."""
+    rows = conn.execute(
+        "SELECT f.zkratka, substr(u.datum,6,2) m, COUNT(*) n "
+        "FROM ukony u JOIN firmy f ON f.id=u.firma_id "
+        "WHERE substr(u.datum,1,4)=? GROUP BY f.id, m",
+        (f"{year:04d}",),
+    ).fetchall()
+    by_firma: dict[str, list[int]] = {}
+    for r in rows:
+        arr = by_firma.setdefault(r["zkratka"], [0] * 12)
+        arr[int(r["m"]) - 1] = r["n"]
+    out = [{"zkratka": z, "pocty": p} for z, p in by_firma.items()]
+    out.sort(key=lambda x: sum(x["pocty"]), reverse=True)
+    return out
+
+
 def denni_souhrn(conn: Connection, iso_date: str) -> dict:
     """Count and revenue for a single day (ISO date string)."""
     r = conn.execute(
