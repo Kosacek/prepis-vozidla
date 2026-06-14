@@ -1,4 +1,5 @@
 """Příchozí — inbox of incoming žádosti awaiting manual assignment."""
+import json
 from datetime import date
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
@@ -24,9 +25,21 @@ def _note(p) -> str | None:
 @bp.get("/prichozi")
 def inbox():
     conn = db.get_db()
+    rows = prichozi_repo.list_by_status(conn, "pending")
+    # Surface the vehicle make (znacka) from the stored payload — it helps
+    # identify the firm at a glance (e.g. Volvo → Cardion). Convert each Row to
+    # a dict so the template can read the extra `znacka` key alongside columns.
+    items = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["znacka"] = (json.loads(r["raw_json"] or "{}").get("znacka") or "").strip()
+        except (ValueError, TypeError):
+            d["znacka"] = ""
+        items.append(d)
     return render_template(
         "prichozi.html",
-        items=prichozi_repo.list_by_status(conn, "pending"),
+        items=items,
         firmy=firmy_repo.list_all(conn, only_active=True),
         typy=typy_repo.list_active(conn),
         mode_typ=MODE_TYP,

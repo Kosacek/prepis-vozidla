@@ -22,7 +22,8 @@ def client(tmp_path, monkeypatch):
                 conn, zadost_id="z1", datum="2026-06-14", mode="prevod",
                 rz="1AB2345", vin="TMBVIN1234567890", orv="ABC123456",
                 novy_jmeno="Cardion", novy_ico="11111111",
-                suggested_firma_id=fid, status="pending", raw={},
+                suggested_firma_id=fid, status="pending",
+                raw={"znacka": "Škoda Octavia"},
             )
         yield c, fid, pid
 
@@ -33,6 +34,8 @@ def test_inbox_renders_pending(client):
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "Příchozí" in body and "1AB2345" in body and "ABC123456" in body
+    assert "Cardion" in body                 # company name shown
+    assert "Škoda Octavia" in body           # vehicle make from raw_json shown
 
 
 def test_nav_badge_shows_pending_count(client):

@@ -13,17 +13,18 @@
 {% for p in items %}
 <div class="card prichozi-card">
   <div class="prichozi-head">
-    <div>
-      <b class="u-rz">{{ p.rz or '—' }}</b>
+    <div class="prichozi-title">
+      <span class="prichozi-vehicle">{{ p.znacka or p.rz or '—' }}</span>
       <span class="tag">{{ p.mode }}</span>
-      {% if p.vin %}<span class="muted small">VIN {{ p.vin }}</span>{% endif %}
-      {% if p.orv %}<span class="muted small">· ORV {{ p.orv }}</span>{% endif %}
     </div>
     <div class="muted small">{{ p.datum }}</div>
   </div>
-  <div class="muted small prichozi-parties">
-    {% if p.novy_jmeno %}nový: <b>{{ p.novy_jmeno }}</b>{% if p.novy_ico %} (IČO {{ p.novy_ico }}){% endif %}{% endif %}
-    {% if p.puvodni_jmeno %} · původní: <b>{{ p.puvodni_jmeno }}</b>{% if p.puvodni_ico %} (IČO {{ p.puvodni_ico }}){% endif %}{% endif %}
+  <div class="prichozi-parties">
+    {% if p.novy_jmeno %}<div class="party"><span class="party-label">nový</span><b>{{ p.novy_jmeno }}</b>{% if p.novy_ico %} <span class="muted small">IČO {{ p.novy_ico }}</span>{% endif %}</div>{% endif %}
+    {% if p.puvodni_jmeno %}<div class="party"><span class="party-label">původní</span><b>{{ p.puvodni_jmeno }}</b>{% if p.puvodni_ico %} <span class="muted small">IČO {{ p.puvodni_ico }}</span>{% endif %}</div>{% endif %}
+  </div>
+  <div class="muted small prichozi-meta">
+    <b>{{ p.rz or '—' }}</b>{% if p.vin %} · VIN {{ p.vin }}{% endif %}{% if p.orv %} · ORV {{ p.orv }}{% endif %}
   </div>
 
   <form method="post" action="/prichozi/{{ p.id }}/approve" class="prichozi-form">

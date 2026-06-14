@@ -10,6 +10,7 @@ def test_build_payload_uses_today_not_form_date():
         "mode": "prevod",
         "registracni_znacka": "1ab2345",
         "vin": "tmbvin1234567890",
+        "znacka": "Škoda Octavia",
         "osvedceni_serie": "ABC",
         "osvedceni_cislo": "123456",
         "novy_jmeno": "Cardion s.r.o.",
@@ -20,6 +21,7 @@ def test_build_payload_uses_today_not_form_date():
     p = tracker_push.build_payload(data)
     assert p["mode"] == "prevod"
     assert p["rz"] == "1ab2345"
+    assert p["znacka"] == "Škoda Octavia"
     assert p["novy_ico"] == "04156854"
     assert p["osvedceni_serie"] == "ABC" and p["osvedceni_cislo"] == "123456"
     assert len(p["zadost_id"]) >= 16              # uuid present

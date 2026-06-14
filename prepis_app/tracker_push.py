@@ -37,6 +37,7 @@ def build_payload(data: dict) -> dict:
         "mode": data.get("mode", "prevod"),
         "rz": data.get("registracni_znacka"),
         "vin": data.get("vin"),
+        "znacka": data.get("znacka"),  # brand+model (e.g. "Škoda Octavia") — helps ID the firm
         "osvedceni_serie": data.get("osvedceni_serie"),
         "osvedceni_cislo": data.get("osvedceni_cislo"),
         "puvodni_jmeno": data.get("puvodni_jmeno"),
