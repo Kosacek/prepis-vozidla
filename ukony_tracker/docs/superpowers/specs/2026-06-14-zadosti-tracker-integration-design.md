@@ -173,6 +173,63 @@ the tracker where the user assigns it manually.
   appears in the tracker; generate one with no matching IČO → it appears in
   Příchozí and can be assigned + approved.
 
+## Review resolutions (2026-06-14, architect pass)
+
+These supersede any looser wording above.
+
+- **R1 — `orv` migration (was C2/C3).** Add `orv TEXT` directly to the
+  `CREATE TABLE ukony` body (covers fresh + test DBs). For the existing live DB,
+  run a guarded migration inside `init_schema` **after** the `executescript`:
+  read `PRAGMA table_info(ukony)`; only `ALTER TABLE ukony ADD COLUMN orv TEXT`
+  if the column is absent. Never put a bare `ALTER` in the executed `SCHEMA`
+  string (it re-runs every request and would error). `prichozi` is a normal
+  `CREATE TABLE IF NOT EXISTS` in `SCHEMA`. The migration must be idempotent and
+  verified before deploy (a throwing migration turns every request into a 500).
+- **R2 — auto-create `celkem` (was C1).** On the auto path, resolve price via
+  `typy_repo.get_by_kod(typ)`; use `vychozi_cena` when present, else `0.0`
+  (editable on the úkon afterwards). `typy_ukonu` being seeded is a precondition
+  for a *useful* auto price, not for correctness — a missing/NULL price degrades
+  to `0.0`, never an error. (Production DB is seeded: PŘEVOD/NOVÉ = 1300.)
+- **R3 — API-key auth is independent of the login gate (was I1/M5).** Add a
+  separate `before_request` (or api-blueprint guard) that fires for `/api/*`:
+  if `INTEGRATION_API_KEY` is set, require header `X-Api-Key` to equal it (else
+  `401`); if it is **unset**, `/api/*` is open (preserves the existing keyless
+  `test_api.py`). Independently, `/api/*` must be **exempt from the
+  `_require_login` redirect** so server-to-server POSTs (incl. the public-URL
+  fallback, where `ADMIN_PASSWORD` is set) reach the route instead of `302
+  /login`. Existing keyless API tests must stay green via the unset-key path —
+  add that as an explicit test.
+- **R4 — matching scope + normalization (was I2/I3).** Match only against
+  **active** firms (`firmy_repo.list_all(only_active=True)` / a client filter) —
+  not the whole seeded `firmy.xlsx`. Normalize each candidate IČO to digits-only
+  before lookup. Resolve every non-empty party/operator IČO to a `firma_id` and
+  count **distinct firma_ids**: exactly one → match; zero → no match; ≥2 →
+  ambiguous (inbox). `get_by_ico(None/'')` already returns `None` (safe).
+- **R5 — intake ordering / idempotency (was I5).** Order: (1) INSERT the
+  `prichozi` row to **claim** `zadost_id` (UNIQUE) — catch `IntegrityError` and
+  return `{status:"duplicate"}`; (2) run matching; (3) if auto, create the úkon
+  via `ingest_service`, then UPDATE the row with `created_ukon_id` + `status`.
+  `ukony_repo.create` commits internally, so these are separate atomic writes;
+  the only intermediate state is "claimed but úkon not yet created", which is
+  acceptable and surfaces in the inbox if step 3 fails (no orphan úkon, no double
+  úkon).
+- **R6 — ORV only when complete (was I4).** Build `orv` only when **both**
+  `osvedceni_serie` and `osvedceni_cislo` are present; else store `NULL`. Strip
+  spaces, uppercase.
+- **R7 — `datum` is Prague-local today (was M1).** zadosti sends
+  `date.today().isoformat()` from its `TZ=Europe/Prague` container (not a
+  UTC-derived date) so near-midnight the work date is the Czech calendar day. The
+  žádost's on-form date (`_next_working_day()` = tomorrow) is never used.
+- **R8 — coordinated `orv` edits (was M2).** Wiring `orv` touches:
+  `ukony_repo.create` (signature + INSERT), `ingest_service.pridat_ukon`
+  (passthrough), the entry form + "Tento měsíc" list, and **both** export paths
+  (`export_service` Excel header+row tuples **and** the CSV column list).
+- **R9 — push timeout + audit (was M3/M4).** zadosti's push is synchronous with
+  a pinned **2 s** timeout (added to generate latency, acceptable). Persist the
+  full payload (incl. operator IČOs used for matching) in `prichozi.raw_json` so
+  an auto-match decision is auditable; the inbox derives suggested typ/price at
+  render time from `mode` + `typy_repo`.
+
 ## Risks
 
 - **Docker network reachability** between zadosti and ukony-app (mitigated by
