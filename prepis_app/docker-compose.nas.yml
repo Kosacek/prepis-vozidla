@@ -30,6 +30,10 @@ services:
       SECRET_KEY: "${SECRET_KEY:?SECRET_KEY must be set in .env}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set in .env}"
       DATAOVOZIDLECH_API_KEY: "${DATAOVOZIDLECH_API_KEY:?DATAOVOZIDLECH_API_KEY must be set in .env}"
+      # Úkony Tracker integration (push finished žádosti). Key must match the
+      # tracker's INTEGRATION_API_KEY. URL is the tracker on the shared net.
+      UKONY_API_URL: "${UKONY_API_URL:-http://ukony-app:8090}"
+      UKONY_API_KEY: "${UKONY_API_KEY:?UKONY_API_KEY must be set in .env}"
       DATA_DIR: "/data"
       HTTP_PORT: "8089"
       TZ: "Europe/Prague"
