@@ -66,6 +66,7 @@
         <td>{% if firma.aktivni %}✓{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="muted">{{ pocty[firma.id] }}</td>
         <td class="actions">
+          <a class="btn btn-sm" href="/firmy/{{ firma.id }}/ceny">Ceník</a>
           <button type="button" class="btn btn-sm"
             onclick="toggleEdit({{ firma.id }})">Upravit</button>
           {% if pocty[firma.id] == 0 %}

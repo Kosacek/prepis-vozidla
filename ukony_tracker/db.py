@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS ukony (
 );
 CREATE INDEX IF NOT EXISTS idx_ukony_firma ON ukony(firma_id);
 CREATE INDEX IF NOT EXISTS idx_ukony_datum ON ukony(datum);
+-- Per-firm price overrides: only rows where a firm's price for a type differs
+-- from the type's default (typy_ukonu.vychozi_cena). Absent = use the default.
+CREATE TABLE IF NOT EXISTS firma_ceny (
+  firma_id INTEGER NOT NULL REFERENCES firmy(id),
+  typ_kod TEXT NOT NULL,
+  cena REAL NOT NULL,
+  PRIMARY KEY (firma_id, typ_kod)
+);
 -- Incoming žádosti pushed from the zadosti app, awaiting auto-create or manual
 -- assignment in the Příchozí inbox. raw_json keeps the full payload (incl. the
 -- operator IČOs used for matching) for auditability.

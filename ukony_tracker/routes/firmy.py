@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 import db
-from repositories import firmy_repo, ukony_repo
+from repositories import firmy_repo, ukony_repo, typy_repo, firma_ceny_repo
 from services import ares_service
 
 bp = Blueprint("firmy", __name__)
@@ -76,3 +76,44 @@ def ares():
     if not out:
         return jsonify(ok=False), 404
     return jsonify(ok=True, **out)
+
+
+@bp.get("/firmy/<int:fid>/ceny")
+def ceny_form(fid):
+    conn = db.get_db()
+    firma = firmy_repo.get(conn, fid)
+    if not firma:
+        abort(404)
+    return render_template(
+        "firma_ceny.html",
+        firma=firma,
+        typy=typy_repo.list_active(conn),
+        overrides=firma_ceny_repo.get_map(conn, fid),
+    )
+
+
+@bp.post("/firmy/<int:fid>/ceny")
+def ceny_save(fid):
+    conn = db.get_db()
+    if not firmy_repo.get(conn, fid):
+        abort(404)
+    f = request.form
+    bad = []
+    for t in typy_repo.list_active(conn):
+        raw = (f.get("cena_" + t["kod"]) or "").strip().replace(",", ".")
+        if raw == "":
+            firma_ceny_repo.set_price(conn, fid, t["kod"], None)  # revert to default
+            continue
+        try:
+            val = float(raw)
+            if val < 0:
+                raise ValueError
+        except ValueError:
+            bad.append(t["kod"])
+            continue
+        firma_ceny_repo.set_price(conn, fid, t["kod"], val)
+    if bad:
+        flash("Neplatná cena u: " + ", ".join(bad) + " — přeskočeno.", "error")
+    else:
+        flash("Ceník uložen.", "success")
+    return redirect(url_for("firmy.ceny_form", fid=fid))

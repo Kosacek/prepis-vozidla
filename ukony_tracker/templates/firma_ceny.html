@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Ceník — {{ firma.zkratka }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Ceník — {{ firma.nazev }}</h1>
+  <a href="/firmy" class="btn">Zpět na firmy</a>
+</div>
+
+<div class="card" style="max-width: 560px;">
+  <p class="muted small" style="margin-bottom: var(--sp-4);">
+    Cena za úkon pro tuto firmu. Nech prázdné = použít výchozí cenu typu
+    z Nastavení.
+  </p>
+  <form method="post" action="/firmy/{{ firma.id }}/ceny">
+    {% for t in typy %}
+    <div class="cenik-row">
+      <span class="cenik-kod">{{ t.kod }}</span>
+      <input name="cena_{{ t.kod }}" class="cenik-input" inputmode="numeric" autocomplete="off"
+        value="{{ overrides[t.kod]|int if t.kod in overrides else '' }}"
+        placeholder="{% if t.vychozi_cena is not none %}{{ t.vychozi_cena|int }} (výchozí){% else %}bez výchozí{% endif %}">
+      <span class="cenik-unit muted">Kč</span>
+    </div>
+    {% else %}
+    <p class="muted">Žádné aktivní typy úkonů.</p>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary" style="margin-top: var(--sp-4);">Uložit ceník</button>
+  </form>
+</div>
+{% endblock %}

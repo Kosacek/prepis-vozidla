@@ -7,8 +7,8 @@ one active firm matched) or leave the row pending for the Příchozí inbox.
 import sqlite3
 from datetime import date
 
-from repositories import prichozi_repo, typy_repo
-from services import ingest_service, matching_service
+from repositories import prichozi_repo
+from services import ingest_service, matching_service, pricing_service
 
 # žádost mode → tracker úkon type for the AUTO-create path only. Modes not listed
 # (notably 'zmena') never auto-create — they always wait in the inbox.
@@ -20,13 +20,6 @@ def build_orv(serie: str | None, cislo: str | None) -> str | None:
     s = (serie or "").strip()
     c = (cislo or "").strip()
     return f"{s}{c}".upper() if (s and c) else None
-
-
-def _default_price(conn: sqlite3.Connection, typ_kod: str) -> float:
-    t = typy_repo.get_by_kod(conn, typ_kod)
-    if t and t["vychozi_cena"] is not None:
-        return float(t["vychozi_cena"])
-    return 0.0  # missing/NULL price degrades to 0, editable on the úkon (spec R2)
 
 
 def _context_note(payload: dict) -> str | None:
@@ -100,7 +93,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 firma_id=m["firma_id"],
                 datum=datum,
                 typ_kod=typ,
-                celkem=_default_price(conn, typ),
+                celkem=pricing_service.effective_price(conn, m["firma_id"], typ) or 0.0,
                 rz=rz, vin=vin, orv=orv,
                 poznamka=_context_note(payload),
                 zdroj="zadosti",

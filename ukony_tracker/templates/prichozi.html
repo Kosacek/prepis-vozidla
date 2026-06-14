@@ -69,15 +69,28 @@
 
 <script>
 (function () {
-  function fill(sel) {
-    var o = sel.options[sel.selectedIndex];
-    var c = o && o.dataset.cena;
-    var inp = sel.closest("form").querySelector(".cena-input");
-    if (inp && c) inp.value = c;
+  var FIRM_PRICES = {{ firm_prices_json|safe }};
+  function priceFor(form) {
+    var firma = form.querySelector("select[name=firma_id]").value;
+    var typ = form.querySelector("select[name=typ_kod]").value;
+    if (!typ) return null;
+    // firm-specific price (override or default) when a firm is chosen…
+    if (firma && FIRM_PRICES[firma] && FIRM_PRICES[firma][typ] != null) {
+      return FIRM_PRICES[firma][typ];
+    }
+    // …otherwise the type's global default from the option
+    var opt = form.querySelector("select[name=typ_kod] option[value='" + typ + "']");
+    return opt && opt.dataset.cena ? opt.dataset.cena : null;
   }
-  document.querySelectorAll(".typ-select").forEach(function (sel) {
-    fill(sel);  // default the price to the selected type on load
-    sel.addEventListener("change", function () { fill(sel); });
+  function sync(form) {
+    var inp = form.querySelector(".cena-input");
+    var p = priceFor(form);
+    if (inp && p != null && p !== "") inp.value = p;
+  }
+  document.querySelectorAll(".prichozi-form").forEach(function (form) {
+    sync(form);  // prefill from the suggested firm + type on load
+    form.querySelector("select[name=firma_id]").addEventListener("change", function () { sync(form); });
+    form.querySelector("select[name=typ_kod]").addEventListener("change", function () { sync(form); });
   });
 })();
 </script>

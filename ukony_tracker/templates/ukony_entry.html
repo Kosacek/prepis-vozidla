@@ -30,13 +30,14 @@
       <label>Typ úkonu</label>
       <div class="seg" id="typ-seg">
         {% for t in typy %}
-        <span data-kod="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
+        <span data-kod="{{ t.kod }}" data-cena="{{ ceny.get(t.kod)|int if ceny.get(t.kod) is not none else '' }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
         {% endfor %}
       </div>
       <input type="hidden" name="typ_kod" id="typ_kod" value="{{ sel_typ if sel_typ else (typy[0].kod if typy) }}">
     </div>
+    {% set init_typ = sel_typ if sel_typ else (typy[0].kod if typy else none) %}
     <div class="form-row">
-      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else ((typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '') }}"></div>
+      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else (ceny.get(init_typ)|int if ceny.get(init_typ) is not none else '') }}"></div>
       <div class="field"><label>VIN</label><input name="vin" class="input-upper" value="{{ sel_vin }}"></div>
     </div>
     <div class="field"><label>ORV <span class="muted small">(číslo OTP)</span></label><input name="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}"></div>

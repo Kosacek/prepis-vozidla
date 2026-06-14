@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import db
 from repositories import firmy_repo, typy_repo, prichozi_repo
 from services import ingest_service as ing
+from services import pricing_service
 
 bp = Blueprint("prichozi", __name__)
 
@@ -37,12 +38,16 @@ def inbox():
         except (ValueError, TypeError):
             d["znacka"] = ""
         items.append(d)
+    firmy = firmy_repo.list_all(conn, only_active=True)
+    # Per-firm price maps so the inbox price field follows the chosen firm+type.
+    firm_prices = {str(f["id"]): pricing_service.firm_price_map(conn, f["id"]) for f in firmy}
     return render_template(
         "prichozi.html",
         items=items,
-        firmy=firmy_repo.list_all(conn, only_active=True),
+        firmy=firmy,
         typy=typy_repo.list_active(conn),
         mode_typ=MODE_TYP,
+        firm_prices_json=json.dumps(firm_prices),
     )
 
 

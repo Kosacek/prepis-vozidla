@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import db
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import ingest_service as ing
+from services import pricing_service
 
 bp = Blueprint("ukony", __name__)
 
@@ -47,6 +48,7 @@ def entry(firma_id):
         firmy=firmy_repo.list_all(conn, only_active=True),
         firma=firma,
         typy=typy_repo.list_active(conn),
+        ceny=pricing_service.firm_price_map(conn, firma_id),
         ukony=rows,
         total=total,
         pocet=len(rows),

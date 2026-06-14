@@ -1308,3 +1308,16 @@ a.kpi-link:hover {
 @media (max-width: 760px) {
   .prichozi-form { grid-template-columns: 1fr 1fr; }
 }
+
+/* --- Per-firm ceník --- */
+.cenik-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.cenik-row:last-of-type { border-bottom: none; }
+.cenik-kod { flex: 0 0 120px; font-weight: 600; }
+.cenik-input { flex: 1; min-width: 0; }
+.cenik-unit { flex: 0 0 auto; }
