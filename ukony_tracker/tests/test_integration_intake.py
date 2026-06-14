@@ -150,3 +150,29 @@ def test_intake_orv_only_when_both_parts(conn):
     assert prichozi_service.build_orv("ABC", "") is None
     assert prichozi_service.build_orv("", "123456") is None
     assert prichozi_service.build_orv(None, None) is None
+
+
+def test_export_csv_includes_orv(conn):
+    from services import ingest_service, export_service
+    fid = firmy_repo.create(conn, nazev="C", zkratka="C", ico="1")
+    ingest_service.pridat_ukon(conn, firma_id=fid, datum="2026-06-14",
+                               typ_kod="PŘEVOD", celkem=1300, orv="ABC123456")
+    csv = export_service.export_csv(conn, "2026-06-01", "2026-06-30")
+    assert "orv" in csv.splitlines()[0]    # header column present
+    assert "ABC123456" in csv              # value exported
+
+
+def test_export_excel_has_orv_header(conn):
+    import io
+    import openpyxl
+    from services import ingest_service, export_service
+    fid = firmy_repo.create(conn, nazev="C", zkratka="C", ico="1")
+    ingest_service.pridat_ukon(conn, firma_id=fid, datum="2026-06-14",
+                               typ_kod="PŘEVOD", celkem=1300, orv="ABC123456")
+    data = export_service.export_excel(conn, 2026, 6)
+    wb = openpyxl.load_workbook(io.BytesIO(data))
+    ws = wb[wb.sheetnames[0]]
+    header = [c.value for c in ws[1]]
+    assert "ORV" in header
+    orv_col = header.index("ORV")
+    assert ws[2][orv_col].value == "ABC123456"

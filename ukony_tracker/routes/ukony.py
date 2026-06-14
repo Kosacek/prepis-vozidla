@@ -86,6 +86,7 @@ def add(firma_id):
             celkem=f.get("celkem"),
             rz=f.get("rz") or None,
             vin=f.get("vin") or None,
+            orv=f.get("orv") or None,
             poznamka=f.get("poznamka") or None,
         )
         flash("Úkon přidán.", "success")
@@ -154,6 +155,7 @@ def edit_save(uid):
         stav = ing.derive_stav(celkem, zaplaceno)
         rz = (f.get("rz") or "").strip().upper() or None
         vin = (f.get("vin") or "").strip().upper() or None
+        orv = (f.get("orv") or "").strip().upper() or None
         ukony_repo.update(
             conn, uid,
             datum=datum,
@@ -161,6 +163,7 @@ def edit_save(uid):
             typ_kod=f.get("typ_kod"),
             celkem=celkem,
             vin=vin,
+            orv=orv,
             poznamka=f.get("poznamka") or None,
             zaplaceno_kc=zaplaceno,
             stav_platby=stav,

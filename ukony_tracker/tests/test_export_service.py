@@ -17,8 +17,8 @@ def test_excel_has_firm_sheet_with_total(conn):
     assert "Cardion" in wb.sheetnames
     ws = wb["Cardion"]
     header = [c.value for c in ws[1]]
-    assert header[:6] == ["Datum", "RZ", "Úkon", "Celkem", "VIN", "Poznámka"]
-    assert "Zaplaceno" in header and "Zaplaceno Kč" in header
+    assert header[:6] == ["Datum", "RZ", "Úkon", "Celkem", "VIN", "ORV"]
+    assert "Poznámka" in header and "Zaplaceno" in header and "Zaplaceno Kč" in header
     # the LAST row is the totals row: a CELKEM label with the count + the period sum
     celkem_col = header.index("Celkem") + 1
     last = ws.max_row

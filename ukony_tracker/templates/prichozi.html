@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Příchozí{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Příchozí žádosti</h1>
+  <div class="muted">{{ items|length }} čeká na přiřazení</div>
+</div>
+
+{% if not items %}
+<div class="card"><p class="muted">Žádné nové žádosti — vše přiřazeno ✓</p></div>
+{% endif %}
+
+{% for p in items %}
+<div class="card prichozi-card">
+  <div class="prichozi-head">
+    <div>
+      <b class="u-rz">{{ p.rz or '—' }}</b>
+      <span class="tag">{{ p.mode }}</span>
+      {% if p.vin %}<span class="muted small">VIN {{ p.vin }}</span>{% endif %}
+      {% if p.orv %}<span class="muted small">· ORV {{ p.orv }}</span>{% endif %}
+    </div>
+    <div class="muted small">{{ p.datum }}</div>
+  </div>
+  <div class="muted small prichozi-parties">
+    {% if p.novy_jmeno %}nový: <b>{{ p.novy_jmeno }}</b>{% if p.novy_ico %} (IČO {{ p.novy_ico }}){% endif %}{% endif %}
+    {% if p.puvodni_jmeno %} · původní: <b>{{ p.puvodni_jmeno }}</b>{% if p.puvodni_ico %} (IČO {{ p.puvodni_ico }}){% endif %}{% endif %}
+  </div>
+
+  <form method="post" action="/prichozi/{{ p.id }}/approve" class="prichozi-form">
+    <div class="field">
+      <label>Firma</label>
+      <select name="firma_id" required>
+        <option value="">— vyber —</option>
+        {% for f in firmy %}
+        <option value="{{ f.id }}" {{ 'selected' if p.suggested_firma_id == f.id }}>{{ f.zkratka }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Typ</label>
+      {% set sugg = mode_typ.get(p.mode, '') %}
+      <select name="typ_kod" class="typ-select" required>
+        <option value="" {{ 'selected' if not sugg }}>— vyber —</option>
+        {% for t in typy %}
+        <option value="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" {{ 'selected' if sugg == t.kod }}>{{ t.kod }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Cena (Kč)</label>
+      <input name="celkem" class="cena-input" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Datum</label>
+      <input type="date" name="datum" value="{{ p.datum }}" required>
+    </div>
+    <div class="prichozi-actions">
+      <button type="submit" class="btn btn-primary">Přidat úkon</button>
+    </div>
+  </form>
+
+  <form method="post" action="/prichozi/{{ p.id }}/discard" class="discard-form"
+    onsubmit="return confirm('Zahodit tuto žádost?')">
+    <button type="submit" class="btn btn-sm btn-danger">Zahodit</button>
+  </form>
+</div>
+{% endfor %}
+
+<script>
+(function () {
+  function fill(sel) {
+    var o = sel.options[sel.selectedIndex];
+    var c = o && o.dataset.cena;
+    var inp = sel.closest("form").querySelector(".cena-input");
+    if (inp && c) inp.value = c;
+  }
+  document.querySelectorAll(".typ-select").forEach(function (sel) {
+    fill(sel);  // default the price to the selected type on load
+    sel.addEventListener("change", function () { fill(sel); });
+  });
+})();
+</script>
+{% endblock %}

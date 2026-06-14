@@ -42,9 +42,15 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>Poznámka</label>
-      <input name="poznamka" value="{{ u.poznamka or '' }}">
+    <div class="form-row">
+      <div class="field">
+        <label>ORV <span class="muted small">(číslo OTP)</span></label>
+        <input name="orv" value="{{ u.orv or '' }}" class="input-upper">
+      </div>
+      <div class="field">
+        <label>Poznámka</label>
+        <input name="poznamka" value="{{ u.poznamka or '' }}">
+      </div>
     </div>
 
     <div style="display:flex; gap: var(--sp-3); align-items:center; margin-top: var(--sp-2);">

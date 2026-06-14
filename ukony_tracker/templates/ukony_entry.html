@@ -39,6 +39,7 @@
       <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else ((typy[0].vychozi_cena|int) if typy and typy[0].vychozi_cena is not none else '') }}"></div>
       <div class="field"><label>VIN</label><input name="vin" class="input-upper" value="{{ sel_vin }}"></div>
     </div>
+    <div class="field"><label>ORV <span class="muted small">(číslo OTP)</span></label><input name="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}"></div>
     <div class="field">
       <label>Poznámka</label>
       <input name="poznamka" id="poznamka" value="{{ sel_pozn }}">
@@ -63,7 +64,7 @@
       <span class="tag">{{ u.typ_kod }}</span>
       {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
     </span>
-    <span class="u-vin" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}</span>
+    <span class="u-vin" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}{% if u.orv %}<span class="muted small" style="display:block">ORV {{ u.orv }}</span>{% endif %}</span>
     <span class="u-kc"><b>{{ u.celkem|int }} Kč</b></span>
     <span class="u-actions">
       <span class="stav-slot">

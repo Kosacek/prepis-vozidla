@@ -44,12 +44,14 @@ def create_app():
     @app.context_processor
     def _nav_context():
         from flask import session
-        from repositories import firmy_repo, typy_repo
+        from repositories import firmy_repo, typy_repo, prichozi_repo
         conn = db.get_db()
+        authed = (not config.ADMIN_PASSWORD) or bool(session.get("authed"))
         return {
             "nav_firmy": firmy_repo.list_all(conn, only_active=True),
             "nav_typy": typy_repo.list_active(conn),
-            "authed": (not config.ADMIN_PASSWORD) or bool(session.get("authed")),
+            "authed": authed,
+            "nav_prichozi_count": prichozi_repo.count_pending(conn) if authed else 0,
         }
 
     from routes.dashboard import bp as dashboard_bp
@@ -64,6 +66,8 @@ def create_app():
     app.register_blueprint(export_bp)
     from routes.api import bp as api_bp
     app.register_blueprint(api_bp)
+    from routes.prichozi import bp as prichozi_bp
+    app.register_blueprint(prichozi_bp)
     from routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
 

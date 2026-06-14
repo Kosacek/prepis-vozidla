@@ -8,7 +8,7 @@ import openpyxl
 from repositories import firmy_repo, ukony_repo
 
 # Column order for the Excel header row
-HEAD = ["Datum", "RZ", "Úkon", "Celkem", "VIN", "Poznámka", "Zaplaceno", "Zaplaceno Kč"]
+HEAD = ["Datum", "RZ", "Úkon", "Celkem", "VIN", "ORV", "Poznámka", "Zaplaceno", "Zaplaceno Kč"]
 
 
 def export_excel(conn: Connection, year: int, month: int | None = None,
@@ -44,14 +44,15 @@ def export_excel(conn: Connection, year: int, month: int | None = None,
                 u["typ_kod"],
                 u["celkem"],
                 u["vin"],
+                u["orv"],
                 u["poznamka"],
                 u["stav_platby"],
                 u["zaplaceno_kc"],
             ])
             total += u["celkem"]
 
-        # Totals row: label in column A, sum in the Celkem column (index 4)
-        ws.append([f"CELKEM ({len(rows)} úkonů)", "", "", total, "", "", "", ""])
+        # Totals row: label in column A, sum in the Celkem column (index 3)
+        ws.append([f"CELKEM ({len(rows)} úkonů)", "", "", total, "", "", "", "", ""])
 
     if not wb.sheetnames:
         wb.create_sheet(title="Prázdné")
@@ -64,7 +65,7 @@ def export_excel(conn: Connection, year: int, month: int | None = None,
 def export_csv(conn: Connection, date_from: str, date_to: str) -> str:
     """Return all úkony in [date_from, date_to] as a CSV string."""
     rows = conn.execute(
-        "SELECT u.datum, f.zkratka firma, u.rz, u.typ_kod, u.celkem, u.vin, "
+        "SELECT u.datum, f.zkratka firma, u.rz, u.typ_kod, u.celkem, u.vin, u.orv, "
         "u.poznamka, u.stav_platby, u.zaplaceno_kc "
         "FROM ukony u JOIN firmy f ON f.id=u.firma_id "
         "WHERE u.datum BETWEEN ? AND ? "
@@ -74,7 +75,7 @@ def export_csv(conn: Connection, date_from: str, date_to: str) -> str:
 
     buf = io.StringIO()
     w = csvmod.writer(buf)
-    w.writerow(["datum", "firma", "rz", "typ", "celkem", "vin", "poznamka", "stav_platby", "zaplaceno_kc"])
+    w.writerow(["datum", "firma", "rz", "typ", "celkem", "vin", "orv", "poznamka", "stav_platby", "zaplaceno_kc"])
     for r in rows:
         w.writerow([r[k] for k in r.keys()])
     return buf.getvalue()

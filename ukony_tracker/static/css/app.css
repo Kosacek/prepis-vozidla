@@ -1266,3 +1266,41 @@ a.kpi-link:hover {
     padding: 6px 10px;
   }
 }
+
+/* --- Příchozí (inbox) --- */
+.nav-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  vertical-align: middle;
+}
+.prichozi-card { margin-bottom: var(--sp-4); }
+.prichozi-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+.prichozi-head .tag { margin: 0 var(--sp-2); }
+.prichozi-parties { margin-bottom: var(--sp-3); }
+.prichozi-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.7fr 1fr auto;
+  gap: var(--sp-3);
+  align-items: end;
+}
+.prichozi-form .field { margin: 0; }
+.prichozi-actions { align-self: end; }
+.discard-form { margin-top: var(--sp-2); }
+
+@media (max-width: 760px) {
+  .prichozi-form { grid-template-columns: 1fr 1fr; }
+}
