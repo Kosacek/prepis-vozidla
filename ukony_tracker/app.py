@@ -20,8 +20,20 @@ def create_app():
             return  # gate disabled (local/dev — no password configured)
         if request.path in ("/healthz", "/health", "/login") or request.endpoint == "static":
             return
+        if request.path.startswith("/api/"):
+            return  # server-to-server: key auth (_require_api_key), not the session gate
         if not session.get("authed"):
             return redirect(url_for("auth.login", next=request.path))
+
+    @app.before_request
+    def _require_api_key():
+        from flask import request, jsonify
+        if not request.path.startswith("/api/"):
+            return
+        if not config.INTEGRATION_API_KEY:
+            return  # no key configured → open (local/dev; keeps keyless API tests green)
+        if request.headers.get("X-Api-Key") != config.INTEGRATION_API_KEY:
+            return jsonify(error="unauthorized"), 401
 
     @app.before_request
     def _auto_backup():

@@ -1,8 +1,20 @@
 from flask import Blueprint, request, jsonify
 import db
 from services.ingest_service import pridat_ukon, UnknownFirmaError, ValidationError
+from services import prichozi_service
 
 bp = Blueprint("api", __name__)
+
+
+@bp.post("/api/prichozi")
+def intake_zadost():
+    """Receive a finished žádost from the zadosti app. Auto-creates an úkon when
+    a single active firm matches by IČO (převod/zápis), else queues it in the
+    Příchozí inbox. Idempotent on `zadost_id`."""
+    p = request.get_json(silent=True) or {}
+    res = prichozi_service.intake(db.get_db(), p)
+    code = 200 if res["status"] == "duplicate" else 201
+    return jsonify(res), code
 
 
 @bp.post("/api/ukony")

@@ -18,6 +18,10 @@ FIRMY_XLSX = os.path.abspath(os.path.join(BASE_DIR, "..", "prepis_app", "firmy.x
 PORT = int(os.environ.get("HTTP_PORT", "5051"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "ukony-tracker-local-dev")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+# Shared secret for server-to-server calls to /api/* (the zadosti push). When
+# set, /api/* requires header X-Api-Key == this value; when empty, /api/* is open
+# (local/dev — preserves the keyless API tests).
+INTEGRATION_API_KEY = os.environ.get("INTEGRATION_API_KEY", "")
 
 ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}"
 BACKUP_RETENTION = 30
