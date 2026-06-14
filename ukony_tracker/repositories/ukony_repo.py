@@ -12,6 +12,7 @@ def create(
     celkem: float,
     rz: str | None = None,
     vin: str | None = None,
+    orv: str | None = None,
     poznamka: str | None = None,
     stav_platby: str = "nezaplaceno",
     zaplaceno_kc: float = 0,
@@ -19,10 +20,10 @@ def create(
 ) -> int:
     ts = db.now_iso()
     cur = conn.execute(
-        "INSERT INTO ukony(firma_id,datum,rz,typ_kod,celkem,vin,poznamka,"
+        "INSERT INTO ukony(firma_id,datum,rz,typ_kod,celkem,vin,orv,poznamka,"
         "stav_platby,zaplaceno_kc,zdroj,created_at,updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-        (firma_id, datum, rz, typ_kod, celkem, vin, poznamka,
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (firma_id, datum, rz, typ_kod, celkem, vin, orv, poznamka,
          stav_platby, zaplaceno_kc, zdroj, ts, ts),
     )
     conn.commit()

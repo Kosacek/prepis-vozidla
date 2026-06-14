@@ -71,6 +71,7 @@ def pridat_ukon(
     celkem: float,
     rz: str | None = None,
     vin: str | None = None,
+    orv: str | None = None,
     poznamka: str | None = None,
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
@@ -101,11 +102,13 @@ def pridat_ukon(
     if not (0 <= zaplaceno_kc <= celkem):
         raise ValidationError("zaplaceno musí být mezi 0 a celkovou cenou")
 
-    # --- normalize RZ / VIN: always stored uppercase ---
+    # --- normalize RZ / VIN / ORV: always stored uppercase ---
     if isinstance(rz, str):
         rz = rz.strip().upper() or None
     if isinstance(vin, str):
         vin = vin.strip().upper() or None
+    if isinstance(orv, str):
+        orv = orv.strip().upper() or None
 
     # --- firma resolution ---
     fid = _resolve_firma(conn, firma_id, ico)
@@ -121,6 +124,7 @@ def pridat_ukon(
         celkem=celkem,
         rz=rz,
         vin=vin,
+        orv=orv,
         poznamka=poznamka,
         stav_platby=stav,
         zaplaceno_kc=zaplaceno_kc,
