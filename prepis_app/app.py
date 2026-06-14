@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.11"
+__version__ = "1.3.12"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1186,6 +1186,15 @@ def api_generate():
                     plne_moce.append(url)
     if plne_moce:
         result["plne_moce"] = plne_moce
+
+    # ── Push the finished žádost to the Úkony Tracker (best-effort) ──────────
+    # Must never break PDF generation; tracker_push swallows its own errors and
+    # logs unreachable pushes to failed_pushes.jsonl for replay.
+    try:
+        import tracker_push
+        tracker_push.push(data, DATA_DIR)
+    except Exception as e:
+        _log.warning("tracker push skipped: %s", e)
 
     return jsonify(result)
 
