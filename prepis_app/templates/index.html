@@ -1610,18 +1610,20 @@ function checkInsurance() {
 }
 
 function printAll() {
-  // Open ONLY the žádost the user actually filled out. A převod prints just
-  // the přepis (zmeny.pdf) — not the zápis form. Plné moci always print too.
+  // Print ONLY the žádost the user actually filled out (a převod = just the
+  // přepis, zmeny.pdf — not the zápis form), plus any plné moci — all merged
+  // into ONE print job that auto-opens the dialog (just hit Enter), then closes.
   const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena' };
   const key = primaryByMode[generatedUrls.mode];
+  const files = [];
   if (key && generatedUrls[key]) {
-    window.open(generatedUrls[key], '_blank');
+    files.push(generatedUrls[key]);
   } else {
-    // Defensive fallback if the mode wasn't recorded: open whatever single
-    // žádost exists (shouldn't happen in normal flow).
-    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
+    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) files.push(generatedUrls[k]); });
   }
-  (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
+  (generatedUrls.plne_moce || []).forEach(url => files.push(url));
+  if (!files.length) return;
+  window.open('/tisk?files=' + encodeURIComponent(files.join(',')), '_blank');
 }
 
 // PPD prints on A5 — the print page carries @page{size:A5}, so the browser's

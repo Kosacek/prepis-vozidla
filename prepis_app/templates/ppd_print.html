@@ -4,17 +4,20 @@
 <meta charset="utf-8">
 <title>PPD č. {{ r.cislo }}</title>
 <style>
-  /* A5 portrait — Chrome's print dialog switches the paper size to A5
-     automatically because of this rule, so nobody has to change it by hand.
-     The žádosti stay plain A4 PDFs and are unaffected. */
-  @page { size: A5 portrait; margin: 0; }
+  /* A5 portrait. The 6 mm @page margin matters: with margin:0 the page box is
+     the FULL A5, which overflows the printer's non-printable border, so Chrome
+     shrinks the whole receipt to fit ("wrong size"). A 6 mm margin keeps the
+     content inside the printable area, so it prints at 100 % on A5 paper. */
+  @page { size: A5 portrait; margin: 6mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body { font-family: "DejaVu Sans", Arial, "Helvetica Neue", sans-serif; color: #000; }
 
-  /* Mirrors ppd.build_ppd_pdf: 12mm outer border, same font sizes/spacing. */
-  .sheet { width: 148mm; height: 209mm; padding: 12mm; }
-  .frame { border: 1.5px solid #000; height: 100%; position: relative; padding: 12mm 6mm 0; }
+  /* The printable area of A5 with 6 mm margins is 136 × 198 mm. The sheet sits
+     a hair inside that (134 × 196 mm) so sub-pixel rounding can never push it
+     onto a blank second page, and there's nothing to scale. */
+  .sheet { width: 134mm; margin: 0 auto; }
+  .frame { border: 1.5px solid #000; height: 196mm; position: relative; padding: 12mm 8mm 0; }
   h1   { font-size: 15pt; font-weight: 400; text-align: center; margin: 0 0 5mm; }
   .num { font-size: 12pt; text-align: center; margin: 0 0 13mm; }
   .meta { font-size: 10pt; margin: 0 0 4.5mm; }
@@ -24,7 +27,7 @@
   .value { font-size: 11.5pt; }
   .value.big { font-size: 14pt; }
   .sub   { font-size: 10.5pt; margin-top: 1.8mm; }
-  .sign  { position: absolute; right: 6mm; bottom: 14mm; width: 55mm;
+  .sign  { position: absolute; right: 8mm; bottom: 14mm; width: 55mm;
            border-top: 0.5pt solid #000; padding-top: 2mm; font-size: 8pt; }
 
   /* On-screen preview only (never printed): grey backdrop + paper shadow. */

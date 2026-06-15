@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.12"
+__version__ = "1.3.13"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1380,6 +1380,56 @@ def download(filename):
     if not os.path.exists(path):
         return "File not found", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
+
+
+# ── Auto-print wrapper (žádost) ──────────────────────────────────────────────
+def _resolve_print_pdf(url: str):
+    """Map one of OUR own PDF URLs to a file path on disk, or None. Only the
+    žádost (/download) and plná-moc (/plna-moc) endpoints are accepted — no path
+    traversal, no external embeds."""
+    if not isinstance(url, str):
+        return None
+    if url.startswith("/download/"):
+        fn = os.path.basename(url[len("/download/"):])
+        p = os.path.join(DATA_DIR, "output", fn)
+    elif url.startswith("/plna-moc/"):
+        ico = "".join(c for c in url[len("/plna-moc/"):] if c.isdigit())
+        if not ico:
+            return None
+        p = os.path.join(PLNE_MOCE_DIR, f"{ico}.pdf")
+    else:
+        return None
+    return p if os.path.isfile(p) else None
+
+
+@app.route("/tisk")
+def tisk_wrapper():
+    """HTML helper that embeds the print bundle and fires the print dialog on
+    load — so printing a žádost is just one click + Enter, then the tab closes.
+    `files` is a comma-separated list of our own PDF URLs."""
+    return render_template("print_wrapper.html", files=request.args.get("files", ""))
+
+
+@app.route("/tisk-pdf")
+def tisk_pdf():
+    """Merge the requested žádost + plné moci into a single PDF, so the whole
+    print is one dialog. A4 docs → printer's default A4 paper (no @page tricks
+    needed for these)."""
+    from pypdf import PdfReader as _R, PdfWriter as _W
+    urls = [u for u in request.args.get("files", "").split(",") if u]
+    paths = [p for p in (_resolve_print_pdf(u) for u in urls) if p]
+    if not paths:
+        return Response("Žádné soubory k tisku.", status=404, mimetype="text/plain")
+    writer = _W()
+    for p in paths:
+        try:
+            writer.append(_R(p))
+        except Exception as e:  # a damaged plná moc shouldn't kill the whole print
+            _log.warning("tisk-pdf skipped %s: %s", p, e)
+    buf = io.BytesIO()
+    writer.write(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/pdf")
 
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")
