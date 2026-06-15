@@ -45,9 +45,18 @@ Auto-backup je centralizovaný v `app.before_request` — spustí se throttlovan
 
 `data/` (živá DB + zálohy) a `scripts/seed_data/` (zdrojové xlsx) jsou osobní finanční data — **nikdy je nepřidávej do gitu**.
 
-## Budoucí integrace
+## Integrace s Přepis Vozidla — HOTOVO
 
-Aplikace Přepis Vozidla bude v budoucí fázi posílat hotové žádosti na `POST /api/ukony`. Firma se páruje **přesnou shodou IČO** — žádný fuzzy matching, žádné auto-vytváření firem. Endpoint a `ingest_service` jsou navrženy a otestovány; Přepis app se v současnosti nemění.
+Přepis Vozidla (zadosti.spznaklic.cz) posílá každou hotovou žádost na
+**`POST /api/prichozi`** (auth `X-Api-Key`). Firma se páruje **přesnou shodou
+IČO** — žádný fuzzy matching, žádné auto-vytváření firem:
+- shoda IČO → buď se rovnou založí úkon, nebo se položka zařadí do **Příchozí**
+  inboxu k potvrzení,
+- bez shody → zůstává v Příchozí inboxu.
+
+Druhá strana je `../prepis_app/tracker_push.py` (best-effort, nikdy neshodí
+generování PDF; neúspěšné pushe → `failed_pushes.jsonl`). Klíč musí sedět s
+`UKONY_API_KEY` na straně Přepisu.
 
 ## Klíčové soubory
 
