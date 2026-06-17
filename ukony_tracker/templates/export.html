@@ -4,57 +4,48 @@
 <h1 class="page-header">Export</h1>
 
 <div class="card">
-  <div class="card-title">Excel (po firmách)</div>
   <form method="get" action="/export/excel">
     <div class="fields-row">
       <div class="field">
-        <label for="excel-year">Rok</label>
-        <input type="number" id="excel-year" name="year" value="{{ year }}" min="2000" max="2099" required>
+        <label for="ex-from">Od</label>
+        <input type="date" id="ex-from" name="from" value="{{ dfrom }}" required>
       </div>
       <div class="field">
-        <label for="excel-month">Měsíc</label>
-        <select id="excel-month" name="month">
-          <option value="">— celý rok —</option>
-          <option value="1"  {% if month == 1  %}selected{% endif %}>Leden</option>
-          <option value="2"  {% if month == 2  %}selected{% endif %}>Únor</option>
-          <option value="3"  {% if month == 3  %}selected{% endif %}>Březen</option>
-          <option value="4"  {% if month == 4  %}selected{% endif %}>Duben</option>
-          <option value="5"  {% if month == 5  %}selected{% endif %}>Květen</option>
-          <option value="6"  {% if month == 6  %}selected{% endif %}>Červen</option>
-          <option value="7"  {% if month == 7  %}selected{% endif %}>Červenec</option>
-          <option value="8"  {% if month == 8  %}selected{% endif %}>Srpen</option>
-          <option value="9"  {% if month == 9  %}selected{% endif %}>Září</option>
-          <option value="10" {% if month == 10 %}selected{% endif %}>Říjen</option>
-          <option value="11" {% if month == 11 %}selected{% endif %}>Listopad</option>
-          <option value="12" {% if month == 12 %}selected{% endif %}>Prosinec</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="excel-firma">Firma</label>
-        <select id="excel-firma" name="firma">
-          <option value="">— všechny firmy —</option>
-          {% for f in firmy %}<option value="{{ f.id }}">{{ f.zkratka }}</option>{% endfor %}
-        </select>
+        <label for="ex-to">Do</label>
+        <input type="date" id="ex-to" name="to" value="{{ dto }}" required>
       </div>
     </div>
-    <button type="submit" class="btn btn-primary">Stáhnout Excel</button>
+
+    <div class="field">
+      <label>Firmy <span class="muted small">— nic nezaškrtnuto = všechny</span></label>
+      <div class="export-firmy">
+        {% for f in firmy %}
+        <label class="chk"><input type="checkbox" name="firma" value="{{ f.id }}"> {{ f.zkratka }}</label>
+        {% else %}
+        <span class="muted">Žádné firmy.</span>
+        {% endfor %}
+      </div>
+      {% if firmy %}
+      <div class="export-firmy-actions">
+        <button type="button" class="btn btn-sm" onclick="exAll(true)">Vybrat vše</button>
+        <button type="button" class="btn btn-sm" onclick="exAll(false)">Zrušit výběr</button>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="export-buttons">
+      <button type="submit" class="btn btn-primary">Stáhnout Excel</button>
+      <button type="submit" class="btn" formaction="/export/csv">Stáhnout CSV</button>
+    </div>
+    <p class="muted small" style="margin-top: var(--sp-3);">
+      Excel = jeden list na firmu (se součtem). Více firem → více listů.
+    </p>
   </form>
 </div>
 
-<div class="card">
-  <div class="card-title">CSV (plochý)</div>
-  <form method="get" action="/export/csv">
-    <div class="fields-row">
-      <div class="field">
-        <label for="csv-from">Od</label>
-        <input type="date" id="csv-from" name="from" value="{{ year }}-01-01" required>
-      </div>
-      <div class="field">
-        <label for="csv-to">Do</label>
-        <input type="date" id="csv-to" name="to" value="{{ year }}-12-31" required>
-      </div>
-    </div>
-    <button type="submit" class="btn btn-primary">Stáhnout CSV</button>
-  </form>
-</div>
+<script>
+function exAll(v) {
+  document.querySelectorAll('.export-firmy input[type=checkbox]').forEach(function (c) { c.checked = v; });
+}
+</script>
 {% endblock %}

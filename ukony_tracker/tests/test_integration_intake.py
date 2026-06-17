@@ -169,7 +169,7 @@ def test_export_excel_has_orv_header(conn):
     fid = firmy_repo.create(conn, nazev="C", zkratka="C", ico="1")
     ingest_service.pridat_ukon(conn, firma_id=fid, datum="2026-06-14",
                                typ_kod="PŘEVOD", celkem=1300, orv="ABC123456")
-    data = export_service.export_excel(conn, 2026, 6)
+    data = export_service.export_excel(conn, "2026-06-01", "2026-06-30")
     wb = openpyxl.load_workbook(io.BytesIO(data))
     ws = wb[wb.sheetnames[0]]
     header = [c.value for c in ws[1]]

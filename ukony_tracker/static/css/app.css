@@ -1321,3 +1321,21 @@ a.kpi-link:hover {
 .cenik-kod { flex: 0 0 120px; font-weight: 600; }
 .cenik-input { flex: 1; min-width: 0; }
 .cenik-unit { flex: 0 0 auto; }
+
+/* --- Export: firm multi-select --- */
+.export-firmy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-2);
+}
+.export-firmy .chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+.export-firmy .chk input { width: auto; margin: 0; }
+.export-firmy-actions { margin-top: var(--sp-3); display: flex; gap: var(--sp-2); }
+.export-buttons { display: flex; gap: var(--sp-3); margin-top: var(--sp-4); }
