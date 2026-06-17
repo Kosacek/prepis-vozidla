@@ -30,15 +30,6 @@ def _context_note(payload: dict) -> str | None:
     return novy or puvodni or None
 
 
-def _candidate_icos(payload: dict) -> list[str | None]:
-    return [
-        payload.get("puvodni_ico"),
-        payload.get("novy_ico"),
-        payload.get("puvodni_prov_ico"),
-        payload.get("novy_prov_ico"),
-    ]
-
-
 def intake(conn: sqlite3.Connection, payload: dict) -> dict:
     """Process one incoming žádost.
 
@@ -61,7 +52,12 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
     )
     datum = payload.get("datum") or date.today().isoformat()
 
-    m = matching_service.match(conn, _candidate_icos(payload))
+    # Prefer the provozovatel (operator) over the vlastník (owner): when a car's
+    # owner is a leasing company, the operator is the client we actually track.
+    m = matching_service.match_tiered(conn, [
+        [payload.get("novy_prov_ico"), payload.get("puvodni_prov_ico")],  # operators first
+        [payload.get("novy_ico"), payload.get("puvodni_ico")],            # owners fallback
+    ])
     # Suggest the matched firm; if ambiguous, suggest the first match as a hint.
     suggested = m["firma_id"] or (m["matched"][0]["id"] if m["matched"] else None)
 

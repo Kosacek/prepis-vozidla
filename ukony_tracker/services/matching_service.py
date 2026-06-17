@@ -44,3 +44,18 @@ def match(conn: Connection, icos: list[str | None]) -> dict:
     if len(rows) == 1:
         return {"firma_id": rows[0]["id"], "matched": rows, "ambiguous": False}
     return {"firma_id": None, "matched": rows, "ambiguous": len(rows) > 1}
+
+
+def match_tiered(conn: Connection, tiers: list[list[str | None]]) -> dict:
+    """Match by priority tiers. The FIRST tier that yields any match decides
+    (one distinct firm → match, ≥2 → ambiguous); later tiers are ignored.
+
+    Used so the provozovatel (operator) wins over the vlastník (owner): when a
+    car's owner is a leasing company but the operator is the actual client, we
+    track the operator. Pass operator IČOs as tier 0, owner IČOs as tier 1.
+    """
+    for icos in tiers:
+        m = match(conn, icos)
+        if m["matched"]:
+            return m
+    return {"firma_id": None, "matched": [], "ambiguous": False}

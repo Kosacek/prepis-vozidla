@@ -126,6 +126,40 @@ def test_intake_ambiguous_queues(conn):
     assert res["status"] == "pending"
 
 
+def test_match_tiered_operator_wins_over_owner(conn):
+    c, a = _firms(conn)  # Cardion 11111111, Albion 22222222 (both active)
+    # operator = Cardion, owner = Albion → operator tier wins, not ambiguous
+    m = matching_service.match_tiered(conn, [["11111111"], ["22222222"]])
+    assert m["firma_id"] == c and not m["ambiguous"]
+    # no operator match → fall back to owner tier
+    m2 = matching_service.match_tiered(conn, [["00000000"], ["22222222"]])
+    assert m2["firma_id"] == a
+
+
+def test_intake_prefers_provozovatel_when_owner_is_leasing(conn):
+    c, a = _firms(conn)
+    # New owner (vlastník) = Albion (stand-in leasing co), operator = Cardion.
+    # Both are tracker firms → must NOT be ambiguous; assign to the operator.
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "lease1", "mode": "zapis", "datum": "2026-06-14",
+        "novy_ico": "22222222", "novy_jmeno": "Albion Leasing",
+        "novy_prov_ico": "11111111", "novy_jmeno_prov": "Cardion",
+    })
+    assert res["status"] == "auto"
+    assert ukony_repo.get(conn, res["ukon_id"])["firma_id"] == c  # the provozovatel
+
+
+def test_intake_falls_back_to_owner_without_operator(conn):
+    c, a = _firms(conn)
+    # No provozovatel given → match on the owner (the usual owner==operator case)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "noop-prov", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111",
+    })
+    assert res["status"] == "auto"
+    assert ukony_repo.get(conn, res["ukon_id"])["firma_id"] == c
+
+
 def test_intake_duplicate_zadost_id_is_noop(conn):
     _firms(conn)
     p = {"zadost_id": "dup", "mode": "prevod", "datum": "2026-06-14", "novy_ico": "11111111"}
