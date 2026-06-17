@@ -5,6 +5,43 @@
   // Apple system colors — vivid but soft, in the iOS/macOS palette.
   var COLORS = ["#0a84ff", "#34c759", "#ff9f0a", "#bf5af2", "#ff375f",
                 "#5ac8fa", "#ffd60a", "#ff6482", "#64d2ff", "#30d158"];
+
+  // Typy úkonů — revenue share per type (doughnut). Independent of the trend
+  // chart, so render it before the trend-chart early-return.
+  var pctx = document.getElementById("typChart");
+  if (pctx) {
+    var per = window.PER_TYP || [];
+    new Chart(pctx, {
+      type: "doughnut",
+      data: {
+        labels: per.map(function (t) { return t.kod; }),
+        datasets: [{
+          data: per.map(function (t) { return t.trzby; }),
+          backgroundColor: per.map(function (t, i) { return COLORS[i % COLORS.length]; }),
+          borderColor: "#fff",
+          borderWidth: 2
+        }]
+      },
+      options: {
+        cutout: "58%",
+        plugins: {
+          legend: {
+            position: "right",
+            labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 10, font: { size: 11 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var t = per[ctx.dataIndex] || {};
+                return t.kod + ": " + Math.round(t.trzby || 0) + " Kč (×" + (t.pocet || 0) + ")";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   var tctx = document.getElementById("trendChart");
   if (!tctx) return;
 
@@ -85,7 +122,7 @@
     });
   }
 
-  render("trzby");
+  render("firmy");  // Firmy is the default view (most useful at a glance)
 
   var seg = document.getElementById("metric-seg");
   if (seg) seg.addEventListener("click", function (e) {

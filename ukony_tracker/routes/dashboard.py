@@ -33,6 +33,7 @@ def index():
     # The trend chart runs day-by-day from the 1st of the current month to today.
     denni = st.denni_trend(conn, today.year, today.month, today.day)
     denni_firmy = st.denni_trend_podle_firmy(conn, today.year, today.month, today.day)
+    per_typ = st.podle_typu(conn, year)
 
     return render_template(
         "dashboard.html",
@@ -47,12 +48,14 @@ def index():
         nezaplaceno=st.nezaplaceno_celkem(conn),
         dluhy=st.nezaplaceno_podle_firmy(conn),
         per_firma=st.podle_firmy(conn, year),
-        per_typ=st.podle_typu(conn, year),
-        recent=list(ukony_repo.list(conn))[:10],
+        recent=list(ukony_repo.list(conn))[:12],
         denni_json=json.dumps(
             [{"d": t["d"], "trzby": t["trzby"], "pocet": t["pocet"]} for t in denni]
         ),
         denni_firmy_json=json.dumps(
             [{"zkratka": r["zkratka"], "pocty": r["pocty"]} for r in denni_firmy]
+        ),
+        per_typ_json=json.dumps(
+            [{"kod": t["typ_kod"], "pocet": t["pocet"], "trzby": t["trzby"]} for t in per_typ]
         ),
     )

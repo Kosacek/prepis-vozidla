@@ -41,9 +41,9 @@
     <div class="card">
       <div class="card-head"><h2>Tento měsíc <span class="muted small">{{ mesic_nazev }} {{ aktualni_rok }}</span></h2>
         <div class="seg" id="metric-seg">
-          <span class="on" data-mode="trzby">Tržby</span>
+          <span class="on" data-mode="firmy">Firmy</span>
+          <span data-mode="trzby">Tržby</span>
           <span data-mode="pocet">Počet</span>
-          <span data-mode="firmy">Firmy</span>
         </div>
       </div>
       <canvas id="trendChart" height="110"></canvas>
@@ -64,13 +64,7 @@
 
       <div class="card">
         <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
-        {% for t in per_typ %}
-        <div class="typ-row">
-          <span class="tag">{{ t.typ_kod }}</span>
-          <span class="muted">×{{ t.pocet }}</span>
-          <span class="typ-kc">{{ t.trzby|int }} Kč</span>
-        </div>
-        {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+        <canvas id="typChart" height="200"></canvas>
       </div>
     </div>
   </div>
@@ -88,23 +82,30 @@
       <p class="muted">Vše zaplaceno ✓</p>
       {% endfor %}
     </div>
+  </div>
+</div>
 
-    <div class="card">
-      <h2>Poslední úkony</h2>
-      <ul class="list">
-        {% for u in recent %}
-        <li><span class="muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
-          <span><b>{{ u.rz or '—' }}</b> <span class="muted">{{ u.firma_zkratka }} · {{ u.typ_kod }}</span></span>
-          <span>{{ u.celkem|int }} Kč</span></li>
-        {% else %}<li class="muted">Žádné úkony.</li>{% endfor %}
-      </ul>
-    </div>
+<div class="card recent-card">
+  <div class="card-head"><h2>Poslední úkony</h2>
+    <a href="/ukony/vse" class="muted small">Zobrazit všechny →</a>
+  </div>
+  <div class="recent-list">
+    {% for u in recent %}
+    <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back=/">
+      <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+      <b class="recent-rz">{{ u.rz or '—' }}</b>
+      <span class="tag">{{ u.typ_kod }}</span>
+      <span class="recent-mid"><span class="muted">{{ u.firma_zkratka }}</span>{% if u.vin %} <span class="muted small">· {{ u.vin }}</span>{% endif %}</span>
+      <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+    </a>
+    {% else %}<p class="muted">Žádné úkony.</p>{% endfor %}
   </div>
 </div>
 
 <script>
   window.DAILY = {{ denni_json|safe }};
   window.DAILY_FIRMY = {{ denni_firmy_json|safe }};
+  window.PER_TYP = {{ per_typ_json|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=8"></script>
 {% endblock %}
