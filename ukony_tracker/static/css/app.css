@@ -388,6 +388,22 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   color: var(--muted);
 }
 
+/* Checkboxes & radios must keep their NATIVE rendering — the reset above is for
+   text inputs/selects. Without this they become blank bordered boxes that
+   toggle but show no checkmark (looks like clicking does nothing). */
+.field input[type="checkbox"],
+.field input[type="radio"] {
+  appearance: auto;
+  -webkit-appearance: auto;
+  width: auto;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .field textarea {
   resize: vertical;
   min-height: 80px;
