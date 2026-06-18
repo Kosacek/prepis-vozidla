@@ -1610,20 +1610,20 @@ function checkInsurance() {
 }
 
 function printAll() {
-  // Print ONLY the žádost the user actually filled out (a převod = just the
-  // přepis, zmeny.pdf — not the zápis form), plus any plné moci — all merged
-  // into ONE print job that auto-opens the dialog (just hit Enter), then closes.
+  // Open the žádost the user actually filled out (a převod = just the přepis,
+  // zmeny.pdf — not the zápis form), plus any plné moci, each in its own tab as
+  // a normal EDITABLE PDF. The žádost is a form — the user often tweaks fields
+  // (the editable "v z.", hand corrections) before printing — so we deliberately
+  // do NOT auto-print/auto-close here. They edit, then print from the viewer.
+  // (The PPD is a finished receipt, so that one keeps the auto-print flow.)
   const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena' };
   const key = primaryByMode[generatedUrls.mode];
-  const files = [];
   if (key && generatedUrls[key]) {
-    files.push(generatedUrls[key]);
+    window.open(generatedUrls[key], '_blank');
   } else {
-    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) files.push(generatedUrls[k]); });
+    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   }
-  (generatedUrls.plne_moce || []).forEach(url => files.push(url));
-  if (!files.length) return;
-  window.open('/tisk?files=' + encodeURIComponent(files.join(',')), '_blank');
+  (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
 // PPD prints on A5 — the print page carries @page{size:A5}, so the browser's
