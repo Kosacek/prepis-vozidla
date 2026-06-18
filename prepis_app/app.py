@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.15"
+__version__ = "1.3.16"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1380,38 +1380,6 @@ def download(filename):
     if not os.path.exists(path):
         return "File not found", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
-
-
-# ── Editable print helper (žádost) ───────────────────────────────────────────
-def _resolve_print_pdf(url: str):
-    """Map one of OUR own PDF URLs to a file path on disk, or None. Only the
-    žádost (/download) and plná-moc (/plna-moc) endpoints are accepted — no path
-    traversal, no external embeds."""
-    if not isinstance(url, str):
-        return None
-    if url.startswith("/download/"):
-        fn = os.path.basename(url[len("/download/"):])
-        p = os.path.join(DATA_DIR, "output", fn)
-    elif url.startswith("/plna-moc/"):
-        ico = "".join(c for c in url[len("/plna-moc/"):] if c.isdigit())
-        if not ico:
-            return None
-        p = os.path.join(PLNE_MOCE_DIR, f"{ico}.pdf")
-    else:
-        return None
-    return p if os.path.isfile(p) else None
-
-
-@app.route("/tisk")
-def tisk_wrapper():
-    """Show ONE of our PDFs in the browser's PDF viewer (form fields stay
-    editable) with a Print button that prints THAT pdf and then closes the tab.
-    The žádost is a form the user tweaks before printing, so we deliberately do
-    NOT auto-fire the dialog (that's only right for the finished PPD receipt)."""
-    src = request.args.get("src", "")
-    if _resolve_print_pdf(src) is None:
-        return Response("Neplatný dokument.", status=400, mimetype="text/plain")
-    return render_template("print_wrapper.html", src=src)
 
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")

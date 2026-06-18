@@ -1611,19 +1611,18 @@ function checkInsurance() {
 
 function printAll() {
   // Open the žádost the user actually filled out (a převod = just the přepis,
-  // zmeny.pdf — not the zápis form), plus any plné moci, each in the editable
-  // print helper: the real PDF stays editable in the browser viewer, and the
-  // helper's Vytisknout button prints it then closes the tab. No merging, no
-  // auto-fired dialog — so editing then printing works (unlike the old wrapper).
+  // zmeny.pdf — not the zápis form), plus any plné moci, each DIRECTLY in its
+  // own tab — Chrome's full PDF viewer, which renders correctly and keeps the
+  // form fields editable. (Embedding the PDF to enable auto-close makes Chrome
+  // render it in a cramped, broken-looking embedded viewer, so we don't.)
   const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena' };
   const key = primaryByMode[generatedUrls.mode];
-  const open = (url) => window.open('/tisk?src=' + encodeURIComponent(url), '_blank');
   if (key && generatedUrls[key]) {
-    open(generatedUrls[key]);
+    window.open(generatedUrls[key], '_blank');
   } else {
-    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) open(generatedUrls[k]); });
+    ['zmeny','zapis','zmena'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   }
-  (generatedUrls.plne_moce || []).forEach(url => open(url));
+  (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
 
 // PPD prints on A5 — the print page carries @page{size:A5}, so the browser's
