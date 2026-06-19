@@ -95,7 +95,12 @@
       <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
       <b class="recent-rz">{{ u.rz or '—' }}</b>
       <span class="tag">{{ u.typ_kod }}</span>
-      <span class="recent-mid"><span class="muted">{{ u.firma_zkratka }}</span>{% if u.vin %} <span class="muted small">· {{ u.vin }}</span>{% endif %}</span>
+      <span class="recent-mid"><span class="muted">{{ u.firma_zkratka }}</span>{% if u.vin %} <span class="muted small">· {{ u.vin }}</span>{% endif %}{% if u.poznamka %} <span class="muted small">· {{ u.poznamka }}</span>{% endif %}</span>
+      <span class="recent-pay">
+        {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
+        {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>
+        {% else %}<span class="muted small">nezapl.</span>{% endif %}
+      </span>
       <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
     </a>
     {% else %}<p class="muted">Žádné úkony.</p>{% endfor %}

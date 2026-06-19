@@ -1362,7 +1362,7 @@ a.kpi-link:hover {
 .recent-list { display: flex; flex-direction: column; }
 .recent-row {
   display: grid;
-  grid-template-columns: 46px 96px auto minmax(0, 1fr) auto;
+  grid-template-columns: 46px 96px auto minmax(0, 1fr) auto auto;
   gap: var(--sp-3);
   align-items: center;
   padding: 10px var(--sp-2);
@@ -1376,9 +1376,10 @@ a.kpi-link:hover {
 .recent-date { font-size: 0.8125rem; }
 .recent-rz { white-space: nowrap; }
 .recent-mid { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-pay { white-space: nowrap; text-align: right; }
 .recent-kc { text-align: right; white-space: nowrap; }
 
 @media (max-width: 700px) {
-  .recent-row { grid-template-columns: auto 90px 1fr auto; }
+  .recent-row { grid-template-columns: auto 84px minmax(0, 1fr) auto auto; }
   .recent-row .tag { display: none; }
 }
