@@ -29,7 +29,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.16"
+__version__ = "1.3.17"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1225,8 +1225,14 @@ def ppd_print(number):
     if rec is None:
         return Response("Doklad nenalezen.", status=404, mimetype="text/plain")
     words = ppd.amount_to_words_cs(rec.get("castka") or 0)
-    return render_template("ppd_print.html", r=rec, words=words,
-                           issuer_name=ppd.ISSUER_NAME, issuer_ico=ppd.ISSUER_ICO)
+    from flask import make_response
+    resp = make_response(render_template("ppd_print.html", r=rec, words=words,
+                                         issuer_name=ppd.ISSUER_NAME, issuer_ico=ppd.ISSUER_ICO))
+    # Never cache: this page is opened in its own tab, so a stale copy (e.g. from
+    # before the @page A5 rule existed) would keep printing on A4. no-store forces
+    # a fresh fetch every time.
+    resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
 
 
 @app.route("/api/ppd-deleted", methods=["GET"])

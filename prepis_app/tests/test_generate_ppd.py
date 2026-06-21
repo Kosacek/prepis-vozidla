@@ -57,7 +57,8 @@ def test_ppd_print_page_is_a5(client, tmp_path, monkeypatch):
     page = client.get(data["ppd_print"])
     assert page.status_code == 200
     html = page.get_data(as_text=True)
-    assert "size: A5" in html                       # @page pre-selects A5 paper
+    assert "148mm 210mm" in html                    # @page = explicit A5 paper size
+    assert "no-store" in page.headers.get("Cache-Control", "")  # always fresh (no stale A4 page)
     assert "PŘÍJMOVÝ POKLADNÍ DOKLAD" in html
     assert "PETR KUPUJÍCÍ" in html
     assert "1AB2345" in html                        # SPZ on the receipt

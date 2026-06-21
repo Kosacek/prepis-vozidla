@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <title>PPD č. {{ r.cislo }}</title>
 <style>
-  /* A5 portrait. The 6 mm @page margin matters: with margin:0 the page box is
-     the FULL A5, which overflows the printer's non-printable border, so Chrome
-     shrinks the whole receipt to fit ("wrong size"). A 6 mm margin keeps the
-     content inside the printable area, so it prints at 100 % on A5 paper. */
-  @page { size: A5 portrait; margin: 6mm; }
+  /* A5 portrait, given as EXPLICIT dimensions (148×210 mm) rather than the
+     "A5" keyword — Chrome matches the printer's A5 paper from the size more
+     reliably than from the name. The 6 mm margin keeps the receipt inside the
+     printable area so it prints at 100 % (margin:0 makes Chrome scale it down). */
+  @page { size: 148mm 210mm; margin: 6mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body { font-family: "DejaVu Sans", Arial, "Helvetica Neue", sans-serif; color: #000; }
