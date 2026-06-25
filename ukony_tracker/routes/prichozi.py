@@ -37,6 +37,7 @@ def inbox():
             d["znacka"] = (json.loads(r["raw_json"] or "{}").get("znacka") or "").strip()
         except (ValueError, TypeError):
             d["znacka"] = ""
+        d["note"] = _note(r) or ""  # default poznámka to prefill (editable)
         items.append(d)
     firmy = firmy_repo.list_all(conn, only_active=True)
     # Per-firm price maps so the inbox price field follows the chosen firm+type.
@@ -76,7 +77,7 @@ def approve(pid):
             rz=p["rz"],
             vin=p["vin"],
             orv=p["orv"],
-            poznamka=_note(p),
+            poznamka=(f.get("poznamka") or "").strip() or None,
             zdroj="zadosti",
         )
         prichozi_repo.update(conn, pid, status="approved", created_ukon_id=uid)

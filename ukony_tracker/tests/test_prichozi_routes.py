@@ -47,6 +47,7 @@ def test_approve_creates_ukon(client):
     c, fid, pid = client
     r = c.post(f"/prichozi/{pid}/approve", data={
         "firma_id": str(fid), "typ_kod": "PŘEVOD", "celkem": "1300", "datum": "2026-06-14",
+        "poznamka": "TZ + dobírka",
     })
     assert r.status_code in (302, 303)
     with c.application.app_context():
@@ -56,6 +57,7 @@ def test_approve_creates_ukon(client):
         u = ukony_repo.get(conn, p["created_ukon_id"])
         assert u["firma_id"] == fid and u["typ_kod"] == "PŘEVOD" and u["celkem"] == 1300
         assert u["rz"] == "1AB2345" and u["orv"] == "ABC123456" and u["zdroj"] == "zadosti"
+        assert u["poznamka"] == "TZ + dobírka"  # note from the form is saved
 
 
 def test_approve_without_firma_keeps_pending(client):

@@ -28,36 +28,40 @@
   </div>
 
   <form method="post" action="/prichozi/{{ p.id }}/approve" class="prichozi-form">
-    <div class="field">
-      <label>Firma</label>
-      <select name="firma_id" required>
-        <option value="">— vyber —</option>
-        {% for f in firmy %}
-        <option value="{{ f.id }}" {{ 'selected' if p.suggested_firma_id == f.id }}>{{ f.zkratka }}</option>
-        {% endfor %}
-      </select>
+    <div class="prichozi-fields">
+      <div class="field">
+        <label>Firma</label>
+        <select name="firma_id" required>
+          <option value="">— vyber —</option>
+          {% for f in firmy %}
+          <option value="{{ f.id }}" {{ 'selected' if p.suggested_firma_id == f.id }}>{{ f.zkratka }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Typ</label>
+        {% set sugg = mode_typ.get(p.mode, '') %}
+        <select name="typ_kod" class="typ-select" required>
+          <option value="" {{ 'selected' if not sugg }}>— vyber —</option>
+          {% for t in typy %}
+          <option value="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" {{ 'selected' if sugg == t.kod }}>{{ t.kod }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Cena (Kč)</label>
+        <input name="celkem" class="cena-input" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>Datum</label>
+        <input type="date" name="datum" value="{{ p.datum }}" required>
+      </div>
     </div>
-    <div class="field">
-      <label>Typ</label>
-      {% set sugg = mode_typ.get(p.mode, '') %}
-      <select name="typ_kod" class="typ-select" required>
-        <option value="" {{ 'selected' if not sugg }}>— vyber —</option>
-        {% for t in typy %}
-        <option value="{{ t.kod }}" data-cena="{{ t.vychozi_cena if t.vychozi_cena is not none else '' }}" {{ 'selected' if sugg == t.kod }}>{{ t.kod }}</option>
-        {% endfor %}
-      </select>
+    <div class="field prichozi-pozn">
+      <label>Poznámka</label>
+      <input name="poznamka" autocomplete="off" value="{{ p.note }}">
     </div>
-    <div class="field">
-      <label>Cena (Kč)</label>
-      <input name="celkem" class="cena-input" inputmode="numeric">
-    </div>
-    <div class="field">
-      <label>Datum</label>
-      <input type="date" name="datum" value="{{ p.datum }}" required>
-    </div>
-    <div class="prichozi-actions">
-      <button type="submit" class="btn btn-primary">Přidat úkon</button>
-    </div>
+    <button type="submit" class="btn btn-primary">Přidat úkon</button>
   </form>
 
   <form method="post" action="/prichozi/{{ p.id }}/discard" class="discard-form"

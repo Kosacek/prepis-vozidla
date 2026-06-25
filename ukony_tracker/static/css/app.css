@@ -1312,18 +1312,19 @@ a.kpi-link:hover {
 .prichozi-parties .party { font-size: 0.95rem; }
 .prichozi-parties .party-label { color: var(--muted); display: inline-block; min-width: 64px; }
 .prichozi-meta { margin-bottom: var(--sp-3); }
-.prichozi-form {
+.prichozi-fields {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.7fr 1fr auto;
+  grid-template-columns: 1.2fr 1fr 0.7fr 1fr;
   gap: var(--sp-3);
   align-items: end;
 }
 .prichozi-form .field { margin: 0; }
-.prichozi-actions { align-self: end; }
+.prichozi-pozn { margin-top: var(--sp-3); }
+.prichozi-form .btn-primary { margin-top: var(--sp-3); }
 .discard-form { margin-top: var(--sp-2); }
 
 @media (max-width: 760px) {
-  .prichozi-form { grid-template-columns: 1fr 1fr; }
+  .prichozi-fields { grid-template-columns: 1fr 1fr; }
 }
 
 /* --- Per-firm ceník --- */
