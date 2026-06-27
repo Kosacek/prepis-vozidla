@@ -106,7 +106,11 @@ def test_table_renders(client_fid):
     uid = _seed_ukon(c.application, fid, rz="ZZZ9999")
     r = c.get("/ukony/vse")
     assert r.status_code == 200
-    assert "ZZZ9999" in r.get_data(as_text=True)
+    body = r.get_data(as_text=True)
+    assert "ZZZ9999" in body
+    assert 'id="ukony-search"' in body          # live search box present
+    assert "data-search=" in body               # rows carry the searchable index
+    assert ">Filtrovat<" not in body            # filter button removed (auto-submit)
 
 
 def test_table_filter_by_stav(client_fid):

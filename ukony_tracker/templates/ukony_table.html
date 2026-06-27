@@ -8,36 +8,37 @@
 
 {# ── Filter bar ── #}
 <div class="card" style="margin-bottom: var(--sp-5);">
+  <input type="search" id="ukony-search" class="ukony-search" autocomplete="off"
+         placeholder="Hledat — RZ, VIN, poznámka, firma, typ…">
   <form method="get" action="/ukony/vse" class="filter-bar">
     <div class="filter-bar__fields">
-      <select name="firma" class="filter-select">
+      <select name="firma" class="filter-select" onchange="this.form.submit()">
         <option value="">Všechny firmy</option>
         {% for f in firmy %}
           <option value="{{ f.id }}" {{ 'selected' if sel.firma == f.id }}>{{ f.zkratka }}</option>
         {% endfor %}
       </select>
 
-      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month">
+      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month" onchange="this.form.submit()">
 
-      <select name="typ" class="filter-select">
+      <select name="typ" class="filter-select" onchange="this.form.submit()">
         <option value="">Všechny typy</option>
         {% for t in typy %}
           <option value="{{ t.kod }}" {{ 'selected' if sel.typ == t.kod }}>{{ t.kod }}</option>
         {% endfor %}
       </select>
 
-      <select name="stav" class="filter-select">
+      <select name="stav" class="filter-select" onchange="this.form.submit()">
         <option value="">Vše</option>
         <option value="nezaplaceno" {{ 'selected' if sel.stav == 'nezaplaceno' }}>Nezaplaceno</option>
         <option value="zaplaceno"   {{ 'selected' if sel.stav == 'zaplaceno'   }}>Zaplaceno</option>
         <option value="castecne"    {{ 'selected' if sel.stav == 'castecne'    }}>Částečně</option>
       </select>
 
-      <button type="submit" class="btn btn-primary btn-sm">Filtrovat</button>
       <a href="/ukony/vse" class="btn btn-sm">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
-      {{ ukony|length }} úkonů · {{ total|int }} Kč
+      <span id="ukony-count">{{ ukony|length }}</span> úkonů · <span id="ukony-sum">{{ total|int }}</span> Kč
     </div>
   </form>
 </div>
@@ -47,28 +48,29 @@
   <table>
     <thead>
       <tr>
-        <th>Datum</th>
-        <th>Firma</th>
+        <th class="shrink">Datum</th>
+        <th class="shrink">Firma</th>
         <th>RZ</th>
-        <th>Úkon</th>
-        <th class="right">Kč</th>
+        <th class="shrink">Úkon</th>
+        <th class="right shrink">Kč</th>
         <th>VIN</th>
         <th>Poznámka</th>
-        <th>Platba</th>
-        <th>Akce</th>
+        <th class="shrink">Platba</th>
+        <th class="shrink">Akce</th>
       </tr>
     </thead>
     <tbody>
       {% for u in ukony %}
-      <tr>
-        <td class="muted" style="white-space:nowrap;">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</td>
-        <td style="white-space:nowrap;">{{ u.firma_zkratka }}</td>
+      <tr data-kc="{{ u.celkem|int }}"
+          data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod) | lower }}">
+        <td class="muted shrink" style="white-space:nowrap;">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</td>
+        <td class="shrink" style="white-space:nowrap;">{{ u.firma_zkratka }}</td>
         <td><b>{{ u.rz or '—' }}</b></td>
-        <td>{{ u.typ_kod }}</td>
-        <td class="right">{{ u.celkem|int }}</td>
+        <td class="shrink">{{ u.typ_kod }}</td>
+        <td class="right shrink">{{ u.celkem|int }}</td>
         <td class="muted small">{{ u.vin or '' }}</td>
         <td class="muted small">{{ u.poznamka or '' }}</td>
-        <td>
+        <td class="shrink">
           {% if u.stav_platby == 'zaplaceno' %}
             <span class="badge ok">zapl.</span>
           {% elif u.stav_platby == 'castecne' %}
@@ -77,7 +79,7 @@
             <span class="muted">—</span>
           {% endif %}
         </td>
-        <td class="actions">
+        <td class="actions shrink">
           {# Full pay button #}
           <form method="post" action="/ukony/{{ u.id }}/zaplaceno" style="display:inline;">
             <input type="hidden" name="back" value="{{ request.full_path }}">
@@ -115,16 +117,33 @@
       </tr>
       {% endfor %}
     </tbody>
-    {% if ukony %}
-    <tfoot>
-      <tr>
-        <td colspan="4" class="muted">{{ ukony|length }} úkonů</td>
-        <td class="right"><b>{{ total|int }} Kč</b></td>
-        <td colspan="4"></td>
-      </tr>
-    </tfoot>
-    {% endif %}
   </table>
 </div>
 
+<script>
+(function () {
+  var input = document.getElementById('ukony-search');
+  if (!input) return;
+  var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr[data-search]'));
+  var countEl = document.getElementById('ukony-count');
+  var sumEl = document.getElementById('ukony-sum');
+  function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  rows.forEach(function (r) {
+    r._s = fold(r.getAttribute('data-search'));
+    r._kc = parseInt(r.getAttribute('data-kc'), 10) || 0;
+  });
+  function apply() {
+    var q = fold(input.value.trim());
+    var n = 0, sum = 0;
+    rows.forEach(function (r) {
+      var show = !q || r._s.indexOf(q) >= 0;
+      r.style.display = show ? '' : 'none';
+      if (show) { n++; sum += r._kc; }
+    });
+    if (countEl) countEl.textContent = n;
+    if (sumEl) sumEl.textContent = sum;
+  }
+  input.addEventListener('input', apply);
+})();
+</script>
 {% endblock %}

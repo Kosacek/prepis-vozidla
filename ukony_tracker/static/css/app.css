@@ -755,6 +755,24 @@ ul.list li > span:last-child {
   align-items: center;
 }
 
+/* Live search box above the filter dropdowns */
+.ukony-search {
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: var(--sp-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.9375rem;
+}
+.ukony-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
+
 .filter-select {
   appearance: none;
   -webkit-appearance: none;
@@ -798,16 +816,21 @@ ul.list li > span:last-child {
   box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
 }
 
-/* Actions cell — inline wrapping flex */
+/* Actions cell — one compact, non-wrapping row of small buttons */
 .actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
+  flex-wrap: nowrap;
+  gap: 5px;
   align-items: center;
   white-space: nowrap;
 }
+.actions .btn { padding: 4px 9px; font-size: 0.75rem; }
 
 .actions form { display: inline; }
+
+/* Shrink-to-content columns so the table doesn't stretch every field evenly —
+   the leftover width goes to the flexible columns (RZ, VIN, Poznámka). */
+th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
 /* Partial-pay disclosure widget */
 .partial-pay {
