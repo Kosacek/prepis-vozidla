@@ -49,38 +49,23 @@
       <canvas id="trendChart" height="110"></canvas>
     </div>
 
-    <div class="dash-breakdowns">
-      <div class="card">
-        <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
-        {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
-        {% for r in per_firma %}
-        <div class="bar-row">
-          <span class="bar-label">{{ r.zkratka }}</span>
-          <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
-          <span class="bar-amt">{{ r.trzby|int }}</span>
-        </div>
-        {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+    <div class="card">
+      <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
+      {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
+      {% for r in per_firma %}
+      <div class="bar-row">
+        <span class="bar-label">{{ r.zkratka }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
+        <span class="bar-amt">{{ r.trzby|int }}</span>
       </div>
-
-      <div class="card">
-        <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
-        <canvas id="typChart" height="200"></canvas>
-      </div>
+      {% else %}<p class="muted">Žádná data.</p>{% endfor %}
     </div>
   </div>
 
   <div class="dash-side">
     <div class="card">
-      <h2>Kdo dluží</h2>
-      {% for d in dluhy %}
-      <a class="dluh-row" href="/ukony/vse?firma={{ d.firma_id }}&stav=nezaplaceno">
-        <span class="dluh-firma">{{ d.zkratka }}</span>
-        <span class="muted">{{ d.pocet }} úkonů</span>
-        <span class="dluh-kc">{{ d.dluh|int }} Kč</span>
-      </a>
-      {% else %}
-      <p class="muted">Vše zaplaceno ✓</p>
-      {% endfor %}
+      <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
+      <canvas id="typChart" height="200"></canvas>
     </div>
   </div>
 </div>

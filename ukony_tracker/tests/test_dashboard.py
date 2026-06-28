@@ -75,10 +75,9 @@ def test_dashboard_nezaplaceno(client):
     assert "45700" in body
 
 
-def test_dashboard_kdo_dluzi_links_to_unpaid_table(client):
-    """'Kdo dluží' panel lists the indebted firm with a link to its unpaid úkony."""
-    c, fid = client
+def test_dashboard_has_typy_chart_and_no_kdo_dluzi(client):
+    """Typy úkonů wheel moved to the side column; the 'Kdo dluží' panel is gone."""
+    c, _ = client
     body = c.get("/?rok=2026").get_data(as_text=True)
-    assert "Kdo dluží" in body
-    assert f"/ukony/vse?firma={fid}" in body
-    assert "stav=nezaplaceno" in body
+    assert 'id="typChart"' in body          # types doughnut still rendered
+    assert "Kdo dluží" not in body          # debt panel removed per request

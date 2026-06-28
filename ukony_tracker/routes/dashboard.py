@@ -52,7 +52,6 @@ def index():
         minuly_mesic=st.mesicni_souhrn(conn, prev_y, prev_m),
         rok=st.rocni_souhrn(conn, today.year),
         nezaplaceno=st.nezaplaceno_celkem(conn),
-        dluhy=st.nezaplaceno_podle_firmy(conn),
         per_firma=st.podle_firmy(conn, year),
         recent=list(ukony_repo.list(conn))[:12],
         denni_json=json.dumps(
