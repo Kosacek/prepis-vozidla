@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
-ARG CACHEBUST=2026-06-28-evidence-36-firm-dot-only
+ARG CACHEBUST=2026-06-28-evidence-37-brand-colors
 COPY app.py config.py db.py ./
 COPY repositories ./repositories
 COPY services ./services

@@ -66,13 +66,23 @@ def test_search_respects_limit(client):
 
 # ── colors_service ────────────────────────────────────────────────────────────
 
-def test_firma_color_map_assigns_distinct_palette_colors(client):
+def test_firma_color_map_uses_brand_colors(client):
     c, _, _ = client
     with c.application.app_context():
         cmap = colors_service.firma_color_map(db.get_db())
     assert set(cmap) == {"Cardion", "Tesla"}
-    assert cmap["Cardion"] in colors_service.PALETTE
-    assert cmap["Cardion"] != cmap["Tesla"]            # different firms, different colors
+    assert cmap["Tesla"] == colors_service.BRAND_COLORS["Tesla"]      # Tesla red
+    assert cmap["Cardion"] == colors_service.BRAND_COLORS["Cardion"]  # Volvo navy
+    assert cmap["Tesla"] != cmap["Cardion"]
+
+
+def test_firma_color_map_falls_back_to_palette_for_unknown_firm(client):
+    c, _, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        firmy_repo.create(conn, nazev="Neznámá", zkratka="Neznámá", ico="9")
+        cmap = colors_service.firma_color_map(conn)
+    assert cmap["Neznámá"] in colors_service.PALETTE   # no brand → palette fallback
 
 
 # ── /ukony/hledat route ───────────────────────────────────────────────────────
