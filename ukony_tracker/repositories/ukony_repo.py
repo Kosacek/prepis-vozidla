@@ -1,3 +1,8 @@
+# Defer annotation evaluation: this module defines its own `list()`, which would
+# otherwise shadow the builtin in `-> list[sqlite3.Row]` return hints and raise
+# "'function' object is not subscriptable" on Python 3.12 (eager annotations).
+from __future__ import annotations
+
 import sqlite3
 
 import db
