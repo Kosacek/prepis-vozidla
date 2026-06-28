@@ -46,6 +46,14 @@ def build_payload(data: dict) -> dict:
         "novy_ico": data.get("novy_ico"),
         "puvodni_prov_ico": data.get("puvodni_prov_ico"),
         "novy_prov_ico": data.get("novy_prov_ico"),
+        # Operator (provozovatel) NAMES — only when a distinct operator was
+        # entered ("jiný provozovatel" checked). Lets the tracker inbox show the
+        # real client instead of a leasing-company owner. IČOs above stay
+        # unconditional so firm matching is unchanged.
+        "puvodni_prov_jmeno": ((data.get("puvodni_prov_jmeno") or "").strip() or None)
+            if data.get("puvodni_prov_jiny") else None,
+        "novy_prov_jmeno": ((data.get("novy_prov_jmeno") or "").strip() or None)
+            if data.get("novy_prov_jiny") else None,
     }
 
 

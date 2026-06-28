@@ -20,8 +20,22 @@
     <div class="muted small">{{ p.datum }}</div>
   </div>
   <div class="prichozi-parties">
-    {% if p.novy_jmeno %}<div class="party"><span class="party-label">nový</span><b>{{ p.novy_jmeno }}</b>{% if p.novy_ico %} <span class="muted small">IČO {{ p.novy_ico }}</span>{% endif %}</div>{% endif %}
-    {% if p.puvodni_jmeno %}<div class="party"><span class="party-label">původní</span><b>{{ p.puvodni_jmeno }}</b>{% if p.puvodni_ico %} <span class="muted small">IČO {{ p.puvodni_ico }}</span>{% endif %}</div>{% endif %}
+    {# New side — headline the provozovatel (operator) when present; the owner
+       may be a leasing company, so demote it to a muted secondary line. #}
+    {% if p.novy_prov_jmeno %}
+      <div class="party"><span class="party-label">nový provoz.</span><b>{{ p.novy_prov_jmeno }}</b>{% if p.novy_prov_ico %} <span class="muted small">IČO {{ p.novy_prov_ico }}</span>{% endif %}</div>
+      {% if p.novy_jmeno %}<div class="party party-owner"><span class="party-label">vlastník</span><span class="muted">{{ p.novy_jmeno }}</span>{% if p.novy_ico %} <span class="muted small">IČO {{ p.novy_ico }}</span>{% endif %}</div>{% endif %}
+    {% elif p.novy_jmeno %}
+      <div class="party"><span class="party-label">nový</span><b>{{ p.novy_jmeno }}</b>{% if p.novy_ico %} <span class="muted small">IČO {{ p.novy_ico }}</span>{% endif %}</div>
+    {% endif %}
+
+    {# Original side — same treatment. #}
+    {% if p.puvodni_prov_jmeno %}
+      <div class="party"><span class="party-label">pův. provoz.</span><b>{{ p.puvodni_prov_jmeno }}</b>{% if p.puvodni_prov_ico %} <span class="muted small">IČO {{ p.puvodni_prov_ico }}</span>{% endif %}</div>
+      {% if p.puvodni_jmeno %}<div class="party party-owner"><span class="party-label">vlastník</span><span class="muted">{{ p.puvodni_jmeno }}</span>{% if p.puvodni_ico %} <span class="muted small">IČO {{ p.puvodni_ico }}</span>{% endif %}</div>{% endif %}
+    {% elif p.puvodni_jmeno %}
+      <div class="party"><span class="party-label">původní</span><b>{{ p.puvodni_jmeno }}</b>{% if p.puvodni_ico %} <span class="muted small">IČO {{ p.puvodni_ico }}</span>{% endif %}</div>
+    {% endif %}
   </div>
   <div class="muted small prichozi-meta">
     <b>{{ p.rz or '—' }}</b>{% if p.vin %} · VIN {{ p.vin }}{% endif %}{% if p.orv %} · ORV {{ p.orv }}{% endif %}

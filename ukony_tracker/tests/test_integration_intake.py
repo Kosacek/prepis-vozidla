@@ -143,10 +143,43 @@ def test_intake_prefers_provozovatel_when_owner_is_leasing(conn):
     res = prichozi_service.intake(conn, {
         "zadost_id": "lease1", "mode": "zapis", "datum": "2026-06-14",
         "novy_ico": "22222222", "novy_jmeno": "Albion Leasing",
-        "novy_prov_ico": "11111111", "novy_jmeno_prov": "Cardion",
+        "novy_prov_ico": "11111111", "novy_prov_jmeno": "Cardion",
     })
     assert res["status"] == "auto"
-    assert ukony_repo.get(conn, res["ukon_id"])["firma_id"] == c  # the provozovatel
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["firma_id"] == c                       # assigned to the provozovatel
+    assert u["poznamka"] == "Cardion"               # note names the operator, not the leasing owner
+    # The inbox row keeps both parties (operator headline + owner for reference).
+    pr = prichozi_repo.get(conn, res["prichozi_id"])
+    assert pr["novy_prov_jmeno"] == "Cardion"
+    assert pr["novy_prov_ico"] == "11111111"
+    assert pr["novy_jmeno"] == "Albion Leasing"
+
+
+def test_prichozi_repo_round_trips_provozovatel_columns(conn):
+    pid = prichozi_repo.create(
+        conn, zadost_id="prov1", datum="2026-06-14", mode="zapis",
+        novy_jmeno="Leasing a.s.", novy_ico="22222222",
+        novy_prov_jmeno="Real Client s.r.o.", novy_prov_ico="11111111",
+        puvodni_prov_jmeno="Old Operator", puvodni_prov_ico="33333333",
+    )
+    row = prichozi_repo.get(conn, pid)
+    assert row["novy_prov_jmeno"] == "Real Client s.r.o."
+    assert row["novy_prov_ico"] == "11111111"
+    assert row["puvodni_prov_jmeno"] == "Old Operator"
+    assert row["puvodni_prov_ico"] == "33333333"
+    assert row["novy_jmeno"] == "Leasing a.s."       # owner still stored alongside
+
+
+def test_intake_note_keeps_owner_when_no_provozovatel(conn):
+    # Plain sale, no separate operator → note uses the owner names as before.
+    _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "plain1", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111", "novy_jmeno": "Cardion s.r.o.",
+        "puvodni_jmeno": "Jan Novák",
+    })
+    assert ukony_repo.get(conn, res["ukon_id"])["poznamka"] == "Cardion s.r.o. ← Jan Novák"
 
 
 def test_intake_falls_back_to_owner_without_operator(conn):

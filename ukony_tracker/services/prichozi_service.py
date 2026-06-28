@@ -23,8 +23,10 @@ def build_orv(serie: str | None, cislo: str | None) -> str | None:
 
 
 def _context_note(payload: dict) -> str | None:
-    novy = (payload.get("novy_jmeno") or "").strip()
-    puvodni = (payload.get("puvodni_jmeno") or "").strip()
+    # Prefer the provozovatel (operator) name on each side: when the owner is a
+    # leasing company, the operator is the real client we want named in the note.
+    novy = (payload.get("novy_prov_jmeno") or payload.get("novy_jmeno") or "").strip()
+    puvodni = (payload.get("puvodni_prov_jmeno") or payload.get("puvodni_jmeno") or "").strip()
     if novy and puvodni:
         return f"{novy} ← {puvodni}"
     return novy or puvodni or None
@@ -73,6 +75,10 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
             puvodni_ico=payload.get("puvodni_ico"),
             novy_jmeno=payload.get("novy_jmeno"),
             novy_ico=payload.get("novy_ico"),
+            puvodni_prov_jmeno=payload.get("puvodni_prov_jmeno"),
+            puvodni_prov_ico=payload.get("puvodni_prov_ico"),
+            novy_prov_jmeno=payload.get("novy_prov_jmeno"),
+            novy_prov_ico=payload.get("novy_prov_ico"),
             suggested_firma_id=suggested,
             status="pending",
             raw=payload,

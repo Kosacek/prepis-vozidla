@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS prichozi (
   puvodni_ico TEXT,
   novy_jmeno TEXT,
   novy_ico TEXT,
+  puvodni_prov_jmeno TEXT,
+  puvodni_prov_ico TEXT,
+  novy_prov_jmeno TEXT,
+  novy_prov_ico TEXT,
   suggested_firma_id INTEGER,
   status TEXT NOT NULL DEFAULT 'pending',
   created_ukon_id INTEGER,
@@ -103,8 +107,14 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str)
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     # Migrations for DBs created before a column existed. CREATE TABLE above
-    # already carries `orv` for fresh DBs; this upgrades the live DB in place.
+    # already carries these for fresh DBs; this upgrades the live DB in place.
     _ensure_column(conn, "ukony", "orv", "orv TEXT")
+    # Provozovatel (operator) party — added so the Příchozí inbox can show the
+    # real client instead of a leasing-company owner. See prichozi_service.
+    _ensure_column(conn, "prichozi", "puvodni_prov_jmeno", "puvodni_prov_jmeno TEXT")
+    _ensure_column(conn, "prichozi", "puvodni_prov_ico", "puvodni_prov_ico TEXT")
+    _ensure_column(conn, "prichozi", "novy_prov_jmeno", "novy_prov_jmeno TEXT")
+    _ensure_column(conn, "prichozi", "novy_prov_ico", "novy_prov_ico TEXT")
     conn.commit()
 
 

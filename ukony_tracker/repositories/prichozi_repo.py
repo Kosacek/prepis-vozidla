@@ -18,6 +18,10 @@ def create(
     puvodni_ico: str | None = None,
     novy_jmeno: str | None = None,
     novy_ico: str | None = None,
+    puvodni_prov_jmeno: str | None = None,
+    puvodni_prov_ico: str | None = None,
+    novy_prov_jmeno: str | None = None,
+    novy_prov_ico: str | None = None,
     suggested_firma_id: int | None = None,
     status: str = "pending",
     raw: dict | None = None,
@@ -27,12 +31,14 @@ def create(
     ts = db.now_iso()
     cur = conn.execute(
         "INSERT INTO prichozi(zadost_id,received_at,datum,mode,rz,vin,orv,"
-        "puvodni_jmeno,puvodni_ico,novy_jmeno,novy_ico,suggested_firma_id,"
-        "status,raw_json,created_at,updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "puvodni_jmeno,puvodni_ico,novy_jmeno,novy_ico,"
+        "puvodni_prov_jmeno,puvodni_prov_ico,novy_prov_jmeno,novy_prov_ico,"
+        "suggested_firma_id,status,raw_json,created_at,updated_at)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (zadost_id, ts, datum, mode, rz, vin, orv,
-         puvodni_jmeno, puvodni_ico, novy_jmeno, novy_ico, suggested_firma_id,
-         status, json.dumps(raw or {}, ensure_ascii=False), ts, ts),
+         puvodni_jmeno, puvodni_ico, novy_jmeno, novy_ico,
+         puvodni_prov_jmeno, puvodni_prov_ico, novy_prov_jmeno, novy_prov_ico,
+         suggested_firma_id, status, json.dumps(raw or {}, ensure_ascii=False), ts, ts),
     )
     conn.commit()
     return cur.lastrowid
