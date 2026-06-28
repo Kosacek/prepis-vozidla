@@ -8,7 +8,7 @@
   <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
   <b class="recent-rz">{{ u.rz or '—' }}</b>
   <span class="tag">{{ u.typ_kod }}</span>
-  <span class="recent-firma" style="color: {{ firma_colors.get(u.firma_zkratka, 'var(--ink)') }};">
+  <span class="recent-firma">
     <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
   </span>
   <span class="recent-mid muted small">{{ u.vin or '' }}{% if u.vin and u.poznamka %} · {% endif %}{{ u.poznamka or '' }}</span>
