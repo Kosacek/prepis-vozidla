@@ -1385,13 +1385,32 @@ a.kpi-link:hover {
 
 /* --- Dashboard: Poslední úkony (standalone clickable list) --- */
 .recent-card { margin-top: var(--sp-4); }
+.recent-tools { display: flex; align-items: center; gap: var(--sp-4); }
+.recent-search {
+  width: 280px;
+  max-width: 42vw;
+  padding: 7px 11px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.875rem;
+}
+.recent-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
+}
 .recent-list { display: flex; flex-direction: column; }
+/* Fixed type + firm columns so every row's firm/VIN start at the same x; the
+   VIN+poznámka column (1fr) absorbs the slack instead of leaving it on the right. */
 .recent-row {
   display: grid;
-  grid-template-columns: 46px 96px auto minmax(0, 1fr) auto auto;
+  grid-template-columns: 44px 88px 72px 132px minmax(0, 1fr) auto auto;
   gap: var(--sp-3);
   align-items: center;
-  padding: 10px var(--sp-2);
+  padding: 11px var(--sp-3);
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
@@ -1401,11 +1420,20 @@ a.kpi-link:hover {
 .recent-row:hover { background: var(--bg); }
 .recent-date { font-size: 0.8125rem; }
 .recent-rz { white-space: nowrap; }
+.recent-row .tag { justify-self: start; }
+.recent-firma {
+  display: flex; align-items: center; gap: 7px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; font-size: 0.875rem;
+}
+.firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .recent-mid { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-pay { white-space: nowrap; text-align: right; }
 .recent-kc { text-align: right; white-space: nowrap; }
 
-@media (max-width: 700px) {
-  .recent-row { grid-template-columns: auto 84px minmax(0, 1fr) auto auto; }
+@media (max-width: 760px) {
+  /* drop the type badge; firm keeps its color dot for at-a-glance ID */
+  .recent-row { grid-template-columns: auto 78px 108px minmax(0, 1fr) auto auto; }
   .recent-row .tag { display: none; }
+  .recent-search { width: 180px; }
 }

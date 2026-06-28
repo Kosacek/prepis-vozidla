@@ -1,0 +1,24 @@
+{# Recent / search-result rows for the dashboard. Expects:
+   rows         — list of úkon rows (with firma_zkratka)
+   firma_colors — {zkratka: hex} color map
+   back         — where the edit page returns to (default '/')
+   empty_text   — message when rows is empty #}
+{% for u in rows %}
+<a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ (back|default('/', true))|urlencode }}">
+  <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+  <b class="recent-rz">{{ u.rz or '—' }}</b>
+  <span class="tag">{{ u.typ_kod }}</span>
+  <span class="recent-firma" style="color: {{ firma_colors.get(u.firma_zkratka, 'var(--ink)') }};">
+    <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
+  </span>
+  <span class="recent-mid muted small">{{ u.vin or '' }}{% if u.vin and u.poznamka %} · {% endif %}{{ u.poznamka or '' }}</span>
+  <span class="recent-pay">
+    {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
+    {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>
+    {% else %}<span class="muted small">nezapl.</span>{% endif %}
+  </span>
+  <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+</a>
+{% else %}
+<p class="muted" style="padding: var(--sp-3);">{{ empty_text|default('Žádné úkony.', true) }}</p>
+{% endfor %}

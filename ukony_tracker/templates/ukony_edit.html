@@ -6,7 +6,7 @@
   <h1>Upravit úkon</h1>
 </div>
 
-<div class="card" style="max-width: 600px;">
+<div class="card" style="max-width: 600px; margin: 0 auto;">
   <div class="card-title">Úkon #{{ u.id }}</div>
   <form method="post" action="/ukony/{{ u.id }}/upravit">
     <input type="hidden" name="back" value="{{ request.args.get('back', '') }}">

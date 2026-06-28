@@ -5,6 +5,9 @@
   // Apple system colors — vivid but soft, in the iOS/macOS palette.
   var COLORS = ["#0a84ff", "#34c759", "#ff9f0a", "#bf5af2", "#ff375f",
                 "#5ac8fa", "#ffd60a", "#ff6482", "#64d2ff", "#30d158"];
+  // Canonical firm -> color map (server-provided), shared with the recent list
+  // so a firm has the same color in the chart and the table.
+  var FIRMA_COLORS = window.FIRMA_COLORS || {};
 
   // Typy úkonů — revenue share per type (doughnut). Independent of the trend
   // chart, so render it before the trend-chart early-return.
@@ -66,7 +69,7 @@
         data: {
           labels: labels,
           datasets: firmy.map(function (f, i) {
-            var color = COLORS[i % COLORS.length];
+            var color = FIRMA_COLORS[f.zkratka] || COLORS[i % COLORS.length];
             return {
               label: f.zkratka,
               data: cumulative(f.pocty),
@@ -132,4 +135,30 @@
     s.classList.add("on");
     render(s.dataset.mode);
   });
+
+  // ── Recent-list quick search ───────────────────────────────────────────────
+  // Server-backed live find across ALL úkony (not just the recent rows). Lets you
+  // locate a freshly registered car by a few VIN digits and click straight into
+  // its edit page to fill in the new SPZ. Restores the recent list when cleared.
+  var search = document.getElementById("recent-search");
+  var list = document.getElementById("recent-list");
+  if (search && list) {
+    var original = list.innerHTML;
+    var timer = null, ctrl = null, seq = 0;
+    function runSearch() {
+      var q = search.value.trim();
+      if (!q) { if (ctrl) { ctrl.abort(); ctrl = null; } seq++; list.innerHTML = original; return; }
+      if (ctrl) ctrl.abort();
+      ctrl = new AbortController();
+      var id = ++seq;  // ignore a slow response that lands after a newer query
+      fetch("/ukony/hledat?q=" + encodeURIComponent(q), { signal: ctrl.signal })
+        .then(function (r) { return r.text(); })
+        .then(function (html) { if (id === seq) list.innerHTML = html; })
+        .catch(function () { /* aborted or offline — ignore */ });
+    }
+    search.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(runSearch, 180);
+    });
+  }
 })();

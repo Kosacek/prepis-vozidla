@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request
 import db
 from repositories import ukony_repo
 from services import stats_service as st
+from services import colors_service
 
 bp = Blueprint("dashboard", __name__)
 
@@ -35,9 +36,14 @@ def index():
     denni_firmy = st.denni_trend_podle_firmy(conn, today.year, today.month, today.day)
     per_typ = st.podle_typu(conn, year)
 
+    # One canonical firm -> color map for both the chart and the recent list.
+    firma_colors = colors_service.firma_color_map(conn)
+
     return render_template(
         "dashboard.html",
         year=year,
+        firma_colors=firma_colors,
+        firma_colors_json=json.dumps(firma_colors),
         roky=roky,
         aktualni_rok=today.year,
         mesic_nazev=MESICE[today.month - 1],

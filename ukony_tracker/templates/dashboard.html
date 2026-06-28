@@ -87,23 +87,15 @@
 
 <div class="card recent-card">
   <div class="card-head"><h2>Poslední úkony</h2>
-    <a href="/ukony/vse" class="muted small">Zobrazit všechny →</a>
+    <div class="recent-tools">
+      <input type="search" id="recent-search" class="recent-search" autocomplete="off"
+             placeholder="Hledat vůz — VIN, RZ, firma, poznámka…">
+      <a href="/ukony/vse" class="muted small">Zobrazit všechny →</a>
+    </div>
   </div>
-  <div class="recent-list">
-    {% for u in recent %}
-    <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back=/">
-      <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
-      <b class="recent-rz">{{ u.rz or '—' }}</b>
-      <span class="tag">{{ u.typ_kod }}</span>
-      <span class="recent-mid"><span class="muted">{{ u.firma_zkratka }}</span>{% if u.vin %} <span class="muted small">· {{ u.vin }}</span>{% endif %}{% if u.poznamka %} <span class="muted small">· {{ u.poznamka }}</span>{% endif %}</span>
-      <span class="recent-pay">
-        {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
-        {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>
-        {% else %}<span class="muted small">nezapl.</span>{% endif %}
-      </span>
-      <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
-    </a>
-    {% else %}<p class="muted">Žádné úkony.</p>{% endfor %}
+  <div class="recent-list" id="recent-list">
+    {% set rows = recent %}
+    {% include "_recent_rows.html" %}
   </div>
 </div>
 
@@ -111,6 +103,7 @@
   window.DAILY = {{ denni_json|safe }};
   window.DAILY_FIRMY = {{ denni_firmy_json|safe }};
   window.PER_TYP = {{ per_typ_json|safe }};
+  window.FIRMA_COLORS = {{ firma_colors_json|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=9"></script>
 {% endblock %}

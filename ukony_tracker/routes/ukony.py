@@ -5,8 +5,26 @@ import db
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import ingest_service as ing
 from services import pricing_service
+from services import colors_service
 
 bp = Blueprint("ukony", __name__)
+
+
+@bp.get("/ukony/hledat")
+def hledat():
+    """Live quick-find for the dashboard: returns the recent-row partial filtered
+    by the query (VIN/RZ/ORV/poznámka/firma). Used to locate a freshly registered
+    car so its úkon can be opened and the SPZ filled in."""
+    conn = db.get_db()
+    q = (request.args.get("q") or "").strip()
+    rows = ukony_repo.search(conn, q) if q else []
+    return render_template(
+        "_recent_rows.html",
+        rows=rows,
+        firma_colors=colors_service.firma_color_map(conn),
+        back="/",
+        empty_text="Nic nenalezeno.",
+    )
 
 
 def _this_month():

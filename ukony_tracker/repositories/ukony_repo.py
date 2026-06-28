@@ -89,3 +89,24 @@ def list(
     q.append("ORDER BY u.datum DESC, u.id DESC")
 
     return conn.execute(" ".join(q), args).fetchall()
+
+
+def search(conn: sqlite3.Connection, q: str, limit: int = 25) -> list[sqlite3.Row]:
+    """Free-text search across all úkony for the dashboard quick-find: matches a
+    substring of RZ, VIN, ORV, poznámka, or firm shortcut. Used to locate a car
+    (e.g. by a few VIN digits) so its úkon can be opened and the SPZ filled in.
+
+    Returns newest-first, capped at ``limit``. Empty/blank query → no rows.
+    """
+    term = (q or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    return conn.execute(
+        "SELECT u.*, f.zkratka AS firma_zkratka"
+        " FROM ukony u JOIN firmy f ON f.id=u.firma_id"
+        " WHERE u.rz LIKE ? OR u.vin LIKE ? OR u.orv LIKE ?"
+        "    OR u.poznamka LIKE ? OR f.zkratka LIKE ?"
+        " ORDER BY u.datum DESC, u.id DESC LIMIT ?",
+        (like, like, like, like, like, limit),
+    ).fetchall()
