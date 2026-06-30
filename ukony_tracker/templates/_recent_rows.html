@@ -11,7 +11,7 @@
   <span class="recent-firma">
     <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
   </span>
-  <span class="recent-mid muted small">{{ u.vin or '' }}{% if u.vin and u.poznamka %} · {% endif %}{{ u.poznamka or '' }}</span>
+  <span class="recent-mid small">{% if u.vin %}<b class="recent-vin">{{ u.vin }}</b>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
   <span class="recent-pay">
     {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
     {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>

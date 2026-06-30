@@ -1430,6 +1430,8 @@ a.kpi-link:hover {
 }
 .firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .recent-mid { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* VIN is the key identifier — bold + dark, with a gap before the note text. */
+.recent-vin { font-weight: 600; color: var(--ink); margin-right: var(--sp-4); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .recent-pay { white-space: nowrap; text-align: right; }
 .recent-kc { text-align: right; white-space: nowrap; }
 
