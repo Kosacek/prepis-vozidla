@@ -1099,7 +1099,9 @@ a.kpi-link:hover {
      The pay button and the paid badge share ONE fixed slot inside actions,
      so marking a row paid swaps button→badge in place — nothing jumps. */
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 190px 90px 200px;
+  /* VIN column wide enough for a full 17-char VIN + the "VIN" label on one line
+     (190px clipped the last char onto a second row). */
+  grid-template-columns: 52px minmax(0, 1fr) 236px 90px 200px;
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) 0;
