@@ -84,11 +84,19 @@
   </div>
 </div>
 
+{# Inline edit overlay: a recent-row click fetches its form fragment into here. #}
+<div class="modal-backdrop" id="ukon-modal" hidden>
+  <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="ukon-modal-title">
+    <button class="modal-close" type="button" aria-label="Zavřít" data-modal-close>&times;</button>
+    <div class="modal-body" id="ukon-modal-body"></div>
+  </div>
+</div>
+
 <script>
   window.DAILY = {{ denni_json|safe }};
   window.DAILY_FIRMY = {{ denni_firmy_json|safe }};
   window.PER_TYP = {{ per_typ_json|safe }};
   window.FIRMA_COLORS = {{ firma_colors_json|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=9"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=10"></script>
 {% endblock %}

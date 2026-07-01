@@ -32,6 +32,16 @@ def _this_month():
     return f"{t.year:04d}-{t.month:02d}"
 
 
+def _safe_back(value: str | None) -> str | None:
+    """Only allow a same-site relative redirect target, guarding against an open
+    redirect via a crafted ?back=. Rejects absolute URLs and protocol-relative
+    ('//host', '/\\host') values. Returns None when unsafe so callers fall back."""
+    v = (value or "").strip()
+    if v.startswith("/") and not v.startswith(("//", "/\\")):
+        return v
+    return None
+
+
 @bp.get("/ukony")
 def entry_default():
     conn = db.get_db()
@@ -148,12 +158,10 @@ def edit_form(uid):
     u = ukony_repo.get(conn, uid)
     if not u:
         abort(404)
-    return render_template(
-        "ukony_edit.html",
-        u=u,
-        typy=typy_repo.list_active(conn),
-        firmy=firmy_repo.list_all(conn),
-    )
+    # ?modal=1 → just the form fragment, for the dashboard inline-edit overlay.
+    # Otherwise the full page (also the no-JS fallback when a row link is followed).
+    template = "_ukon_form.html" if request.args.get("modal") else "ukony_edit.html"
+    return render_template(template, u=u, typy=typy_repo.list_active(conn))
 
 
 @bp.post("/ukony/<int:uid>/upravit")
@@ -191,7 +199,7 @@ def edit_save(uid):
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):
         flash("Neplatné hodnoty (zkontroluj datum a cenu).", "error")
-    return redirect(f.get("back") or url_for("ukony.table"))
+    return redirect(_safe_back(f.get("back")) or url_for("ukony.table"))
 
 
 @bp.post("/ukony/<int:uid>/smazat")
@@ -199,7 +207,7 @@ def delete(uid):
     conn = db.get_db()
     ukony_repo.delete(conn, uid)
     flash("Úkon smazán.", "success")
-    return redirect(request.form.get("back") or url_for("ukony.table"))
+    return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))
 
 
 @bp.post("/ukony/<int:uid>/zaplaceno")
@@ -217,4 +225,4 @@ def mark_paid(uid):
     stav = ing.derive_stav(float(u["celkem"]), z)
     ukony_repo.update(conn, uid, zaplaceno_kc=z, stav_platby=stav)
     flash("Platba zaznamenána.", "success")
-    return redirect(request.form.get("back") or url_for("ukony.table"))
+    return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))

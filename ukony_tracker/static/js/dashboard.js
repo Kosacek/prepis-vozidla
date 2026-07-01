@@ -161,4 +161,61 @@
       timer = setTimeout(runSearch, 180);
     });
   }
+
+  // ── Inline úkon edit modal ──────────────────────────────────────────────────
+  // Clicking a recent (or search-result) row opens its edit form in a blurred
+  // overlay instead of navigating away. Saving submits normally (full reload to
+  // the dashboard, so KPIs/charts reflect the change). Falls back to the plain
+  // edit page if the fetch fails or JS is off (the row is still a real link).
+  var modal = document.getElementById("ukon-modal");
+  var modalBody = document.getElementById("ukon-modal-body");
+  var recentList = document.getElementById("recent-list");
+  if (modal && modalBody && recentList) {
+    var lastFocused = null;
+
+    function openModal(url) {
+      fetch(url, { headers: { "X-Requested-With": "fetch" } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          modalBody.innerHTML = html;
+          lastFocused = document.activeElement;
+          modal.hidden = false;
+          document.body.classList.add("modal-open");
+          requestAnimationFrame(function () {
+            modal.classList.add("is-open");
+            var first = modalBody.querySelector("input, select, button");
+            if (first) first.focus();
+          });
+        })
+        .catch(function () { window.location.href = url.replace(/[?&]modal=1/, ""); });
+    }
+
+    function closeModal() {
+      modal.classList.remove("is-open");
+      document.body.classList.remove("modal-open");
+      setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
+      if (lastFocused && lastFocused.focus) lastFocused.focus();
+    }
+
+    // Open — delegated so it also covers rows swapped in by the search box.
+    recentList.addEventListener("click", function (e) {
+      var row = e.target.closest("a.recent-row");
+      if (!row) return;
+      var href = row.getAttribute("href");
+      if (!href || href.indexOf("/upravit") < 0) return;
+      e.preventDefault();
+      openModal(href + (href.indexOf("?") >= 0 ? "&" : "?") + "modal=1");
+    });
+
+    // Close — backdrop click, the × button, or the form's "Zpět" link.
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal || e.target.closest("[data-modal-close]")) {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) closeModal();
+    });
+  }
 })();

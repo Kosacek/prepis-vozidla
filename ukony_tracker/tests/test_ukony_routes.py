@@ -182,8 +182,38 @@ def test_edit_form_renders(client_fid):
     c, fid = client_fid
     uid = _seed_ukon(c.application, fid, rz="EDIT123")
     r = c.get(f"/ukony/{uid}/upravit")
+    body = r.get_data(as_text=True)
     assert r.status_code == 200
-    assert "EDIT123" in r.get_data(as_text=True)
+    assert "EDIT123" in body
+    assert "Upravit úkon" in body          # full-page chrome present
+
+
+def test_edit_save_rejects_offsite_back_redirect(client_fid):
+    """A crafted ?back=external URL must NOT redirect off-site after save."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    for evil in ("https://evil.com", "//evil.com", "http://x"):
+        r = c.post(f"/ukony/{uid}/upravit",
+                   data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "1300", "back": evil})
+        assert r.status_code in (302, 303)
+        assert evil not in r.headers["Location"]        # fell back to the safe table URL
+    # a same-site relative back is honoured
+    r = c.post(f"/ukony/{uid}/upravit",
+               data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "1300", "back": "/"})
+    assert r.headers["Location"].endswith("/")
+
+
+def test_edit_form_modal_returns_fragment(client_fid):
+    """?modal=1 returns just the form fragment for the dashboard overlay — the
+    form fields without the full-page layout."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, rz="EDIT123")
+    r = c.get(f"/ukony/{uid}/upravit?modal=1&back=/")
+    body = r.get_data(as_text=True)
+    assert r.status_code == 200
+    assert 'name="datum"' in body and f"/ukony/{uid}/upravit" in body  # the form
+    assert 'value="/"' in body                                         # back field carried
+    assert "<html" not in body and "Upravit úkon" not in body          # no page chrome
 
 
 def test_edit_raising_celkem_rederives_to_castecne(client_fid):

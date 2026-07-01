@@ -1433,6 +1433,64 @@ a.kpi-link:hover {
 /* VIN is the key identifier — bold + dark, same size as the SPZ (15px), with a
    gap before the note text. */
 .recent-vin { font-weight: 600; color: var(--ink); margin-right: var(--sp-4); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-size: 0.9375rem; }
+
+/* ── Inline edit modal (dashboard) ──────────────────────────────────────────
+   Dimmed + blurred backdrop with a centered card that scales/fades in. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  background: rgba(0, 0, 0, .42);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+.modal-backdrop[hidden] { display: none; }
+.modal-backdrop.is-open { opacity: 1; }
+
+.modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  /* a little more lift than a normal card so it reads as floating */
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .22), 0 6px 18px rgba(0, 0, 0, .10);
+  opacity: 0;
+  transform: translateY(10px) scale(.97);
+  transition: transform .26s cubic-bezier(.2, .8, .25, 1), opacity .26s ease;
+}
+.modal-backdrop.is-open .modal-card { opacity: 1; transform: none; }
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.modal-close:hover { background: var(--bg); color: var(--ink); }
+
+body.modal-open { overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop, .modal-card { transition: none; }
+}
 .recent-pay { white-space: nowrap; text-align: right; }
 .recent-kc { text-align: right; white-space: nowrap; }
 
