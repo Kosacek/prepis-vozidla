@@ -22,14 +22,15 @@ def create(
     stav_platby: str = "nezaplaceno",
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
+    zpracoval: str | None = None,
 ) -> int:
     ts = db.now_iso()
     cur = conn.execute(
         "INSERT INTO ukony(firma_id,datum,rz,typ_kod,celkem,vin,orv,poznamka,"
-        "stav_platby,zaplaceno_kc,zdroj,created_at,updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "stav_platby,zaplaceno_kc,zdroj,zpracoval,created_at,updated_at)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (firma_id, datum, rz, typ_kod, celkem, vin, orv, poznamka,
-         stav_platby, zaplaceno_kc, zdroj, ts, ts),
+         stav_platby, zaplaceno_kc, zdroj, zpracoval, ts, ts),
     )
     conn.commit()
     return cur.lastrowid

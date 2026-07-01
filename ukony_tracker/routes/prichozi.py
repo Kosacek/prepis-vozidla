@@ -36,9 +36,12 @@ def inbox():
     for r in rows:
         d = dict(r)
         try:
-            d["znacka"] = (json.loads(r["raw_json"] or "{}").get("znacka") or "").strip()
+            raw = json.loads(r["raw_json"] or "{}")
+            d["znacka"] = (raw.get("znacka") or "").strip()
+            d["profil"] = (raw.get("profil") or "").strip()  # who filled it out in zadosti
         except (ValueError, TypeError):
             d["znacka"] = ""
+            d["profil"] = ""
         d["note"] = _note(r) or ""  # default poznámka to prefill (editable)
         items.append(d)
     firmy = firmy_repo.list_all(conn, only_active=True)
@@ -81,6 +84,7 @@ def approve(pid):
             orv=p["orv"],
             poznamka=(f.get("poznamka") or "").strip() or None,
             zdroj="zadosti",
+            zpracoval=(f.get("zpracoval") or "").strip() or None,
         )
         prichozi_repo.update(conn, pid, status="approved", created_ukon_id=uid)
         flash("Úkon vytvořen.", "success")

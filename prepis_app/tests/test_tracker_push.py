@@ -61,6 +61,16 @@ def test_build_payload_drops_operator_name_when_not_jiny():
     assert p["puvodni_prov_jmeno"] is None
 
 
+def test_build_payload_forwards_profil():
+    """The chosen profile (who filled it out) is forwarded so the tracker can
+    record who added the car."""
+    p = tracker_push.build_payload({"mode": "prevod", "profil": "Roman"})
+    assert p["profil"] == "Roman"
+    # absent / blank → None (no attribution)
+    assert tracker_push.build_payload({"mode": "prevod"})["profil"] is None
+    assert tracker_push.build_payload({"mode": "prevod", "profil": "  "})["profil"] is None
+
+
 def test_build_payload_gates_each_side_independently():
     """A 'jiný provozovatel' flag on one side must not leak the other side's
     operator name (guards a copy-paste flag mix-up)."""

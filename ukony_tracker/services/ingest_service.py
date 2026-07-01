@@ -57,6 +57,14 @@ def derive_stav(celkem: float, zaplaceno_kc: float) -> str:
 _derive_stav = derive_stav
 
 
+def normalize_profil(value: str | None) -> str | None:
+    """Constrain the 'who added' label (zpracoval) to a known profile
+    (config.PROFILY). Anything else — blank, a typo, a forged POST — becomes
+    None, so only valid attributions are ever stored."""
+    v = value.strip() if isinstance(value, str) else ""
+    return v if v in config.PROFILY else None
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -75,6 +83,7 @@ def pridat_ukon(
     poznamka: str | None = None,
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
+    zpracoval: str | None = None,
 ) -> int:
     """Validate, resolve firma, derive payment state and persist a new úkon.
 
@@ -129,4 +138,5 @@ def pridat_ukon(
         stav_platby=stav,
         zaplaceno_kc=zaplaceno_kc,
         zdroj=zdroj,
+        zpracoval=normalize_profil(zpracoval),
     )

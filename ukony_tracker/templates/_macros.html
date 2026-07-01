@@ -1,0 +1,12 @@
+{# Shared bits for "who added the car" (zpracoval). Import with context so the
+   global `profily` (from app.context_processor) is in scope:
+   {% import "_macros.html" as m with context %} #}
+
+{% macro person_select(selected='') %}
+<select name="zpracoval" class="filter-select person-select">
+  <option value="">— kdo —</option>
+  {% for p in profily %}<option value="{{ p }}" {{ 'selected' if selected == p }}>{{ p }}</option>{% endfor %}
+</select>
+{% endmacro %}
+
+{% macro person_badge(name) %}{% if name %}<span class="kdo" title="Přidal {{ name }}">{{ name }}</span>{% endif %}{% endmacro %}

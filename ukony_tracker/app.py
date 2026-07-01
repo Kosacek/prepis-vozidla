@@ -52,6 +52,7 @@ def create_app():
             "nav_typy": typy_repo.list_active(conn),
             "authed": authed,
             "nav_prichozi_count": prichozi_repo.count_pending(conn) if authed else 0,
+            "profily": config.PROFILY,
         }
 
     from routes.dashboard import bp as dashboard_bp

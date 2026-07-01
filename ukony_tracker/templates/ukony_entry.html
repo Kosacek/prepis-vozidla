@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Úkony — {{ firma.zkratka if firma else '' }}{% endblock %}
 {% block content %}
+{% import "_macros.html" as m with context %}
 <div class="pills">
   {% for f in firmy %}
     <a class="pill {{ 'on' if firma and f.id==firma.id }}" href="/ukony/{{ f.id }}?mesic={{ mesic }}">{{ f.zkratka }}</a>
@@ -50,6 +51,10 @@
         <span class="chip" data-tag="RZ">+ RZ</span>
       </div>
     </div>
+    <div class="field">
+      <label>Kdo vyplnil</label>
+      {{ m.person_select(sel_zpracoval) }}
+    </div>
     <button type="submit" class="btn btn-primary">Přidat úkon</button>
   </form>
 </div>
@@ -64,6 +69,7 @@
       <b class="u-rz">{{ u.rz or '—' }}</b>
       <span class="tag">{{ u.typ_kod }}</span>
       {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
+      {{ m.person_badge(u.zpracoval) }}
     </span>
     <span class="u-vin" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}{% if u.orv %}<span class="muted small" style="display:block">ORV {{ u.orv }}</span>{% endif %}</span>
     <span class="u-kc"><b>{{ u.celkem|int }} Kč</b></span>
@@ -120,6 +126,12 @@
     });
   });
   var rz=document.getElementById('rz'); if(rz) rz.focus();
+  // Remember the last "Kdo vyplnil" choice on this device (empty selection only).
+  var zp=document.querySelector('select[name=zpracoval]');
+  if(zp){
+    if(!zp.value){ var saved=localStorage.getItem('ukony_zpracoval'); if(saved) zp.value=saved; }
+    zp.addEventListener('change',function(){ localStorage.setItem('ukony_zpracoval', zp.value); });
+  }
 })();
 </script>
 {% endblock %}

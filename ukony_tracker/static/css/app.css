@@ -1434,6 +1434,21 @@ a.kpi-link:hover {
    gap before the note text. */
 .recent-vin { font-weight: 600; color: var(--ink); margin-right: var(--sp-4); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-size: 0.9375rem; }
 
+/* "Kdo přidal" — who added the car (attribution badge). */
+.kdo {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.person-select { min-width: 130px; }
+
 /* ── Inline edit modal (dashboard) ──────────────────────────────────────────
    Dimmed + blurred backdrop with a centered card that scales/fades in. */
 .modal-backdrop {

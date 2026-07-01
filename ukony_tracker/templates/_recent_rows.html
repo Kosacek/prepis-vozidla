@@ -3,6 +3,7 @@
    firma_colors — {zkratka: hex} color map
    back         — where the edit page returns to (default '/')
    empty_text   — message when rows is empty #}
+{% import "_macros.html" as m with context %}
 {% for u in rows %}
 <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ (back|default('/', true))|urlencode }}">
   <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
@@ -11,7 +12,7 @@
   <span class="recent-firma">
     <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
   </span>
-  <span class="recent-mid small">{% if u.vin %}<b class="recent-vin">{{ u.vin }}</b>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+  <span class="recent-mid small">{% if u.vin %}<b class="recent-vin">{{ u.vin }}</b>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.zpracoval %} {{ m.person_badge(u.zpracoval) }}{% endif %}</span>
   <span class="recent-pay">
     {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
     {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>

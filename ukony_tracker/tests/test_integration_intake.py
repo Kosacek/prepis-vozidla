@@ -182,6 +182,17 @@ def test_intake_note_keeps_owner_when_no_provozovatel(conn):
     assert ukony_repo.get(conn, res["ukon_id"])["poznamka"] == "Cardion s.r.o. ← Jan Novák"
 
 
+def test_intake_auto_stores_profil_as_zpracoval(conn):
+    """The zadosti profile (who filled it out) is saved on the auto-created úkon."""
+    c, _ = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "prof1", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111", "profil": "Roman",
+    })
+    assert res["status"] == "auto"
+    assert ukony_repo.get(conn, res["ukon_id"])["zpracoval"] == "Roman"
+
+
 def test_intake_falls_back_to_owner_without_operator(conn):
     c, a = _firms(conn)
     # No provozovatel given → match on the owner (the usual owner==operator case)

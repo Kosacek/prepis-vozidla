@@ -44,6 +44,7 @@
 </div>
 
 {# ── Table ── #}
+{% import "_macros.html" as m with context %}
 <div class="table-wrap">
   <table>
     <thead>
@@ -55,6 +56,7 @@
         <th class="right shrink">Kč</th>
         <th>VIN</th>
         <th>Poznámka</th>
+        <th class="shrink">Kdo</th>
         <th class="shrink">Platba</th>
         <th class="shrink">Akce</th>
       </tr>
@@ -62,7 +64,7 @@
     <tbody>
       {% for u in ukony %}
       <tr data-kc="{{ u.celkem|int }}"
-          data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod) | lower }}">
+          data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
         <td class="muted shrink" style="white-space:nowrap;">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</td>
         <td class="shrink" style="white-space:nowrap;">{{ u.firma_zkratka }}</td>
         <td><b>{{ u.rz or '—' }}</b></td>
@@ -70,6 +72,7 @@
         <td class="right shrink">{{ u.celkem|int }}</td>
         <td class="muted small">{{ u.vin or '' }}</td>
         <td class="muted small">{{ u.poznamka or '' }}</td>
+        <td class="shrink">{{ m.person_badge(u.zpracoval) }}</td>
         <td class="shrink">
           {% if u.stav_platby == 'zaplaceno' %}
             <span class="badge ok">zapl.</span>
@@ -113,7 +116,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="9" class="center muted" style="padding: var(--sp-6);">
+        <td colspan="10" class="center muted" style="padding: var(--sp-6);">
           Žádné úkony neodpovídají filtru.
         </td>
       </tr>

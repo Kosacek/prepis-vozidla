@@ -99,6 +99,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 rz=rz, vin=vin, orv=orv,
                 poznamka=_context_note(payload),
                 zdroj="zadosti",
+                zpracoval=payload.get("profil"),  # who filled it out in zadosti
             )
         except ingest_service.IngestError:
             return {"status": "pending", "prichozi_id": pid}  # surfaces in inbox

@@ -259,10 +259,20 @@
     <div class="subtitle">Automatické vyplnění žádosti</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
+    <button onclick="openProfilModal()" id="profil-chip" title="Kdo vyplňuje — kliknutím změníš" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">👤 <span id="profil-name">—</span></button>
     <button onclick="openDokladyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🧾 Doklady</button>
     <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
   </div>
 </header>
+
+<!-- Kdo vyplňuje (profil) -->
+<div class="modal-overlay" id="profil-modal">
+  <div class="modal-box" style="max-width:360px;text-align:center;">
+    <h2 style="margin-bottom:6px;">Kdo vyplňuje?</h2>
+    <p class="subtitle" style="margin:0 0 18px;">Vyber sebe — zapíše se ke každému autu.</p>
+    <div id="profil-choices" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+</div>
 
 <!-- Update notification banner -->
 <div id="update-banner" style="display:none;background:#059669;color:#fff;padding:10px 32px;font-size:14px;font-weight:500;text-align:center;">
@@ -1545,6 +1555,7 @@ async function generatePDFs() {
     ppd_prijato_od:      v('ppd_prijato_od'),
     ppd_prijato_ico:     v('ppd_prijato_ico'),
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
+    profil:              (window.getProfil ? window.getProfil() : ''),
   };
 
   document.getElementById('nav-next').disabled = true;
@@ -2049,6 +2060,35 @@ tryAutoOpenCamera();
 </script>
 <script>
   fetch('/api/version').then(r=>r.json()).then(d=>{ document.getElementById('app-version-bar').textContent = 'v' + d.version; });
+</script>
+<script>
+// ── Kdo vyplňuje (profil) ─────────────────────────────────────────────────────
+// A per-device label of who's filling it out, sent with each žádost so the Úkony
+// Tracker can show who added the car. Not authentication — just a name.
+(function () {
+  var PROFILY = ['David', 'Roman', 'Petr'];
+  window.getProfil = function () { return localStorage.getItem('zadosti_profil') || ''; };
+  function setProfil(p) { localStorage.setItem('zadosti_profil', p); updateProfilUI(); closeProfilModal(); }
+  function updateProfilUI() {
+    var el = document.getElementById('profil-name');
+    if (el) el.textContent = window.getProfil() || 'Vyber';
+  }
+  window.openProfilModal = function () { document.getElementById('profil-modal').style.display = 'flex'; };
+  window.closeProfilModal = function () { document.getElementById('profil-modal').style.display = 'none'; };
+
+  var box = document.getElementById('profil-choices');
+  if (box) {
+    PROFILY.forEach(function (p) {
+      var b = document.createElement('button');
+      b.textContent = p;
+      b.style.cssText = 'padding:14px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;font-weight:600;';
+      b.onclick = function () { setProfil(p); };
+      box.appendChild(b);
+    });
+  }
+  updateProfilUI();
+  if (!window.getProfil()) window.openProfilModal();  // prompt on first open
+})();
 </script>
 </body>
 </html>

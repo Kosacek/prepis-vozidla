@@ -54,6 +54,9 @@ def build_payload(data: dict) -> dict:
             if data.get("puvodni_prov_jiny") else None,
         "novy_prov_jmeno": ((data.get("novy_prov_jmeno") or "").strip() or None)
             if data.get("novy_prov_jiny") else None,
+        # Who filled this out (David/Roman/Petr), chosen in the app — the tracker
+        # stores it as the úkon's `zpracoval` so we know who added each car.
+        "profil": (data.get("profil") or "").strip() or None,
     }
 
 

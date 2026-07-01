@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS ukony (
   stav_platby TEXT NOT NULL DEFAULT 'nezaplaceno',
   zaplaceno_kc REAL NOT NULL DEFAULT 0,
   zdroj TEXT NOT NULL DEFAULT 'rucni',
+  zpracoval TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CHECK (celkem >= 0),
@@ -109,6 +110,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Migrations for DBs created before a column existed. CREATE TABLE above
     # already carries these for fresh DBs; this upgrades the live DB in place.
     _ensure_column(conn, "ukony", "orv", "orv TEXT")
+    # Who added the car (attribution — David/Roman/Petr). See config.PROFILY.
+    _ensure_column(conn, "ukony", "zpracoval", "zpracoval TEXT")
     # Provozovatel (operator) party — added so the Příchozí inbox can show the
     # real client instead of a leasing-company owner. See prichozi_service.
     _ensure_column(conn, "prichozi", "puvodni_prov_jmeno", "puvodni_prov_jmeno TEXT")

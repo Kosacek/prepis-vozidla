@@ -30,3 +30,7 @@ BACKUP_MIN_INTERVAL_SEC = 300  # throttle: at most one backup per 5 min
 STAV_NEZAPLACENO = "nezaplaceno"
 STAV_ZAPLACENO = "zaplaceno"
 STAV_CASTECNE = "castecne"
+
+# Who filled out / added a car (attribution). Chosen per-device in zadosti and
+# pushed through; also selectable on the tracker's own entry/edit forms.
+PROFILY = ["David", "Roman", "Petr"]
