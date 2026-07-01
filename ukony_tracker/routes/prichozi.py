@@ -2,7 +2,7 @@
 import json
 from datetime import date
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
 import db
 from repositories import firmy_repo, typy_repo, prichozi_repo
@@ -73,12 +73,6 @@ def approve(pid):
         date.fromisoformat(datum)  # reject blank/invalid
         if not firma_id:
             raise ValueError("firma")
-        # Attribute to who filled it out in zadosti; fall back to the tracker
-        # operator's active profile if the push carried no name.
-        try:
-            pushed = (json.loads(p["raw_json"] or "{}").get("profil") or "").strip()
-        except (ValueError, TypeError):
-            pushed = ""
         uid = ing.pridat_ukon(
             conn,
             firma_id=firma_id,
@@ -90,7 +84,7 @@ def approve(pid):
             orv=p["orv"],
             poznamka=(f.get("poznamka") or "").strip() or None,
             zdroj="zadosti",
-            zpracoval=pushed or session.get("profil"),
+            zpracoval=(f.get("zpracoval") or "").strip() or None,
         )
         prichozi_repo.update(conn, pid, status="approved", created_ukon_id=uid)
         flash("Úkon vytvořen.", "success")

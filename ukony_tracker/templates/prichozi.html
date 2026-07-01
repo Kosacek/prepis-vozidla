@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Příchozí{% endblock %}
 {% block content %}
+{% import "_macros.html" as m with context %}
 <div class="page-header">
   <h1>Příchozí žádosti</h1>
   <div class="muted">{{ items|length }} čeká na přiřazení</div>
@@ -75,7 +76,10 @@
       <label>Poznámka</label>
       <input name="poznamka" autocomplete="off" value="{{ p.note }}">
     </div>
-    {% if p.profil %}<div class="muted small" style="margin: 2px 0 var(--sp-2);">Vyplnil v Přepisu: <b>{{ p.profil }}</b></div>{% endif %}
+    <div class="field">
+      <label>Kdo vyplnil {% if p.profil %}<span class="muted small">(z Přepisu)</span>{% endif %}</label>
+      {{ m.person_select(p.profil) }}
+    </div>
     <button type="submit" class="btn btn-primary">Přidat úkon</button>
   </form>
 

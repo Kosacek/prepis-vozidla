@@ -24,11 +24,6 @@ def create_app():
             return  # server-to-server: key auth (_require_api_key), not the session gate
         if not session.get("authed"):
             return redirect(url_for("auth.login", next=request.path))
-        # Logged in but hasn't said who's working yet → pick a profile first, so
-        # everything added is auto-attributed. /kdo (no loop) and /logout (so you
-        # can always leave) are exempt.
-        if not session.get("profil") and request.path not in ("/kdo", "/logout"):
-            return redirect(url_for("auth.choose_profil", next=request.path))
 
     @app.before_request
     def _require_api_key():
@@ -58,7 +53,6 @@ def create_app():
             "authed": authed,
             "nav_prichozi_count": prichozi_repo.count_pending(conn) if authed else 0,
             "profily": config.PROFILY,
-            "aktivni_profil": session.get("profil"),
         }
 
     from routes.dashboard import bp as dashboard_bp

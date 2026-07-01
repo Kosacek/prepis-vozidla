@@ -1447,17 +1447,7 @@ a.kpi-link:hover {
   white-space: nowrap;
   vertical-align: middle;
 }
-/* Active-profile chip in the header + the "who's working" picker page. */
-.profil-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 12px; border-radius: var(--radius-pill);
-  background: var(--bg); border: 1px solid var(--line);
-  color: var(--ink); font-size: 0.8125rem; font-weight: 600;
-  text-decoration: none; white-space: nowrap;
-}
-.profil-chip:hover { border-color: var(--accent); }
-.profil-choices { display: flex; flex-direction: column; gap: var(--sp-3); }
-.profil-btn { font-size: 1.05rem; padding: 14px; width: 100%; }
+.person-select { min-width: 130px; }
 
 /* ── Inline edit modal (dashboard) ──────────────────────────────────────────
    Dimmed + blurred backdrop with a centered card that scales/fades in. */
