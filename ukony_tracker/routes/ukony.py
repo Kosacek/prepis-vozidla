@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import date
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, session
 import db
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import ingest_service as ing
@@ -92,7 +92,6 @@ def entry(firma_id):
         # on a successful add they stay empty, ready for the next car.
         sel_rz=request.args.get("rz") or "",
         sel_vin=request.args.get("vin") or "",
-        sel_zpracoval=request.args.get("zpracoval") or "",
     )
 
 
@@ -108,8 +107,6 @@ def add(firma_id):
              "typ": f.get("typ_kod"), "celkem": f.get("celkem")}
     if f.get("poznamka"):
         carry["poznamka"] = f.get("poznamka")
-    if f.get("zpracoval"):
-        carry["zpracoval"] = f.get("zpracoval")  # keep the person for the next car
     try:
         ing.pridat_ukon(
             conn,
@@ -121,7 +118,7 @@ def add(firma_id):
             vin=f.get("vin") or None,
             orv=f.get("orv") or None,
             poznamka=f.get("poznamka") or None,
-            zpracoval=f.get("zpracoval") or None,
+            zpracoval=session.get("profil"),  # auto — the active session profile
         )
         flash("Úkon přidán.", "success")
     except ing.IngestError as e:
@@ -199,7 +196,6 @@ def edit_save(uid):
             poznamka=f.get("poznamka") or None,
             zaplaceno_kc=zaplaceno,
             stav_platby=stav,
-            zpracoval=ing.normalize_profil(f.get("zpracoval")),
         )
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):

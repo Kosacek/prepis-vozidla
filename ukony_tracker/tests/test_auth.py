@@ -23,8 +23,12 @@ def test_dashboard_redirects_when_not_logged_in(gated_client):
     assert "/login" in r.headers["Location"]
 
 
-def test_login_correct_password_grants_access(gated_client):
+def test_login_then_choose_profile_grants_access(gated_client):
     assert gated_client.post("/login", data={"heslo": "secret123"}).status_code in (301, 302)
+    # logged in but must pick who's working first
+    r = gated_client.get("/")
+    assert r.status_code in (301, 302) and "/kdo" in r.headers["Location"]
+    gated_client.post("/kdo", data={"profil": "Roman"})
     assert gated_client.get("/").status_code == 200
 
 

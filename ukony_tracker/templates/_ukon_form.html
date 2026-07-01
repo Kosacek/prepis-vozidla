@@ -1,6 +1,5 @@
 {# Edit-úkon form. Rendered standalone inside ukony_edit.html (full page) and as a
    fragment in the dashboard modal (GET /ukony/<id>/upravit?modal=1). #}
-{% import "_macros.html" as m with context %}
 <div class="card-title" id="ukon-modal-title">Úkon #{{ u.id }}</div>
 <form method="post" action="/ukony/{{ u.id }}/upravit">
   <input type="hidden" name="back" value="{{ request.args.get('back', '') }}">
@@ -45,11 +44,6 @@
       <label>Poznámka</label>
       <input name="poznamka" value="{{ u.poznamka or '' }}">
     </div>
-  </div>
-
-  <div class="field">
-    <label>Kdo přidal</label>
-    {{ m.person_select(u.zpracoval or '') }}
   </div>
 
   <div style="display:flex; gap: var(--sp-3); align-items:center; margin-top: var(--sp-2);">
