@@ -180,7 +180,11 @@
           modalBody.innerHTML = html;
           lastFocused = document.activeElement;
           modal.hidden = false;
+          // Reserve the width the scrollbar occupied before overflow:hidden hides
+          // it, so locking background scroll doesn't shift the page sideways.
+          var sbw = window.innerWidth - document.documentElement.clientWidth;
           document.body.classList.add("modal-open");
+          if (sbw > 0) document.body.style.paddingRight = sbw + "px";
           requestAnimationFrame(function () {
             modal.classList.add("is-open");
             var first = modalBody.querySelector("input, select, button");
@@ -193,6 +197,7 @@
     function closeModal() {
       modal.classList.remove("is-open");
       document.body.classList.remove("modal-open");
+      document.body.style.paddingRight = "";
       setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
       if (lastFocused && lastFocused.focus) lastFocused.focus();
     }
