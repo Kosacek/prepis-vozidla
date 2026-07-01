@@ -165,7 +165,11 @@ def edit_form(uid):
     # ?modal=1 → just the form fragment, for the dashboard inline-edit overlay.
     # Otherwise the full page (also the no-JS fallback when a row link is followed).
     template = "_ukon_form.html" if request.args.get("modal") else "ukony_edit.html"
-    return render_template(template, u=u, typy=typy_repo.list_active(conn))
+    # All firms (not only active) so the úkon's current firm is always present and
+    # selectable, and the úkon can be re-assigned to a different company here.
+    return render_template(
+        template, u=u, typy=typy_repo.list_active(conn), firmy=firmy_repo.list_all(conn)
+    )
 
 
 @bp.post("/ukony/<int:uid>/upravit")
@@ -188,8 +192,15 @@ def edit_save(uid):
         rz = (f.get("rz") or "").strip().upper() or None
         vin = (f.get("vin") or "").strip().upper() or None
         orv = (f.get("orv") or "").strip().upper() or None
+        # Allow re-assigning the úkon to a different company. Keep the current firm
+        # when the field is absent (older callers) or names a firm that doesn't
+        # exist, so a bad value can never orphan the row.
+        firma_id = f.get("firma_id", type=int)
+        if not firma_id or not firmy_repo.get(conn, firma_id):
+            firma_id = u["firma_id"]
         ukony_repo.update(
             conn, uid,
+            firma_id=firma_id,
             datum=datum,
             rz=rz,
             typ_kod=f.get("typ_kod"),

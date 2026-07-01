@@ -16,13 +16,23 @@
     </div>
   </div>
 
-  <div class="field">
-    <label>Typ úkonu</label>
-    <select name="typ_kod">
-      {% for t in typy %}
-        <option value="{{ t.kod }}" {{ 'selected' if u.typ_kod == t.kod }}>{{ t.kod }}</option>
-      {% endfor %}
-    </select>
+  <div class="form-row">
+    <div class="field">
+      <label>Typ úkonu</label>
+      <select name="typ_kod">
+        {% for t in typy %}
+          <option value="{{ t.kod }}" {{ 'selected' if u.typ_kod == t.kod }}>{{ t.kod }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Firma</label>
+      <select name="firma_id">
+        {% for f in firmy %}
+          <option value="{{ f.id }}" {{ 'selected' if u.firma_id == f.id }}>{{ f.zkratka }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
 
   <div class="form-row">

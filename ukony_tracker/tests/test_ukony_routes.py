@@ -274,6 +274,47 @@ def test_edit_uppercases_rz_and_vin(client_fid):
     assert row["rz"] == "3BK9696" and row["vin"] == "TMBJJ7NS"
 
 
+def test_edit_form_shows_firma_select(client_fid):
+    """The edit form exposes a Firma select so the úkon can be re-assigned; both
+    the current firm and any other firm appear as options."""
+    c, fid = client_fid
+    with c.application.app_context():
+        other = firmy_repo.create(db.get_db(), nazev="Albion", zkratka="Albion", ico="2")
+    uid = _seed_ukon(c.application, fid)
+    body = c.get(f"/ukony/{uid}/upravit").get_data(as_text=True)
+    assert 'name="firma_id"' in body
+    assert "Cardion" in body and "Albion" in body      # current + other firm listed
+
+
+def test_edit_can_change_firma(client_fid):
+    """POST /ukony/<id>/upravit with a different firma_id re-assigns the úkon."""
+    c, fid = client_fid
+    with c.application.app_context():
+        other = firmy_repo.create(db.get_db(), nazev="Albion", zkratka="Albion", ico="2")
+    uid = _seed_ukon(c.application, fid)
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD",
+                                          "celkem": "1300", "firma_id": str(other)})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["firma_id"] == other
+
+
+def test_edit_invalid_firma_keeps_current(client_fid):
+    """A missing or non-existent firma_id must never orphan the row — the current
+    firm is kept."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    # non-existent firm id
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD",
+                                          "celkem": "1300", "firma_id": "99999"})
+    # field entirely absent (older callers)
+    c.post(f"/ukony/{uid}/upravit", data={"datum": "2026-05-10", "typ_kod": "PŘEVOD",
+                                          "celkem": "1300"})
+    with c.application.app_context():
+        row = ukony_repo.get(db.get_db(), uid)
+    assert row["firma_id"] == fid
+
+
 def test_edit_lowering_celkem_to_paid_rederives_to_zaplaceno(client_fid):
     """Lowering celkem down to the amount already received must become 'zaplaceno'."""
     c, fid = client_fid
