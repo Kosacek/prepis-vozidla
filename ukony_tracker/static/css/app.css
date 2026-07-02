@@ -1409,7 +1409,7 @@ a.kpi-link:hover {
    VIN+poznámka column (1fr) absorbs the slack instead of leaving it on the right. */
 .recent-row {
   display: grid;
-  grid-template-columns: 44px 88px 72px 132px minmax(0, 1fr) auto auto;
+  grid-template-columns: 44px 88px 72px 132px minmax(0, 1fr) auto auto auto;
   gap: var(--sp-3);
   align-items: center;
   padding: 11px var(--sp-3);
@@ -1429,10 +1429,13 @@ a.kpi-link:hover {
   font-weight: 600; font-size: 0.875rem;
 }
 .firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
-.recent-mid { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* VIN is the key identifier — bold + dark, same size as the SPZ (15px), with a
-   gap before the note text. */
-.recent-vin { font-weight: 600; color: var(--ink); margin-right: var(--sp-4); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-size: 0.9375rem; }
+.recent-mid { min-width: 0; overflow: hidden; white-space: nowrap; display: flex; align-items: baseline; }
+/* VIN is the key identifier — bold + dark, same size as the SPZ (15px). Fixed
+   flex-basis (fits a full 17-char VIN) so the poznámka column starts at the
+   same x on every row, whatever the VIN length (or none at all). */
+.recent-vin { flex: 0 0 172px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-size: 0.9375rem; }
+.recent-pozn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.recent-kdo { white-space: nowrap; }
 
 /* "Kdo přidal" — who added the car (attribution badge). */
 .kdo {
@@ -1511,7 +1514,9 @@ body.modal-open { overflow: hidden; }
 
 @media (max-width: 760px) {
   /* drop the type badge; firm keeps its color dot for at-a-glance ID */
-  .recent-row { grid-template-columns: auto 78px 108px minmax(0, 1fr) auto auto; }
+  .recent-row { grid-template-columns: auto 78px 108px minmax(0, 1fr) auto auto auto; }
   .recent-row .tag { display: none; }
+  /* narrow screens: let the VIN size itself — space matters more than alignment */
+  .recent-vin { flex-basis: auto; margin-right: var(--sp-3); }
   .recent-search { width: 180px; }
 }

@@ -12,12 +12,16 @@
   <span class="recent-firma">
     <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
   </span>
-  <span class="recent-mid small">{% if u.vin %}<b class="recent-vin">{{ u.vin }}</b>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.zpracoval %} {{ m.person_badge(u.zpracoval) }}{% endif %}</span>
+  {# VIN span is always rendered (even empty) — it is a fixed-width flex column,
+     so every poznámka starts at the same x regardless of VIN length/absence. #}
+  <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
   <span class="recent-pay">
+    {# nezaplaceno is the normal state (invoiced monthly) — show nothing for it,
+       only the exceptions (paid / partial) get a badge. #}
     {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
-    {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>
-    {% else %}<span class="muted small">nezapl.</span>{% endif %}
+    {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>{% endif %}
   </span>
+  <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
   <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
 </a>
 {% else %}
