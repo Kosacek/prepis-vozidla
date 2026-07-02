@@ -1409,7 +1409,8 @@ a.kpi-link:hover {
    VIN+poznámka column (1fr) absorbs the slack instead of leaving it on the right. */
 .recent-row {
   display: grid;
-  grid-template-columns: 44px 88px 72px 132px minmax(0, 1fr) auto auto auto;
+  /* firm column sized to the longest real zkratka ('BSAuto Brno' + dot ≈ 98px) */
+  grid-template-columns: 44px 88px 72px 104px minmax(0, 1fr) auto auto auto;
   gap: var(--sp-3);
   align-items: center;
   padding: 11px var(--sp-3);
@@ -1514,7 +1515,7 @@ body.modal-open { overflow: hidden; }
 
 @media (max-width: 760px) {
   /* drop the type badge; firm keeps its color dot for at-a-glance ID */
-  .recent-row { grid-template-columns: auto 78px 108px minmax(0, 1fr) auto auto auto; }
+  .recent-row { grid-template-columns: auto 78px 100px minmax(0, 1fr) auto auto auto; }
   .recent-row .tag { display: none; }
   /* narrow screens: let the VIN size itself — space matters more than alignment
      (the .recent-mid column-gap still separates VIN from the note) */
