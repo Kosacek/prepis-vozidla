@@ -69,6 +69,26 @@ generování PDF; neúspěšné pushe → `failed_pushes.jsonl`). Klíč musí s
 | `db.py` | Schéma, backup_db() (throttlované zálohy) |
 | `scripts/seed.py` | Seed + rekonciliace; idempotentní |
 
+## Deploy (každá změna)
+
+Běží jako kontejner `ukony-app` (port 8090) na QNAP NASu, `/share/Container/ukony/`.
+`DEPLOY.md` popisuje prvotní zřízení (nginx, Cloudflare) — rutinní update je:
+
+1. `python -m pytest tests/` musí projít.
+2. Zvyš `ARG CACHEBUST=<datum>-<slug>` v `Dockerfile` (jinak COPY vrstvy zůstanou staré).
+3. `git commit` + push (repo je VEŘEJNÉ — nikdy žádné tajné údaje).
+4. Nakopíruj změněné soubory do `/share/Container/ukony/source` — přes SMB
+   (`\\192.168.1.18\Container\ukony\source`) nebo
+   `python ../prepis_app/scripts/nas_deploy.py puttree . /share/Container/ukony/source`
+   (NAS creds přes env `NAS_USER`/`NAS_PASSWORD` — nikdy necommitovat).
+5. `python ../prepis_app/scripts/nas_deploy.py run "sh /share/Container/ukony/deploy.sh"`
+   — build + `up -d --force-recreate` (bez recreate zůstane běžet STARÝ kontejner!)
+   + nginx reload.
+6. Ověř: healthcheck `healthy`, `docker exec ukony-app cat /etc/cachebust` ukazuje
+   nový slug, `/healthz` vrací ok. (Prod je Python 3.12 — sleduj start, viz gotcha
+   s anotacemi.)
+7. Uživateli: hard-refresh (Ctrl+Shift+R).
+
 ## Dokumentace
 
 - **Specifikace:** `docs/superpowers/specs/2026-06-09-ukony-tracker-design.md`
