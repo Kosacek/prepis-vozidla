@@ -1,3 +1,5 @@
+import hmac
+
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import config
 
@@ -9,7 +11,7 @@ def login():
     if not config.ADMIN_PASSWORD:
         return redirect(url_for("dashboard.index"))
     if request.method == "POST":
-        if request.form.get("heslo") == config.ADMIN_PASSWORD:
+        if hmac.compare_digest(request.form.get("heslo", ""), config.ADMIN_PASSWORD):
             session["authed"] = True
             session.permanent = True
             return redirect(request.args.get("next") or url_for("dashboard.index"))

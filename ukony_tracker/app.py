@@ -1,3 +1,6 @@
+import hmac
+import os
+
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 import config
@@ -7,8 +10,17 @@ import db
 def create_app():
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    # In production (login gate on) refuse to boot with a fallback SECRET_KEY —
+    # a known constant would let anyone forge a signed 'authed' session cookie.
+    # Keyed on the ENV var (not config.ADMIN_PASSWORD, which tests monkeypatch).
+    _prod = bool(os.environ.get("ADMIN_PASSWORD"))
+    if _prod and not os.environ.get("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY must be set in the environment when ADMIN_PASSWORD is set.")
     app.config["SECRET_KEY"] = config.SECRET_KEY
     app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if _prod:  # behind Cloudflare/nginx TLS → mark cookie Secure
+        app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # always revalidate static (no stale CSS/JS)
 
     app.teardown_appcontext(db.close_db)
@@ -32,7 +44,8 @@ def create_app():
             return
         if not config.INTEGRATION_API_KEY:
             return  # no key configured → open (local/dev; keeps keyless API tests green)
-        if request.headers.get("X-Api-Key") != config.INTEGRATION_API_KEY:
+        # Constant-time compare so the key can't be recovered by timing.
+        if not hmac.compare_digest(request.headers.get("X-Api-Key", ""), config.INTEGRATION_API_KEY):
             return jsonify(error="unauthorized"), 401
 
     @app.before_request

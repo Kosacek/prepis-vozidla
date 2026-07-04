@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import requests
 import json
 import os
+import hmac
 from dotenv import load_dotenv
 import sys as _sys
 _base = getattr(_sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -19,6 +20,13 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 # Session signing key. Falls back to the historical constant for local
 # desktop use; the web container overrides it via the SECRET_KEY env var.
 app.secret_key = os.environ.get("SECRET_KEY", "prepis-vozidla-secret-2024")
+# In production (login gate on) refuse to boot on the public fallback key —
+# a known constant would let anyone forge a signed 'authed' session cookie.
+if os.environ.get("ADMIN_PASSWORD") and not os.environ.get("SECRET_KEY"):
+    raise RuntimeError("Set SECRET_KEY in the environment when ADMIN_PASSWORD is set (production).")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+if os.environ.get("ADMIN_PASSWORD"):  # prod: behind Cloudflare/nginx TLS → mark cookie Secure
+    app.config["SESSION_COOKIE_SECURE"] = True
 
 # Behind Cloudflare → nginx the app must trust X-Forwarded-* so it sees
 # scheme=https and stamps Secure cookies. No-op for local desktop (no proxy).
@@ -848,7 +856,7 @@ def login():
     if not ADMIN_PASSWORD:
         return redirect("/")
     if _rq.method == "POST":
-        if _rq.form.get("password", "") == ADMIN_PASSWORD:
+        if hmac.compare_digest(_rq.form.get("password", ""), ADMIN_PASSWORD):
             session["authed"] = True
             return redirect("/")
         return _LOGIN_HTML.replace("__ERR__", '<div class="err">Špatné heslo</div>'), 401
