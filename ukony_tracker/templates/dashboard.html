@@ -93,10 +93,10 @@
 </div>
 
 <script>
-  window.DAILY = {{ denni_json|safe }};
-  window.DAILY_FIRMY = {{ denni_firmy_json|safe }};
-  window.PER_TYP = {{ per_typ_json|safe }};
-  window.FIRMA_COLORS = {{ firma_colors_json|safe }};
+  window.DAILY = {{ denni_chart|tojson }};
+  window.DAILY_FIRMY = {{ denni_firmy_chart|tojson }};
+  window.PER_TYP = {{ per_typ_chart|tojson }};
+  window.FIRMA_COLORS = {{ firma_colors|tojson }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=11"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=12"></script>
 {% endblock %}

@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import db
 from repositories import firmy_repo, typy_repo, prichozi_repo
 from services import ingest_service as ing
+from services import prichozi_service
 from services import pricing_service
 
 bp = Blueprint("prichozi", __name__)
@@ -16,13 +17,9 @@ MODE_TYP = {"prevod": "PŘEVOD", "zapis": "NOVÉ", "zmena": ""}
 
 
 def _note(p) -> str | None:
-    # Prefer the provozovatel (operator) on each side — the real client when the
-    # owner is a leasing company. Mirrors prichozi_service._context_note.
-    novy = (p["novy_prov_jmeno"] or p["novy_jmeno"] or "").strip()
-    puvodni = (p["puvodni_prov_jmeno"] or p["puvodni_jmeno"] or "").strip()
-    if novy and puvodni:
-        return f"{novy} ← {puvodni}"
-    return novy or puvodni or None
+    """Default poznámka for an inbox row — one shared rule (operator name over
+    leasing-company owner) lives in prichozi_service.context_note."""
+    return prichozi_service.context_note(dict(p))
 
 
 @bp.get("/prichozi")

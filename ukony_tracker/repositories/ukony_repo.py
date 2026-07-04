@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 
 import db
 
@@ -66,6 +67,7 @@ def list(
     month: int | None = None,
     typ_kod: str | None = None,
     stav: str | None = None,
+    limit: int | None = None,
 ) -> list[sqlite3.Row]:
     q = [
         "SELECT u.*, f.zkratka AS firma_zkratka"
@@ -93,8 +95,19 @@ def list(
     if where:
         q.append("WHERE " + " AND ".join(where))
     q.append("ORDER BY u.datum DESC, u.id DESC")
+    if limit is not None:
+        q.append("LIMIT ?")
+        args.append(limit)
 
     return conn.execute(" ".join(q), args).fetchall()
+
+
+def _fold(s: str) -> str:
+    """Lowercase and strip diacritics so 'martinu' matches 'MARTINŮ'."""
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", s.lower())
+        if not unicodedata.combining(ch)
+    )
 
 
 def search(conn: sqlite3.Connection, q: str, limit: int = 25) -> list[sqlite3.Row]:
@@ -102,17 +115,26 @@ def search(conn: sqlite3.Connection, q: str, limit: int = 25) -> list[sqlite3.Ro
     substring of RZ, VIN, ORV, poznámka, or firm shortcut. Used to locate a car
     (e.g. by a few VIN digits) so its úkon can be opened and the SPZ filled in.
 
+    Matching is case- AND diacritic-insensitive (SQLite LIKE only case-folds
+    ASCII, which would miss Czech names). Folding happens in Python — the scan
+    costs single-digit ms at this table's size and the client debounces input.
+
     Returns newest-first, capped at ``limit``. Empty/blank query → no rows.
     """
-    term = (q or "").strip()
+    term = _fold((q or "").strip())
     if not term:
         return []
-    like = f"%{term}%"
-    return conn.execute(
+    rows: list[sqlite3.Row] = []
+    for r in conn.execute(
         "SELECT u.*, f.zkratka AS firma_zkratka"
         " FROM ukony u JOIN firmy f ON f.id=u.firma_id"
-        " WHERE u.rz LIKE ? OR u.vin LIKE ? OR u.orv LIKE ?"
-        "    OR u.poznamka LIKE ? OR f.zkratka LIKE ?"
-        " ORDER BY u.datum DESC, u.id DESC LIMIT ?",
-        (like, like, like, like, like, limit),
-    ).fetchall()
+        " ORDER BY u.datum DESC, u.id DESC"
+    ):
+        hay = _fold(" ".join(
+            v for v in (r["rz"], r["vin"], r["orv"], r["poznamka"], r["firma_zkratka"]) if v
+        ))
+        if term in hay:
+            rows.append(r)
+            if len(rows) >= limit:
+                break
+    return rows

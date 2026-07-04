@@ -203,6 +203,19 @@ def test_edit_save_rejects_offsite_back_redirect(client_fid):
     assert r.headers["Location"].endswith("/")
 
 
+def test_edit_form_sanitizes_back_in_rendered_links(client_fid):
+    """The GET-rendered form must not emit a crafted ?back= into the Zpět link or
+    the hidden field (e.g. a javascript: URL) — same rule as the POST redirect."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    for evil in ("javascript:alert(1)", "https://evil.example", "//evil.example"):
+        body = c.get(f"/ukony/{uid}/upravit?back={evil}").get_data(as_text=True)
+        assert "evil" not in body and "javascript:alert" not in body
+    # a same-site relative back still flows through to the link and hidden field
+    body = c.get(f"/ukony/{uid}/upravit?back=/ukony/vse").get_data(as_text=True)
+    assert 'value="/ukony/vse"' in body
+
+
 def test_edit_form_modal_returns_fragment(client_fid):
     """?modal=1 returns just the form fragment for the dashboard overlay — the
     form fields without the full-page layout."""

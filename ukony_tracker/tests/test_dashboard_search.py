@@ -47,6 +47,29 @@ def test_search_is_case_insensitive_and_matches_firm(client):
     assert len(by_pozn) == 1 and "DHS" in by_pozn[0]["poznamka"]
 
 
+def test_search_ignores_diacritics(client):
+    """SQLite LIKE only case-folds ASCII — the Python fold must let 'martinu'
+    find 'MARTINŮ' (and diacritics in the query itself must not matter)."""
+    c, cardion, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        ukony_repo.create(conn, firma_id=cardion, datum="2026-06-27", typ_kod="NOVÉ",
+                          celkem=1300, rz="3AB0406", poznamka="LUKÁŠ MARTINŮ")
+        plain = ukony_repo.search(conn, "martinu")
+        accented = ukony_repo.search(conn, "MARTINŮ")
+    assert len(plain) == 1 and plain[0]["rz"] == "3AB0406"
+    assert len(accented) == 1 and accented[0]["rz"] == "3AB0406"
+
+
+def test_list_limit_returns_newest_first(client):
+    """ukony_repo.list(limit=N) caps the result (dashboard recent-12 path)."""
+    c, _, _ = client
+    with c.application.app_context():
+        rows = ukony_repo.list(db.get_db(), limit=1)
+    assert len(rows) == 1
+    assert rows[0]["datum"] == "2026-06-28"          # the newer of the two seeded
+
+
 def test_search_blank_returns_empty(client):
     c, _, _ = client
     with c.application.app_context():

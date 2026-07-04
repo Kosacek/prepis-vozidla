@@ -152,9 +152,14 @@
       ctrl = new AbortController();
       var id = ++seq;  // ignore a slow response that lands after a newer query
       fetch("/ukony/hledat?q=" + encodeURIComponent(q), { signal: ctrl.signal })
-        .then(function (r) { return r.text(); })
+        .then(function (r) {
+          // Non-OK (expired session, server error) would inject an error page
+          // into the list — keep the current rows instead.
+          if (!r.ok) throw new Error("search " + r.status);
+          return r.text();
+        })
         .then(function (html) { if (id === seq) list.innerHTML = html; })
-        .catch(function () { /* aborted or offline — ignore */ });
+        .catch(function () { /* aborted, offline or non-OK — keep current rows */ });
     }
     search.addEventListener("input", function () {
       clearTimeout(timer);
@@ -175,7 +180,12 @@
 
     function openModal(url) {
       fetch(url, { headers: { "X-Requested-With": "fetch" } })
-        .then(function (r) { return r.text(); })
+        .then(function (r) {
+          // Non-OK (e.g. the úkon was deleted meanwhile) → fall back to plain
+          // navigation via .catch instead of rendering an error page in the modal.
+          if (!r.ok) throw new Error("modal " + r.status);
+          return r.text();
+        })
         .then(function (html) {
           modalBody.innerHTML = html;
           lastFocused = document.activeElement;
@@ -187,7 +197,9 @@
           if (sbw > 0) document.body.style.paddingRight = sbw + "px";
           requestAnimationFrame(function () {
             modal.classList.add("is-open");
-            var first = modalBody.querySelector("input, select, button");
+            // Skip the hidden `back` input — focusing it silently does nothing,
+            // so the intended "cursor in first field" never happened.
+            var first = modalBody.querySelector("input:not([type=hidden]), select, button");
             if (first) first.focus();
           });
         })

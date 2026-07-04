@@ -22,9 +22,12 @@ def build_orv(serie: str | None, cislo: str | None) -> str | None:
     return f"{s}{c}".upper() if (s and c) else None
 
 
-def _context_note(payload: dict) -> str | None:
-    # Prefer the provozovatel (operator) name on each side: when the owner is a
-    # leasing company, the operator is the real client we want named in the note.
+def context_note(payload: dict) -> str | None:
+    """Default poznámka naming the parties. Public: the Příchozí inbox uses the
+    same rule to prefill its editable note field.
+
+    Prefers the provozovatel (operator) name on each side: when the owner is a
+    leasing company, the operator is the real client we want named in the note."""
     novy = (payload.get("novy_prov_jmeno") or payload.get("novy_jmeno") or "").strip()
     puvodni = (payload.get("puvodni_prov_jmeno") or payload.get("puvodni_jmeno") or "").strip()
     if novy and puvodni:
@@ -97,7 +100,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 typ_kod=typ,
                 celkem=pricing_service.effective_price(conn, m["firma_id"], typ) or 0.0,
                 rz=rz, vin=vin, orv=orv,
-                poznamka=_context_note(payload),
+                poznamka=context_note(payload),
                 zdroj="zadosti",
                 zpracoval=payload.get("profil"),  # who filled it out in zadosti
             )

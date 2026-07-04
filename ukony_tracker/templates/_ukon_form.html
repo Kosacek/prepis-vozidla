@@ -3,7 +3,8 @@
 {% import "_macros.html" as m with context %}
 <div class="card-title" id="ukon-modal-title">Úkon #{{ u.id }}</div>
 <form method="post" action="/ukony/{{ u.id }}/upravit">
-  <input type="hidden" name="back" value="{{ request.args.get('back', '') }}">
+  {# `back` is pre-sanitized by the route (_safe_back) — same-site paths only. #}
+  <input type="hidden" name="back" value="{{ back }}">
 
   <div class="form-row">
     <div class="field">
@@ -64,6 +65,6 @@
 
   <div style="display:flex; gap: var(--sp-3); align-items:center; margin-top: var(--sp-2);">
     <button type="submit" class="btn btn-primary">Uložit</button>
-    <a href="{{ request.args.get('back') or '/ukony/vse' }}" class="btn" data-modal-close>Zpět</a>
+    <a href="{{ back or '/ukony/vse' }}" class="btn" data-modal-close>Zpět</a>
   </div>
 </form>

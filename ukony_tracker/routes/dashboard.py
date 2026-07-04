@@ -1,4 +1,3 @@
-import json
 from datetime import date
 
 from flask import Blueprint, render_template, request
@@ -43,7 +42,6 @@ def index():
         "dashboard.html",
         year=year,
         firma_colors=firma_colors,
-        firma_colors_json=json.dumps(firma_colors),
         roky=roky,
         aktualni_rok=today.year,
         mesic_nazev=MESICE[today.month - 1],
@@ -53,14 +51,10 @@ def index():
         rok=st.rocni_souhrn(conn, today.year),
         nezaplaceno=st.nezaplaceno_celkem(conn),
         per_firma=st.podle_firmy(conn, year),
-        recent=list(ukony_repo.list(conn))[:12],
-        denni_json=json.dumps(
-            [{"d": t["d"], "trzby": t["trzby"], "pocet": t["pocet"]} for t in denni]
-        ),
-        denni_firmy_json=json.dumps(
-            [{"zkratka": r["zkratka"], "pocty": r["pocty"]} for r in denni_firmy]
-        ),
-        per_typ_json=json.dumps(
-            [{"kod": t["typ_kod"], "pocet": t["pocet"], "trzby": t["trzby"]} for t in per_typ]
-        ),
+        recent=ukony_repo.list(conn, limit=12),
+        # Plain structures — the template serializes them with |tojson, which
+        # (unlike json.dumps + |safe) escapes </script> and friends.
+        denni_chart=[{"d": t["d"], "trzby": t["trzby"], "pocet": t["pocet"]} for t in denni],
+        denni_firmy_chart=[{"zkratka": r["zkratka"], "pocty": r["pocty"]} for r in denni_firmy],
+        per_typ_chart=[{"kod": t["typ_kod"], "pocet": t["pocet"], "trzby": t["trzby"]} for t in per_typ],
     )
