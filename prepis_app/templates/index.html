@@ -105,6 +105,15 @@
     font-size: 14px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
   }
   input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
+  /* Fixed-length fields (VIN…) go green once filled to their EXACT max length —
+     a "correct, nothing missing" cue. The .len-ok class is toggled by JS on the
+     exact character count (reliable for typed AND scan-filled values, unlike the
+     minlength :valid trick). Beats :focus so green shows even while focused. */
+  input.len-check.len-ok {
+    border-color: #10b981;
+    background: #f0fdf4;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, .18);
+  }
   /* Úřední formuláře se vyplňují VELKÝMI písmeny — text v polích zobrazujeme
      velkými hned při psaní (hodnotu zvelkáčťuje i JS, viz forceUppercase).
      Opt-out třídou .no-uc (vyhledávací pole). Placeholdery necháme čitelné. */
@@ -586,7 +595,7 @@
           </div>
           <div class="field">
             <label>VIN</label>
-            <input type="text" id="vin" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+            <input type="text" id="vin" class="len-check" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
           </div>
           <div class="field">
             <label>Druh vozidla</label>
@@ -651,7 +660,7 @@
         <div class="form-grid" style="margin-top:14px;">
           <div class="field full">
             <label>VIN</label>
-            <input type="text" id="vin_z" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
+            <input type="text" id="vin_z" class="len-check" placeholder="WBA3A5C51DF123456" maxlength="17" style="font-family:monospace;letter-spacing:.06em;">
           </div>
           <div class="field">
             <label>Druh vozidla</label>
@@ -790,6 +799,19 @@
     if (isUcTarget(ev.target)) forceUppercase(ev.target);
   }, true);
 })();
+
+// ── "Filled to full length" green cue (VIN…) ────────────────────────────────
+// A .len-check field turns green the moment its value hits its exact maxlength,
+// so you can see the VIN is complete and you didn't drop a character.
+function refreshLenCheck(el) {
+  if (!el || !el.classList || !el.classList.contains('len-check')) return;
+  const max = parseInt(el.getAttribute('maxlength') || '0', 10);
+  el.classList.toggle('len-ok', max > 0 && el.value.length === max);
+}
+function refreshAllLenChecks() {
+  document.querySelectorAll('input.len-check').forEach(refreshLenCheck);
+}
+document.addEventListener('input', function (ev) { refreshLenCheck(ev.target); });
 
 let appMode = 'prevod';
 let flowIdx = 0;
@@ -1921,6 +1943,7 @@ async function applyOrvData(d) {
     }
     filled.push('druh');
   }
+  refreshAllLenChecks();   // a scan-filled VIN should light up green too
   return filled;
 }
 
@@ -2000,6 +2023,7 @@ async function scanDoc(input, target) {
 
     resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
     resultEl.textContent = filled.length ? '✓ Vyplneno: ' + filled.join(', ') : '⚠ Zadna data nenalezena';
+    refreshAllLenChecks();   // a scan-filled VIN should light up green too
   } catch(e) {
     resultEl.className = 'scan-result err';
     resultEl.textContent = '✗ Chyba: ' + e.message;
