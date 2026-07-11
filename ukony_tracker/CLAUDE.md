@@ -58,6 +58,16 @@ Druhá strana je `../prepis_app/tracker_push.py` (best-effort, nikdy neshodí
 generování PDF; neúspěšné pushe → `failed_pushes.jsonl`). Klíč musí sedět s
 `UKONY_API_KEY` na straně Přepisu.
 
+**Explicitní úkon z Přepisu (2026-07-11):** když v Přepisu na poslední straně
+(karta „Evidence úkonu") vybereš firmu + typ + cenu, pošlou se v payloadu jako
+`firma_id` / `typ_kod` / `celkem`. `prichozi_service.intake` je pak upřednostní
+před IČO-matchem a **vytvoří úkon rovnou** (jakýkoliv mód včetně `zmena`, jakákoliv
+firma) — pořád přes `pridat_ukon`, pořád deduplikace přes `zadost_id`, pořád
+audit řádek. Bez explicitní volby → původní auto-match. Přibyly typy **KOLA** a
+**A50-X** (technické změny; seedují se idempotentně v `init_schema`). Nový
+read-only `GET /api/evidence-meta` (firmy + typy + ceny, chráněný `X-Api-Key`)
+plní výběr na straně Přepisu.
+
 ## Klíčové soubory
 
 | Soubor | Účel |
