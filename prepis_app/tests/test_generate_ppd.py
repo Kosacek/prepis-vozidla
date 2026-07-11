@@ -35,6 +35,28 @@ def test_generate_includes_ppd(client, tmp_path, monkeypatch):
     assert os.path.exists(os.path.join(str(tmp_path), "ppd_evidence.xlsx"))
 
 
+def test_generate_pushes_to_evidence_by_default(client, tmp_path, monkeypatch):
+    """The 'Zapsat úkon do evidence' box defaults on, so a normal generate fires
+    the tracker push (with the žádost data)."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    import tracker_push
+    calls = []
+    monkeypatch.setattr(tracker_push, "push", lambda data, dd: calls.append(data))
+    r = client.post("/api/generate", json=_payload())     # no evidence_log → default true
+    assert r.get_json()["success"] is True
+    assert len(calls) == 1
+
+
+def test_generate_skips_evidence_when_unchecked(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    import tracker_push
+    calls = []
+    monkeypatch.setattr(tracker_push, "push", lambda data, dd: calls.append(data))
+    r = client.post("/api/generate", json=_payload(evidence_log=False))
+    assert r.get_json()["success"] is True
+    assert calls == []                                    # box off → no push
+
+
 def test_ppd_payer_is_uppercased(client, tmp_path, monkeypatch):
     """A hand-typed / autofilled payer is stored UPPERCASE on the receipt, like
     the rest of the form. The receipt ledger row reflects it."""

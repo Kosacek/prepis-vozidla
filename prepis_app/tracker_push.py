@@ -31,8 +31,10 @@ def build_payload(data: dict) -> dict:
     deliberately post-dated to tomorrow for the úřad. We send only what an úkon
     needs (vehicle ids, mode, party names + IČO); no rodné číslo, no addresses.
     """
-    return {
-        "zadost_id": uuid.uuid4().hex,
+    payload = {
+        # Stable per-žádost id from the browser (regenerate → same id → the
+        # tracker dedups on it, so no double úkon). Falls back to a fresh uuid.
+        "zadost_id": (data.get("zadost_id") or uuid.uuid4().hex),
         "datum": date.today().isoformat(),
         "mode": data.get("mode", "prevod"),
         "rz": data.get("registracni_znacka"),
@@ -58,6 +60,37 @@ def build_payload(data: dict) -> dict:
         # stores it as the úkon's `zpracoval` so we know who added each car.
         "profil": (data.get("profil") or "").strip() or None,
     }
+    # Explicit assignment chosen on the last page (Evidence úkonu card): the
+    # tracker then creates the úkon exactly as picked — right firm, type and
+    # price — with no inbox sorting. Absent → the tracker auto-matches by IČO.
+    try:
+        fid = int(data.get("evidence_firma_id") or 0)
+    except (TypeError, ValueError):
+        fid = 0
+    if fid:
+        payload["firma_id"] = fid
+        payload["typ_kod"] = (data.get("evidence_typ") or "").strip() or None
+        cena = data.get("evidence_cena")
+        if cena not in (None, ""):
+            payload["celkem"] = cena
+    return payload
+
+
+def fetch_meta() -> dict | None:
+    """GET the evidence firms/types/prices for the last-page picker. Returns the
+    parsed JSON ({firmy, typy, ceny}), or None on any failure — the picker then
+    simply isn't offered. Best-effort; never raises."""
+    headers = {"X-Api-Key": UKONY_API_KEY} if UKONY_API_KEY else {}
+    try:
+        r = requests.get(
+            f"{UKONY_API_URL}/api/evidence-meta", headers=headers, timeout=4
+        )
+        if r.status_code == 200:
+            return r.json()
+        _log.warning("evidence-meta HTTP %s", r.status_code)
+    except Exception as e:
+        _log.warning("evidence-meta fetch failed: %s", e)
+    return None
 
 
 def _record_failure(data_dir: str, payload: dict, reason) -> None:

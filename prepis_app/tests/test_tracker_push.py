@@ -84,6 +84,50 @@ def test_build_payload_gates_each_side_independently():
     assert p["novy_prov_jmeno"] is None
 
 
+def test_build_payload_explicit_evidence_assignment():
+    """Firm/type/price chosen on the last page ride along so the tracker creates
+    the úkon directly; the browser's stable zadost_id is reused (dedup)."""
+    p = tracker_push.build_payload({
+        "mode": "zmena", "zadost_id": "stable-123",
+        "evidence_firma_id": "5", "evidence_typ": "KOLA", "evidence_cena": "450",
+    })
+    assert p["zadost_id"] == "stable-123"     # reused, not a fresh uuid
+    assert p["firma_id"] == 5                  # coerced to int
+    assert p["typ_kod"] == "KOLA"
+    assert p["celkem"] == "450"                # passed through (tracker coerces)
+
+
+def test_build_payload_no_explicit_assignment():
+    p = tracker_push.build_payload({"mode": "prevod", "novy_ico": "1"})
+    assert "firma_id" not in p                 # absent → tracker auto-matches by IČO
+    assert len(p["zadost_id"]) >= 16           # falls back to a fresh uuid
+
+
+def test_build_payload_ignores_blank_or_bad_firma():
+    assert "firma_id" not in tracker_push.build_payload({"mode": "prevod", "evidence_firma_id": ""})
+    assert "firma_id" not in tracker_push.build_payload({"mode": "prevod", "evidence_firma_id": "abc"})
+
+
+def test_fetch_meta_ok(monkeypatch):
+    class _R:
+        status_code = 200
+        def json(self):
+            return {"firmy": [{"id": 1, "nazev": "C"}], "typy": [], "ceny": {}}
+    cap = {}
+    monkeypatch.setattr(tracker_push, "UKONY_API_KEY", "k")
+    monkeypatch.setattr(tracker_push.requests, "get",
+                        lambda url, headers=None, timeout=None: (cap.update(url=url, headers=headers) or _R()))
+    m = tracker_push.fetch_meta()
+    assert m["firmy"][0]["id"] == 1
+    assert cap["url"].endswith("/api/evidence-meta")
+    assert cap["headers"]["X-Api-Key"] == "k"
+
+
+def test_fetch_meta_none_on_failure(monkeypatch):
+    monkeypatch.setattr(tracker_push, "UKONY_API_URL", "http://127.0.0.1:1")
+    assert tracker_push.fetch_meta() is None    # never raises
+
+
 def test_push_records_failure_when_unreachable(tmp_path, monkeypatch):
     monkeypatch.setattr(tracker_push, "UKONY_API_URL", "http://127.0.0.1:1")
     monkeypatch.setattr(tracker_push, "TIMEOUT", 0.2)

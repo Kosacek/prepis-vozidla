@@ -736,6 +736,28 @@
       </div>
       <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vystaví jen když zadáš částku (např. 1300). Při 0 se nevystaví.</p>
     </div>
+    <div class="card" id="evidence-card">
+      <div class="card-title">Evidence úkonu <span style="font-weight:400;color:var(--muted);font-size:13px">(evidence.spznaklic.cz)</span></div>
+      <label class="prov-toggle-row" for="evidence_log" style="margin-bottom:14px">
+        <input type="checkbox" id="evidence_log" checked onchange="toggleEvidence()">
+        <span class="prov-toggle-label">Zapsat úkon do evidence</span>
+      </label>
+      <div id="evidence-fields" class="form-grid">
+        <div class="field">
+          <label>Firma</label>
+          <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
+        </div>
+        <div class="field">
+          <label>Typ úkonu</label>
+          <select id="evidence_typ" onchange="evidencePriceUpdate()"><option value="">—</option></select>
+        </div>
+        <div class="field">
+          <label>Cena (Kč)</label>
+          <input type="number" id="evidence_cena" class="no-uc" min="0" step="50" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+      <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
+    </div>
     <div class="card output-card" id="output-card" style="display:none;">
       <div class="check">✅</div>
       <h2>Hotovo!</h2>
@@ -816,6 +838,11 @@ document.addEventListener('input', function (ev) { refreshLenCheck(ev.target); }
 let appMode = 'prevod';
 let flowIdx = 0;
 let generatedUrls = {};
+// Stable id for THIS žádost — sent to the evidence tracker so regenerating the
+// same form doesn't create a duplicate úkon. A fresh page ("Nová žádost"
+// reloads) gets a new one.
+let _zadostId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('z' + Date.now() + Math.random().toString(16).slice(2));
+let _evidenceMeta = null;   // {firmy, typy, ceny} from evidence.spznaklic.cz
 
 // panel id → which HTML panel to show
 // prevod: Typ(1) → Vozidlo(4) → Puvodni(2) → Novy(3) → Generovat(5)
@@ -1528,6 +1555,82 @@ function buildSummary() {
       adrEl.value = a ? (a + (p ? ', ' + p : '')) : p;
     }
   }
+
+  prepareEvidence();   // populate the evidence úkon card (firm/type/price)
+}
+
+// ── Evidence úkonu (evidence.spznaklic.cz) ─────────────────────────────────────
+const _MODE_TO_TYP = { prevod: 'PŘEVOD', zapis: 'NOVÉ', zmena: '' };
+const _digits = s => String(s || '').replace(/\D/g, '');
+
+async function loadEvidenceMeta() {
+  if (_evidenceMeta) return _evidenceMeta;
+  try {
+    const r = await fetch('/api/evidence-meta');
+    const m = await r.json();
+    if (m && Array.isArray(m.firmy) && m.firmy.length) _evidenceMeta = m;
+  } catch { /* offline → picker stays empty */ }
+  return _evidenceMeta;
+}
+
+async function prepareEvidence() {
+  const card = document.getElementById('evidence-card');
+  const status = document.getElementById('evidence-status');
+  const meta = await loadEvidenceMeta();
+  const firmaSel = document.getElementById('evidence_firma');
+  const typSel   = document.getElementById('evidence_typ');
+  if (!meta) {
+    // Evidence unreachable — hide the card so nothing looks broken.
+    if (card) card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  // Populate firms (once).
+  if (firmaSel.options.length <= 1) {
+    meta.firmy.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.id; o.textContent = f.nazev + (f.ico ? ` (${f.ico})` : '');
+      firmaSel.appendChild(o);
+    });
+    meta.typy.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.kod; o.textContent = t.kod;
+      typSel.appendChild(o);
+    });
+  }
+  // Pre-select the firm by the buyer's IČO (nový provozovatel, else nový vlastník).
+  if (!firmaSel.value) {
+    const ico = _digits(cb('novy_prov_jiny') ? (v('novy_prov_ico') || v('novy_ico')) : v('novy_ico'));
+    const match = ico && meta.firmy.find(f => _digits(f.ico) === ico);
+    if (match) firmaSel.value = String(match.id);
+  }
+  // Default the type from the mode (change mode: leave blank → user picks KOLA / A50-X…).
+  if (!typSel.value) typSel.value = _MODE_TO_TYP[appMode] || '';
+  evidencePriceUpdate();
+  // Who will be recorded as zpracoval — the profil chip (👤) in the header.
+  const who = window.getProfil ? window.getProfil() : '';
+  status.textContent = who ? ('Zapíše: ' + who) : 'Vyber nahoře 👤 kdo úkon zapisuje.';
+}
+
+function evidencePriceUpdate() {
+  if (!_evidenceMeta) return;
+  const fid = v('evidence_firma');
+  const typ = v('evidence_typ');
+  const cena = document.getElementById('evidence_cena');
+  const price = fid && typ && _evidenceMeta.ceny[fid] ? _evidenceMeta.ceny[fid][typ] : null;
+  // Only auto-fill when we have a known price and the user hasn't typed one.
+  if (price != null && (!cena.value || cena.dataset.auto === '1')) {
+    cena.value = price; cena.dataset.auto = '1';
+  }
+  cena.oninput = () => { cena.dataset.auto = ''; };
+}
+
+function toggleEvidence() {
+  const on = cb('evidence_log');
+  document.getElementById('evidence-fields').style.opacity = on ? '1' : '.45';
+  ['evidence_firma', 'evidence_typ', 'evidence_cena'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = !on;
+  });
 }
 
 // ── Generate PDFs ─────────────────────────────────────────────────────────────
@@ -1587,6 +1690,12 @@ async function generatePDFs() {
     ppd_prijato_ico:     v('ppd_prijato_ico'),
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
     profil:              (window.getProfil ? window.getProfil() : ''),
+    // Evidence úkonu (evidence.spznaklic.cz) — stable id + the explicit choice.
+    zadost_id:           _zadostId,
+    evidence_log:        cb('evidence_log'),
+    evidence_firma_id:   v('evidence_firma'),
+    evidence_typ:        v('evidence_typ'),
+    evidence_cena:       v('evidence_cena'),
   };
 
   document.getElementById('nav-next').disabled = true;

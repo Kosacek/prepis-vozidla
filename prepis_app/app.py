@@ -37,7 +37,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.21"
+__version__ = "1.3.22"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1196,13 +1196,15 @@ def api_generate():
         result["plne_moce"] = plne_moce
 
     # ── Push the finished žádost to the Úkony Tracker (best-effort) ──────────
-    # Must never break PDF generation; tracker_push swallows its own errors and
-    # logs unreachable pushes to failed_pushes.jsonl for replay.
-    try:
-        import tracker_push
-        tracker_push.push(data, DATA_DIR)
-    except Exception as e:
-        _log.warning("tracker push skipped: %s", e)
+    # Only when the "Zapsat úkon do evidence" box was left on (default). The
+    # profil (who's at the keyboard) and the explicit firm/type/price chosen on
+    # the last page ride along in `data`. Never breaks PDF generation.
+    if data.get("evidence_log", True):
+        try:
+            import tracker_push
+            tracker_push.push(data, DATA_DIR)
+        except Exception as e:
+            _log.warning("tracker push skipped: %s", e)
 
     return jsonify(result)
 
@@ -1406,6 +1408,16 @@ def api_version():
         "BASE_DIR": BASE_DIR,
         "cwd": os.getcwd(),
     })
+
+
+@app.route("/api/evidence-meta")
+def api_evidence_meta():
+    """Proxy the Úkony Tracker's firm/type/price list to the browser (the browser
+    never sees the API key — this server call carries it). Empty structure on any
+    failure so the last-page picker degrades gracefully to 'don't log'."""
+    import tracker_push
+    meta = tracker_push.fetch_meta()
+    return jsonify(meta or {"firmy": [], "typy": [], "ceny": {}, "ok": False})
 
 @app.route("/api/debug-version")
 def api_debug_version():
