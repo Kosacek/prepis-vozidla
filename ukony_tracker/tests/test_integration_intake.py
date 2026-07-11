@@ -258,6 +258,17 @@ def test_intake_explicit_price_defaults_to_effective(conn):
     assert ukony_repo.get(conn, res["ukon_id"])["celkem"] == 1300
 
 
+def test_intake_explicit_note_overrides_derived(conn):
+    _c, a = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "note1", "mode": "zmena", "datum": "2026-06-14",
+        "firma_id": a, "typ_kod": "KOLA", "celkem": 300,
+        "novy_jmeno": "Kupující", "puvodni_jmeno": "Prodávající",  # would derive a note
+        "evidence_poznamka": "zimní sada", "poznamka": "zimní sada",
+    })
+    assert ukony_repo.get(conn, res["ukon_id"])["poznamka"] == "zimní sada"
+
+
 def test_intake_explicit_firm_overrides_ico_match(conn):
     c, a = _firms(conn)   # Cardion c (11111111), Albion a (22222222)
     # IČO would match Cardion, but the user explicitly picked Albion → Albion wins.

@@ -111,6 +111,8 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         celkem = pricing_service.effective_price(conn, firma_id, typ) or 0.0 if firma_id else 0.0
 
     if firma_id and typ:
+        # An explicit note typed on the last page wins over the derived one.
+        poznamka = (payload.get("poznamka") or "").strip() or context_note(payload)
         try:
             uid = ingest_service.pridat_ukon(
                 conn,
@@ -119,7 +121,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 typ_kod=typ,
                 celkem=celkem,
                 rz=rz, vin=vin, orv=orv,
-                poznamka=context_note(payload),
+                poznamka=poznamka,
                 zdroj="zadosti",
                 zpracoval=payload.get("profil"),  # who filled it out in zadosti
             )

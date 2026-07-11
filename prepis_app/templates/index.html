@@ -97,6 +97,22 @@
 
   /* Form */
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  /* Generate step (panel 5): inputs on the left, Shrnutí as a right sidebar.
+     The container widens (.gen-wide, toggled by JS) to give both room. */
+  .container.gen-wide { max-width: 1120px; }
+  .gen-layout { display: flex; gap: 20px; align-items: flex-start; }
+  .gen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .gen-side { width: 340px; flex-shrink: 0; }
+  .gen-side .card { position: sticky; top: 20px; }
+  .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .ev-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .ev-toggle input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
+  .ev-toggle span { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
+  @media (max-width: 820px) {
+    .gen-layout { flex-direction: column; }
+    .gen-side { width: 100%; }
+    .gen-side .card { position: static; }
+  }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field.full { grid-column: 1 / -1; }
   label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -713,50 +729,62 @@
 
   <!-- ── Step 5: Summary + Generate ── -->
   <div class="step-panel" id="panel-5">
-    <div class="card" id="summary-card">
-      <div class="card-title">Shrnutí před generováním</div>
-      <div id="summary-content"></div>
-    </div>
-    <div class="card" id="ppd-card">
-      <div class="card-title">Doklad (PPD)</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Částka za vyřízení (Kč)</label>
-          <input type="number" id="ppd_castka" value="0" min="0" step="50" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label>Přijato od</label>
-          <div style="position:relative">
-            <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest()" style="width:100%">
-            <input type="hidden" id="ppd_prijato_ico">
-            <input type="hidden" id="ppd_prijato_adresa">
-            <div class="firm-dropdown" id="ppd-payer-firms"></div>
+    <div class="gen-layout">
+      <div class="gen-main">
+        <div class="card" id="ppd-card">
+          <div class="card-title">Doklad (PPD)</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Částka za vyřízení (Kč)</label>
+              <input type="number" id="ppd_castka" value="0" min="0" step="50" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label>Přijato od</label>
+              <div style="position:relative">
+                <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest()" style="width:100%">
+                <input type="hidden" id="ppd_prijato_ico">
+                <input type="hidden" id="ppd_prijato_adresa">
+                <div class="firm-dropdown" id="ppd-payer-firms"></div>
+              </div>
+            </div>
           </div>
+          <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vystaví jen když zadáš částku (např. 1300). Při 0 se nevystaví.</p>
+        </div>
+        <div class="card" id="evidence-card">
+          <div class="evidence-head">
+            <div class="card-title" style="margin:0">Evidence úkonu <span style="font-weight:400;color:var(--muted);font-size:13px">(evidence.spznaklic.cz)</span></div>
+            <label class="ev-toggle" for="evidence_log">
+              <input type="checkbox" id="evidence_log" checked onchange="toggleEvidence()">
+              <span>ZAPSAT ÚKON DO EVIDENCE</span>
+            </label>
+          </div>
+          <div id="evidence-fields" class="form-grid">
+            <div class="field">
+              <label>Firma</label>
+              <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
+            </div>
+            <div class="field">
+              <label>Typ úkonu</label>
+              <select id="evidence_typ" onchange="evidencePriceUpdate()"><option value="">—</option></select>
+            </div>
+            <div class="field">
+              <label>Cena (Kč)</label>
+              <input type="number" id="evidence_cena" class="no-uc" min="0" step="50" inputmode="numeric" placeholder="0">
+            </div>
+            <div class="field">
+              <label>Poznámky</label>
+              <input type="text" id="evidence_poznamka" maxlength="120" placeholder="volitelná poznámka k úkonu">
+            </div>
+          </div>
+          <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
         </div>
       </div>
-      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vystaví jen když zadáš částku (např. 1300). Při 0 se nevystaví.</p>
-    </div>
-    <div class="card" id="evidence-card">
-      <div class="card-title">Evidence úkonu <span style="font-weight:400;color:var(--muted);font-size:13px">(evidence.spznaklic.cz)</span></div>
-      <label class="prov-toggle-row" for="evidence_log" style="margin-bottom:14px">
-        <input type="checkbox" id="evidence_log" checked onchange="toggleEvidence()">
-        <span class="prov-toggle-label">Zapsat úkon do evidence</span>
-      </label>
-      <div id="evidence-fields" class="form-grid">
-        <div class="field">
-          <label>Firma</label>
-          <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
-        </div>
-        <div class="field">
-          <label>Typ úkonu</label>
-          <select id="evidence_typ" onchange="evidencePriceUpdate()"><option value="">—</option></select>
-        </div>
-        <div class="field">
-          <label>Cena (Kč)</label>
-          <input type="number" id="evidence_cena" class="no-uc" min="0" step="50" inputmode="numeric" placeholder="0">
+      <div class="gen-side">
+        <div class="card" id="summary-card">
+          <div class="card-title">Shrnutí před generováním</div>
+          <div id="summary-content"></div>
         </div>
       </div>
-      <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
     </div>
     <div class="card output-card" id="output-card" style="display:none;">
       <div class="check">✅</div>
@@ -938,6 +966,9 @@ function activatePanel(n) {
   if (n !== 1 && cameraStream) closeCamera();
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
+  // The generate step uses a wider two-column layout (inputs + Shrnutí sidebar).
+  const container = document.querySelector('.container');
+  if (container) container.classList.toggle('gen-wide', n === 5);
   if (n === 1) {
     // Try to auto-open camera as soon as Step 1 is active. Browsers may block
     // without a user gesture; tryAutoOpenCamera handles that gracefully (silent
@@ -1696,6 +1727,7 @@ async function generatePDFs() {
     evidence_firma_id:   v('evidence_firma'),
     evidence_typ:        v('evidence_typ'),
     evidence_cena:       v('evidence_cena'),
+    evidence_poznamka:   v('evidence_poznamka'),
   };
 
   document.getElementById('nav-next').disabled = true;

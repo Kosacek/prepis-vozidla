@@ -97,6 +97,15 @@ def test_build_payload_explicit_evidence_assignment():
     assert p["celkem"] == "450"                # passed through (tracker coerces)
 
 
+def test_build_payload_forwards_note():
+    p = tracker_push.build_payload({
+        "mode": "zmena", "evidence_firma_id": "3", "evidence_typ": "KOLA",
+        "evidence_poznamka": "  zimní sada  ",
+    })
+    assert p["poznamka"] == "zimní sada"                        # trimmed
+    assert "poznamka" not in tracker_push.build_payload({"mode": "prevod"})
+
+
 def test_build_payload_no_explicit_assignment():
     p = tracker_push.build_payload({"mode": "prevod", "novy_ico": "1"})
     assert "firma_id" not in p                 # absent → tracker auto-matches by IČO

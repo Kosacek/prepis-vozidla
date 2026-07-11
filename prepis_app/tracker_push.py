@@ -73,6 +73,10 @@ def build_payload(data: dict) -> dict:
         cena = data.get("evidence_cena")
         if cena not in (None, ""):
             payload["celkem"] = cena
+    # Optional úkon note typed on the last page (overrides the derived one).
+    poznamka = (data.get("evidence_poznamka") or "").strip()
+    if poznamka:
+        payload["poznamka"] = poznamka
     return payload
 
 
