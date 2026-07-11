@@ -74,6 +74,22 @@ def test_prichozi_duplicate_zadost_id(client):
     assert r2.status_code == 200 and r2.get_json()["status"] == "duplicate"
 
 
+# ── /api/evidence-meta (firms/types/prices for zadosti's picker) ──────────────
+
+def test_evidence_meta(client):
+    with client.application.app_context():
+        from repositories import typy_repo
+        typy_repo.upsert(db.get_db(), "PŘEVOD", 1300, 1)
+    r = client.get("/api/evidence-meta")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "04156854" in {f["ico"] for f in body["firmy"]}       # seeded Cardion
+    kods = {t["kod"] for t in body["typy"]}
+    assert "PŘEVOD" in kods and "KOLA" in kods                    # incl. new change type
+    fid = next(f["id"] for f in body["firmy"] if f["ico"] == "04156854")
+    assert body["ceny"][str(fid)]["PŘEVOD"] == 1300              # firm's effective price
+
+
 # ── API key auth ──────────────────────────────────────────────────────────────
 
 def test_api_open_when_no_key_configured(client):

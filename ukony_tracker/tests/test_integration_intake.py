@@ -223,6 +223,54 @@ def test_intake_auto_price_zero_when_type_missing(conn):
     assert ukony_repo.get(conn, res["ukon_id"])["celkem"] == 0
 
 
+# ── explicit firm/type/price chosen in zadosti (bypasses IČO auto-match) ──────
+
+def test_new_change_types_seeded_on_init(conn):
+    kods = {t["kod"] for t in typy_repo.list_active(conn)}
+    assert "KOLA" in kods and "A50-X" in kods
+
+
+def test_intake_explicit_firm_type_price_creates_directly(conn):
+    # 'zmena' with no matching IČO would normally queue; an explicit choice
+    # creates the úkon straight away with exactly the picked firm/type/price.
+    _c, a = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "exp1", "mode": "zmena", "datum": "2026-06-14",
+        "rz": "1ab2345", "vin": "tmbvin1234567890",
+        "firma_id": a, "typ_kod": "KOLA", "celkem": 450, "profil": "Petr",
+    })
+    assert res["status"] == "auto"
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["firma_id"] == a
+    assert u["typ_kod"] == "KOLA"
+    assert u["celkem"] == 450
+    assert u["zpracoval"] == "Petr"
+    assert u["zdroj"] == "zadosti"
+
+
+def test_intake_explicit_price_defaults_to_effective(conn):
+    c, _ = _firms(conn)   # PŘEVOD default 1300
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "exp2", "mode": "zmena", "datum": "2026-06-14",
+        "firma_id": c, "typ_kod": "PŘEVOD",   # celkem omitted → effective price
+    })
+    assert res["status"] == "auto"
+    assert ukony_repo.get(conn, res["ukon_id"])["celkem"] == 1300
+
+
+def test_intake_explicit_firm_overrides_ico_match(conn):
+    c, a = _firms(conn)   # Cardion c (11111111), Albion a (22222222)
+    # IČO would match Cardion, but the user explicitly picked Albion → Albion wins.
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "exp3", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111",
+        "firma_id": a, "typ_kod": "NOVÉ", "celkem": 1500,
+    })
+    assert res["status"] == "auto"
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["firma_id"] == a and u["typ_kod"] == "NOVÉ" and u["celkem"] == 1500
+
+
 def test_intake_orv_only_when_both_parts(conn):
     assert prichozi_service.build_orv("ABC", "123456") == "ABC123456"
     assert prichozi_service.build_orv("ABC", "") is None

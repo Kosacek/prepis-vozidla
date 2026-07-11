@@ -57,6 +57,13 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
     )
     datum = payload.get("datum") or date.today().isoformat()
 
+    # Explicit assignment from zadosti's "Evidence úkonu" card: the user picked
+    # the firm + type (+ price) up front, so we create the úkon exactly as chosen
+    # — for ANY mode (incl. 'zmena') and any firm, no inbox sorting needed. When
+    # absent we fall back to the original IČO auto-match below.
+    explicit_firma_id = payload.get("firma_id")
+    explicit_typ = (payload.get("typ_kod") or "").strip() or None
+
     # Prefer the provozovatel (operator) over the vlastník (owner): when a car's
     # owner is a leasing company, the operator is the client we actually track.
     m = matching_service.match_tiered(conn, [
@@ -64,7 +71,8 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         [payload.get("novy_ico"), payload.get("puvodni_ico")],            # owners fallback
     ])
     # Suggest the matched firm; if ambiguous, suggest the first match as a hint.
-    suggested = m["firma_id"] or (m["matched"][0]["id"] if m["matched"] else None)
+    # An explicit choice wins for the audit row's suggestion too.
+    suggested = explicit_firma_id or m["firma_id"] or (m["matched"][0]["id"] if m["matched"] else None)
 
     # Claim the row (UNIQUE on zadost_id wins the race against a concurrent retry).
     try:
@@ -90,15 +98,26 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         seen = prichozi_repo.get_by_zadost_id(conn, zadost_id)
         return {"status": "duplicate", "prichozi_id": seen["id"] if seen else None}
 
-    typ = MODE_TO_TYP.get(mode)
-    if typ and m["firma_id"]:
+    # Decide the firm + type + price to create. Explicit choice first; else the
+    # original auto-path (mode maps to a type AND exactly one active firm matched).
+    if explicit_firma_id and explicit_typ:
+        firma_id, typ = explicit_firma_id, explicit_typ
+        celkem = payload.get("celkem")
+        if celkem is None:
+            celkem = pricing_service.effective_price(conn, firma_id, typ) or 0.0
+    else:
+        typ = MODE_TO_TYP.get(mode)
+        firma_id = m["firma_id"] if typ else None
+        celkem = pricing_service.effective_price(conn, firma_id, typ) or 0.0 if firma_id else 0.0
+
+    if firma_id and typ:
         try:
             uid = ingest_service.pridat_ukon(
                 conn,
-                firma_id=m["firma_id"],
+                firma_id=firma_id,
                 datum=datum,
                 typ_kod=typ,
-                celkem=pricing_service.effective_price(conn, m["firma_id"], typ) or 0.0,
+                celkem=celkem,
                 rz=rz, vin=vin, orv=orv,
                 poznamka=context_note(payload),
                 zdroj="zadosti",

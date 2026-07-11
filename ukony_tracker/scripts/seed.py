@@ -20,6 +20,9 @@ DEFAULT_TYPY = [
     ("VÝVOZ", 1000),
     ("ORV", 1000),
     ("3RZ", 1200),
+    # Technical-data changes (žádost mode 'zmena'); price set per úkon.
+    ("KOLA", None),
+    ("A50-X", None),
 ]
 
 SHEET_ZKRATKA = {"Albion": "Albion", "Cardion": "Cardion", "Orbion": "Orbion"}

@@ -1,9 +1,32 @@
 from flask import Blueprint, request, jsonify
 import db
+from repositories import firmy_repo, typy_repo
 from services.ingest_service import pridat_ukon, UnknownFirmaError, ValidationError
-from services import prichozi_service
+from services import prichozi_service, pricing_service
 
 bp = Blueprint("api", __name__)
+
+
+@bp.get("/api/evidence-meta")
+def evidence_meta():
+    """Active firms + úkon types + each firm's effective price map, so the
+    zadosti app can let the user pick the firm/type/price up front. Read-only;
+    protected by the same X-Api-Key as the rest of /api/*."""
+    conn = db.get_db()
+    active = firmy_repo.list_all(conn, only_active=True)
+    return jsonify({
+        "firmy": [
+            {"id": f["id"], "nazev": f["nazev"], "ico": f["ico"] or "", "zkratka": f["zkratka"]}
+            for f in active
+        ],
+        "typy": [
+            {"kod": t["kod"], "vychozi_cena": t["vychozi_cena"]}
+            for t in typy_repo.list_active(conn)
+        ],
+        # {firma_id: {typ_kod: effective_price|null}} — lets the browser pre-fill
+        # the price for the chosen firm+type without another round-trip.
+        "ceny": {f["id"]: pricing_service.firm_price_map(conn, f["id"]) for f in active},
+    })
 
 
 @bp.post("/api/prichozi")

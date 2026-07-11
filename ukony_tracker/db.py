@@ -118,6 +118,15 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "prichozi", "puvodni_prov_ico", "puvodni_prov_ico TEXT")
     _ensure_column(conn, "prichozi", "novy_prov_jmeno", "novy_prov_jmeno TEXT")
     _ensure_column(conn, "prichozi", "novy_prov_ico", "novy_prov_ico TEXT")
+    # Úkon types for technical-data changes (žádost mode 'zmena'), added
+    # idempotently so a live DB gets them on boot without a re-seed. Price left
+    # NULL — set per úkon (or as a firm/type default later).
+    for kod, poradi in (("KOLA", 10), ("A50-X", 11)):
+        conn.execute(
+            "INSERT INTO typy_ukonu(kod, vychozi_cena, poradi, aktivni) VALUES(?, NULL, ?, 1)"
+            " ON CONFLICT(kod) DO NOTHING",
+            (kod, poradi),
+        )
     conn.commit()
 
 
