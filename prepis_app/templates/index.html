@@ -98,16 +98,30 @@
   /* Form */
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   /* Generate step (panel 5): inputs on the left, Shrnutí as a right sidebar.
-     The container widens (.gen-wide, toggled by JS) to give both room. */
-  .container.gen-wide { max-width: 1120px; }
-  .gen-layout { display: flex; gap: 20px; align-items: flex-start; }
-  .gen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
-  .gen-side { width: 340px; flex-shrink: 0; }
+     The container widens (.gen-wide, toggled by JS) and everything reads larger
+     — it's a spacious review-before-submit screen. Scoped to .gen-wide so steps
+     1–4 keep their compact size. */
+  .container.gen-wide { max-width: 1180px; }
+  .gen-layout { display: flex; gap: 24px; align-items: flex-start; }
+  .gen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+  .gen-side { width: 380px; flex-shrink: 0; }
   .gen-side .card { position: sticky; top: 20px; }
-  .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-  .ev-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-  .ev-toggle input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
-  .ev-toggle span { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
+  .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .ev-toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+  .ev-toggle input { width: 20px; height: 20px; accent-color: var(--primary); flex-shrink: 0; }
+  .ev-toggle span { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
+  /* Enlarge the content on this wide step. */
+  .container.gen-wide .card { padding: 28px 34px; border-radius: 16px; }
+  .container.gen-wide .card-title { font-size: 21px; margin-bottom: 20px; }
+  .container.gen-wide .field label { font-size: 13px; }
+  .container.gen-wide .field input[type=text],
+  .container.gen-wide .field input[type=number],
+  .container.gen-wide .field select { font-size: 16px; padding: 12px 15px; }
+  .container.gen-wide .form-grid { gap: 20px 26px; }
+  .container.gen-wide #ppd-card > p, .container.gen-wide #evidence-status { font-size: 13.5px; }
+  .container.gen-wide #summary-card .card-title { font-size: 19px; }
+  .container.gen-wide .summary-section { font-size: 12.5px; padding: 15px 0 5px; }
+  .container.gen-wide .summary-row { font-size: 15.5px; padding: 9px 0; }
   @media (max-width: 820px) {
     .gen-layout { flex-direction: column; }
     .gen-side { width: 100%; }
