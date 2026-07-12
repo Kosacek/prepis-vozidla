@@ -92,36 +92,27 @@
   .kb-key   { background:#f1f3f5; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; font-size:10px; font-family:monospace; color:#374151; }
 
   /* Cards */
-  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 28px; margin-bottom: 16px; box-shadow: var(--shadow); }
-  .card-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); padding: 28px 34px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .card-title { font-size: 21px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
 
   /* Form */
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 26px; }
   /* Generate step (panel 5): inputs on the left, Shrnutí as a right sidebar.
-     The container widens (.gen-wide, toggled by JS) and everything reads larger
-     — it's a spacious review-before-submit screen. Scoped to .gen-wide so steps
-     1–4 keep their compact size. */
+     The container widens (.gen-wide, toggled by JS) for the two-column layout.
+     The larger element sizes (cards, titles, inputs) are now the app-wide base,
+     so every step reads at this bigger, consistent size. */
   .container.gen-wide { max-width: 1180px; }
   .gen-layout { display: flex; gap: 24px; align-items: flex-start; }
   .gen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .gen-side { width: 380px; flex-shrink: 0; }
+  .gen-main .card, .gen-side .card { margin-bottom: 0; }   /* spacing via the flex gap */
   .gen-side .card { position: sticky; top: 20px; }
   .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   .ev-toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
   .ev-toggle input { width: 20px; height: 20px; accent-color: var(--primary); flex-shrink: 0; }
   .ev-toggle span { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
-  /* Enlarge the content on this wide step. */
-  .container.gen-wide .card { padding: 28px 34px; border-radius: 16px; }
-  .container.gen-wide .card-title { font-size: 21px; margin-bottom: 20px; }
-  .container.gen-wide .field label { font-size: 13px; }
-  .container.gen-wide .field input[type=text],
-  .container.gen-wide .field input[type=number],
-  .container.gen-wide .field select { font-size: 16px; padding: 12px 15px; }
-  .container.gen-wide .form-grid { gap: 20px 26px; }
-  .container.gen-wide #ppd-card > p, .container.gen-wide #evidence-status { font-size: 13.5px; }
-  .container.gen-wide #summary-card .card-title { font-size: 19px; }
-  .container.gen-wide .summary-section { font-size: 12.5px; padding: 15px 0 5px; }
-  .container.gen-wide .summary-row { font-size: 15.5px; padding: 9px 0; }
+  #ppd-card > p, #evidence-status { font-size: 13.5px; }
+  #summary-card .card-title { font-size: 19px; }
   @media (max-width: 820px) {
     .gen-layout { flex-direction: column; }
     .gen-side { width: 100%; }
@@ -129,10 +120,10 @@
   }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field.full { grid-column: 1 / -1; }
-  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  label { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   input[type=text], select {
-    border: 1.5px solid var(--border); border-radius: 7px; padding: 9px 12px;
-    font-size: 14px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
+    border: 1.5px solid var(--border); border-radius: 8px; padding: 12px 15px;
+    font-size: 16px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
   }
   input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
   /* Fixed-length fields (VIN…) go green once filled to their EXACT max length —
@@ -225,8 +216,8 @@
   .mode-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* Summary */
-  .summary-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--primary); padding: 12px 0 4px; }
-  .summary-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .summary-section { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--primary); padding: 15px 0 5px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 15.5px; }
   .summary-row:last-child { border: none; }
   .summary-key { color: var(--muted); font-weight: 500; }
   .summary-val { font-weight: 600; text-align: right; max-width: 55%; }
