@@ -121,10 +121,14 @@
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field.full { grid-column: 1 / -1; }
   label { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  input[type=text], select {
+  input[type=text], input[type=number], select {
     border: 1.5px solid var(--border); border-radius: 8px; padding: 12px 15px;
     font-size: 16px; color: var(--text); background: #fafbfc; transition: border-color .15s; width: 100%;
   }
+  /* Number fields (the Kč amounts) match the text fields — no default spinners. */
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
   /* Fixed-length fields (VIN…) go green once filled to their EXACT max length —
      a "correct, nothing missing" cue. The .len-ok class is toggled by JS on the
