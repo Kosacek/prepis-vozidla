@@ -7,6 +7,9 @@ build/
 *.egg-info/
 scans/
 firmy.xlsx
+# Runtime state — the tracker-push replay queue (žádost payload data)
+failed_pushes.jsonl
+*.xlsx
 
 # IDE / editor settings
 .claude/

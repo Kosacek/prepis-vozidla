@@ -58,18 +58,40 @@ def _ensure_font() -> str:
 
 
 # ── Amount in words ─────────────────────────────────────────────────────────
-def amount_to_words_cs(n: int) -> str:
-    """Czech words for a whole-crown amount, correctly declined.
+# num2words glues Czech hundreds into a single token ("pětset"); standard
+# spelling writes them as two words ("pět set"). Small substitution table.
+_HUNDREDS_FIX = {
+    "dvěstě": "dvě stě",   "třista": "tři sta",     "čtyřista": "čtyři sta",
+    "pětset": "pět set",   "šestset": "šest set",   "sedmset": "sedm set",
+    "osmset": "osm set",   "devětset": "devět set",
+}
+# On an official doklad the currency reads "korun českých" — append the
+# adjective in the case that agrees with num2words' koruna/koruny/korun ending.
+_CZK_ADJ = {"koruna": "česká", "koruny": "české", "korun": "českých"}
 
-    num2words currency mode treats the integer as the minor unit (haléře),
-    so we pass n*100 to get crown declension (koruna/koruny/korun), then drop
-    the ", nula haléřů" tail (amounts are always whole crowns here).
+
+def amount_to_words_cs(n: int) -> str:
+    """Czech words for a whole-crown amount, e.g. 1500 → "tisíc pět set korun
+    českých", correctly declined.
+
+    num2words currency mode treats the integer as the minor unit (haléře), so we
+    pass n*100 to get crown declension (koruna/koruny/korun), then drop the
+    ", nula haléřů" tail (amounts are always whole crowns here). num2words glues
+    the hundreds ("pětset") — we split them — and omits the "českých" adjective,
+    which we append in the matching case.
     """
     try:
         words = num2words(int(n) * 100, lang="cs", to="currency", currency="CZK")
     except Exception:
         return ""
-    return words.split(",", 1)[0].strip()
+    words = words.split(",", 1)[0].strip()
+    for glued, spaced in _HUNDREDS_FIX.items():
+        words = words.replace(glued, spaced)
+    parts = words.split()
+    if parts and parts[-1] in _CZK_ADJ:
+        parts.append(_CZK_ADJ[parts[-1]])
+        words = " ".join(parts)
+    return words
 
 
 # ── Number allocation + evidence ledger (one lock) ──────────────────────────

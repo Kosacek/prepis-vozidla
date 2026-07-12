@@ -19,6 +19,29 @@ def test_words_declension():
     assert "hal" not in ppd.amount_to_words_cs(1300)
 
 
+def test_words_hundreds_are_spaced():
+    """num2words glues Czech hundreds ("pětset"); we split them ("pět set")."""
+    assert ppd.amount_to_words_cs(500).startswith("pět set ")
+    assert ppd.amount_to_words_cs(800).startswith("osm set ")
+    assert ppd.amount_to_words_cs(200).startswith("dvě stě ")
+    assert ppd.amount_to_words_cs(350).startswith("tři sta ")
+    assert "pět set" in ppd.amount_to_words_cs(1500)     # tisíc pět set …
+    assert "dvě stě" in ppd.amount_to_words_cs(3200)     # tři tisíce dvě stě …
+    # the glued forms must never survive
+    for glued in ("pětset", "osmset", "dvěstě", "třista"):
+        assert glued not in ppd.amount_to_words_cs(1500)
+        assert glued not in ppd.amount_to_words_cs(3200)
+
+
+def test_words_czech_crown_adjective():
+    """Official doklad reads "…korun českých", declined to the crown form."""
+    assert ppd.amount_to_words_cs(1500).endswith("korun českých")
+    assert ppd.amount_to_words_cs(5).endswith("korun českých")
+    assert ppd.amount_to_words_cs(1).endswith("koruna česká")
+    assert ppd.amount_to_words_cs(22).endswith("koruny české")
+    assert ppd.amount_to_words_cs(1234).endswith("koruny české")
+
+
 # ── numbering + ledger ──────────────────────────────────────────────────────
 def test_numbering_increments_and_persists(tmp_path):
     d = str(tmp_path)
