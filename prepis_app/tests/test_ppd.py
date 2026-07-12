@@ -10,11 +10,7 @@ import ppd
 
 # ── amount in words ─────────────────────────────────────────────────────────
 def test_words_declension():
-    assert "korun" in ppd.amount_to_words_cs(1300)      # 5+/hundreds → korun
     assert "tisíc" in ppd.amount_to_words_cs(1300)
-    assert "koruna" in ppd.amount_to_words_cs(1)         # 1 → koruna
-    assert "koruny" in ppd.amount_to_words_cs(22)        # 2-4 → koruny
-    assert "korun" in ppd.amount_to_words_cs(5)          # 5 → korun
     # no heller tail leaks through
     assert "hal" not in ppd.amount_to_words_cs(1300)
 
@@ -33,13 +29,14 @@ def test_words_hundreds_are_spaced():
         assert glued not in ppd.amount_to_words_cs(3200)
 
 
-def test_words_czech_crown_adjective():
-    """Official doklad reads "…korun českých", declined to the crown form."""
-    assert ppd.amount_to_words_cs(1500).endswith("korun českých")
-    assert ppd.amount_to_words_cs(5).endswith("korun českých")
-    assert ppd.amount_to_words_cs(1).endswith("koruna česká")
-    assert ppd.amount_to_words_cs(22).endswith("koruny české")
-    assert ppd.amount_to_words_cs(1234).endswith("koruny české")
+def test_words_czech_crown_phrase():
+    """On a doklad the sum always ends in the fixed genitive "korun českých",
+    regardless of the final digit (never "koruny české" / "koruna česká")."""
+    for n in (1, 5, 22, 500, 1234, 1500, 25000):
+        w = ppd.amount_to_words_cs(n)
+        assert w.endswith("korun českých"), (n, w)
+        assert "koruny české" not in w
+        assert "koruna česká" not in w
 
 
 # ── numbering + ledger ──────────────────────────────────────────────────────

@@ -65,20 +65,21 @@ _HUNDREDS_FIX = {
     "pětset": "pět set",   "šestset": "šest set",   "sedmset": "sedm set",
     "osmset": "osm set",   "devětset": "devět set",
 }
-# On an official doklad the currency reads "korun českých" — append the
-# adjective in the case that agrees with num2words' koruna/koruny/korun ending.
-_CZK_ADJ = {"koruna": "česká", "koruny": "české", "korun": "českých"}
+# On a doklad the sum is always written in the genitive fixed phrase
+# "korun českých", regardless of the final digit — never "koruny české" /
+# "koruna česká". num2words' trailing koruna/koruny/korun is normalised to it.
+_CZK_TAIL = {"koruna", "koruny", "korun"}
 
 
 def amount_to_words_cs(n: int) -> str:
     """Czech words for a whole-crown amount, e.g. 1500 → "tisíc pět set korun
-    českých", correctly declined.
+    českých".
 
     num2words currency mode treats the integer as the minor unit (haléře), so we
-    pass n*100 to get crown declension (koruna/koruny/korun), then drop the
-    ", nula haléřů" tail (amounts are always whole crowns here). num2words glues
-    the hundreds ("pětset") — we split them — and omits the "českých" adjective,
-    which we append in the matching case.
+    pass n*100, then drop the ", nula haléřů" tail (amounts are always whole
+    crowns here). num2words glues the hundreds ("pětset") — we split them — and
+    declines the crown by the last digit; on a doklad the whole sum reads
+    "…korun českých", so we force that fixed genitive phrase.
     """
     try:
         words = num2words(int(n) * 100, lang="cs", to="currency", currency="CZK")
@@ -88,8 +89,8 @@ def amount_to_words_cs(n: int) -> str:
     for glued, spaced in _HUNDREDS_FIX.items():
         words = words.replace(glued, spaced)
     parts = words.split()
-    if parts and parts[-1] in _CZK_ADJ:
-        parts.append(_CZK_ADJ[parts[-1]])
+    if parts and parts[-1] in _CZK_TAIL:
+        parts[-1] = "korun českých"
         words = " ".join(parts)
     return words
 
