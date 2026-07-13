@@ -1743,6 +1743,7 @@ async function generatePDFs() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('summary-card').style.display = 'none';
   document.getElementById('ppd-card').style.display = 'none';
+  document.getElementById('evidence-card').style.display = 'none';   // hide too — else it stays stuck under the "Hotovo!" card
 
   try {
     const res    = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });

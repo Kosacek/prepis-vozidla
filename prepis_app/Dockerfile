@@ -29,7 +29,7 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 # Cache buster — bump on every source change shipped to the NAS. The QNAP
 # SMB share can keep a stale snapshot across builds; changing this value
 # forces all subsequent layers (the COPYs below) to rebuild.
-ARG CACHEBUST=2026-07-12-zadosti-ppd-korun-ceskych-genitiv
+ARG CACHEBUST=2026-07-13-zadosti-hide-evidence-card-on-generate
 
 # App code (read-only assets baked into the image; writable state lives on /data)
 COPY app.py ./app.py
