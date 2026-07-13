@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS ukony (
   vin TEXT,
   orv TEXT,
   poznamka TEXT,
+  prevod TEXT,
   stav_platby TEXT NOT NULL DEFAULT 'nezaplaceno',
   zaplaceno_kc REAL NOT NULL DEFAULT 0,
   zdroj TEXT NOT NULL DEFAULT 'rucni',
@@ -112,6 +113,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "ukony", "orv", "orv TEXT")
     # Who added the car (attribution — David/Roman/Petr). See config.PROFILY.
     _ensure_column(conn, "ukony", "zpracoval", "zpracoval TEXT")
+    # Auto "z koho → na koho" transfer line, kept SEPARATE from the user's
+    # poznámka so a typed note no longer erases the parties. See prichozi_service.
+    _ensure_column(conn, "ukony", "prevod", "prevod TEXT")
     # Provozovatel (operator) party — added so the Příchozí inbox can show the
     # real client instead of a leasing-company owner. See prichozi_service.
     _ensure_column(conn, "prichozi", "puvodni_prov_jmeno", "puvodni_prov_jmeno TEXT")

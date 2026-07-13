@@ -16,12 +16,6 @@ bp = Blueprint("prichozi", __name__)
 MODE_TYP = {"prevod": "PŘEVOD", "zapis": "NOVÉ", "zmena": ""}
 
 
-def _note(p) -> str | None:
-    """Default poznámka for an inbox row — one shared rule (operator name over
-    leasing-company owner) lives in prichozi_service.context_note."""
-    return prichozi_service.context_note(dict(p))
-
-
 @bp.get("/prichozi")
 def inbox():
     conn = db.get_db()
@@ -39,7 +33,10 @@ def inbox():
         except (ValueError, TypeError):
             d["znacka"] = ""
             d["profil"] = ""
-        d["note"] = _note(r) or ""  # default poznámka to prefill (editable)
+        # The note field is the operator's OWN note (empty by default); the
+        # "z koho → na koho" transfer is shown separately by the party rows and
+        # stored automatically on approve, so it never lands in poznámka.
+        d["note"] = ""
         items.append(d)
     firmy = firmy_repo.list_all(conn, only_active=True)
     # Per-firm price maps so the inbox price field follows the chosen firm+type.
@@ -80,6 +77,7 @@ def approve(pid):
             vin=p["vin"],
             orv=p["orv"],
             poznamka=(f.get("poznamka") or "").strip() or None,
+            prevod=prichozi_service.context_note(dict(p)),  # auto transfer line
             zdroj="zadosti",
             zpracoval=(f.get("zpracoval") or "").strip() or None,
         )

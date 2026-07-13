@@ -68,6 +68,7 @@
     <span class="u-main" data-datum="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.">
       <b class="u-rz">{{ u.rz or '—' }}</b>
       <span class="tag">{{ u.typ_kod }}</span>
+      {% if u.prevod %}<span class="muted u-pozn">{{ u.prevod }}</span>{% endif %}
       {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
       {{ m.person_badge(u.zpracoval) }}
     </span>

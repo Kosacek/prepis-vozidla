@@ -20,6 +20,7 @@ def create(
     vin: str | None = None,
     orv: str | None = None,
     poznamka: str | None = None,
+    prevod: str | None = None,
     stav_platby: str = "nezaplaceno",
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
@@ -27,10 +28,10 @@ def create(
 ) -> int:
     ts = db.now_iso()
     cur = conn.execute(
-        "INSERT INTO ukony(firma_id,datum,rz,typ_kod,celkem,vin,orv,poznamka,"
+        "INSERT INTO ukony(firma_id,datum,rz,typ_kod,celkem,vin,orv,poznamka,prevod,"
         "stav_platby,zaplaceno_kc,zdroj,zpracoval,created_at,updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (firma_id, datum, rz, typ_kod, celkem, vin, orv, poznamka,
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (firma_id, datum, rz, typ_kod, celkem, vin, orv, poznamka, prevod,
          stav_platby, zaplaceno_kc, zdroj, zpracoval, ts, ts),
     )
     conn.commit()
@@ -131,7 +132,7 @@ def search(conn: sqlite3.Connection, q: str, limit: int = 25) -> list[sqlite3.Ro
         " ORDER BY u.datum DESC, u.id DESC"
     ):
         hay = _fold(" ".join(
-            v for v in (r["rz"], r["vin"], r["orv"], r["poznamka"], r["firma_zkratka"]) if v
+            v for v in (r["rz"], r["vin"], r["orv"], r["poznamka"], r["prevod"], r["firma_zkratka"]) if v
         ))
         if term in hay:
             rows.append(r)

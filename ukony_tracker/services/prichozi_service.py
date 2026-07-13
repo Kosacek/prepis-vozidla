@@ -23,15 +23,16 @@ def build_orv(serie: str | None, cislo: str | None) -> str | None:
 
 
 def context_note(payload: dict) -> str | None:
-    """Default poznámka naming the parties. Public: the Příchozí inbox uses the
-    same rule to prefill its editable note field.
+    """The automatic "z koho → na koho" transfer line, stored on the úkon's
+    `prevod` column (kept separate from the user's poznámka).
 
     Prefers the provozovatel (operator) name on each side: when the owner is a
-    leasing company, the operator is the real client we want named in the note."""
+    leasing company, the operator is the real client we want named. Reads
+    original → new (from → to)."""
     novy = (payload.get("novy_prov_jmeno") or payload.get("novy_jmeno") or "").strip()
     puvodni = (payload.get("puvodni_prov_jmeno") or payload.get("puvodni_jmeno") or "").strip()
     if novy and puvodni:
-        return f"{novy} ← {puvodni}"
+        return f"{puvodni} → {novy}"
     return novy or puvodni or None
 
 
@@ -111,8 +112,11 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         celkem = pricing_service.effective_price(conn, firma_id, typ) or 0.0 if firma_id else 0.0
 
     if firma_id and typ:
-        # An explicit note typed on the last page wins over the derived one.
-        poznamka = (payload.get("poznamka") or "").strip() or context_note(payload)
+        # Two SEPARATE fields: the user's typed note (poznamka) and the automatic
+        # "z koho → na koho" transfer line (prevod). A typed note no longer erases
+        # the parties — both are stored and shown independently.
+        poznamka = (payload.get("poznamka") or "").strip() or None
+        prevod = context_note(payload)
         try:
             uid = ingest_service.pridat_ukon(
                 conn,
@@ -122,6 +126,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 celkem=celkem,
                 rz=rz, vin=vin, orv=orv,
                 poznamka=poznamka,
+                prevod=prevod,
                 zdroj="zadosti",
                 zpracoval=payload.get("profil"),  # who filled it out in zadosti
             )

@@ -11,8 +11,8 @@ from sqlite3 import Connection
 import openpyxl
 
 # Column order for the Excel header row
-HEAD = ["Datum", "RZ", "Úkon", "Celkem", "VIN", "ORV", "Poznámka", "Zaplaceno", "Zaplaceno Kč"]
-_CSV_HEAD = ["datum", "firma", "rz", "typ", "celkem", "vin", "orv", "poznamka", "stav_platby", "zaplaceno_kc"]
+HEAD = ["Datum", "RZ", "Úkon", "Celkem", "VIN", "ORV", "Převod", "Poznámka", "Zaplaceno", "Zaplaceno Kč"]
+_CSV_HEAD = ["datum", "firma", "rz", "typ", "celkem", "vin", "orv", "prevod", "poznamka", "stav_platby", "zaplaceno_kc"]
 _INVALID_SHEET = re.compile(r"[\[\]:*?/\\]")  # Excel-forbidden sheet-title chars
 
 
@@ -60,10 +60,10 @@ def export_excel(conn: Connection, date_from: str, date_to: str, firma_ids=None)
         for u in g["rows"]:
             ws.append([
                 u["datum"], u["rz"], u["typ_kod"], u["celkem"], u["vin"],
-                u["orv"], u["poznamka"], u["stav_platby"], u["zaplaceno_kc"],
+                u["orv"], u["prevod"], u["poznamka"], u["stav_platby"], u["zaplaceno_kc"],
             ])
             total += u["celkem"]
-        ws.append([f"CELKEM ({len(g['rows'])} úkonů)", "", "", total, "", "", "", "", ""])
+        ws.append([f"CELKEM ({len(g['rows'])} úkonů)", "", "", total, "", "", "", "", "", ""])
 
     if not wb.sheetnames:
         wb.create_sheet(title="Prázdné")
@@ -82,6 +82,6 @@ def export_csv(conn: Connection, date_from: str, date_to: str, firma_ids=None) -
     for r in rows:
         w.writerow([
             r["datum"], r["f_zkratka"], r["rz"], r["typ_kod"], r["celkem"],
-            r["vin"], r["orv"], r["poznamka"], r["stav_platby"], r["zaplaceno_kc"],
+            r["vin"], r["orv"], r["prevod"], r["poznamka"], r["stav_platby"], r["zaplaceno_kc"],
         ])
     return buf.getvalue()

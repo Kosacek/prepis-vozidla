@@ -108,6 +108,7 @@ def test_approve_creates_ukon(client):
         assert u["firma_id"] == fid and u["typ_kod"] == "PŘEVOD" and u["celkem"] == 1300
         assert u["rz"] == "1AB2345" and u["orv"] == "ABC123456" and u["zdroj"] == "zadosti"
         assert u["poznamka"] == "TZ + dobírka"  # note from the form is saved
+        assert u["prevod"] == "Cardion"         # auto transfer line stored separately
 
 
 def test_approve_without_firma_keeps_pending(client):

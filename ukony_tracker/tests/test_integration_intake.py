@@ -92,7 +92,8 @@ def test_intake_auto_creates_on_single_match(conn):
     assert u["vin"] == "TMBVIN1234567890"  # full VIN, uppercased
     assert u["zdroj"] == "zadosti"
     assert u["datum"] == "2026-06-14"      # payload date, never recomputed
-    assert u["poznamka"] == "Cardion s.r.o. ← Jan Novák"
+    assert u["prevod"] == "Jan Novák → Cardion s.r.o."   # auto transfer line
+    assert u["poznamka"] is None                          # no user note typed
     pr = prichozi_repo.get(conn, res["prichozi_id"])
     assert pr["status"] == "auto" and pr["created_ukon_id"] == res["ukon_id"]
 
@@ -148,7 +149,8 @@ def test_intake_prefers_provozovatel_when_owner_is_leasing(conn):
     assert res["status"] == "auto"
     u = ukony_repo.get(conn, res["ukon_id"])
     assert u["firma_id"] == c                       # assigned to the provozovatel
-    assert u["poznamka"] == "Cardion"               # note names the operator, not the leasing owner
+    assert u["prevod"] == "Cardion"                 # transfer names the operator, not the leasing owner
+    assert u["poznamka"] is None
     # The inbox row keeps both parties (operator headline + owner for reference).
     pr = prichozi_repo.get(conn, res["prichozi_id"])
     assert pr["novy_prov_jmeno"] == "Cardion"
@@ -171,15 +173,15 @@ def test_prichozi_repo_round_trips_provozovatel_columns(conn):
     assert row["novy_jmeno"] == "Leasing a.s."       # owner still stored alongside
 
 
-def test_intake_note_keeps_owner_when_no_provozovatel(conn):
-    # Plain sale, no separate operator → note uses the owner names as before.
+def test_intake_transfer_keeps_owner_when_no_provozovatel(conn):
+    # Plain sale, no separate operator → transfer uses the owner names.
     _firms(conn)
     res = prichozi_service.intake(conn, {
         "zadost_id": "plain1", "mode": "prevod", "datum": "2026-06-14",
         "novy_ico": "11111111", "novy_jmeno": "Cardion s.r.o.",
         "puvodni_jmeno": "Jan Novák",
     })
-    assert ukony_repo.get(conn, res["ukon_id"])["poznamka"] == "Cardion s.r.o. ← Jan Novák"
+    assert ukony_repo.get(conn, res["ukon_id"])["prevod"] == "Jan Novák → Cardion s.r.o."
 
 
 def test_intake_auto_stores_profil_as_zpracoval(conn):
@@ -258,15 +260,19 @@ def test_intake_explicit_price_defaults_to_effective(conn):
     assert ukony_repo.get(conn, res["ukon_id"])["celkem"] == 1300
 
 
-def test_intake_explicit_note_overrides_derived(conn):
+def test_intake_user_note_and_transfer_stored_separately(conn):
+    # A typed note no longer erases the parties: poznámka holds the user's note,
+    # prevod holds the automatic "z koho → na koho" transfer line.
     _c, a = _firms(conn)
     res = prichozi_service.intake(conn, {
         "zadost_id": "note1", "mode": "zmena", "datum": "2026-06-14",
         "firma_id": a, "typ_kod": "KOLA", "celkem": 300,
-        "novy_jmeno": "Kupující", "puvodni_jmeno": "Prodávající",  # would derive a note
+        "novy_jmeno": "Kupující", "puvodni_jmeno": "Prodávající",
         "evidence_poznamka": "zimní sada", "poznamka": "zimní sada",
     })
-    assert ukony_repo.get(conn, res["ukon_id"])["poznamka"] == "zimní sada"
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["poznamka"] == "zimní sada"                  # user's note kept
+    assert u["prevod"] == "Prodávající → Kupující"        # transfer kept too
 
 
 def test_intake_explicit_firm_overrides_ico_match(conn):
