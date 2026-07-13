@@ -1,13 +1,22 @@
 import sqlite3
 from datetime import date
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 import db
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import ingest_service as ing
 from services import pricing_service
 from services import colors_service
+from services import orv_service
 
 bp = Blueprint("ukony", __name__)
+
+
+@bp.get("/orv-lookup")
+def orv_lookup():
+    """Auto-fill helper for the úkon form: given the ORV, return the vehicle's
+    VIN from the dataovozidlech.cz registry (same source as the zadosti app).
+    Session-gated (not /api/*), so the logged-in browser can call it directly."""
+    return jsonify(orv_service.lookup_vin(request.args.get("orv", "")))
 
 
 @bp.get("/ukony/hledat")

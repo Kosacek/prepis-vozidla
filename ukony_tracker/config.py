@@ -22,6 +22,10 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 # set, /api/* requires header X-Api-Key == this value; when empty, /api/* is open
 # (local/dev — preserves the keyless API tests).
 INTEGRATION_API_KEY = os.environ.get("INTEGRATION_API_KEY", "")
+# dataovozidlech.cz registry key — lets the úkon form auto-fill the VIN from the
+# ORV (same source the zadosti app uses). Empty → the lookup returns a clear
+# "missing key" message instead of failing to boot.
+DATAOVOZIDLECH_API_KEY = os.environ.get("DATAOVOZIDLECH_API_KEY", "")
 
 ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}"
 BACKUP_RETENTION = 30

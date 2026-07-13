@@ -13,6 +13,7 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set in .env}"
       SECRET_KEY: "${SECRET_KEY:?SECRET_KEY must be set in .env}"
       INTEGRATION_API_KEY: "${INTEGRATION_API_KEY:?INTEGRATION_API_KEY must be set in .env}"
+      DATAOVOZIDLECH_API_KEY: "${DATAOVOZIDLECH_API_KEY:-}"
       DATA_DIR: "/data"
       HTTP_PORT: "8090"
       TZ: "Europe/Prague"
