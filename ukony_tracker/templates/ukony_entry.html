@@ -44,8 +44,8 @@
     <div class="field">
       <label>ORV <span class="muted small">(číslo OTP)</span></label>
       <input name="orv" id="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}"
-             oninput="if(this.value.replace(/\s/g,'').length>=9)orvLookup()" onblur="orvLookup()">
-      <div id="orv-status" class="muted small" style="display:none;margin-top:4px"></div>
+             oninput="if(this.value.replace(/\s/g,'').length>=9)orvLookupFrom(this)" onblur="orvLookupFrom(this)">
+      <div class="orv-status muted small" style="display:none;margin-top:4px"></div>
     </div>
     <div class="field">
       <label>Poznámka</label>
@@ -139,30 +139,5 @@
     zp.addEventListener('change',function(){ localStorage.setItem('ukony_zpracoval', zp.value); });
   }
 })();
-
-// ORV → VIN auto-fill (same registry as the zadosti app). Global so the inline
-// oninput/onblur on #orv can reach it. Debounced on the last looked-up value.
-var _orvLast = '';
-async function orvLookup(){
-  var el = document.getElementById('orv'); if(!el) return;
-  var raw = (el.value || '').replace(/\s/g,'').toUpperCase();
-  if(raw.length < 9 || raw === _orvLast) return;
-  _orvLast = raw;
-  var st = document.getElementById('orv-status');
-  var vin = document.getElementById('vin');
-  if(st){ st.style.display='block'; st.style.color=''; st.textContent='Načítám VIN…'; }
-  try{
-    var res = await fetch('/orv-lookup?orv=' + encodeURIComponent(raw));
-    var d = await res.json();
-    if(d.success){
-      if(vin && d.vin){ vin.value = d.vin; }
-      if(st){ st.style.color='#2a7'; st.textContent='✓ ' + (d.znacka || d.vin || 'Načteno'); }
-    } else {
-      if(st){ st.style.color='#c33'; st.textContent='✗ ' + (d.error || 'Nenačteno'); }
-    }
-  }catch(e){
-    if(st){ st.style.color='#c33'; st.textContent='✗ Chyba spojení'; }
-  }
-}
 </script>
 {% endblock %}

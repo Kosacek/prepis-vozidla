@@ -76,6 +76,7 @@ plní výběr na straně Přepisu.
 | `stats_service.py` | agregace pro dashboard (mesicni_souhrn, rocni_trend, podle_firmy, nezaplaceno_celkem) |
 | `export_service.py` | Excel (jeden list na firmu) + CSV export |
 | `ares_service.py` | Lookup firmy v ARES dle IČO |
+| `orv_service.py` | ORV→VIN lookup (dataovozidlech.cz) pro auto-doplnění VIN v úkon formu; potřebuje `DATAOVOZIDLECH_API_KEY` v `.env` + compose (session route `GET /orv-lookup`, NE `/api/*`) |
 | `db.py` | Schéma, backup_db() (throttlované zálohy) |
 | `scripts/seed.py` | Seed + rekonciliace; idempotentní |
 

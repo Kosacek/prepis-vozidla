@@ -31,5 +31,32 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <script>
+  // Shared ORV → VIN autofill (dataovozidlech.cz via /orv-lookup). Form-relative
+  // (uses `this` + name="vin"/.orv-status in the same form) so it works on the
+  // add form, the edit page, AND the edit modal fragment (injected via innerHTML,
+  // where a <script> would not run but inline on* handlers do). Debounced per input.
+  window._orvSeen = window._orvSeen || new WeakMap();
+  async function orvLookupFrom(el){
+    var raw = (el.value || '').replace(/\s/g,'').toUpperCase();
+    if(raw.length < 9 || window._orvSeen.get(el) === raw) return;
+    window._orvSeen.set(el, raw);
+    var form = el.form;
+    var vin = form ? form.querySelector('input[name="vin"]') : null;
+    var fld = el.closest ? el.closest('.field') : null;
+    var st  = fld ? fld.querySelector('.orv-status') : null;
+    if(st){ st.style.display='block'; st.style.color=''; st.textContent='Načítám VIN…'; }
+    try{
+      var res = await fetch('/orv-lookup?orv=' + encodeURIComponent(raw));
+      var d = await res.json();
+      if(d.success){
+        if(vin && d.vin) vin.value = d.vin;
+        if(st){ st.style.color='#2a7'; st.textContent='✓ ' + (d.znacka || d.vin || 'Načteno'); }
+      } else {
+        if(st){ st.style.color='#c33'; st.textContent='✗ ' + (d.error || 'Nenačteno'); }
+      }
+    }catch(e){ if(st){ st.style.color='#c33'; st.textContent='✗ Chyba spojení'; } }
+  }
+  </script>
 </body>
 </html>

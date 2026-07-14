@@ -50,7 +50,9 @@
   <div class="form-row">
     <div class="field">
       <label>ORV <span class="muted small">(číslo OTP)</span></label>
-      <input name="orv" value="{{ u.orv or '' }}" class="input-upper">
+      <input name="orv" value="{{ u.orv or '' }}" class="input-upper" autocomplete="off"
+             oninput="if(this.value.replace(/\s/g,'').length>=9)orvLookupFrom(this)" onblur="orvLookupFrom(this)">
+      <div class="orv-status muted small" style="display:none;margin-top:4px"></div>
     </div>
     <div class="field">
       <label>Poznámka</label>
