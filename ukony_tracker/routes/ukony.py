@@ -162,6 +162,7 @@ def table():
         typy=typy_repo.list_active(conn),
         total=total,
         sel={"firma": firma_id, "mesic": mesic, "typ": typ, "stav": stav},
+        firma_colors=colors_service.firma_color_map(conn),  # same dot colors as the dashboard
     )
 
 

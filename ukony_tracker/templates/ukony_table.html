@@ -43,95 +43,71 @@
   </form>
 </div>
 
-{# ── Table ── #}
+{# ── List — same row design as the dashboard's "Poslední úkony" (whole row is a
+     link opening the edit modal), plus a trailing action cluster per row. ── #}
 {% import "_macros.html" as m with context %}
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th class="shrink">Datum</th>
-        <th class="shrink">Firma</th>
-        <th>RZ</th>
-        <th class="shrink">Úkon</th>
-        <th class="right shrink">Kč</th>
-        <th>VIN</th>
-        <th>Převod</th>
-        <th>Poznámka</th>
-        <th class="shrink">Kdo</th>
-        <th class="shrink">Platba</th>
-        <th class="shrink">Akce</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in ukony %}
-      <tr data-kc="{{ u.celkem|int }}"
-          data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ (u.prevod or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
-        <td class="muted shrink" style="white-space:nowrap;">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</td>
-        <td class="shrink" style="white-space:nowrap;">{{ u.firma_zkratka }}</td>
-        <td><b>{{ u.rz or '—' }}</b></td>
-        <td class="shrink">{{ u.typ_kod }}</td>
-        <td class="right shrink">{{ u.celkem|int }}</td>
-        <td class="muted small">{{ u.vin or '' }}</td>
-        <td class="muted small">{{ u.prevod or '' }}</td>
-        <td class="muted small">{{ u.poznamka or '' }}</td>
-        <td class="shrink">{{ m.person_badge(u.zpracoval) }}</td>
-        <td class="shrink">
-          {% if u.stav_platby == 'zaplaceno' %}
-            <span class="badge ok">zapl.</span>
-          {% elif u.stav_platby == 'castecne' %}
-            <span class="badge warn">část. {{ u.zaplaceno_kc|int }} Kč</span>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
-        <td class="shrink">
-          <div class="actions">
-          {# Full pay button #}
-          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" style="display:inline;">
+<div class="card recent-card">
+  <div class="recent-list ukony-list">
+    {% for u in ukony %}
+    <div class="ukony-item" data-kc="{{ u.celkem|int }}"
+         data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ (u.prevod or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
+      <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ request.full_path | urlencode }}">
+        <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</span>
+        <b class="recent-rz">{{ u.rz or '—' }}</b>
+        <span class="tag">{{ u.typ_kod }}</span>
+        <span class="recent-firma">
+          <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
+        </span>
+        {# VIN span is always rendered (even empty) — fixed-width flex column, so
+           every převod/poznámka starts at the same x (same rule as the dashboard). #}
+        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+        <span class="recent-pay">
+          {# nezaplaceno is the normal state (invoiced monthly) — badge only the
+             exceptions, exactly like the dashboard. #}
+          {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
+          {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>{% endif %}
+        </span>
+        <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
+        <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+      </a>
+      <span class="row-actions actions">
+        {# Full pay #}
+        <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
+          <input type="hidden" name="back" value="{{ request.full_path }}">
+          <button type="submit" class="btn btn-sm" title="Označit zaplaceno">✓ zapl.</button>
+        </form>
+        {# Partial pay #}
+        <details class="partial-pay">
+          <summary class="btn btn-sm">část.</summary>
+          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="partial-pay__form">
             <input type="hidden" name="back" value="{{ request.full_path }}">
-            <button type="submit" class="btn btn-sm" title="Označit zaplaceno">✓ zapl.</button>
+            <input type="number" name="castka" inputmode="numeric" placeholder="část. Kč"
+                   min="0" max="{{ u.celkem }}" class="partial-pay__input">
+            <button type="submit" class="btn btn-sm btn-primary">OK</button>
           </form>
-
-          {# Partial pay #}
-          <details class="partial-pay">
-            <summary class="btn btn-sm">část.</summary>
-            <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="partial-pay__form">
-              <input type="hidden" name="back" value="{{ request.full_path }}">
-              <input type="number" name="castka" inputmode="numeric" placeholder="část. Kč"
-                     min="0" max="{{ u.celkem }}" class="partial-pay__input">
-              <button type="submit" class="btn btn-sm btn-primary">OK</button>
-            </form>
-          </details>
-
-          {# Edit link #}
-          <a href="/ukony/{{ u.id }}/upravit?back={{ request.full_path | urlencode }}"
-             class="btn btn-sm">upravit</a>
-
-          {# Delete #}
-          <form method="post" action="/ukony/{{ u.id }}/smazat" style="display:inline;"
-                onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
-            <input type="hidden" name="back" value="{{ request.full_path }}">
-            <button type="submit" class="btn btn-sm btn-danger">smazat</button>
-          </form>
-          </div>
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="11" class="center muted" style="padding: var(--sp-6);">
-          Žádné úkony neodpovídají filtru.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </details>
+        {# Delete #}
+        <form method="post" action="/ukony/{{ u.id }}/smazat"
+              onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
+          <input type="hidden" name="back" value="{{ request.full_path }}">
+          <button type="submit" class="btn btn-sm btn-danger">smazat</button>
+        </form>
+      </span>
+    </div>
+    {% else %}
+    <p class="center muted" style="padding: var(--sp-6);">Žádné úkony neodpovídají filtru.</p>
+    {% endfor %}
+  </div>
 </div>
+
+{% include "_ukon_modal.html" %}
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=1"></script>
 
 <script>
 (function () {
   var input = document.getElementById('ukony-search');
   if (!input) return;
-  var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr[data-search]'));
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.ukony-item[data-search]'));
   var countEl = document.getElementById('ukony-count');
   var sumEl = document.getElementById('ukony-sum');
   function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }

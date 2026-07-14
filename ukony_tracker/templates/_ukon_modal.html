@@ -1,0 +1,9 @@
+{# Inline úkon-edit overlay: clicking an a.recent-row fetches its edit-form
+   fragment (?modal=1) into the body below. Shared by the dashboard and the
+   /ukony list; the behavior lives in static/js/ukon_modal.js. #}
+<div class="modal-backdrop" id="ukon-modal" hidden>
+  <div class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="ukon-modal-title">
+    <button class="modal-close" type="button" aria-label="Zavřít" data-modal-close>&times;</button>
+    <div class="modal-body" id="ukon-modal-body"></div>
+  </div>
+</div>

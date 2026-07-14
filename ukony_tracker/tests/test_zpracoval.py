@@ -79,11 +79,13 @@ def test_edit_updates_person(client_fid):
 
 # ── display ───────────────────────────────────────────────────────────────────
 
-def test_table_shows_kdo_column(client_fid):
+def test_table_shows_kdo_badge(client_fid):
+    # /ukony/vse uses the dashboard's header-less recent-row design; the
+    # attribution renders as the kdo badge in the recent-kdo slot (before the price).
     c, fid = client_fid
     with c.application.app_context():
         ukony_repo.create(db.get_db(), firma_id=fid, datum="2026-06-14",
                           typ_kod="PŘEVOD", celkem=1300, rz="KDO111", zpracoval="David")
     body = c.get("/ukony/vse").get_data(as_text=True)
-    assert ">Kdo<" in body                    # column header
+    assert 'class="recent-kdo"' in body                # badge slot in the row grid
     assert 'class="kdo"' in body and "David" in body   # attribution badge

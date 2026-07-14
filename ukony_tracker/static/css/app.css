@@ -1522,3 +1522,23 @@ body.modal-open { overflow: hidden; }
   .recent-vin { flex-basis: auto; }
   .recent-search { width: 180px; }
 }
+
+/* ── /ukony list — dashboard recent-row design + a trailing action cluster ──
+   Each item wraps the clickable row (a.recent-row, same grid/typography as the
+   dashboard) and a .row-actions cluster OUTSIDE the link, so pay/delete buttons
+   stay valid HTML and don't trigger the row's edit-modal click. */
+.ukony-item { display: flex; align-items: center; border-bottom: 1px solid var(--line); border-radius: var(--radius-sm); }
+.ukony-item:last-child { border-bottom: none; }
+.ukony-item:hover { background: var(--bg); }
+.ukony-item .recent-row { flex: 1 1 auto; min-width: 0; border-bottom: none; }
+.ukony-item .recent-row:hover { background: transparent; }  /* hover lives on the item */
+/* first column widened: this list shows the full date incl. year */
+.ukony-list .recent-row { grid-template-columns: 78px 88px 72px 104px minmax(0, 1fr) auto auto auto; }
+.row-actions { display: flex; align-items: center; gap: 6px; padding: 0 var(--sp-3) 0 var(--sp-2); flex: 0 0 auto; }
+.row-actions form { display: inline; }
+/* near the right edge — anchor the partial-pay popup right so it can't overflow */
+.row-actions .partial-pay__form { left: auto; right: 0; }
+@media (max-width: 760px) {
+  .ukony-item { flex-wrap: wrap; }                 /* actions drop to a second line */
+  .row-actions { padding: 0 var(--sp-3) 8px 52px; }
+}
