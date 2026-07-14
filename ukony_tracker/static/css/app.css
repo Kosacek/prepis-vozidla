@@ -1538,6 +1538,9 @@ body.modal-open { overflow: hidden; }
    the actions shows the state). Every row is the SAME firm, so the firm column
    can be max-content — kills the fixed-104px slack between firm and VIN. */
 .mesic-recent .recent-row { grid-template-columns: 44px 88px 72px max-content minmax(0, 1fr) auto auto; }
+/* balance the whitespace around the firm: the fixed 72px tag column leaves
+   ~10px slack on the firm's left, so give the VIN side the same visual gap */
+.mesic-recent .recent-mid { padding-left: 10px; }
 /* rows with a trailing action cluster: shave the link's right padding so the
    price sits close to the payment toggle */
 .ukony-item .recent-row { padding-right: 4px; }
