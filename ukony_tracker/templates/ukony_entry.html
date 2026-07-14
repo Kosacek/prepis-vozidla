@@ -64,57 +64,68 @@
   </form>
 </div>
 
-<div class="divider">Tento měsíc</div>
+{# ── Tento měsíc — same row design as the dashboard's "Poslední úkony" (whole
+     row is a link opening the edit modal) + the trailing action cluster. ── #}
 {% set back_url = '/ukony/' ~ firma.id ~ '?mesic=' ~ mesic %}
-<div class="mesic-list">
-  {% for u in ukony %}
-  <div class="ukon-row">
-    <span class="u-datum muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
-    <span class="u-main" data-datum="{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.">
-      <b class="u-rz">{{ u.rz or '—' }}</b>
-      <span class="tag">{{ u.typ_kod }}</span>
-      {% if u.prevod %}<span class="muted u-pozn">{{ u.prevod }}</span>{% endif %}
-      {% if u.poznamka %}<span class="muted u-pozn">{{ u.poznamka }}</span>{% endif %}
-      {{ m.person_badge(u.zpracoval) }}
-    </span>
-    <span class="u-vin" data-typ="{{ u.typ_kod }}">{{ u.vin or '—' }}{% if u.orv %}<span class="muted small" style="display:block">ORV {{ u.orv }}</span>{% endif %}</span>
-    <span class="u-kc"><b>{{ u.celkem|int }} Kč</b></span>
-    <span class="u-actions">
-      <span class="stav-slot">
-        {% if u.stav_platby == 'zaplaceno' %}
-        <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
-          <input type="hidden" name="castka" value="0">
-          <input type="hidden" name="back" value="{{ back_url }}">
-          <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
-        </form>
-        {% elif u.stav_platby == 'castecne' %}
-        <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
-          onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
-          <input type="hidden" name="castka" value="0">
-          <input type="hidden" name="back" value="{{ back_url }}">
-          <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
-        </form>
-        {% else %}
-        <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
-          <input type="hidden" name="back" value="{{ back_url }}">
-          <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
-        </form>
-        {% endif %}
-      </span>
-      <a class="btn btn-sm" href="/ukony/{{ u.id }}/upravit?back={{ back_url|urlencode }}">Upravit</a>
-      <form method="post" action="/ukony/{{ u.id }}/smazat" style="display:inline"
-        onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
-        <input type="hidden" name="back" value="{{ back_url }}">
-        <button type="submit" class="btn btn-sm btn-danger" title="Smazat">✕</button>
-      </form>
-    </span>
+<div class="card recent-card">
+  <div class="card-head"><h2>Tento měsíc</h2>
+    <a href="/ukony/vse?firma={{ firma.id }}" class="muted small">Zobrazit všechny →</a>
   </div>
-  {% else %}
-  <div class="muted" style="padding: var(--sp-4) 0;">Zatím žádné úkony v tomto měsíci.</div>
-  {% endfor %}
+  <div class="recent-list">
+    {% for u in ukony %}
+    <div class="ukony-item">
+      <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ back_url|urlencode }}">
+        <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.</span>
+        <b class="recent-rz">{{ u.rz or '—' }}</b>
+        <span class="tag">{{ u.typ_kod }}</span>
+        <span class="recent-firma">
+          <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
+        </span>
+        {# VIN span always rendered (fixed-width flex column) so ORV/převod/
+           poznámka start at the same x on every row — same rule as the dashboard. #}
+        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.orv %}<span class="recent-pozn muted">ORV {{ u.orv }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+        <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
+        <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+      </a>
+      <span class="row-actions actions">
+        {# Payment toggle: the badge doubles as the cancel button (existing UX). #}
+        <span class="stav-slot">
+          {% if u.stav_platby == 'zaplaceno' %}
+          <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
+            <input type="hidden" name="castka" value="0">
+            <input type="hidden" name="back" value="{{ back_url }}">
+            <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
+          </form>
+          {% elif u.stav_platby == 'castecne' %}
+          <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
+            onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
+            <input type="hidden" name="castka" value="0">
+            <input type="hidden" name="back" value="{{ back_url }}">
+            <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
+          </form>
+          {% else %}
+          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
+            <input type="hidden" name="back" value="{{ back_url }}">
+            <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
+          </form>
+          {% endif %}
+        </span>
+        <form method="post" action="/ukony/{{ u.id }}/smazat"
+          onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
+          <input type="hidden" name="back" value="{{ back_url }}">
+          <button type="submit" class="btn btn-sm btn-danger" title="Smazat">✕</button>
+        </form>
+      </span>
+    </div>
+    {% else %}
+    <p class="muted" style="padding: var(--sp-4);">Zatím žádné úkony v tomto měsíci.</p>
+    {% endfor %}
+  </div>
 </div>
-<a class="muted" style="display:inline-block; margin-top: var(--sp-3);" href="/ukony/vse?firma={{ firma.id }}">Zobrazit všechny úkony →</a>
 {% endif %}
+
+{% include "_ukon_modal.html" %}
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=1"></script>
 
 <script>
 (function(){

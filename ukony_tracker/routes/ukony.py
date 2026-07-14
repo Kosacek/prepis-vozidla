@@ -90,6 +90,7 @@ def entry(firma_id):
         total=total,
         pocet=len(rows),
         mesic=mesic,
+        firma_colors=colors_service.firma_color_map(conn),  # dot colors, same as dashboard
         # After adding an úkon we carry the typ/date/price/note back so the next
         # car of the same kind can be added with only a fresh RZ/VIN. Absent on
         # first load → defaults (today, first typ, that typ's price, empty).
