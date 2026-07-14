@@ -1536,8 +1536,10 @@ body.modal-open { overflow: hidden; }
 .ukony-list .recent-row { grid-template-columns: 78px 88px 72px 104px minmax(0, 1fr) auto auto auto; }
 /* Per-firm "Tento měsíc" list: 7 columns (no pay slot — the payment toggle in
    the actions shows the state). Every row is the SAME firm, so the firm column
-   can be max-content — kills the fixed-104px slack between firm and VIN. */
-.mesic-recent .recent-row { grid-template-columns: 44px 88px 72px max-content minmax(0, 1fr) auto auto; }
+   can be max-content — kills the fixed-104px slack between firm and VIN. The RZ
+   column is 72px (a 7-char plate is ~60px), not the dashboard's 88px — keeps
+   the SPZ→tag gap at the same ~22px rhythm as the rest of the row. */
+.mesic-recent .recent-row { grid-template-columns: 44px 72px 72px max-content minmax(0, 1fr) auto auto; }
 /* balance the whitespace around the firm: the fixed 72px tag column leaves
    ~10px slack on the firm's left, so give the VIN side the same visual gap */
 .mesic-recent .recent-mid { padding-left: 10px; }
