@@ -59,8 +59,9 @@
           <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
         </span>
         {# VIN span is always rendered (even empty) — fixed-width flex column, so
-           every převod/poznámka starts at the same x (same rule as the dashboard). #}
-        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+           the notes start at the same x. User's poznámka FIRST (it must survive
+           the ellipsis), then the auto převod arrow. #}
+        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
         <span class="recent-pay">
           {# nezaplaceno is the normal state (invoiced monthly) — badge only the
              exceptions, exactly like the dashboard. #}

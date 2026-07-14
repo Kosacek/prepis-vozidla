@@ -1534,7 +1534,14 @@ body.modal-open { overflow: hidden; }
 .ukony-item .recent-row:hover { background: transparent; }  /* hover lives on the item */
 /* first column widened: this list shows the full date incl. year */
 .ukony-list .recent-row { grid-template-columns: 78px 88px 72px 104px minmax(0, 1fr) auto auto auto; }
-.row-actions { display: flex; align-items: center; gap: 6px; padding: 0 var(--sp-3) 0 var(--sp-2); flex: 0 0 auto; }
+/* Per-firm "Tento měsíc" list: 7 columns (no pay slot — the payment toggle in
+   the actions shows the state). Every row is the SAME firm, so the firm column
+   can be max-content — kills the fixed-104px slack between firm and VIN. */
+.mesic-recent .recent-row { grid-template-columns: 44px 88px 72px max-content minmax(0, 1fr) auto auto; }
+/* rows with a trailing action cluster: shave the link's right padding so the
+   price sits close to the payment toggle */
+.ukony-item .recent-row { padding-right: 4px; }
+.row-actions { display: flex; align-items: center; gap: 6px; padding: 0 var(--sp-3) 0 2px; flex: 0 0 auto; }
 .row-actions form { display: inline; }
 /* near the right edge — anchor the partial-pay popup right so it can't overflow */
 .row-actions .partial-pay__form { left: auto; right: 0; }

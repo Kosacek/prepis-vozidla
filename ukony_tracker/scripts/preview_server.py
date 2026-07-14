@@ -39,8 +39,9 @@ with application.app_context():
                         rz="2CD6789", vin="WVWZZZ1KZAW123456", poznamka="počká na doklady",
                         zaplaceno_kc=1500, zpracoval="David")
         ing.pridat_ukon(conn, firma_id=cardion, datum="2026-07-12", typ_kod="PŘEVOD", celkem=1300,
-                        rz="3EF1122", vin="TMBEG7NE3K0654321", prevod="AUTO OPAT → CARDION S.R.O.",
-                        poznamka="zimní kola v kufru", zaplaceno_kc=500, zpracoval="Roman")
+                        rz="3EF1122", vin="TMBEG7NE3K0654321", orv="UBL632097",
+                        prevod="AUTO OPAT → CARDION S.R.O.",
+                        poznamka="ACC", zaplaceno_kc=500, zpracoval="Roman")
 
 if __name__ == "__main__":
     application.run(host="127.0.0.1", port=5056)

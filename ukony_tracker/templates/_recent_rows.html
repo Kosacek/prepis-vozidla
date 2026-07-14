@@ -14,7 +14,8 @@
   </span>
   {# VIN span is always rendered (even empty) — it is a fixed-width flex column,
      so every poznámka starts at the same x regardless of VIN length/absence. #}
-  <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+  {# User's poznámka first (it must survive the ellipsis), then the auto převod. #}
+  <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
   <span class="recent-pay">
     {# nezaplaceno is the normal state (invoiced monthly) — show nothing for it,
        only the exceptions (paid / partial) get a badge. #}

@@ -71,7 +71,7 @@
   <div class="card-head"><h2>Tento měsíc</h2>
     <a href="/ukony/vse?firma={{ firma.id }}" class="muted small">Zobrazit všechny →</a>
   </div>
-  <div class="recent-list">
+  <div class="recent-list mesic-recent">
     {% for u in ukony %}
     <div class="ukony-item">
       <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ back_url|urlencode }}">
@@ -81,9 +81,11 @@
         <span class="recent-firma">
           <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
         </span>
-        {# VIN span always rendered (fixed-width flex column) so ORV/převod/
-           poznámka start at the same x on every row — same rule as the dashboard. #}
-        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.orv %}<span class="recent-pozn muted">ORV {{ u.orv }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}</span>
+        {# VIN span always rendered (fixed-width flex column) so the notes start
+           at the same x on every row. User's poznámka FIRST (it must survive the
+           ellipsis), then the auto převod arrow. ORV intentionally not shown —
+           it's in the edit modal a click away. #}
+        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
         <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
         <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
       </a>
