@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=35">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=36">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
@@ -25,7 +25,7 @@
       {% endif %}
     </div>
   </header>
-  <main class="container">
+  <main class="container {% block main_class %}{% endblock %}">
     {% with msgs = get_flashed_messages(with_categories=true) %}
       {% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}
     {% endwith %}

@@ -171,6 +171,11 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   margin: 0 auto;
   padding: var(--sp-5) 20px var(--sp-7);
 }
+/* Pages that opt in (the úkony table) use the full window width so the long
+   VIN + Poznámka columns are readable instead of squeezed into 1200px. */
+.container-wide {
+  max-width: min(2400px, 100%);
+}
 
 /* ------------------------------------------------------------
    5. Card
