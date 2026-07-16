@@ -80,6 +80,11 @@ def test_ppd_print_page_is_a5(client, tmp_path, monkeypatch):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert "148mm 210mm" in html                    # @page = explicit A5 paper size
+    # Misfeed tolerance: the frame is smaller than the printable area and
+    # centered on the paper (~9-12 mm clearance), so a printer that feeds A5 a
+    # few mm off can't cut the top border line (bug seen on real hardware).
+    assert "width: 130mm" in html
+    assert "height: 186mm" in html
     assert "no-store" in page.headers.get("Cache-Control", "")  # always fresh (no stale A4 page)
     assert "PŘÍJMOVÝ POKLADNÍ DOKLAD" in html
     assert "PETR KUPUJÍCÍ" in html

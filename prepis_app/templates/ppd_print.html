@@ -13,13 +13,21 @@
   html, body { margin: 0; padding: 0; }
   body { font-family: "DejaVu Sans", Arial, "Helvetica Neue", sans-serif; color: #000; }
 
-  /* The printable area of A5 with 6 mm margins is 136 × 198 mm. The sheet sits
-     a hair inside that (134 × 196 mm) so sub-pixel rounding can never push it
-     onto a blank second page, and there's nothing to scale. */
-  .sheet { width: 134mm; margin: 0 auto; }
-  .frame { border: 1.5px solid #000; height: 196mm; position: relative; padding: 12mm 8mm 0; }
+  /* The printable area of A5 with 6 mm margins is 136 × 198 mm. The frame is
+     deliberately SMALLER than that (130 × 186 mm) and centered on the PAPER:
+     9 mm clearance left/right, 12 mm top/bottom. Printers routinely feed A5 a
+     couple of mm off and refuse to print the outermost ~5 mm — with only the
+     6 mm page margin the top border landed in that dead zone and got cut off.
+     The extra slack absorbs the misfeed; total height 192 mm < 198 mm so
+     rounding can never push it onto a blank second page. */
+  .sheet { width: 130mm; margin: 0 auto; padding-top: 6mm; }
+  /* Header spacing is 6 mm tighter than the pre-2026-07-16 layout (top padding
+     12→9, num margin 13→10) to give back the room the shorter frame took from
+     the bottom — long payer names / amounts-in-words wrap an extra line each
+     and must never run into the signature. */
+  .frame { border: 1.5px solid #000; height: 186mm; position: relative; padding: 9mm 8mm 0; }
   h1   { font-size: 15pt; font-weight: 400; text-align: center; margin: 0 0 5mm; }
-  .num { font-size: 12pt; text-align: center; margin: 0 0 13mm; }
+  .num { font-size: 12pt; text-align: center; margin: 0 0 10mm; }
   .meta { font-size: 10pt; margin: 0 0 4.5mm; }
   .meta.last { margin-bottom: 10mm; }
   .block { margin-bottom: 8.5mm; }
