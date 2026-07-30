@@ -1558,5 +1558,56 @@ body.modal-open { overflow: hidden; }
 .row-actions .partial-pay__form { left: auto; right: 0; }
 @media (max-width: 760px) {
   .ukony-item { flex-wrap: wrap; }                 /* actions drop to a second line */
-  .row-actions { padding: 0 var(--sp-3) 8px 52px; }
+  .row-actions { padding: 0 var(--sp-3) 8px var(--sp-3); }
+}
+
+/* ── Mobile: úkon rows stack instead of overflowing ─────────────────────────
+   All three row lists (dashboard "Poslední úkony", /ukony/vse, and the
+   per-firm "Tento měsíc" list) share the .recent-row grid, whose fixed pixel
+   columns add up to ~430px. The compound selectors above (.ukony-list /
+   .mesic-recent .recent-row) outrank the generic mobile override, so on a
+   phone the page overflowed horizontally (190px on /ukony/vse, 379px on the
+   entry page) and the 1fr VIN+note column collapsed to 0px.
+
+   Below 760px every variant becomes a WRAPPING FLEX row: identity, badges and
+   price on the first line(s), then VIN + the full poznámka underneath — the
+   note wraps instead of being ellipsised, so nothing is cut off. */
+@media (max-width: 760px) {
+  .recent-list .recent-row,
+  .ukony-list .recent-row,
+  .mesic-recent .recent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--sp-3);
+    row-gap: 3px;
+    padding: 10px var(--sp-3);
+  }
+  /* the type badge fits again once the row stacks — it's real data, show it */
+  .recent-list .recent-row .tag,
+  .ukony-list .recent-row .tag,
+  .mesic-recent .recent-row .tag { display: inline-block; }
+
+  .recent-list .recent-date,  .ukony-list .recent-date,  .mesic-recent .recent-date  { order: 1; }
+  .recent-list .recent-rz,    .ukony-list .recent-rz,    .mesic-recent .recent-rz    { order: 2; }
+  .recent-list .recent-row .tag,
+  .ukony-list .recent-row .tag,
+  .mesic-recent .recent-row .tag { order: 3; }
+  .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 4; flex: 0 1 auto; }
+  .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 5; text-align: left; }
+  .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 6; }
+  .recent-list .recent-kc,    .ukony-list .recent-kc,    .mesic-recent .recent-kc    { order: 7; margin-left: auto; }
+
+  /* VIN + poznámka on their own full-width line, free to wrap */
+  .recent-list .recent-mid,   .ukony-list .recent-mid,   .mesic-recent .recent-mid {
+    order: 8;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow: visible;
+    column-gap: var(--sp-2);
+    padding-left: 0;
+  }
+  .recent-vin { flex: 0 1 auto; }
+  .recent-pozn { white-space: normal; overflow: visible; text-overflow: clip; }
 }
