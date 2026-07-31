@@ -82,6 +82,10 @@ CREATE TABLE IF NOT EXISTS prichozi (
   suggested_firma_id INTEGER,
   status TEXT NOT NULL DEFAULT 'pending',
   created_ukon_id INTEGER,
+  -- Set when intake found an existing úkon for the SAME vehicle at the same
+  -- firm: the row is held in the inbox instead of auto-created so the user can
+  -- confirm it's a genuine second job. See prichozi_service.intake.
+  duplicate_ukon_id INTEGER,
   raw_json TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -122,6 +126,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "prichozi", "puvodni_prov_ico", "puvodni_prov_ico TEXT")
     _ensure_column(conn, "prichozi", "novy_prov_jmeno", "novy_prov_jmeno TEXT")
     _ensure_column(conn, "prichozi", "novy_prov_ico", "novy_prov_ico TEXT")
+    # Same-vehicle duplicate guard: points at the existing úkon that held this
+    # žádost back from auto-creating. See prichozi_service.intake.
+    _ensure_column(conn, "prichozi", "duplicate_ukon_id", "duplicate_ukon_id INTEGER")
     # Úkon types for technical-data changes (žádost mode 'zmena'), added
     # idempotently so a live DB gets them on boot without a re-seed. Price left
     # NULL — set per úkon (or as a firm/type default later).

@@ -42,6 +42,18 @@
     <b>{{ p.rz or '—' }}</b>{% if p.vin %} · VIN {{ p.vin }}{% endif %}{% if p.orv %} · ORV {{ p.orv }}{% endif %}
   </div>
 
+  {# Held back by the same-vehicle guard: this car already has an úkon at this
+     firm, so it wasn't auto-created. Name the existing one (číslo + datum) and
+     link to it, so the user can confirm this really is a second job. #}
+  {% if p.dup %}
+  <div class="prichozi-dup">
+    <b>Možný duplikát</b> — tohle vozidlo už má úkon
+    <a href="/ukony/{{ p.dup.id }}/upravit?back={{ request.full_path | urlencode }}">#{{ p.dup.id }}</a>
+    z {{ p.dup.datum[8:10] }}.{{ p.dup.datum[5:7] }}.{{ p.dup.datum[0:4] }}{% if p.dup.typ_kod %} ({{ p.dup.typ_kod }}){% endif %}.
+    Přidej jen pokud jde opravdu o další úkon.
+  </div>
+  {% endif %}
+
   <form method="post" action="/prichozi/{{ p.id }}/approve" class="prichozi-form">
     <div class="prichozi-fields">
       <div class="field">

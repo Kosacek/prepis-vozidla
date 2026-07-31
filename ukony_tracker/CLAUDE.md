@@ -58,6 +58,21 @@ Druhá strana je `../prepis_app/tracker_push.py` (best-effort, nikdy neshodí
 generování PDF; neúspěšné pushe → `failed_pushes.jsonl`). Klíč musí sedět s
 `UKONY_API_KEY` na straně Přepisu.
 
+### Dvě různé ochrany proti duplicitám — neplést
+
+| Ochrana | Klíč | Co řeší |
+|---|---|---|
+| Idempotence žádosti | `prichozi.zadost_id` (UNIQUE) | tatáž žádost pushnutá dvakrát → no-op |
+| **Stejné vozidlo** | VIN (jinak RZ) + `firma_id` | **totéž auto ze dvou různých žádostí** — typicky překlik v Přepisu |
+
+Před auto-založením úkonu se `prichozi_service.intake()` ptá
+`ukony_repo.find_by_vehicle()`, jestli pro danou firmu už úkon na to auto
+neexistuje. Když ano, **úkon se nezaloží** — položka zůstane v Příchozí se
+`prichozi.duplicate_ukon_id` a inbox ukáže „Možný duplikát" s číslem a datem
+původního úkonu. Uživatel pak potvrdí (schválí = založí druhý úkon), nebo
+zahodí. Identita vozidla = VIN, když je; RZ jen jako fallback (značka se dá
+přendat na jiné auto). Porovnává se bez ohledu na velikost písmen a mezery.
+
 **Explicitní úkon z Přepisu (2026-07-11):** když v Přepisu na poslední straně
 (karta „Evidence úkonu") vybereš firmu + typ + cenu, pošlou se v payloadu jako
 `firma_id` / `typ_kod` / `celkem`. `prichozi_service.intake` je pak upřednostní

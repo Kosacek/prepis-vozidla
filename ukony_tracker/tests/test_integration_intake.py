@@ -319,3 +319,91 @@ def test_export_excel_has_orv_header(conn):
     assert "ORV" in header
     orv_col = header.index("ORV")
     assert ws[2][orv_col].value == "ABC123456"
+
+
+# ── same-vehicle duplicate guard ──────────────────────────────────────────────
+# zadost_id dedupes the SAME žádost pushed twice; this guard catches the same
+# CAR logged twice from two separate žádosti (normally a misclick in zadosti).
+
+def _push(conn, zadost_id, *, ico="11111111", vin=None, rz=None, datum="2026-06-14"):
+    return prichozi_service.intake(conn, {
+        "zadost_id": zadost_id, "mode": "prevod", "datum": datum,
+        "novy_ico": ico, "vin": vin, "rz": rz,
+    })
+
+
+def test_intake_flags_same_vehicle_instead_of_auto_creating(conn):
+    """A second žádost for the same car at the same firm waits in the inbox,
+    flagged with the existing úkon — it is NOT auto-created."""
+    _firms(conn)
+    first = _push(conn, "z-a", vin="TMBEP6PJ7S4066544", rz="1AB2345")
+    assert first["status"] == "auto"
+
+    second = _push(conn, "z-b", vin="TMBEP6PJ7S4066544", rz="1AB2345",
+                   datum="2026-06-20")
+    assert second["status"] == "pending"
+    assert second["duplicate_ukon_id"] == first["ukon_id"]
+
+    row = prichozi_repo.get(conn, second["prichozi_id"])
+    assert row["status"] == "pending"
+    assert row["duplicate_ukon_id"] == first["ukon_id"]
+    assert len(ukony_repo.list(conn)) == 1        # no second úkon created
+
+
+def test_intake_duplicate_guard_is_per_firm(conn):
+    """The same car at a DIFFERENT firm is a normal job — still auto-creates."""
+    _firms(conn)
+    a = _push(conn, "z1", ico="11111111", vin="VIN0000000000001")
+    b = _push(conn, "z2", ico="22222222", vin="VIN0000000000001")
+    assert a["status"] == "auto" and b["status"] == "auto"
+    assert len(ukony_repo.list(conn)) == 2
+
+
+def test_intake_duplicate_guard_uses_rz_when_vin_absent(conn):
+    """No VIN → the plate identifies the car (case/space-insensitively)."""
+    _firms(conn)
+    a = _push(conn, "z1", rz="1AB2345")
+    assert a["status"] == "auto"
+    b = _push(conn, "z2", rz=" 1ab2345 ", datum="2026-06-18")
+    assert b["status"] == "pending" and b["duplicate_ukon_id"] == a["ukon_id"]
+
+
+def test_intake_prefers_vin_over_rz_for_identity(conn):
+    """A plate can be moved to another car: same RZ but a different VIN is a
+    different vehicle, so it still auto-creates."""
+    _firms(conn)
+    a = _push(conn, "z1", vin="VINAAAAAAAAAAAA1", rz="1AB2345")
+    b = _push(conn, "z2", vin="VINBBBBBBBBBBBB2", rz="1AB2345")
+    assert a["status"] == "auto" and b["status"] == "auto"
+
+
+def test_intake_different_vehicle_still_auto_creates(conn):
+    """No false positives: another car at the same firm is unaffected."""
+    _firms(conn)
+    _push(conn, "z1", vin="VINAAAAAAAAAAAA1")
+    b = _push(conn, "z2", vin="VINBBBBBBBBBBBB2")
+    assert b["status"] == "auto"
+
+
+def test_intake_without_vehicle_ids_is_not_flagged(conn):
+    """A žádost with neither VIN nor RZ can't be matched to a car — it must not
+    be flagged against an unrelated úkon."""
+    _firms(conn)
+    a = _push(conn, "z1")
+    b = _push(conn, "z2")
+    assert a["status"] == "auto" and b["status"] == "auto"
+
+
+def test_find_by_vehicle_matching_rules(conn):
+    """Repo-level: newest-first, case/space-insensitive, firm-scoped."""
+    from services import ingest_service
+    c, other = _firms(conn)
+    old = ingest_service.pridat_ukon(conn, firma_id=c, datum="2026-05-01",
+                                     typ_kod="PŘEVOD", celkem=1300, vin="tmbep6pj7s4066544")
+    new = ingest_service.pridat_ukon(conn, firma_id=c, datum="2026-06-01",
+                                     typ_kod="PŘEVOD", celkem=1300, vin="TMBEP6PJ7S4066544")
+    hit = ukony_repo.find_by_vehicle(conn, firma_id=c, vin="  tmbep6pj7s4066544  ")
+    assert hit["id"] == new and new != old                      # newest wins
+    assert ukony_repo.find_by_vehicle(conn, firma_id=other, vin="TMBEP6PJ7S4066544") is None
+    assert ukony_repo.find_by_vehicle(conn, firma_id=c, vin="OTHERVIN000000001") is None
+    assert ukony_repo.find_by_vehicle(conn, firma_id=c) is None  # nothing to match on

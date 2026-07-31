@@ -7,7 +7,7 @@ one active firm matched) or leave the row pending for the Příchozí inbox.
 import sqlite3
 from datetime import date
 
-from repositories import prichozi_repo
+from repositories import prichozi_repo, ukony_repo
 from services import ingest_service, matching_service, pricing_service
 
 # žádost mode → tracker úkon type for the AUTO-create path only. Modes not listed
@@ -112,6 +112,20 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         celkem = pricing_service.effective_price(conn, firma_id, typ) or 0.0 if firma_id else 0.0
 
     if firma_id and typ:
+        # Same car, same firm, already logged? The zadost_id check at the top
+        # only catches the SAME žádost pushed twice; this catches the same
+        # VEHICLE arriving from two separate žádosti — normally a misclick in
+        # zadosti. Don't auto-create: hold it in the inbox flagged with the
+        # existing úkon so the user can confirm it's a genuine second job.
+        dup = ukony_repo.find_by_vehicle(conn, firma_id=firma_id, vin=vin, rz=rz)
+        if dup:
+            prichozi_repo.update(conn, pid, duplicate_ukon_id=dup["id"])
+            return {
+                "status": "pending",
+                "prichozi_id": pid,
+                "duplicate_ukon_id": dup["id"],
+            }
+
         # Two SEPARATE fields: the user's typed note (poznamka) and the automatic
         # "z koho → na koho" transfer line (prevod). A typed note no longer erases
         # the parties — both are stored and shown independently.

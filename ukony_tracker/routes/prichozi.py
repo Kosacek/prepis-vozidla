@@ -5,7 +5,7 @@ from datetime import date
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 
 import db
-from repositories import firmy_repo, typy_repo, prichozi_repo
+from repositories import firmy_repo, typy_repo, prichozi_repo, ukony_repo
 from services import ingest_service as ing
 from services import prichozi_service
 from services import pricing_service
@@ -37,6 +37,10 @@ def inbox():
         # "z koho → na koho" transfer is shown separately by the party rows and
         # stored automatically on approve, so it never lands in poznámka.
         d["note"] = ""
+        # Held back as a possible duplicate → load the existing úkon so the card
+        # can name it (číslo + datum) for the user's confirmation.
+        dup_id = d.get("duplicate_ukon_id")
+        d["dup"] = ukony_repo.get(conn, dup_id) if dup_id else None
         items.append(d)
     firmy = firmy_repo.list_all(conn, only_active=True)
     # Per-firm price maps so the inbox price field follows the chosen firm+type.

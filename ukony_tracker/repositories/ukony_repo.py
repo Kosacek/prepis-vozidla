@@ -49,6 +49,39 @@ def get(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM ukony WHERE id=?", (uid,)).fetchone()
 
 
+def find_by_vehicle(
+    conn: sqlite3.Connection,
+    *,
+    firma_id: int,
+    vin: str | None = None,
+    rz: str | None = None,
+) -> sqlite3.Row | None:
+    """Newest existing úkon for the SAME vehicle at the SAME firm, or None.
+
+    Vehicle identity is the VIN when present (it uniquely identifies the car);
+    the RZ is only the fallback, because a plate can move between cars. Matching
+    ignores case and surrounding spaces.
+
+    Used by the intake to spot the same car arriving twice from two DIFFERENT
+    žádosti — `zadost_id` only dedupes the same žádost being pushed twice.
+    """
+    v = (vin or "").strip()
+    r = (rz or "").strip()
+    if v:
+        col, val = "vin", v
+    elif r:
+        col, val = "rz", r
+    else:
+        return None  # nothing to identify the car by
+    # `col` is one of our own two literals above — never user input.
+    return conn.execute(
+        f"SELECT * FROM ukony WHERE firma_id=? AND {col} IS NOT NULL"
+        f" AND UPPER(TRIM({col}))=UPPER(TRIM(?))"
+        " ORDER BY datum DESC, id DESC LIMIT 1",
+        (firma_id, val),
+    ).fetchone()
+
+
 def count_by_firma(conn: sqlite3.Connection, firma_id: int) -> int:
     return conn.execute(
         "SELECT COUNT(*) n FROM ukony WHERE firma_id=?", (firma_id,)

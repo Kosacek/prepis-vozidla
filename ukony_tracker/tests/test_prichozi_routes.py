@@ -127,3 +127,58 @@ def test_discard_marks_discarded(client):
     assert r.status_code in (302, 303)
     with c.application.app_context():
         assert prichozi_repo.get(db.get_db(), pid)["status"] == "discarded"
+
+
+# ── same-vehicle duplicate flag ───────────────────────────────────────────────
+
+def _flagged_row(client):
+    """Seed an existing úkon + a pending žádost for the SAME car, flagged."""
+    c, fid, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        uid = ukony_repo.create(conn, firma_id=fid, datum="2026-06-14",
+                                typ_kod="PŘEVOD", celkem=1300,
+                                rz="9XX9999", vin="DUPVIN00000000001")
+        pid = prichozi_repo.create(
+            conn, zadost_id="dup-1", datum="2026-06-20", mode="prevod",
+            rz="9XX9999", vin="DUPVIN00000000001",
+            novy_jmeno="Cardion", novy_ico="11111111",
+            suggested_firma_id=fid, status="pending",
+        )
+        prichozi_repo.update(conn, pid, duplicate_ukon_id=uid)
+    return uid, pid
+
+
+def test_inbox_shows_duplicate_warning_with_ukon_number_and_date(client):
+    """A row held back by the guard names the existing úkon — číslo + datum —
+    and links to it so the user can check before confirming."""
+    c, _, _ = client
+    uid, _pid = _flagged_row(client)
+    body = c.get("/prichozi").get_data(as_text=True)
+    assert "Možný duplikát" in body
+    assert f"#{uid}" in body                    # číslo of the existing úkon
+    assert "14.06.2026" in body                 # its datum, day-first
+    assert f"/ukony/{uid}/upravit" in body      # clickable through to it
+
+
+def test_unflagged_rows_show_no_duplicate_warning(client):
+    """The plain seeded row (no duplicate) must not carry the warning."""
+    c, _, _ = client
+    assert "Možný duplikát" not in c.get("/prichozi").get_data(as_text=True)
+
+
+def test_flagged_duplicate_can_still_be_approved(client):
+    """The flag is advisory: confirming a genuine second job creates the úkon."""
+    c, fid, _ = client
+    uid, pid = _flagged_row(client)
+    r = c.post(f"/prichozi/{pid}/approve", data={
+        "firma_id": str(fid), "typ_kod": "PŘEVOD", "celkem": "1300",
+        "datum": "2026-06-20",
+    })
+    assert r.status_code in (302, 303)
+    with c.application.app_context():
+        conn = db.get_db()
+        row = prichozi_repo.get(conn, pid)
+        assert row["status"] == "approved"
+        assert row["created_ukon_id"] != uid          # a NEW úkon, not the old one
+        assert len(ukony_repo.list(conn, firma_id=fid)) == 2

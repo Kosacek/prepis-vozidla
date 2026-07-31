@@ -1345,6 +1345,18 @@ a.kpi-link:hover {
 /* Demoted owner line (e.g. the leasing company) under the operator headline. */
 .prichozi-parties .party-owner { font-size: 0.85rem; padding-left: 10px; }
 .prichozi-meta { margin-bottom: var(--sp-3); }
+/* Same-vehicle duplicate warning: this car already has an úkon at this firm, so
+   the žádost was held here instead of auto-created. */
+.prichozi-dup {
+  background: var(--flash-warning-bg);
+  color: var(--flash-warning-ink);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.prichozi-dup a { color: inherit; font-weight: 700; }
 .prichozi-fields {
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.7fr 1fr;
