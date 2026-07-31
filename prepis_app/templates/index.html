@@ -878,7 +878,32 @@ let generatedUrls = {};
 // Stable id for THIS žádost — sent to the evidence tracker so regenerating the
 // same form doesn't create a duplicate úkon. A fresh page ("Nová žádost"
 // reloads) gets a new one.
-let _zadostId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('z' + Date.now() + Math.random().toString(16).slice(2));
+let _zadostSeed = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('z' + Date.now() + Math.random().toString(16).slice(2));
+
+// Fields that decide WHICH úkon this is. The tracker dedups on zadost_id, so the
+// id must change exactly when one of these changes — otherwise a real úkon is
+// silently swallowed. The common flow that broke: generate, print, hit
+// "← Upravit údaje", change the last two VIN digits (same firm, next car),
+// generate again — a genuinely new úkon that never reached evidence because the
+// page had not reloaded and the id was minted once per page load.
+const ZADOST_IDENTITY = [
+  'mode', 'vin', 'registracni_znacka', 'zadost_zmena',
+  'puvodni_jmeno', 'puvodni_ico', 'puvodni_prov_ico',
+  'novy_jmeno', 'novy_ico', 'novy_prov_ico',
+  'evidence_firma_id', 'evidence_typ', 'evidence_cena',
+];
+
+// Per-page-load seed + a hash of the identity fields. Consequences, all wanted:
+//   regenerate an unchanged form  → same id → tracker dedups, no double úkon
+//   back → edit VIN → generate    → new id  → new úkon lands in evidence
+//   "Nová žádost" (page reload)   → new seed → even an identical vehicle is sent,
+//     and the tracker decides whether that is a duplicate worth queueing.
+function zadostIdFor(data) {
+  const s = ZADOST_IDENTITY.map(k => String(data[k] == null ? '' : data[k]).trim().toUpperCase()).join('|');
+  let h = 0x811c9dc5;                                   // FNV-1a 32-bit
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return _zadostSeed + '-' + h.toString(16).padStart(8, '0');
+}
 let _evidenceMeta = null;   // {firmy, typy, ceny} from evidence.spznaklic.cz
 
 // panel id → which HTML panel to show
@@ -1731,13 +1756,14 @@ async function generatePDFs() {
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
     profil:              (window.getProfil ? window.getProfil() : ''),
     // Evidence úkonu (evidence.spznaklic.cz) — stable id + the explicit choice.
-    zadost_id:           _zadostId,
+    zadost_id:           '',            // filled in below from the identity fields
     evidence_log:        cb('evidence_log'),
     evidence_firma_id:   v('evidence_firma'),
     evidence_typ:        v('evidence_typ'),
     evidence_cena:       v('evidence_cena'),
     evidence_poznamka:   v('evidence_poznamka'),
   };
+  data.zadost_id = zadostIdFor(data);
 
   document.getElementById('nav-next').disabled = true;
   document.getElementById('loading').style.display = 'block';
