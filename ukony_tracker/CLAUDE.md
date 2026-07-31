@@ -73,6 +73,12 @@ původního úkonu. Uživatel pak potvrdí (schválí = založí druhý úkon), 
 zahodí. Identita vozidla = VIN, když je; RZ jen jako fallback (značka se dá
 přendat na jiné auto). Porovnává se bez ohledu na velikost písmen a mezery.
 
+**Záměrně BEZ časového okna** (rozhodnutí Davida 2026-07-16): hledá se jakýkoliv
+starší úkon, ne jen za posledních N dní. Auta se vrací málokdy — reálný cíl je
+překlik typu „vyplnil jsem tutéž žádost dvakrát za večer". Když auto po roce
+legitimně přijede znovu, flag je v pořádku (uživatel potvrdí). Případné zúžení
+na 90/30 dní je možné později, ale **nepřidávej ho sám od sebe.**
+
 **Explicitní úkon z Přepisu (2026-07-11):** když v Přepisu na poslední straně
 (karta „Evidence úkonu") vybereš firmu + typ + cenu, pošlou se v payloadu jako
 `firma_id` / `typ_kod` / `celkem`. `prichozi_service.intake` je pak upřednostní
