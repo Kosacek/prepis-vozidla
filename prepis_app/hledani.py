@@ -550,12 +550,16 @@ def _volny_text(terms, vystupy, doklady, firmy, od, do, period, obdobi) -> dict:
 
 
 def _ok(headline, detail, period, filters, vystupy, doklady, firmy) -> dict:
+    # `limit` jde ven, aby UI mohlo přiznat oříznutý výpis. Headline říká
+    # „462 žádostí", ale vypsat jich jde 300 — mlčet o tom by byla přesně ta
+    # tichá nepřesnost, kterou tahle appka nesmí dělat.
     return {"understood": True, "headline": headline, "detail": detail,
             "period": period, "filters": filters, "vystupy": vystupy,
-            "doklady": doklady, "firmy": firmy, "priklady": PRIKLADY}
+            "doklady": doklady, "firmy": firmy, "priklady": PRIKLADY,
+            "limit": LIMIT}
 
 
 def _nic(period, headline, detail) -> dict:
     return {"understood": False, "headline": headline, "detail": detail,
             "period": period, "filters": [], "vystupy": [], "doklady": [],
-            "firmy": [], "priklady": PRIKLADY}
+            "firmy": [], "priklady": PRIKLADY, "limit": LIMIT}

@@ -1402,7 +1402,11 @@ function renderHledani(res) {
   if (res.detail) h += `<div class="hl-detail">${esc(res.detail)}</div>`;
 
   if ((res.vystupy || []).length) {
-    h += `<div class="hl-sec">Žádosti (${res.vystupy.length})</div>`;
+    // Když se výpis ořízl, musí to být vidět — headline mluví o víc záznamech,
+    // než kolik jich je v seznamu.
+    const orez = res.limit && res.vystupy.length >= res.limit
+      ? ` <span style="font-weight:400;text-transform:none;">— zobrazeno prvních ${res.limit}</span>` : '';
+    h += `<div class="hl-sec">Žádosti (${res.vystupy.length})${orez}</div>`;
     h += res.vystupy.map(v => {
       const kdo = [v.rz || v.vin, v.na].filter(Boolean).join(' · ');
       return `<a class="hl-row" href="${esc(v.url)}" target="_blank">

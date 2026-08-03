@@ -234,6 +234,16 @@ def test_gibberish_is_honest_and_offers_examples(hledej):
     assert r["priklady"], "musí nabídnout klikací příklady"
 
 
+def test_truncated_list_is_declared(vystupy, doklady, firmy, monkeypatch):
+    """Headline řekne 'N žádostí', ale výpis je omezený — UI to musí umět
+    přiznat, jinak vypadá zkrácený seznam jako úplný."""
+    monkeypatch.setattr(hledani, "LIMIT", 2)
+    r = hledani.hledej("co jsem dělal v červenci", vystupy, doklady, firmy, today=TODAY)
+    assert "3 žádosti" in r["headline"]     # kolik jich opravdu je
+    assert len(r["vystupy"]) == 2           # kolik se jich vypsalo
+    assert r["limit"] == 2                  # ať to UI pozná
+
+
 def test_empty_query(hledej):
     r = hledej("")
     assert not r["understood"] and r["vystupy"] == []
