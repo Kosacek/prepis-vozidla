@@ -12,6 +12,8 @@ PRIKLADY = [
     "Kolik úkonů jsme udělali tento měsíc?",
     "Kolik peněz za červenec?",
     "Nejlepší den?",
+    "Který den v týdnu máme nejvíc kusů?",
+    "Kolik děláme v pondělí?",
     "Která firma nejvíc?",
     "Kdo udělal nejvíc tento měsíc?",
     "Kolik převodů letos?",

@@ -222,3 +222,51 @@ def test_ask_page_renders_and_answers(tmp_path, monkeypatch):
 
         unknown = c.get("/zeptej?q=jaké bude počasí").get_data(as_text=True)
         assert "Tomu nerozumím." in unknown
+
+
+# ── den v týdnu ───────────────────────────────────────────────────────────────
+
+def test_weekday_breakdown_counts_pieces(data):
+    """'který den v týdnu má nejvíc kusů' seskupuje podle dne v týdnu (ne podle
+    data) a řadí podle POČTU. 07-01 ×2, 07-15 a 06-10 jsou všechno středy."""
+    conn, _, _ = data
+    r = ask(conn, "Který den v týdnu máme nejvíc kusů?")
+    assert r["understood"]
+    assert r["headline"].startswith("Nejvíc: středa")
+    assert "4 úkony" in r["headline"]                  # 1300+1300+1950+1300
+    labels = [row["label"] for row in r["rows"]]
+    assert "středa" in labels and "pondělí" in labels  # 07-20 je pondělí
+
+
+def test_weekday_breakdown_switches_to_money_when_asked(data):
+    """Na peníze se řadí podle Kč — jeden drahý úterní úkon přebije 4 středeční."""
+    conn, cardion, _ = data
+    ukony_repo.create(conn, firma_id=cardion, datum="2026-07-21",  # úterý
+                      typ_kod="PŘEVOD", celkem=20000, zpracoval="David")
+    by_count = ask(conn, "Který den v týdnu máme nejvíc kusů?")
+    by_money = ask(conn, "Který den v týdnu vyděláme nejvíc peněz?")
+    assert by_count["headline"].startswith("Nejvíc: středa")   # 4 kusy
+    assert by_money["headline"].startswith("Nejvíc: úterý")    # 20 000 Kč
+    assert "20 000 Kč" in by_money["headline"]
+
+
+def test_weekday_as_filter(data):
+    """'v pondělí' filtruje na pondělky (07-20 = pondělí, 5 000 Kč)."""
+    conn, _, _ = data
+    r = ask(conn, "Kolik děláme v pondělí?")
+    assert "1 úkon" in r["headline"] and "5 000 Kč" in r["headline"]
+    assert "pondělí" in r["filters"]
+
+
+def test_weekday_question_does_not_become_best_date(data):
+    """Nesmí spadnout do větve 'nejlepší den' (konkrétní datum)."""
+    conn, _, _ = data
+    r = ask(conn, "Který den v týdnu je nejlepší?")
+    assert "2026" not in r["headline"]          # není to konkrétní datum
+    assert r["detail"] == "Podle dne v týdnu:"
+
+
+def test_this_week_still_parses_as_period(data):
+    """'tento týden' zůstává obdobím, nezmění se na rozpad podle dnů."""
+    conn, _, _ = data
+    assert ask_service.parse_period("tento týden", TODAY)[2] == "tento týden"

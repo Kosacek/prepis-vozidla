@@ -164,6 +164,30 @@ _STOP = {
 _STOP |= {stem for stem, _ in _MONTH_STEMS}
 
 
+# Dny v týdnu — SQLite strftime('%w') je 0=neděle … 6=sobota.
+_DNY_NAZVY = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"]
+_DNY_STEMY: list[tuple[str, int]] = sorted([
+    ("pondeli", 1), ("pondelek", 1), ("pondelku", 1),
+    ("utery", 2), ("uterku", 2), ("uter", 2),
+    ("streda", 3), ("stredu", 3), ("stredy", 3),
+    ("ctvrtek", 4), ("ctvrtka", 4), ("ctvrtku", 4),
+    ("patek", 5), ("patku", 5), ("patky", 5),
+    ("sobota", 6), ("sobotu", 6), ("soboty", 6),
+    ("nedele", 0), ("nedeli", 0),
+], key=lambda p: -len(p[0]))
+
+# Names of weekdays must never be mistaken for a customer in the text search.
+_STOP |= {stem for stem, _ in _DNY_STEMY}
+
+
+def _match_weekday(f: str) -> int | None:
+    """Weekday mentioned in the question (0=neděle … 6=sobota), or None."""
+    for stem, dow in _DNY_STEMY:
+        if stem in f:
+            return dow
+    return None
+
+
 def _match_firma(conn: sqlite3.Connection, f: str):
     """Longest firm name mentioned in the question, or None."""
     best = None
@@ -202,8 +226,11 @@ def _leftover_terms(f: str) -> list[str]:
 _FIRMA_JOIN = " JOIN firmy f ON f.id = u.firma_id"
 
 
-def _filters(od, do, firma=None, osoba=None, typ=None, stav=None):
+def _filters(od, do, firma=None, osoba=None, typ=None, stav=None, dow=None):
     where, args = [], []
+    if dow is not None:
+        where.append("CAST(strftime('%w', u.datum) AS INTEGER) = ?")
+        args.append(dow)
     if od:
         where.append("u.datum >= ?")
         args.append(od)
@@ -232,11 +259,12 @@ def _totals(conn, clause, args) -> tuple[int, float]:
     return r["n"], r["kc"]
 
 
-def _group(conn, clause, args, expr, join="", limit=8):
+def _group(conn, clause, args, expr, join="", limit=8, order="kc"):
+    by = "n" if order == "n" else "kc"
     return conn.execute(
         f"SELECT {expr} AS label, COUNT(*) n, COALESCE(SUM(u.celkem),0) kc"
         f" FROM ukony u{join}{clause} GROUP BY label"
-        f" ORDER BY kc DESC LIMIT {int(limit)}",
+        f" ORDER BY {by} DESC LIMIT {int(limit)}",
         args,
     ).fetchall()
 
@@ -282,8 +310,14 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
     osoba = _match_osoba(f)
     typ = _match_typ(conn, f)
     stav = "nezaplaceno" if ("nezaplac" in f or "dluh" in f or "dluzi" in f) else None
+    # "v pondělí" filters to Mondays; the breakdown question ("který den v týdnu")
+    # is handled separately below and must NOT be treated as a filter.
+    rozpad_dnu = ("tydnu" in f or "tydne" in f or "vsedni" in f)
+    dow = None if rozpad_dnu else _match_weekday(f)
 
     filters = []
+    if dow is not None:
+        filters.append(_DNY_NAZVY[dow])
     if firma is not None:
         filters.append(firma["zkratka"])
     if osoba:
@@ -298,8 +332,22 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
     superlative = any(w in f for w in ("nejlepsi", "nejvic", "top", "rekord",
                                        "nejhorsi", "nejmin", "nejmene", "nejcastejsi"))
 
-    clause, args = _filters(od, do, firma, osoba, typ, stav)
+    clause, args = _filters(od, do, firma, osoba, typ, stav, dow)
     obdobi = "" if period == "celkem" else f" ({period})"
+
+    # 0) rozpad podle DNE V TÝDNU ("který den v týdnu máme nejvíc kusů?").
+    # Musí předcházet „nejlepší den", který seskupuje podle konkrétního data.
+    if rozpad_dnu:
+        rows = _group(conn, clause, args, "CAST(strftime('%w', u.datum) AS INTEGER)",
+                      limit=7, order="kc" if wants_money else "n")
+        if not rows:
+            return _empty(period, filters)
+        top = rows[0]
+        jmeno = lambda r: _DNY_NAZVY[int(r["label"])]
+        return _ok(f"Nejvíc{obdobi}: {jmeno(top)} — {_ukony(top['n'])} za {kc(top['kc'])}",
+                   "Podle dne v týdnu:",
+                   [{"label": jmeno(r), "n": r["n"], "kc": r["kc"]} for r in rows],
+                   period, filters)
 
     # 1) nejlepší den / měsíc
     if superlative and any(w in f for w in ("den", "dne", "dni", "dnu")):
@@ -366,7 +414,7 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
     # 5) volný text — jméno protistrany, RZ, VIN ("kolik práce od Radima Vyškova").
     # MUSÍ být před součtem: jinak by dotaz se slovem „kolik" spadl do celkového
     # součtu a jméno by se ignorovalo.
-    if firma is None and not osoba and not typ and not stav:
+    if firma is None and not osoba and not typ and not stav and dow is None:
         terms = _leftover_terms(f)
         if terms:
             alt = _fallback_text(conn, terms, od, do, period)
@@ -374,7 +422,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
                 return alt
 
     # 6) prostý součet (s filtry) — nejčastější dotaz
-    if firma is not None or osoba or typ or stav or period != "celkem" or "kolik" in f:
+    if (firma is not None or osoba or typ or stav or dow is not None
+            or period != "celkem" or "kolik" in f):
         n, total = _totals(conn, clause, args)
         popis = ", ".join(filters)
         kdo = f" — {popis}" if popis else ""
