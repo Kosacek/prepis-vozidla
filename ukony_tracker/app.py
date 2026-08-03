@@ -84,6 +84,8 @@ def create_app():
     app.register_blueprint(prichozi_bp)
     from routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
+    from routes.ask import bp as ask_bp
+    app.register_blueprint(ask_bp)
 
     @app.get("/health")
     def health():

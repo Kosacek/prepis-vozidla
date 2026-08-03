@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Zeptej se{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Zeptej se</h1>
+</div>
+
+<div class="card">
+  <form method="get" action="/zeptej" class="ask-form">
+    <input type="search" name="q" class="ask-input" value="{{ q }}" autocomplete="off"
+           autofocus placeholder="Např. kolik peněz za červenec?">
+    <button type="submit" class="btn btn-primary">Zeptat se</button>
+  </form>
+</div>
+
+{% if res %}
+<div class="card ask-answer {{ '' if res.understood else 'ask-answer--unknown' }}">
+  <div class="ask-headline">{{ res.headline }}</div>
+  {% if res.detail %}<div class="muted small ask-detail">{{ res.detail }}</div>{% endif %}
+
+  {% if res.rows %}
+  <div class="ask-rows">
+    {% for r in res.rows %}
+    <div class="ask-row">
+      <span class="ask-row__label">{{ r.label }}</span>
+      <span class="ask-row__n muted">{{ r.n }}×</span>
+      <span class="ask-row__kc"><b>{{ r.kc | round | int }} Kč</b></span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="muted small" style="margin-bottom: var(--sp-3);">Příklady — klikni:</div>
+  <div class="chips">
+    {% for p in priklady %}
+      <a class="chip" href="/zeptej?q={{ p | urlencode }}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  <div class="muted small" style="margin-top: var(--sp-4); line-height:1.5;">
+    Počítá se přímo z databáze úkonů — žádná AI, takže čísla vždycky sedí.
+    Období: dnes, včera, tento/minulý týden, tento/minulý měsíc, název měsíce,
+    letos, loni, posledních N dní.
+  </div>
+</div>
+
+{% endblock %}

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=39">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=40">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
@@ -17,6 +17,7 @@
         <a href="/ukony">Úkony</a>
         <a href="/prichozi">Příchozí{% if nav_prichozi_count %} <span class="nav-badge">{{ nav_prichozi_count }}</span>{% endif %}</a>
         <a href="/firmy">Firmy</a>
+        <a href="/zeptej">Zeptej se</a>
         <a href="/export">Export</a>
       </nav>
       <form method="post" action="/logout" class="logout-form">
