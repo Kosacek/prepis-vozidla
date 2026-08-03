@@ -14,6 +14,7 @@ from datetime import datetime
 from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
+import hledani  # deterministic history search (no AI) — see hledani.py
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -37,7 +38,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.31"
+__version__ = "1.3.32"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1206,7 +1207,40 @@ def api_generate():
         except Exception as e:
             _log.warning("tracker push skipped: %s", e)
 
+    # ── Index the žádost for the 🔍 history search ───────────────────────────
+    # The output filename carries only a timestamp, so without this line a
+    # question like "kdy jsem tiskl 3BR4008" could never be answered without
+    # opening every PDF. Swallows its own errors — search is a convenience.
+    hledani.zapis_vystup(
+        DATA_DIR,
+        [result[k] for k in ("zmeny", "zapis", "zmena") if result.get(k)],
+        data,
+    )
+
     return jsonify(result)
+
+@app.route("/api/outputs", methods=["GET"])
+def api_outputs():
+    """Generated žádosti (newest first). Until this existed the only way to see
+    what had been generated was to open the folder on the NAS."""
+    return jsonify(hledani.nacti_vystupy(DATA_DIR))
+
+
+@app.route("/api/hledat", methods=["GET"])
+def api_hledat():
+    """Deterministic history search over výstupy + doklady + firmy.
+
+    No AI: the question is parsed into a structured query and every record comes
+    from the files themselves, so amounts and receipt numbers are always real.
+    """
+    q = (request.args.get("q") or "").strip()
+    return jsonify(hledani.hledej(
+        q,
+        hledani.nacti_vystupy(DATA_DIR),
+        ppd.read_ppd_log(DATA_DIR),
+        read_firmy(),
+    ))
+
 
 @app.route("/api/ppd-list", methods=["GET"])
 def api_ppd_list():

@@ -27,4 +27,36 @@ if not ppd.read_backup(DATA):
         "purpose": "Zastupování na MMB", "spz": "1AB 2345", "vin": "",
     })
 
+# Pár vygenerovaných žádostí + index, ať má 🔍 hledání co zobrazit.
+import hledani  # noqa: E402
+
+OUT = os.path.join(DATA, "output")
+os.makedirs(OUT, exist_ok=True)
+_SEED = [
+    ("zmeny_20260715_100000.pdf", {"registracni_znacka": "3BR4008", "vin": "",
+     "znacka": "Škoda Octavia", "puvodni_jmeno": "AUTO CARDION s. r. o.",
+     "novy_jmeno": "JAN NOVÁK"}),
+    ("zapis_20260715_113000.pdf", {"registracni_znacka": "", "vin": "TMBJJ7NE5J0123456",
+     "znacka": "Toyota Corolla", "puvodni_jmeno": "",
+     "novy_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O."}),
+    ("zmeny_20260720_090000.pdf", {"registracni_znacka": "1AB2345", "vin": "",
+     "znacka": "Volvo XC60", "puvodni_jmeno": "AUTO CARDION s. r. o.",
+     "novy_jmeno": "PETR SVOBODA"}),
+]
+if not app.read_firmy():
+    app.save_firmy([
+        {"nazev": "AUTO CARDION s. r. o.", "ico": "04156854",
+         "adresa": "Veverkova 1234/5, Brno", "psc": "60200", "id": "5"},
+        {"nazev": "Albion Cars s.r.o.", "ico": "04168313",
+         "adresa": "Náměstí 1, Praha", "psc": "11000", "id": "7"},
+    ])
+
+if not hledani.nacti_index(DATA):
+    for name, meta in _SEED:
+        path = os.path.join(OUT, name)
+        if not os.path.exists(path):
+            with open(path, "wb") as fh:
+                fh.write(b"%PDF-1.4\n% preview placeholder\n")
+        hledani.zapis_vystup(DATA, [name], meta)
+
 app.app.run(host="127.0.0.1", port=5055)

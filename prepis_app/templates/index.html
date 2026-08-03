@@ -283,10 +283,40 @@
   .btn-secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
   .btn-secondary:hover { background: var(--bg); }
 
+  /* ── Hledání v historii ──────────────────────────────────────────────────
+     Vše je flex + wrap, ŽÁDNÉ pevné pixelové sloupce: přesně na tom se
+     v sesterské evidenci rozbil mobil (vodorovný posuvník na 375 px). */
+  .hl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hl-chip {
+    padding: 6px 10px; border-radius: 999px; border: 1.5px solid var(--border);
+    background: #fff; cursor: pointer; font-size: 12px; color: var(--text);
+  }
+  .hl-chip:hover { background: var(--accent); border-color: var(--primary); }
+  .hl-answer { padding: 12px 16px 0; }
+  .hl-headline { font-size: 15px; font-weight: 700; }
+  .hl-headline.unknown { color: var(--muted); font-weight: 600; }
+  .hl-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .hl-sec { font-size: 11px; font-weight: 700; color: var(--muted);
+            text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
+  .hl-row {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 6px; text-decoration: none; color: var(--text); font-size: 13px;
+  }
+  a.hl-row:hover { background: var(--accent); border-color: var(--primary); }
+  .hl-badge { font-size: 11px; font-weight: 700; color: var(--primary);
+              background: var(--accent); padding: 2px 7px; border-radius: 5px; }
+  .hl-when { font-weight: 600; }
+  .hl-sub  { color: var(--muted); font-size: 12px; min-width: 0;
+             overflow-wrap: anywhere; }
+  .hl-kc   { margin-left: auto; font-weight: 700; white-space: nowrap; }
+
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
     .nav-bar { padding: 0 16px; }
     .step-lbl { display: none; }
+    /* Čtvrté tlačítko v hlavičce se na telefon nevejde do jedné řady. */
+    .app-header { flex-wrap: wrap; gap: 10px; }
   }
 </style>
 </head>
@@ -299,6 +329,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <button onclick="openProfilModal()" id="profil-chip" title="Kdo vyplňuje — kliknutím změníš" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">👤 <span id="profil-name">—</span></button>
+    <button onclick="openHledaniModal()" title="Hledat v historii — žádosti, doklady, firmy" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🔍</button>
     <button onclick="openDokladyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🧾 Doklady</button>
     <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
   </div>
@@ -345,6 +376,22 @@
       <input type="text" id="doklady-search" class="no-uc" placeholder="Hledat (číslo, jméno, IČO, datum…)" oninput="renderDoklady()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
     </div>
     <div class="modal-body" id="doklady-modal-body">Načítám…</div>
+  </div>
+</div>
+
+<!-- Hledání v historii (žádosti / doklady / firmy) -->
+<div class="modal-overlay" id="hledani-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🔍 Hledat v historii</h3>
+      <button class="modal-close" onclick="closeHledaniModal()">✕</button>
+    </div>
+    <div style="padding:12px 16px 0;">
+      <input type="text" id="hledani-q" class="no-uc" placeholder="Např. co jsem dělal 15.7."
+             autocomplete="off" oninput="hledaniInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();spustHledani();}"
+             style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    </div>
+    <div class="modal-body" id="hledani-body"></div>
   </div>
 </div>
 
@@ -1278,6 +1325,116 @@ document.addEventListener('keydown', e => {
 // ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
 let _dokladyCache = [];
 let _dokladyDeletedCache = [];
+// ── Hledání v historii ────────────────────────────────────────────────────────
+// Dotaz parsuje server deterministicky (hledani.py) — tady se jen vykresluje.
+// Žádná AI: každý řádek níž je skutečný soubor / doklad / firma.
+let _hlTimer = null;
+let _hlPriklady = [];
+
+async function openHledaniModal() {
+  document.getElementById('hledani-modal').style.display = 'flex';
+  const q = document.getElementById('hledani-q');
+  q.value = '';
+  document.getElementById('hledani-body').innerHTML = '';
+  if (!_hlPriklady.length) {
+    try {
+      const res = await fetch('/api/hledat?q=').then(r => r.json());
+      _hlPriklady = res.priklady || [];
+    } catch (e) { /* příklady jsou nice-to-have */ }
+  }
+  renderHledaniUvod();
+  setTimeout(() => q.focus(), 50);
+}
+
+function closeHledaniModal() {
+  const m = document.getElementById('hledani-modal');
+  if (m) m.style.display = 'none';
+  if (_hlTimer) { clearTimeout(_hlTimer); _hlTimer = null; }
+}
+
+function hledaniInput() {
+  if (_hlTimer) clearTimeout(_hlTimer);
+  _hlTimer = setTimeout(spustHledani, 250);   // ať se nestřílí dotaz na každé písmeno
+}
+
+function hledejPriklad(p) {
+  document.getElementById('hledani-q').value = p;
+  spustHledani();
+}
+
+function _hlChips() {
+  if (!_hlPriklady.length) return '';
+  return '<div class="hl-sec">Příklady — klikni</div><div class="hl-chips">' +
+    _hlPriklady.map(p => `<button class="hl-chip" onclick="hledejPriklad('${esc(p).replace(/'/g, "\\'")}')">${esc(p)}</button>`).join('') +
+    '</div>';
+}
+
+function renderHledaniUvod() {
+  document.getElementById('hledani-body').innerHTML =
+    '<div class="hl-answer"><div class="hl-detail">Žádosti, doklady i firmy — počítá se přímo z dat, ' +
+    'takže čísla vždycky sedí.</div>' + _hlChips() + '</div>';
+}
+
+async function spustHledani() {
+  const q = (document.getElementById('hledani-q').value || '').trim();
+  const body = document.getElementById('hledani-body');
+  if (!q) { renderHledaniUvod(); return; }
+  body.innerHTML = '<div class="hl-answer"><div class="hl-detail">Hledám…</div></div>';
+  try {
+    renderHledani(await fetch('/api/hledat?q=' + encodeURIComponent(q)).then(r => r.json()));
+  } catch (e) {
+    body.innerHTML = '<div class="hl-answer"><div class="hl-headline unknown">Hledání se nepovedlo.</div></div>';
+  }
+}
+
+function _kcFmt(v) {
+  const n = parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
+  return isNaN(n) ? '' : String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Kč';
+}
+
+function _czDate(iso) {
+  return (iso && iso.length >= 10) ? `${iso.slice(8,10)}.${iso.slice(5,7)}.${iso.slice(0,4)}` : (iso || '');
+}
+
+function renderHledani(res) {
+  let h = '<div class="hl-answer">';
+  h += `<div class="hl-headline${res.understood ? '' : ' unknown'}">${esc(res.headline || '')}</div>`;
+  if (res.detail) h += `<div class="hl-detail">${esc(res.detail)}</div>`;
+
+  if ((res.vystupy || []).length) {
+    h += `<div class="hl-sec">Žádosti (${res.vystupy.length})</div>`;
+    h += res.vystupy.map(v => {
+      const kdo = [v.rz || v.vin, v.na].filter(Boolean).join(' · ');
+      return `<a class="hl-row" href="${esc(v.url)}" target="_blank">
+        <span class="hl-badge">${esc(v.typ)}</span>
+        <span class="hl-when">${_czDate(v.datum)}</span>
+        <span class="hl-sub">${esc(v.cas)}${kdo ? ' · ' + esc(kdo) : ''}</span></a>`;
+    }).join('');
+  }
+
+  if ((res.doklady || []).length) {
+    h += `<div class="hl-sec">Doklady (${res.doklady.length})</div>`;
+    h += res.doklady.map(d => `<a class="hl-row" href="${esc(d.url)}" target="_blank">
+        <span class="hl-badge">č. ${esc(d.cislo)}</span>
+        <span class="hl-when">${_czDate(d.datum)}</span>
+        <span class="hl-sub">${esc(d.prijato_od || '')}${d.vozidlo ? ' · ' + esc(d.vozidlo) : ''}</span>
+        <span class="hl-kc">${_kcFmt(d.castka)}</span></a>`).join('');
+  }
+
+  if ((res.firmy || []).length) {
+    h += `<div class="hl-sec">Firmy (${res.firmy.length})</div>`;
+    h += res.firmy.map(f => `<div class="hl-row">
+        <span class="hl-when">${esc(f.nazev || '')}</span>
+        <span class="hl-sub">IČO ${esc(f.ico || '—')}${f.id ? ' · ID ' + esc(f.id) : ''}</span>
+        ${f.has_plna_moc ? `<a class="hl-kc" style="font-weight:600;font-size:12px;" href="/plna-moc/${esc(f.ico)}" target="_blank">📋 plná moc</a>` : ''}
+      </div>`).join('');
+  }
+
+  if (!res.understood) h += _hlChips();
+  h += '</div>';
+  document.getElementById('hledani-body').innerHTML = h;
+}
+
 async function openDokladyModal() {
   document.getElementById('doklady-modal').style.display = 'flex';
   document.getElementById('doklady-modal-body').innerHTML = 'Načítám…';
