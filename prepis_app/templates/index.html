@@ -210,7 +210,16 @@
   .mode-card:hover { border-color: var(--primary); background: var(--accent); }
   .mode-card:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.2); }
   .mode-card.selected { border-color: var(--primary); background: var(--accent); }
-  .mode-icon { font-size: 28px; flex-shrink: 0; }
+  /* Ikona v kartě sedí v jemném čtverci — tři možnosti jdou tím pádem
+     rozeznat periferně, bez čtení popisků. Vybraná karta ho obrátí. */
+  .mode-icon {
+    flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px;
+    background: var(--accent); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s;
+  }
+  .mode-card:hover .mode-icon,
+  .mode-card.selected .mode-icon { background: var(--primary); color: #fff; }
 
   /* Profil (kdo vyplňuje) choice cards — same language as .mode-card */
   .profil-card { width: 100%; border: 2px solid var(--border); border-radius: var(--radius); padding: 15px 18px; background: #fff; color: var(--text); font-size: 16px; font-weight: 700; cursor: pointer; transition: all .15s; }
@@ -283,6 +292,37 @@
   .btn-secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
   .btn-secondary:hover { background: var(--bg); }
 
+  /* ── Hlavička ─────────────────────────────────────────────────────────────
+     Na mobilu se čtyři tlačítka s popisky do jedné řady nevejdou. Místo
+     zalamování do dvou řad (což odsouvalo obsah stránky dolů) se schovají
+     jen POPISKY — ikona zůstane, takže cluster je pořád jedna řada a cíle
+     zůstávají na stejném místě. Proto ta ikonová sada vůbec dává smysl. */
+  .app-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-brand { min-width: 0; }
+  .app-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .hbtn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: #fff; color: var(--text); cursor: pointer;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .hbtn:hover { border-color: var(--primary); background: var(--accent); color: var(--primary); }
+  .hbtn:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.2); }
+  .hbtn .ico { color: var(--muted); transition: color .15s; }
+  .hbtn:hover .ico { color: var(--primary); }
+  .hbtn-icon { padding: 8px 10px; }
+
+  /* ── Ikony ────────────────────────────────────────────────────────────────
+     Tah se nescaluje s velikostí (vector-effect by ztenčil velké ikony), proto
+     má .ico-lg vlastní, o něco tenčí stroke — jinak by 26px ikona působila
+     těžkopádně vedle 18px sourozenců. */
+  .ico { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: currentColor;
+         stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .ico-lg { width: 26px; height: 26px; stroke-width: 1.5; }
+  .ico-xl { width: 44px; height: 44px; stroke-width: 1.4; }
+  .ico-muted { color: var(--muted); }
+
   /* ── Hledání v historii ──────────────────────────────────────────────────
      Vše je flex + wrap, ŽÁDNÉ pevné pixelové sloupce: přesně na tom se
      v sesterské evidenci rozbil mobil (vodorovný posuvník na 375 px). */
@@ -315,23 +355,50 @@
     .form-grid { grid-template-columns: 1fr; }
     .nav-bar { padding: 0 16px; }
     .step-lbl { display: none; }
-    /* Čtvrté tlačítko v hlavičce se na telefon nevejde do jedné řady. */
-    .app-header { flex-wrap: wrap; gap: 10px; }
+    /* Popisky pryč, ikony zůstávají — cluster se vejde do jedné řady. */
+    .hbtn-lbl { display: none; }
+    .hbtn { padding: 9px 11px; }
+    .app-actions { gap: 6px; }
+    .subtitle { display: none; }
   }
 </style>
 </head>
 <body>
 
-<header class="app-header" style="display:flex;align-items:center;justify-content:space-between;">
-  <div>
+<!-- Ikony: jedna inline SVG sada, ŽÁDNÉ CDN (appka musí jet i bez internetu k
+     cizím doménám) a žádné emoji. Emoji kreslí každý systém jinak — na Windows,
+     Androidu a iPhonu to byly tři různé sady — a neumí zdědit barvu textu.
+     Používá se svg.ico s odkazem use na #i-<nazev>; tah i barva
+     se dědí z .ico, takže ikona umí být modrá, šedá i bílá podle kontextu. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16"/><path d="M12 10h7a1 1 0 0 1 1 1v10"/><path d="M3 21h18"/><path d="M7 8h.01M7 12h.01M7 16h.01M16 14h.01M16 18h.01"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 8h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="3.2"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M4 17l4.5-4.5 3 3L15 12l5 5"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="15" width="10" height="6" rx="1"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/><path d="M9 13h6M9 17h4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 4h4"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-transfer" viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M13.5 5.5L17 9l-3.5 3.5"/><path d="M20 15H7"/><path d="M10.5 11.5L7 15l3.5 3.5"/></symbol>
+  <symbol id="i-plus-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 20v-5M5 11V4M12 20v-8M12 8V4M19 20v-4M19 12V4"/><path d="M2.5 15h5M9.5 8h5M16.5 16h5"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></symbol>
+</svg>
+
+<header class="app-header">
+  <div class="app-brand">
     <div class="logo">Přepis Vozidla</div>
     <div class="subtitle">Automatické vyplnění žádosti</div>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <button onclick="openProfilModal()" id="profil-chip" title="Kdo vyplňuje — kliknutím změníš" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">👤 <span id="profil-name">—</span></button>
-    <button onclick="openHledaniModal()" title="Hledat v historii — žádosti, doklady, firmy" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🔍</button>
-    <button onclick="openDokladyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">🧾 Doklady</button>
-    <button onclick="openFirmyModal()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">⚙️ Správa firem</button>
+  <div class="app-actions">
+    <button onclick="openProfilModal()" id="profil-chip" class="hbtn" title="Kdo vyplňuje — kliknutím změníš"><svg class="ico"><use href="#i-user"></use></svg> <span id="profil-name">—</span></button>
+    <button onclick="openHledaniModal()" class="hbtn hbtn-icon" title="Hledat v historii — žádosti, doklady, firmy" aria-label="Hledat v historii"><svg class="ico"><use href="#i-search"></use></svg></button>
+    <button onclick="openDokladyModal()" class="hbtn" title="Vystavené doklady"><svg class="ico"><use href="#i-receipt"></use></svg><span class="hbtn-lbl">Doklady</span></button>
+    <button onclick="openFirmyModal()" class="hbtn" title="Správa firem a plných mocí"><svg class="ico"><use href="#i-building"></use></svg><span class="hbtn-lbl">Správa firem</span></button>
   </div>
 </header>
 
@@ -358,7 +425,7 @@
 <div class="modal-overlay" id="firmy-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>⚙️ Správa firem a plných mocí</h3>
+      <h3><svg class="ico"><use href="#i-building"></use></svg> Správa firem a plných mocí</h3>
       <button class="modal-close" onclick="closeFirmyModal()">✕</button>
     </div>
     <div class="modal-body" id="firmy-modal-body">Načítám...</div>
@@ -369,7 +436,7 @@
 <div class="modal-overlay" id="doklady-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>🧾 Vystavené doklady (PPD)</h3>
+      <h3><svg class="ico"><use href="#i-receipt"></use></svg> Vystavené doklady (PPD)</h3>
       <button class="modal-close" onclick="closeDokladyModal()">✕</button>
     </div>
     <div style="padding:12px 16px 0;">
@@ -383,7 +450,7 @@
 <div class="modal-overlay" id="hledani-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>🔍 Hledat v historii</h3>
+      <h3><svg class="ico"><use href="#i-search"></use></svg> Hledat v historii</h3>
       <button class="modal-close" onclick="closeHledaniModal()">✕</button>
     </div>
     <div style="padding:12px 16px 0;">
@@ -406,21 +473,21 @@
       <div class="card-title">Typ operace</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div class="mode-card selected" data-mode="prevod" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
-          <div class="mode-icon">🔄</div>
+          <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-transfer"></use></svg></div>
           <div>
             <div class="mode-title">Převod vlastnictví</div>
             <div class="mode-desc">Přepis vozidla — změna vlastníka nebo provozovatele. Generuje zmeny.pdf + zapis.pdf.</div>
           </div>
         </div>
         <div class="mode-card" data-mode="zapis" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
-          <div class="mode-icon">🆕</div>
+          <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-plus-circle"></use></svg></div>
           <div>
             <div class="mode-title">Zápis nového vozidla</div>
             <div class="mode-desc">První registrace vozidla v ČR. Generuje pouze zapis.pdf.</div>
           </div>
         </div>
         <div class="mode-card" data-mode="zmena" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
-          <div class="mode-icon">🔧</div>
+          <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-sliders"></use></svg></div>
           <div>
             <div class="mode-title">Změna technických údajů</div>
             <div class="mode-desc">Změny v registru (zápis A50-X, ...). Generuje zmena_udaju.pdf.</div>
@@ -436,10 +503,10 @@
       <div id="camera-container" style="display:none;margin-bottom:12px;">
         <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;transform:rotate(180deg);"></video>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="flex:2;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">📸 Skenovat ORV <span style="opacity:.7;font-weight:500;font-size:12px;">⌨ NumPad Enter</span></button>
+          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="flex:2;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span style="opacity:.7;font-weight:500;font-size:12px;">⌨ NumPad Enter</span></button>
           <button onclick="capturePhoto()" title="Přidat fotku do dávky bez skenování" style="padding:10px 14px;background:#fff;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);">+ Foto do dávky</button>
           <button onclick="closeCamera()" style="padding:10px 14px;background:#f3f4f6;border:1.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">✕ Zavřít</button>
-          <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;">🤖 Sonnet</button>
+          <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-spark"></use></svg> <span id="model-name">Sonnet</span></button>
         </div>
       </div>
       <canvas id="camera-canvas" style="display:none;"></canvas>
@@ -449,12 +516,12 @@
 
       <!-- Action buttons -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button onclick="openCamera()" style="padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;">📷 Kamera</button>
+        <button onclick="openCamera()" style="padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;"><svg class="ico"><use href="#i-camera"></use></svg> Kamera</button>
         <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;background:#fff;">
-          <span>📎 Ze souboru</span>
+          <span><svg class="ico"><use href="#i-photo"></use></svg> Ze souboru</span>
           <input type="file" id="scan-all-input" accept="image/*" multiple style="display:none" onchange="addScanFiles(this)">
         </label>
-        <button id="scan-all-btn" onclick="scanAll()" style="padding:8px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:none;">🔍 Skenovat vše</button>
+        <button id="scan-all-btn" onclick="scanAll()" style="padding:8px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:none;align-items:center;gap:6px;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat vše</button>
       </div>
       <div class="scan-result" id="scan-all-result"></div>
     </div>
@@ -843,15 +910,15 @@
       </div>
     </div>
     <div class="card output-card" id="output-card" style="display:none;">
-      <div class="check">✅</div>
+      <div class="check"><svg class="ico ico-xl" style="color:var(--success)"><use href="#i-check-circle"></use></svg></div>
       <h2>Hotovo!</h2>
       <p>Připraveno k tisku.</p>
       <div class="out-actions">
         <div class="out-row">
-          <button id="btn-ppd" class="btn-download btn-ppd" onclick="printPpd()" style="display:none;">🧾 Vytisknout PPD</button>
-          <button class="btn-download btn-print" onclick="printAll()">🖨️ Vytisknout žádost</button>
+          <button id="btn-ppd" class="btn-download btn-ppd" onclick="printPpd()" style="display:none;"><svg class="ico"><use href="#i-receipt"></use></svg> Vytisknout PPD</button>
+          <button class="btn-download btn-print" onclick="printAll()"><svg class="ico"><use href="#i-printer"></use></svg> Vytisknout žádost</button>
         </div>
-        <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám">🛡️ Zkontrolovat pojištění (ČKP)</button>
+        <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám"><svg class="ico"><use href="#i-shield"></use></svg> Zkontrolovat pojištění (ČKP)</button>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
       <div class="out-reset">
@@ -1430,7 +1497,7 @@ function renderHledani(res) {
     h += res.firmy.map(f => `<div class="hl-row">
         <span class="hl-when">${esc(f.nazev || '')}</span>
         <span class="hl-sub">IČO ${esc(f.ico || '—')}${f.id ? ' · ID ' + esc(f.id) : ''}</span>
-        ${f.has_plna_moc ? `<a class="hl-kc" style="font-weight:600;font-size:12px;" href="/plna-moc/${esc(f.ico)}" target="_blank">📋 plná moc</a>` : ''}
+        ${f.has_plna_moc ? `<a class="hl-kc" style="font-weight:600;font-size:12px;" href="/plna-moc/${esc(f.ico)}" target="_blank"><svg class="ico"><use href="#i-file"></use></svg> plná moc</a>` : ''}
       </div>`).join('');
   }
 
@@ -1488,8 +1555,8 @@ function renderDoklady() {
           <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
           <td>${esc(String(d.ucel || ''))}</td>
           <td style="white-space:nowrap">
-            <a href="/ppd-print/${esc(String(d.cislo))}" target="_blank" class="btn-sm" style="text-decoration:none" title="Vytisknout na A5">🖨️ Tisk</a>
-            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;margin-left:4px">🧾 PDF</a>
+            <a href="/ppd-print/${esc(String(d.cislo))}" target="_blank" class="btn-sm" style="text-decoration:none" title="Vytisknout na A5"><svg class="ico"><use href="#i-printer"></use></svg> Tisk</a>
+            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;margin-left:4px"><svg class="ico"><use href="#i-receipt"></use></svg> PDF</a>
             <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
           </td>
         </tr>`).join('')}</tbody>
@@ -1500,7 +1567,7 @@ function renderDoklady() {
   const del = _dokladyDeletedCache || [];
   if (del.length) {
     html += `<details class="doklady-deleted" style="margin-top:16px">
-      <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 4px;user-select:none">🗑 Smazané doklady — záloha (${del.length}) · lze obnovit</summary>
+      <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 4px;user-select:none"><svg class="ico"><use href="#i-trash"></use></svg> Smazané doklady — záloha (${del.length}) · lze obnovit</summary>
       <table class="doklady-table" style="margin-top:6px">
         <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th></th></tr></thead>
         <tbody>${del.map(d => `
@@ -1510,7 +1577,7 @@ function renderDoklady() {
             <td>${esc(String(d.prijato_od || ''))}</td>
             <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
             <td style="white-space:nowrap">
-              <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none">🧾 PDF</a>
+              <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none"><svg class="ico"><use href="#i-receipt"></use></svg> PDF</a>
               <button onclick="restoreDoklad('${esc(String(d.cislo))}')" title="Obnovit doklad" class="btn-sm" style="margin-left:6px;color:#059669;border-color:#059669;font-weight:700">↩︎ Obnovit</button>
             </td>
           </tr>`).join('')}</tbody>
@@ -1552,7 +1619,7 @@ function _renderFirmyBody() {
         </div>
         <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
           ${f.has_plna_moc
-            ? `<span class="pm-badge">📄 Plná moc</span>
+            ? `<span class="pm-badge"><svg class="ico"><use href="#i-file"></use></svg> Plná moc</span>
                <a href="/plna-moc/${esc(f.ico)}" target="_blank" class="btn-sm" style="text-decoration:none">Zobrazit</a>
                <button class="btn-sm danger" onclick="deletePlnaMoc('${esc(f.ico)}')">Odstranit</button>`
             : `<label class="btn-sm" style="cursor:pointer">➕ Nahrát plnou moc
@@ -1561,7 +1628,7 @@ function _renderFirmyBody() {
           }
         </div>
       </div>
-      <button class="btn-sm danger" onclick="deleteFirmModal('${esc(f.ico)}')">🗑 Smazat</button>
+      <button class="btn-sm danger" onclick="deleteFirmModal('${esc(f.ico)}')"><svg class="ico"><use href="#i-trash"></use></svg> Smazat</button>
     </div>`).join('');
 }
 
@@ -1833,9 +1900,9 @@ async function prepareEvidence() {
   // Default the type from the mode (change mode: leave blank → user picks KOLA / A50-X…).
   if (!typSel.value) typSel.value = _MODE_TO_TYP[appMode] || '';
   evidencePriceUpdate();
-  // Who will be recorded as zpracoval — the profil chip (👤) in the header.
+  // Who will be recorded as zpracoval — the profil chip in the header.
   const who = window.getProfil ? window.getProfil() : '';
-  status.textContent = who ? ('Zapíše: ' + who) : 'Vyber nahoře 👤 kdo úkon zapisuje.';
+  status.textContent = who ? ('Zapíše: ' + who) : 'Vyber nahoře profil — kdo úkon zapisuje.';
 }
 
 function evidencePriceUpdate() {
@@ -1951,7 +2018,7 @@ async function generatePDFs() {
         pmDiv.innerHTML = '<div style="margin-top:12px;font-size:13px;font-weight:600;color:var(--muted)">Plné moci k vytištění:</div>' +
           generatedUrls.plne_moce.map(url => {
             const ico = url.split('/').pop();
-            return `<a href="${url}" target="_blank" class="btn-download" style="font-size:13px;padding:8px 14px;margin-top:6px">📋 Plná moc (IČO ${ico})</a>`;
+            return `<a href="${url}" target="_blank" class="btn-download" style="font-size:13px;padding:8px 14px;margin-top:6px"><svg class="ico"><use href="#i-file"></use></svg> Plná moc (IČO ${ico})</a>`;
           }).join('');
         pmDiv.style.display = 'block';
       } else {
@@ -2061,12 +2128,12 @@ async function tryAutoOpenCamera(attempt = 0) {
 async function quickScanOrv() {
   if (_scanInFlight) return;
   if (!cameraStream) {
-    alert('Kamera není zapnutá. Klikni na 📷 Kamera nebo dej povolení v prohlížeči.');
+    alert('Kamera není zapnutá. Klikni na Kamera nebo dej povolení v prohlížeči.');
     return;
   }
   _scanInFlight = true;
   const btn = document.getElementById('quick-scan-btn');
-  const origBtnText = btn ? btn.textContent : '';
+  const origBtnHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Skenuji…'; }
   const resultEl = document.getElementById('scan-all-result');
   if (resultEl) { resultEl.className = 'scan-result loading'; resultEl.textContent = 'Skenuji ORV…'; }
@@ -2095,7 +2162,7 @@ async function quickScanOrv() {
 
     const filled = await applyOrvData(result.data);
     if (!filled.length) {
-      if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '⚠ Žádná data — zkus znovu'; }
+      if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = 'Žádná data — zkus znovu'; }
       return;
     }
 
@@ -2106,7 +2173,7 @@ async function quickScanOrv() {
     if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + e.message; }
   } finally {
     _scanInFlight = false;
-    if (btn) { btn.disabled = false; btn.textContent = origBtnText || '📸 Skenovat ORV'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
   }
 }
 
@@ -2300,7 +2367,7 @@ async function scanAll() {
     if (!result.success) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + result.error; return; }
     const filled = await applyOrvData(result.data);
     resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
-    resultEl.textContent = filled.length ? '✓ Vyplněno: ' + filled.join(', ') : '⚠ Žádná data nenalezena';
+    resultEl.textContent = filled.length ? '✓ Vyplněno: ' + filled.join(', ') : 'Žádná data nenalezena';
   } catch(e) {
     resultEl.className = 'scan-result err';
     resultEl.textContent = '✗ Chyba: ' + e.message;
@@ -2360,7 +2427,7 @@ async function scanDoc(input, target) {
     }
 
     resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
-    resultEl.textContent = filled.length ? '✓ Vyplneno: ' + filled.join(', ') : '⚠ Zadna data nenalezena';
+    resultEl.textContent = filled.length ? '✓ Vyplneno: ' + filled.join(', ') : 'Zadna data nenalezena';
     refreshAllLenChecks();   // a scan-filled VIN should light up green too
   } catch(e) {
     resultEl.className = 'scan-result err';
@@ -2375,11 +2442,11 @@ function getModel() { return localStorage.getItem('scan_model') || 'sonnet'; }
 function toggleModel() {
   const next = getModel() === 'sonnet' ? 'haiku' : 'sonnet';
   localStorage.setItem('scan_model', next);
-  document.getElementById('model-toggle-btn').textContent = '🤖 ' + (next === 'sonnet' ? 'Sonnet' : 'Haiku');
+  document.getElementById('model-name').textContent = next === 'sonnet' ? 'Sonnet' : 'Haiku';
 }
 document.addEventListener('DOMContentLoaded', () => {
   const m = getModel();
-  document.getElementById('model-toggle-btn').textContent = '🤖 ' + (m === 'sonnet' ? 'Sonnet' : 'Haiku');
+  document.getElementById('model-name').textContent = m === 'sonnet' ? 'Sonnet' : 'Haiku';
 });
 
 // ── Auto-update check ─────────────────────────────────────────────────────────
