@@ -270,3 +270,68 @@ def test_this_week_still_parses_as_period(data):
     """'tento týden' zůstává obdobím, nezmění se na rozpad podle dnů."""
     conn, _, _ = data
     assert ask_service.parse_period("tento týden", TODAY)[2] == "tento týden"
+
+
+# ── výpis konkrétních úkonů pod odpovědí ──────────────────────────────────────
+
+def test_totals_list_the_matching_ukony(data):
+    """Odpověď nese i konkrétní úkony, o kterých mluví."""
+    conn, _, _ = data
+    r = ask(conn, "Kolik pro Cardion?")
+    assert len(r["ukony"]) == 4
+    assert all(u["firma_zkratka"] == "Cardion" for u in r["ukony"])
+    assert r["ukony"][0]["datum"] >= r["ukony"][-1]["datum"]   # nejnovější první
+
+
+def test_free_text_lists_the_found_ukony(data):
+    """Případ ze screenshotu: hledání jména vypíše nalezené úkony."""
+    conn, _, _ = data
+    r = ask(conn, "Kolik práce od Radima Vyškova?")
+    assert len(r["ukony"]) == 1
+    assert r["ukony"][0]["poznamka"] == "RADIM VYŠKOV"
+
+
+def test_best_day_lists_only_that_day(data):
+    conn, _, _ = data
+    r = ask(conn, "Nejlepší den?")
+    assert [u["datum"] for u in r["ukony"]] == ["2026-07-20"]
+
+
+def test_weekday_lists_only_that_weekday(data):
+    conn, _, _ = data
+    r = ask(conn, "Který den v týdnu máme nejvíc kusů?")
+    assert len(r["ukony"]) == 4                       # všechny středy
+    assert all(u["datum"] in ("2026-07-01", "2026-07-15", "2026-06-10")
+               for u in r["ukony"])
+
+
+def test_top_firma_lists_that_firms_ukony(data):
+    conn, _, _ = data
+    r = ask(conn, "Která firma nejvíc?")
+    assert all(u["firma_zkratka"] == "Cardion" for u in r["ukony"])
+
+
+def test_unknown_question_lists_nothing(data):
+    conn, _, _ = data
+    assert ask(conn, "jaké bude zítra počasí")["ukony"] == []
+
+
+def test_ask_page_renders_the_ukon_rows(tmp_path, monkeypatch):
+    """Stránka vykreslí řádky stejným partialem jako přehled úkonů."""
+    import app as appmod, db, config
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "t.db"))
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    a = appmod.create_app(); a.testing = True
+    with a.test_client() as c:
+        with a.app_context():
+            conn = db.get_db()
+            fid = firmy_repo.create(conn, nazev="Cardion", zkratka="Cardion", ico="1")
+            typy_repo.upsert(conn, "PŘEVOD", 1300, 1)
+            uid = ukony_repo.create(conn, firma_id=fid, datum="2026-07-20", typ_kod="PŘEVOD",
+                                    celkem=1300, rz="1AB2345", vin="TMBVIN1234567890",
+                                    poznamka="TOYOTA", zpracoval="David")
+        body = c.get("/zeptej?q=toyota").get_data(as_text=True)
+        assert "1AB2345" in body                       # SPZ v seznamu
+        assert "TMBVIN1234567890" in body              # VIN
+        assert f"/ukony/{uid}/upravit" in body         # klikací na úpravu
+        assert "firma-dot" in body                     # barva firmy jako v přehledu

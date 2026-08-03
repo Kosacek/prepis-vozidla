@@ -31,6 +31,24 @@
   </div>
   {% endif %}
 </div>
+
+{# Konkrétní úkony, o kterých odpověď mluví — stejný řádek jako v přehledu
+   úkonů, takže se dá kliknout a rovnou upravit. #}
+{% if res.ukony %}
+<div class="card recent-card">
+  <div class="card-head">
+    <h2>Úkony <span class="muted small">{{ res.ukony|length }}</span></h2>
+    {% if res.ukony|length >= limit %}
+      <span class="muted small">zobrazeno prvních {{ limit }}</span>
+    {% endif %}
+  </div>
+  <div class="recent-list">
+    {% set rows = res.ukony %}
+    {% set back = '/zeptej?q=' ~ (q | urlencode) %}
+    {% include "_recent_rows.html" %}
+  </div>
+</div>
+{% endif %}
 {% endif %}
 
 <div class="card">

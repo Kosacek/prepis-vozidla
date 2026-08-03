@@ -269,6 +269,36 @@ def _group(conn, clause, args, expr, join="", limit=8, order="kc"):
     ).fetchall()
 
 
+ROW_LIMIT = 500  # strop výpisu, ať stránka nezhloupne u obřího dotazu
+
+
+def _rows(conn, clause, args, extra: str = "", extra_args=(), limit: int = ROW_LIMIT):
+    """Konkrétní úkony, o kterých odpověď mluví — stejná data jako seznam /ukony
+    (včetně firma_zkratka), aby se daly vykreslit stejným partialem."""
+    sql = ("SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u"
+           " JOIN firmy f ON f.id = u.firma_id" + clause)
+    a = list(args)
+    if extra:
+        sql += (" AND " if clause else " WHERE ") + extra
+        a += list(extra_args)
+    sql += " ORDER BY u.datum DESC, u.id DESC LIMIT ?"
+    a.append(limit)
+    return conn.execute(sql, a).fetchall()
+
+
+def _rows_by_ids(conn, ids, limit: int = ROW_LIMIT):
+    if not ids:
+        return []
+    ids = list(ids)[:limit]
+    q = ",".join("?" * len(ids))
+    return conn.execute(
+        "SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u"
+        f" JOIN firmy f ON f.id = u.firma_id WHERE u.id IN ({q})"
+        " ORDER BY u.datum DESC, u.id DESC",
+        ids,
+    ).fetchall()
+
+
 def _text_totals(conn, od, do, term: str) -> tuple[int, float]:
     """Count+sum of úkony whose poznámka / převod / RZ / VIN contains `term`.
 
@@ -279,15 +309,16 @@ def _text_totals(conn, od, do, term: str) -> tuple[int, float]:
     # Czech declension: the question says "od Radima Vyškova", the note stores
     # "RADIM VYŠKOV" — so also try the stem with 1–2 trailing letters dropped.
     stems = [t] + [t[:-1]] * (len(t) >= 5) + [t[:-2]] * (len(t) >= 6)
-    n, total = 0, 0.0
+    n, total, ids = 0, 0.0, []
     for r in conn.execute(
-        "SELECT u.poznamka, u.prevod, u.rz, u.vin, u.celkem FROM ukony u" + clause, args
+        "SELECT u.id, u.poznamka, u.prevod, u.rz, u.vin, u.celkem FROM ukony u" + clause, args
     ):
         hay = fold(" ".join(x for x in (r["poznamka"], r["prevod"], r["rz"], r["vin"]) if x))
         if any(s in hay for s in stems):
             n += 1
             total += r["celkem"] or 0
-    return n, total
+            ids.append(r["id"])
+    return n, total, ids
 
 
 # ── hlavní vstup ──────────────────────────────────────────────────────────────
@@ -302,7 +333,7 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
     q = (question or "").strip()
     if not q:
         return {"understood": False, "headline": "", "detail": None, "rows": [],
-                "period": "", "filters": []}
+                "period": "", "filters": [], "ukony": []}
 
     f = fold(q)
     od, do, period = parse_period(q, today)
@@ -347,7 +378,9 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
         return _ok(f"Nejvíc{obdobi}: {jmeno(top)} — {_ukony(top['n'])} za {kc(top['kc'])}",
                    "Podle dne v týdnu:",
                    [{"label": jmeno(r), "n": r["n"], "kc": r["kc"]} for r in rows],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args,
+                         "CAST(strftime('%w', u.datum) AS INTEGER) = ?", (int(top["label"]),)))
 
     # 1) nejlepší den / měsíc
     if superlative and any(w in f for w in ("den", "dne", "dni", "dnu")):
@@ -359,7 +392,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
                    f"{_ukony(top['n'])} za {kc(top['kc'])}",
                    "Další nejsilnější dny:",
                    [{"label": _cz_date(r["label"]), "n": r["n"], "kc": r["kc"]} for r in rows[1:]],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args, "u.datum = ?", (top["label"],)))
 
     if superlative and ("mesic" in f or "mesici" in f or "mesicu" in f):
         rows = _group(conn, clause, args, "substr(u.datum,1,7)", limit=6)
@@ -370,7 +404,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
                    f"{_ukony(top['n'])} za {kc(top['kc'])}",
                    "Ostatní měsíce:",
                    [{"label": _cz_month(r["label"]), "n": r["n"], "kc": r["kc"]} for r in rows[1:]],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args, "substr(u.datum,1,7) = ?", (top["label"],)))
 
     # 2) podle firmy
     if "firm" in f and firma is None:
@@ -381,7 +416,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
         return _ok(f"Nejvíc{obdobi}: {top['label']} — {_ukony(top['n'])} za {kc(top['kc'])}",
                    "Podle firmy:",
                    [{"label": r["label"], "n": r["n"], "kc": r["kc"]} for r in rows],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args, "f.zkratka = ?", (top["label"],)))
 
     # 3) podle člověka
     if ("kdo" in f or "podle koho" in f) and not osoba:
@@ -397,7 +433,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
                    f"{_ukony(top['n'])} za {kc(top['kc'])}",
                    "Podle člověka:",
                    [{"label": r["label"], "n": r["n"], "kc": r["kc"]} for r in rows],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args, "u.zpracoval = ?", (top["label"],)))
 
     # 4) podle typu
     if "typ" in f and not typ:
@@ -409,7 +446,8 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
                    f"{_ukony(top['n'])} za {kc(top['kc'])}",
                    "Podle typu úkonu:",
                    [{"label": r["label"], "n": r["n"], "kc": r["kc"]} for r in rows],
-                   period, filters)
+                   period, filters,
+                   _rows(conn, clause, args, "u.typ_kod = ?", (top["label"],)))
 
     # 5) volný text — jméno protistrany, RZ, VIN ("kolik práce od Radima Vyškova").
     # MUSÍ být před součtem: jinak by dotaz se slovem „kolik" spadl do celkového
@@ -433,14 +471,16 @@ def answer(conn: sqlite3.Connection, question: str, today: date | None = None) -
         if n and firma is None and not osoba:
             rows = [{"label": r["label"], "n": r["n"], "kc": r["kc"]}
                     for r in _group(conn, clause, args, "f.zkratka", _FIRMA_JOIN, limit=6)]
-        return _ok(headline, "Podle firmy:" if rows else None, rows, period, filters)
+        return _ok(headline, "Podle firmy:" if rows else None, rows, period, filters,
+                   _rows(conn, clause, args) if n else [])
 
     return _fallback_text(conn, [], od, do, period)
 
 
-def _ok(headline, detail, rows, period, filters) -> dict:
+def _ok(headline, detail, rows, period, filters, ukony=None) -> dict:
     return {"understood": True, "headline": headline, "detail": detail,
-            "rows": rows, "period": period, "filters": filters}
+            "rows": rows, "period": period, "filters": filters,
+            "ukony": ukony if ukony is not None else []}
 
 
 def _empty(period, filters) -> dict:
@@ -449,17 +489,17 @@ def _empty(period, filters) -> dict:
 
 def _fallback_text(conn, terms, od, do, period) -> dict:
     for term in terms:
-        n, total = _text_totals(conn, od, do, term)
+        n, total, ids = _text_totals(conn, od, do, term)
         if n:
             obdobi = "" if period == "celkem" else f" ({period})"
             return _ok(f"„{term}“{obdobi} — {_ukony(n)} za {kc(total)}",
                        "Nalezeno v poznámce, převodu, RZ nebo VIN.",
-                       [], period, [term])
+                       [], period, [term], _rows_by_ids(conn, ids))
     return {
         "understood": False,
         "headline": "Tomu nerozumím.",
         "detail": "Umím počty a tržby za období, firmu, člověka nebo typ, "
-                  "nejlepší den/měsíc, nezaplacené a hledání jména v poznámkách. "
-                  "Zkus některý z příkladů níž.",
-        "rows": [], "period": period, "filters": [],
+                  "nejlepší den/měsíc, den v týdnu, nezaplacené a hledání jména "
+                  "v poznámkách. Zkus některý z příkladů níž.",
+        "rows": [], "period": period, "filters": [], "ukony": [],
     }
