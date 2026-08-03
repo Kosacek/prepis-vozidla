@@ -9,7 +9,8 @@ scans/
 firmy.xlsx
 # Runtime state — the tracker-push replay queue (žádost payload data)
 failed_pushes.jsonl
-vystupy.jsonl        # index výstupů (data, ne kód) — píší ho i testy
+# index výstupů pro hledání (data, ne kód) — píší ho i testy
+vystupy.jsonl
 *.xlsx
 
 # IDE / editor settings
