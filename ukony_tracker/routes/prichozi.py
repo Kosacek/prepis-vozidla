@@ -16,6 +16,17 @@ bp = Blueprint("prichozi", __name__)
 MODE_TYP = {"prevod": "PŘEVOD", "zapis": "NOVÉ", "zmena": ""}
 
 
+def _cena(v) -> str:
+    """Cena z payloadu do hodnoty inputu: 1300.0 → '1300', prázdno když nepřišla."""
+    if v in (None, ""):
+        return ""
+    try:
+        f = float(v)
+        return str(int(f)) if f == int(f) else str(f)
+    except (TypeError, ValueError):
+        return str(v).strip()
+
+
 @bp.get("/prichozi")
 def inbox():
     conn = db.get_db()
@@ -30,13 +41,14 @@ def inbox():
             raw = json.loads(r["raw_json"] or "{}")
             d["znacka"] = (raw.get("znacka") or "").strip()
             d["profil"] = (raw.get("profil") or "").strip()  # who filled it out in zadosti
+            # Hodnoty, které uživatel vybral už v Přepisu (karta „Evidence úkonu")
+            # — musí přežít cestu do inboxu. Když se žádost zdrží (třeba kvůli
+            # duplicitě), jinak by je musel psát znovu.
+            d["note"] = (raw.get("poznamka") or "").strip()
+            d["typ_kod"] = (raw.get("typ_kod") or "").strip()
+            d["celkem"] = _cena(raw.get("celkem"))
         except (ValueError, TypeError):
-            d["znacka"] = ""
-            d["profil"] = ""
-        # The note field is the operator's OWN note (empty by default); the
-        # "z koho → na koho" transfer is shown separately by the party rows and
-        # stored automatically on approve, so it never lands in poznámka.
-        d["note"] = ""
+            d["znacka"] = d["profil"] = d["note"] = d["typ_kod"] = d["celkem"] = ""
         # Held back as a possible duplicate → load the existing úkon so the card
         # can name it (číslo + datum) for the user's confirmation.
         dup_id = d.get("duplicate_ukon_id")

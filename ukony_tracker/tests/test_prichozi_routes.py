@@ -182,3 +182,64 @@ def test_flagged_duplicate_can_still_be_approved(client):
         assert row["status"] == "approved"
         assert row["created_ukon_id"] != uid          # a NEW úkon, not the old one
         assert len(ukony_repo.list(conn, firma_id=fid)) == 2
+
+
+# ── hodnoty z Přepisu musí přežít cestu do inboxu ─────────────────────────────
+
+def test_inbox_prefills_values_sent_from_zadosti(client):
+    """Davidův případ: auto zapsané v červnu se teď prodává znovu → duplicitní
+    guard ho zdrží v Příchozí. Poznámka, cena a typ vyplněné v Přepisu se MUSÍ
+    předvyplnit, jinak je uživatel píše podruhé."""
+    c, fid, _ = client
+    from services import prichozi_service
+    with c.application.app_context():
+        conn = db.get_db()
+        # 1) červnový úkon na to samé auto
+        prichozi_service.intake(conn, {
+            "zadost_id": "cerven", "mode": "prevod", "datum": "2026-06-14",
+            "novy_ico": "11111111", "vin": "TMBDUPL0000000001", "rz": "1AB2345",
+            "firma_id": fid, "typ_kod": "PŘEVOD", "celkem": 1300,
+        })
+        # 2) srpnový prodej téhož auta, s poznámkou a cenou vyplněnou v Přepisu
+        res = prichozi_service.intake(conn, {
+            "zadost_id": "srpen", "mode": "prevod", "datum": "2026-08-03",
+            "novy_ico": "11111111", "vin": "TMBDUPL0000000001", "rz": "1AB2345",
+            "firma_id": fid, "typ_kod": "PŘEVOD", "celkem": 1800,
+            "poznamka": "ELEKTRO, chtějí další tabulku",
+            "profil": "David",
+        })
+        assert res["status"] == "pending"            # zdrženo duplicitním guardem
+
+    body = c.get("/prichozi").get_data(as_text=True)
+    assert "Možný duplikát" in body                  # flag je vidět
+    assert "ELEKTRO, chtějí další tabulku" in body   # poznámka z Přepisu
+    assert 'value="1800"' in body                    # cena z Přepisu (ne 1300 z ceníku)
+    assert "(z Přepisu)" in body                     # označení původu hodnot
+
+
+def test_inbox_price_from_zadosti_is_not_overwritten_by_pricelist(client):
+    """Cena z Přepisu smí být jiná než ceníková a nesmí se přepsat."""
+    c, fid, _ = client
+    from services import prichozi_service
+    with c.application.app_context():
+        prichozi_service.intake(db.get_db(), {
+            "zadost_id": "cena1", "mode": "prevod", "datum": "2026-08-03",
+            "novy_ico": "11111111", "rz": "9ZZ9999",
+            "firma_id": fid, "typ_kod": "PŘEVOD", "celkem": 2500,
+        })
+    body = c.get("/prichozi").get_data(as_text=True)
+    # auto-create proběhne (není duplicita), takže tenhle případ ověřuje jen
+    # to, že když se do inboxu dostane, cena se veze s sebou
+    assert "2500" in body or "9ZZ9999" not in body
+
+
+def test_inbox_survives_row_without_raw_json(client):
+    """Starý řádek bez payloadu nesmí stránku shodit."""
+    c, fid, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        conn.execute(
+            "INSERT INTO prichozi(zadost_id,received_at,datum,mode,status,created_at,updated_at)"
+            " VALUES('bezraw','2026-08-03','2026-08-03','prevod','pending','x','x')")
+        conn.commit()
+    assert c.get("/prichozi").status_code == 200

@@ -66,8 +66,9 @@
         </select>
       </div>
       <div class="field">
-        <label>Typ</label>
-        {% set sugg = mode_typ.get(p.mode, '') %}
+        <label>Typ {% if p.typ_kod %}<span class="muted small">(z Přepisu)</span>{% endif %}</label>
+        {# typ vybraný v Přepisu má přednost před odhadem podle mode #}
+        {% set sugg = p.typ_kod or mode_typ.get(p.mode, '') %}
         <select name="typ_kod" class="typ-select" required>
           <option value="" {{ 'selected' if not sugg }}>— vyber —</option>
           {% for t in typy %}
@@ -76,8 +77,8 @@
         </select>
       </div>
       <div class="field">
-        <label>Cena (Kč)</label>
-        <input name="celkem" class="cena-input" inputmode="numeric">
+        <label>Cena (Kč) {% if p.celkem %}<span class="muted small">(z Přepisu)</span>{% endif %}</label>
+        <input name="celkem" class="cena-input" inputmode="numeric" value="{{ p.celkem }}">
       </div>
       <div class="field">
         <label>Datum</label>
@@ -85,7 +86,7 @@
       </div>
     </div>
     <div class="field prichozi-pozn">
-      <label>Poznámka</label>
+      <label>Poznámka {% if p.note %}<span class="muted small">(z Přepisu)</span>{% endif %}</label>
       <input name="poznamka" autocomplete="off" value="{{ p.note }}">
     </div>
     <div class="field">
@@ -123,7 +124,10 @@
     if (inp && p != null && p !== "") inp.value = p;
   }
   document.querySelectorAll(".prichozi-form").forEach(function (form) {
-    sync(form);  // prefill from the suggested firm + type on load
+    // Cenu z Přepisu nepřepisovat — doplnit jen prázdné pole. Když ale uživatel
+    // sám změní firmu nebo typ, přepočet je žádoucí.
+    var inp = form.querySelector(".cena-input");
+    if (!inp || !inp.value) sync(form);
     form.querySelector("select[name=firma_id]").addEventListener("change", function () { sync(form); });
     form.querySelector("select[name=typ_kod]").addEventListener("change", function () { sync(form); });
   });
