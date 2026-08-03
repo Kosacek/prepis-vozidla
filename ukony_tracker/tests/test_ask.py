@@ -335,3 +335,23 @@ def test_ask_page_renders_the_ukon_rows(tmp_path, monkeypatch):
         assert "TMBVIN1234567890" in body              # VIN
         assert f"/ukony/{uid}/upravit" in body         # klikací na úpravu
         assert "firma-dot" in body                     # barva firmy jako v přehledu
+
+
+def test_ask_page_has_inline_edit_modal(tmp_path, monkeypatch):
+    """Proklik z výpisu musí otevřít overlay (jako v přehledu), ne novou stránku
+    — stránka proto musí nést #ukon-modal i jeho skript."""
+    import app as appmod, db, config
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "t.db"))
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    a = appmod.create_app(); a.testing = True
+    with a.test_client() as c:
+        with a.app_context():
+            conn = db.get_db()
+            fid = firmy_repo.create(conn, nazev="Cardion", zkratka="Cardion", ico="1")
+            typy_repo.upsert(conn, "PŘEVOD", 1300, 1)
+            ukony_repo.create(conn, firma_id=fid, datum="2026-07-20", typ_kod="PŘEVOD",
+                              celkem=1300, rz="1AB2345", poznamka="TOYOTA")
+        body = c.get("/zeptej?q=toyota").get_data(as_text=True)
+        assert 'id="ukon-modal"' in body
+        assert 'id="ukon-modal-body"' in body
+        assert "js/ukon_modal.js" in body
