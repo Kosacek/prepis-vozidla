@@ -15,6 +15,7 @@ from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
 import hledani  # deterministic history search (no AI) — see hledani.py
+import prefill  # read a past žádost back into form data — see prefill.py
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -38,7 +39,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.3.35"
+__version__ = "1.4.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -78,6 +79,7 @@ if getattr(sys, 'frozen', False):
 PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
 PDF_ZMENA = os.path.join(BASE_DIR, "pdfs", "zmena_udaju.pdf")
+PDF_3RZ = os.path.join(BASE_DIR, "pdfs", "3rz.pdf")
 FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
 PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
 SCANS_DIR = os.path.join(DATA_DIR, "scans")
@@ -476,10 +478,23 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
 # the PDFs via the label rects).
 VZ_TEXT = "v z."
 VZ_X = 400
+# 3rz.pdf má na podpisovém řádku „Podpis žadatele" — bez „(ů)", které je na
+# ostatních tiskopisech. Popisek je tím pádem asi o 13 bodů kratší a tečkovaná
+# linka začíná dřív (≈375 místo ≈388), takže stejné x působí posunuté doprava.
+# Měřeno z pozic textových bloků: zmeny x=383, zapis x=385 (začátky teček).
+VZ_X_PER_DOC = {"3rz": 385}
 VZ_SIGNATURE_YS = {
     "zmeny": [(0, 95), (1, 37), (2, 163)],
     "zapis": [(0, 53), (1, 105)],
     "zmena": [(0, 52), (1, 143)],
+    # 3rz.pdf: strana 1 (žádost) i strana 2 („Potvrzení o převzetí dokladů
+    # žadatelem") — obojí podepisuje žadatel. Podpis úřední osoby níž na straně 2
+    # (y≈104) nám NEPATŘÍ.
+    #
+    # Účaří textu "Podpis žadatele" je 119 a 170, ale pole je vysoké 14 bodů
+    # s písmem 11, takže účaří vysázené hodnoty vychází přesně na y — tedy PŘESNĚ
+    # na tečkovanou linku. Podpis má sedět nad ní, proto +4.
+    "3rz": [(0, 123), (1, 174)],
 }
 
 
@@ -502,6 +517,7 @@ def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
             return pdf_bytes
         acro = acro.get_object()
         fields = acro.setdefault(NameObject("/Fields"), ArrayObject())
+        vz_x = VZ_X_PER_DOC.get(doc, VZ_X)
         for i, (page_idx, y) in enumerate(VZ_SIGNATURE_YS[doc], start=1):
             field = DictionaryObject({
                 NameObject("/Type"): NameObject("/Annot"),
@@ -511,8 +527,8 @@ def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
                 NameObject("/V"): TextStringObject(VZ_TEXT),
                 NameObject("/DA"): TextStringObject("/Helv 11 Tf 0 g"),
                 NameObject("/Rect"): ArrayObject([
-                    FloatObject(VZ_X), FloatObject(y - 3),
-                    FloatObject(VZ_X + 80), FloatObject(y + 11),
+                    FloatObject(vz_x), FloatObject(y - 3),
+                    FloatObject(vz_x + 80), FloatObject(y + 11),
                 ]),
                 NameObject("/Ff"): NumberObject(0),     # editable text field
                 NameObject("/F"): NumberObject(4),      # print flag
@@ -650,6 +666,81 @@ def build_zmeny_fields(data: dict) -> dict:
         "dne_4": "",  # last page date intentionally left blank — user fills by hand at úřad
     }
     return fields
+
+def build_3rz_fields(data: dict) -> dict:
+    """Žádost o vydání tabulky s registrační značkou (3rz.pdf).
+
+    Field names come from the úřad's AcroForm and are opaque (fill_2, osoby…),
+    so they were mapped by widget position against the printed labels:
+
+        RZ / Druh vozidla / VIN          vozidlo (řádek 1–2)
+        fill_2 + fill_3                  vlastník — jméno (2 řádky)
+        comb_5 / comb_6 / comb_4         vlastník — RČ před /, RČ za /, IČO
+        osoby / fill_5                   vlastník — adresa, PSČ
+        fill_6 + fill_7                  provozovatel — jméno
+        comb_1 / undefined / comb_3      provozovatel — RČ, RČ, IČO
+        osoby_2 / fill_9                 provozovatel — adresa, PSČ
+        toggle_1 / toggle_2              důvod (nosné zařízení / poškození)
+
+    Strana 2 je „Záznam registračního místa" — vyplňuje úřednice, my ji necháme
+    prázdnou, stejně jako TP číslo na ostatních formulářích.
+
+    Na rozdíl od zmena_udaju.pdf tu rodné číslo NENÍ jedno pole s lomítkem —
+    formulář má dvě samostatné kolonky, takže se neslepuje.
+    """
+    # Provozovatel se vyplňuje jen když je odlišný od vlastníka — tak to má
+    # formulář natištěné („vyplnit jen, když…"), takže se tu nezrcadlí.
+    if data.get("novy_prov_jiny"):
+        prov_jmeno  = data.get("novy_prov_jmeno", "")
+        prov_rc_1   = data.get("novy_prov_rc_1", "")
+        prov_rc_2   = data.get("novy_prov_rc_2", "")
+        prov_ico    = data.get("novy_prov_ico", "")
+        prov_adresa = data.get("novy_prov_adresa", "")
+        prov_psc    = data.get("novy_prov_psc", "")
+    else:
+        prov_jmeno = prov_rc_1 = prov_rc_2 = prov_ico = prov_adresa = prov_psc = ""
+
+    poskozeni = (data.get("duvod_3rz") or "nosic") == "poskozeni"
+
+    return {
+        # Vozidlo
+        "RZ":            data.get("registracni_znacka", ""),
+        "Druh vozidla":  data.get("druh_vozidla", ""),
+        "VIN":           data.get("vin", ""),
+
+        # Vlastník
+        "fill_2":  data.get("novy_jmeno", ""),
+        "fill_3":  "",
+        "comb_5":  data.get("novy_rc_1", ""),
+        "comb_6":  data.get("novy_rc_2", ""),
+        "comb_4":  data.get("novy_ico", ""),
+        "osoby":   data.get("novy_adresa", ""),
+        "fill_5":  data.get("novy_psc", ""),
+
+        # Provozovatel (prázdný, když je totožný s vlastníkem)
+        "fill_6":     prov_jmeno,
+        "fill_7":     "",
+        "comb_1":     prov_rc_1,
+        "undefined":  prov_rc_2,
+        "comb_3":     prov_ico,
+        "osoby_2":    prov_adresa,
+        "fill_9":     prov_psc,
+
+        # Důvod — křížkuje se právě jeden
+        "toggle_1": not poskozeni,
+        "toggle_2": poskozeni,
+
+        # Místo a datum
+        "V":   "Brně",
+        "dne": _next_working_day(),
+
+        # Strana 2 — „Potvrzení o převzetí dokladů žadatelem". Místo vyplníme,
+        # datum zůstává prázdné: podepisuje se až při přebírání dokladů na
+        # úřadě, tak jako podpisové datum na ostatních tiskopisech.
+        "V_2":   "Brně",
+        "dne_2": "",
+    }
+
 
 def build_zapis_fields(data: dict) -> dict:
     tomorrow = _next_working_day()
@@ -1067,7 +1158,7 @@ def api_generate():
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
     mode = data.get("mode", "prevod")
 
-    if mode not in {"prevod", "zapis", "zmena"}:
+    if mode not in {"prevod", "zapis", "zmena", "3rz"}:
         return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
 
     out_dir = os.path.join(DATA_DIR, "output")
@@ -1104,9 +1195,9 @@ def api_generate():
         zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))
         if zmeny_overlays: zmeny_bytes = add_id_overlay(zmeny_bytes, zmeny_overlays)
         zmeny_bytes = add_vz_fields(zmeny_bytes, "zmeny")
-        fname_zmeny = os.path.join(out_dir, f"zmeny_{ts}.pdf")
-        with open(fname_zmeny, "wb") as f: f.write(zmeny_bytes)
-        result["zmeny"] = f"/download/zmeny_{ts}.pdf"
+        name = hledani.nazev_vystupu("zmeny", data, ts, out_dir)
+        with open(os.path.join(out_dir, name), "wb") as f: f.write(zmeny_bytes)
+        result["zmeny"] = f"/download/{name}"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
@@ -1117,16 +1208,24 @@ def api_generate():
         if zmena_overlays:
             zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
         zmena_bytes = add_vz_fields(zmena_bytes, "zmena")
-        fname = os.path.join(out_dir, f"zmena_{ts}.pdf")
-        with open(fname, "wb") as f: f.write(zmena_bytes)
-        result["zmena"] = f"/download/zmena_{ts}.pdf"
+        name = hledani.nazev_vystupu("zmena", data, ts, out_dir)
+        with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
+        result["zmena"] = f"/download/{name}"
+    elif mode == "3rz":
+        # Žádost o vydání tabulky s registrační značkou — jeden formulář, žádné
+        # ID overlaye (na tomhle tiskopisu není kolonka na číslo dokladu).
+        trz_bytes = fill_pdf(PDF_3RZ, build_3rz_fields(data))
+        trz_bytes = add_vz_fields(trz_bytes, "3rz")
+        name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
+        with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
+        result["3rz"] = f"/download/{name}"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
         zapis_bytes = add_vz_fields(zapis_bytes, "zapis")
-        fname_zapis = os.path.join(out_dir, f"zapis_{ts}.pdf")
-        with open(fname_zapis, "wb") as f: f.write(zapis_bytes)
-        result["zapis"] = f"/download/zapis_{ts}.pdf"
+        name = hledani.nazev_vystupu("zapis", data, ts, out_dir)
+        with open(os.path.join(out_dir, name), "wb") as f: f.write(zapis_bytes)
+        result["zapis"] = f"/download/{name}"
 
     # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
     try:
@@ -1213,11 +1312,21 @@ def api_generate():
     # opening every PDF. Swallows its own errors — search is a convenience.
     hledani.zapis_vystup(
         DATA_DIR,
-        [result[k] for k in ("zmeny", "zapis", "zmena") if result.get(k)],
+        [result[k] for k in ("zmeny", "zapis", "zmena", "3rz") if result.get(k)],
         data,
     )
 
     return jsonify(result)
+
+@app.route("/api/prefill/<path:filename>", methods=["GET"])
+def api_prefill(filename):
+    """Data dřívější žádosti pro předvyplnění navazujícího úkonu (3RZ).
+
+    Čte se přímo z vygenerovaného PDF — viz prefill.py, proč se kvůli tomu
+    nezakládá další úložiště osobních údajů.
+    """
+    return jsonify(prefill.z_pdf(DATA_DIR, filename))
+
 
 @app.route("/api/outputs", methods=["GET"])
 def api_outputs():

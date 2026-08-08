@@ -55,8 +55,18 @@ if not hledani.nacti_index(DATA):
     for name, meta in _SEED:
         path = os.path.join(OUT, name)
         if not os.path.exists(path):
+            # Skutečně vyplněné tiskopisy, ne prázdné placeholdery — jinak by
+            # nešlo vyzkoušet „navázat na dřívější žádost", které čte data
+            # zpátky z PDF.
+            full = dict(meta, novy_adresa="VEVERKOVA 1234/5, BRNO", novy_psc="60200",
+                        novy_ico="04156854", druh_vozidla="OSOBNI AUTOMOBIL")
+            kind = name.split("_")[0]
+            if kind == "zapis":
+                pdf = app.fill_pdf(app.PDF_ZAPIS, app.build_zapis_fields(full))
+            else:
+                pdf = app.fill_pdf(app.PDF_ZMENY, app.build_zmeny_fields(full))
             with open(path, "wb") as fh:
-                fh.write(b"%PDF-1.4\n% preview placeholder\n")
+                fh.write(pdf)
         hledani.zapis_vystup(DATA, [name], meta)
 
 app.app.run(host="127.0.0.1", port=5055)

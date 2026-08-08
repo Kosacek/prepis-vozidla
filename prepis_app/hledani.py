@@ -154,8 +154,68 @@ def parse_period(q: str, today: date | None = None) -> tuple[str | None, str | N
 # zmeny_ = převod, zapis_ = nové vozidlo, zmena_ = změna údajů. PPD sem NEPATŘÍ:
 # ppd_<cislo>.pdf nemá v názvu datum, a doklady mají vlastní evidenci s datem,
 # číslem, plátcem i částkou — hledají se přes ni, ne přes mtime souboru.
-TYPY = {"zmeny": "Převod", "zapis": "Nové vozidlo", "zmena": "Změna údajů"}
-_TS_RE = re.compile(r"^(zmeny|zapis|zmena)_(\d{8})_(\d{6})\.pdf$", re.I)
+TYPY = {"zmeny": "Převod", "zapis": "Nové vozidlo", "zmena": "Změna údajů",
+        "3rz": "Třetí značka"}
+
+# Název souboru má DVA tvary a oba musí jít přečíst:
+#   starý  zmeny_20260720_090000.pdf                   (do 2026-08, ~850 souborů)
+#   nový   zmeny_PETR-SVOBODA_1AB2345_20260720.pdf     (+ _HHMMSS při kolizi)
+# Nový nese jméno a vozidlo, aby se žádost dala ve složce najít očima podle toho,
+# pro koho byla — ne podle času, který nikomu nic neřekne. Staré soubory se
+# nepřejmenovávají, jen se dál čtou.
+_KIND = r"(3rz|zmeny|zapis|zmena)"
+_STARY_RE = re.compile(rf"^{_KIND}_(\d{{8}})_(\d{{6}})\.pdf$", re.I)
+# Prostřední část (jméno + vozidlo) je volitelná: u žádosti bez vyplněného
+# jména i SPZ vznikne jen "zmena_20260808.pdf" a i tu je potřeba přečíst.
+_NOVY_RE = re.compile(rf"^{_KIND}(?:_(.*?))?_(\d{{8}})(?:_(\d{{6}}))?\.pdf$", re.I)
+
+
+def rozbor_nazvu(name: str) -> tuple[str, str, str] | None:
+    """``název souboru -> (typ, datum ISO, čas HH:MM)`` nebo None.
+
+    Jediné místo, které rozumí oběma tvarům — používá to výpis výstupů
+    i předvyplnění, ať se nerozejdou.
+    """
+    base = os.path.basename(name or "")
+    m = _STARY_RE.match(base)
+    if m:
+        kind, ymd, hms = m.group(1), m.group(2), m.group(3)
+    else:
+        m = _NOVY_RE.match(base)
+        if not m:
+            return None
+        kind, ymd, hms = m.group(1), m.group(3), m.group(4) or ""
+    return (kind.lower(),
+            f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]}",
+            f"{hms[:2]}:{hms[2:4]}" if hms else "")
+
+
+def _slug(text: str, maxlen: int = 28) -> str:
+    """'AUTO CARDION s. r. o.' -> 'AUTO-CARDION-S-R-O'. Bez diakritiky a bez
+    znaků, které by v názvu souboru nebo v URL dělaly potíže."""
+    t = "".join(
+        ch for ch in unicodedata.normalize("NFD", (text or "").upper())
+        if not unicodedata.combining(ch)
+    )
+    t = re.sub(r"[^A-Z0-9]+", "-", t).strip("-")
+    return t[:maxlen].strip("-")
+
+
+def nazev_vystupu(kind: str, data: dict, ts: str, out_dir: str = "") -> str:
+    """Sestaví název vygenerované žádosti: ``typ_JMENO_VOZIDLO_datum.pdf``.
+
+    ``ts`` je ``%Y%m%d_%H%M%S``. Čas se do názvu dostane jen když by soubor
+    jinak přepsal existující (tentýž člověk, totéž auto, tentýž den) — jinak
+    by v názvu jen zabíral místo.
+    """
+    ymd, _, hms = ts.partition("_")
+    jmeno = _slug(data.get("novy_jmeno") or data.get("puvodni_jmeno") or "")
+    vozidlo = _slug(data.get("registracni_znacka") or data.get("vin") or "", 20)
+    casti = [kind] + [p for p in (jmeno, vozidlo) if p] + [ymd]
+    name = "_".join(casti) + ".pdf"
+    if out_dir and os.path.exists(os.path.join(out_dir, name)):
+        name = "_".join(casti + [hms]) + ".pdf"
+    return name
 
 INDEX_NAME = "vystupy.jsonl"
 LIMIT = 300  # strop výpisu, ať modal nezhloupne u dotazu „všechno"
@@ -221,10 +281,10 @@ def nacti_vystupy(data_dir: str) -> list[dict]:
     index = nacti_index(data_dir)
     rows = []
     for name in os.listdir(out_dir):
-        m = _TS_RE.match(name)
-        if not m:
+        rozbor = rozbor_nazvu(name)
+        if not rozbor:
             continue
-        kind, ymd, hms = m.group(1).lower(), m.group(2), m.group(3)
+        kind, datum, cas = rozbor
         try:
             size = os.path.getsize(os.path.join(out_dir, name))
         except OSError:
@@ -234,8 +294,8 @@ def nacti_vystupy(data_dir: str) -> list[dict]:
             "file": name,
             "typ": TYPY.get(kind, kind),
             "kind": kind,
-            "datum": f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]}",
-            "cas": f"{hms[:2]}:{hms[2:4]}",
+            "datum": datum,
+            "cas": cas,
             "velikost": size,
             "url": f"/download/{name}",
             "rz": meta.get("rz", ""),

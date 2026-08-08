@@ -306,6 +306,57 @@ def test_nacti_vystupy_reads_date_from_filename(tmp_path):
     assert rows[0]["datum"] == "2026-07-15" and rows[0]["cas"] == "10:00"
 
 
+# ── názvy souborů ─────────────────────────────────────────────────────────────
+
+def test_filename_carries_who_and_which_car():
+    """David hledá ve složce podle toho, PRO KOHO žádost byla — ne podle času."""
+    n = hledani.nazev_vystupu("3rz", {
+        "novy_jmeno": "Toyota Financial Services Czech s.r.o.",
+        "registracni_znacka": "9EE1234"}, "20260808_141632")
+    assert n.startswith("3rz_TOYOTA-FINANCIAL")
+    assert "9EE1234" in n and n.endswith("_20260808.pdf")
+    assert "141632" not in n            # čas jen při kolizi
+
+
+def test_filename_strips_diacritics_and_punctuation():
+    n = hledani.nazev_vystupu("zmeny", {"novy_jmeno": "Škoda Příbram, a. s.",
+                                        "registracni_znacka": "1AB 2345"}, "20260808_141632")
+    assert n == "zmeny_SKODA-PRIBRAM-A-S_1AB-2345_20260808.pdf"
+
+
+def test_filename_falls_back_to_vin_and_seller(tmp_path):
+    n = hledani.nazev_vystupu("zapis", {"puvodni_jmeno": "PRODEJCE",
+                                        "vin": "TMBJJ7NE5J0123456"}, "20260808_141632")
+    assert "PRODEJCE" in n and "TMBJJ7NE5J0123456" in n
+
+
+def test_filename_adds_time_only_on_collision(tmp_path):
+    data = {"novy_jmeno": "JAN NOVAK", "registracni_znacka": "1AB2345"}
+    first = hledani.nazev_vystupu("3rz", data, "20260808_141632", str(tmp_path))
+    (tmp_path / first).write_bytes(b"x")
+    second = hledani.nazev_vystupu("3rz", data, "20260808_150000", str(tmp_path))
+    assert first != second and second.endswith("_150000.pdf")
+
+
+def test_filename_survives_a_nameless_zadost():
+    n = hledani.nazev_vystupu("zmena", {}, "20260808_141632")
+    assert n == "zmena_20260808.pdf"
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("zmeny_20260720_090000.pdf", ("zmeny", "2026-07-20", "09:00")),      # starý tvar
+    ("zmeny_PETR-SVOBODA_1AB2345_20260720.pdf", ("zmeny", "2026-07-20", "")),
+    ("3rz_TOYOTA_9EE1234_20260808_141632.pdf", ("3rz", "2026-08-08", "14:16")),
+    ("zmena_20260808.pdf", ("zmena", "2026-08-08", "")),
+    ("ppd_152.pdf", None),
+    ("neco.txt", None),
+])
+def test_both_filename_shapes_are_understood(name, expected):
+    """Starých souborů je ve složce ~850 a nepřejmenovávají se — musí jít číst
+    dál, jinak by z hledání i z předvyplnění zmizela celá historie."""
+    assert hledani.rozbor_nazvu(name) == expected
+
+
 # ── route ─────────────────────────────────────────────────────────────────────
 
 def test_route_hledat(client):
