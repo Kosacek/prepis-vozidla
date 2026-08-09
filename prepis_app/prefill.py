@@ -71,6 +71,95 @@ _MAPS["zmena"][_ZMENA_ADDR] = "novy_adresa"
 _MAPS["zmena"][_ZMENA_ADDR_P] = "novy_prov_adresa"
 
 
+# Všechny strany, které v tiskopisu vůbec můžou být — pro plnou moc, kde si
+# uživatel vybírá, na koho ji vystavit. Klíč = popisek do nabídky.
+_STRANY: dict[str, dict[str, dict[str, str]]] = {
+    "zmeny": {
+        "Původní vlastník": {"jmeno": "fill_2", "rc_1": "comb_3", "rc_2": "undefined",
+                             "ico": "comb_5", "adresa": "osoby 1", "psc": "fill_5"},
+        "Původní provozovatel": {"jmeno": "fill_6", "rc_1": "comb_6", "rc_2": "undefined_2",
+                                 "ico": "comb_8", "adresa": "osoby 1_2", "psc": "fill_9"},
+        "Nový vlastník": {"jmeno": "fill_8", "rc_1": "comb_5_2", "rc_2": "undefined_4",
+                          "ico": "comb_7", "adresa": "osoby 1_3", "psc": "fill_11"},
+        "Nový provozovatel": {"jmeno": "fill_12", "rc_1": "comb_2_2", "rc_2": "undefined_3",
+                              "ico": "comb_4", "adresa": "osoby 1_4", "psc": "fill_15"},
+    },
+    "zapis": {
+        "Vlastník": {"jmeno": "Text3", "rc_1": "comb_3", "rc_2": "undefined",
+                     "ico": "comb_5", "adresa": "osoby", "psc": "fill_2"},
+        "Provozovatel": {"jmeno": "fill_3", "rc_1": "comb_6", "rc_2": "undefined_2",
+                         "ico": "comb_8", "adresa": "fill_7", "psc": "fill_5"},
+    },
+    "zmena": {
+        "Vlastník": {"jmeno": "fill_2", "rc": "comb_3", "ico": "comb_4",
+                     "adresa": _ZMENA_ADDR, "psc": "fill_6"},
+        "Provozovatel": {"jmeno": "fill_7", "rc": "comb_5", "ico": "comb_6",
+                         "adresa": _ZMENA_ADDR_P, "psc": "fill_11"},
+    },
+    "3rz": {
+        "Vlastník": {"jmeno": "fill_2", "rc_1": "comb_5", "rc_2": "comb_6",
+                     "ico": "comb_4", "adresa": "osoby", "psc": "fill_5"},
+        "Provozovatel": {"jmeno": "fill_6", "rc_1": "comb_1", "rc_2": "undefined",
+                         "ico": "comb_3", "adresa": "osoby_2", "psc": "fill_9"},
+    },
+}
+
+# Vozidlo se do plné moci bere z téže žádosti.
+_VOZIDLO = {
+    "zmeny": {"rz": "comb_1", "vin": "comb_2"},
+    "zapis": {"rz": "", "vin": "comb_1_2"},
+    "zmena": {"rz": "comb_1", "vin": "comb_2"},
+    "3rz": {"rz": "RZ", "vin": "VIN"},
+}
+
+
+def strany(data_dir: str, filename: str) -> dict:
+    """Všechny vyplněné strany dané žádosti + vozidlo.
+
+    Vrací ``{"vozidlo": {...}, "strany": [{"role", "jmeno", "rc_ic", "adresa"}]}``.
+    Strany bez jména se vynechají — v tiskopisu prostě nebyly vyplněné.
+    """
+    safe = os.path.basename(filename or "")
+    kind = typ_souboru(safe)
+    if not kind or kind not in _STRANY:
+        return {"vozidlo": {}, "strany": []}
+    path = os.path.join(data_dir, "output", safe)
+    if not os.path.exists(path):
+        return {"vozidlo": {}, "strany": []}
+    try:
+        fields = PdfReader(path).get_fields() or {}
+    except Exception:
+        return {"vozidlo": {}, "strany": []}
+
+    def val(key: str) -> str:
+        return str((fields.get(key) or {}).get("/V") or "").strip() if key else ""
+
+    out = []
+    for role, mapa in _STRANY[kind].items():
+        jmeno = val(mapa.get("jmeno", ""))
+        if not jmeno:
+            continue
+        # RČ je na jednom tiskopisu ve dvou kolonkách, na jiném v jedné s lomítkem.
+        if "rc" in mapa:
+            rc = val(mapa["rc"])
+        else:
+            a, b = val(mapa.get("rc_1", "")), val(mapa.get("rc_2", ""))
+            rc = f"{a}/{b}" if a and b else (a or b)
+        ico = val(mapa.get("ico", ""))
+        psc = val(mapa.get("psc", ""))
+        adresa = val(mapa.get("adresa", ""))
+        out.append({
+            "role": role,
+            "jmeno": jmeno,
+            # Do plné moci jde jedna kolonka „RČ/IČ" — u firmy IČO, u osoby RČ.
+            "rc_ic": rc or ico,
+            "adresa": ", ".join(x for x in (adresa, psc) if x),
+        })
+    voz = _VOZIDLO[kind]
+    return {"vozidlo": {"rz": val(voz["rz"]), "vin": val(voz["vin"])},
+            "strany": out, "_zdroj": safe, "_typ": kind}
+
+
 def typ_souboru(filename: str) -> str | None:
     """Typ tiskopisu z názvu. Rozbor názvu je jeden pro celou appku (hledani.py),
     aby starý i nový tvar názvu chápalo všechno stejně."""
@@ -86,7 +175,8 @@ def z_pdf(data_dir: str, filename: str) -> dict:
     """
     safe = os.path.basename(filename or "")
     kind = typ_souboru(safe)
-    if not kind:
+    # Plná moc není žádost — nemá strany ani vozidlo k předvyplnění.
+    if not kind or kind not in _MAPS:
         return {}
     path = os.path.join(data_dir, "output", safe)
     if not os.path.exists(path):

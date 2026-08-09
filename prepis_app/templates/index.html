@@ -344,17 +344,46 @@
     margin-bottom: 6px; text-decoration: none; color: var(--text); font-size: 13px;
   }
   a.hl-row:hover { background: var(--accent); border-color: var(--primary); }
+  /* Štítek i vozidlo mají pevnou šířku, jinak se sloupce rozjedou podle délky
+     typu — „Nové vozidlo" je o 32 px širší než „Převod" a SPZ pak každý řádek
+     začíná jinde. */
   .hl-badge { font-size: 11px; font-weight: 700; color: var(--primary);
-              background: var(--accent); padding: 2px 7px; border-radius: 5px; }
-  .hl-when { font-weight: 600; }
+              background: var(--accent); padding: 2px 7px; border-radius: 5px;
+              min-width: 92px; text-align: center; flex-shrink: 0; }
+  .hl-when { font-weight: 600; min-width: 108px; flex-shrink: 0; }
   .hl-sub  { color: var(--muted); font-size: 12px; min-width: 0;
              overflow-wrap: anywhere; }
   .hl-kc   { margin-left: auto; font-weight: 700; white-space: nowrap; }
+
+  /* Plná moc — obsah drží užší sloupec (jako formulář), ne celou kartu. */
+  #panel-6 .pm-uzsi { max-width: 620px; }
+  #panel-6 .card { padding: 18px 24px; }
+  /* Ruční zadání má o řádek polí víc než zbytek kroku — bez zhuštění by
+     tlačítko spadlo pod okraj obrazovky na 768px notebooku. */
+  #panel-6 .form-grid { gap: 10px 22px; }
+  #panel-6 #pm-rucne .form-grid { grid-template-columns: repeat(4, 1fr); }
+  #panel-6 #pm-rucne .pm-sp2 { grid-column: span 2; }
+  #panel-6 #pm-rucne .pm-sp4 { grid-column: span 4; }
+  #panel-6 #pm-vozidlo-pole { grid-template-columns: repeat(4, 1fr); }
+  #panel-6 .pm-sp3 { grid-column: span 3; }
+  #panel-6 .field input { padding: 9px 13px; }
+  #panel-6 .field label { font-size: 12px; }
+  #panel-6 .card-title { font-size: 19px; margin-bottom: 10px; }
+  #panel-6 .hl-row { padding: 7px 10px; margin-bottom: 4px; }
+  #panel-6 .section-label { margin-top: 0; }
+  #panel-6 hr.divider { margin: 12px 0; }
 
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
     .nav-bar { padding: 0 16px; }
     .step-lbl { display: none; }
+    /* Čtyřsloupcová mřížka plné moci má vyšší specificitu než obecné
+       .form-grid pravidlo — na telefonu ji musíme přebít, jinak by z polí
+       byly nepoužitelné 70px proužky. */
+    #panel-6 #pm-rucne .form-grid { grid-template-columns: 1fr; }
+    #panel-6 #pm-rucne .pm-sp2, #panel-6 #pm-rucne .pm-sp4 { grid-column: span 1; }
+    #panel-6 #pm-vozidlo-pole { grid-template-columns: 1fr; }
+    #panel-6 .pm-sp3 { grid-column: span 1; }
     /* Popisky pryč, ikony zůstávají — cluster se vejde do jedné řady. */
     .hbtn-lbl { display: none; }
     .hbtn { padding: 9px 11px; }
@@ -385,6 +414,7 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 4h4"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
   <symbol id="i-transfer" viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M13.5 5.5L17 9l-3.5 3.5"/><path d="M20 15H7"/><path d="M10.5 11.5L7 15l3.5 3.5"/></symbol>
   <symbol id="i-plus-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></symbol>
+  <symbol id="i-pm" viewBox="0 0 24 24"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 8h3M9 11h6"/><path d="M9 16.5c1-1.5 1.8.8 2.8 0s1.4-1.2 2.3 0"/></symbol>
   <symbol id="i-plate" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10"/><path d="M10.5 11h7M10.5 13.5h4.5"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 20v-5M5 11V4M12 20v-8M12 8V4M19 20v-4M19 12V4"/><path d="M2.5 15h5M9.5 8h5M16.5 16h5"/></symbol>
   <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></symbol>
@@ -494,6 +524,14 @@
             <div class="mode-desc">Třetí značka na nosič kol nebo náhrada za poškozenou. Generuje 3rz.pdf.</div>
           </div>
         </div>
+        <div class="mode-card" data-mode="pm" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
+          <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-pm"></use></svg></div>
+          <div>
+            <div class="mode-title">Plná moc</div>
+            <div class="mode-desc">K zastupování na registru vozidel. Vystaví se na některou stranu z dřívější žádosti.</div>
+          </div>
+        </div>
+
         <div class="mode-card" data-mode="zmena" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
           <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-sliders"></use></svg></div>
           <div>
@@ -964,6 +1002,86 @@
     </div>
   </div>
 
+  <!-- ── Step 6: Plná moc ── -->
+  <div class="step-panel" id="panel-6">
+    <div class="card">
+      <div class="card-title">Plná moc k zastupování na registru vozidel</div>
+      <div class="hl-detail" id="pm-zmocnenec" style="margin-bottom:14px;"></div>
+
+      <div class="pm-uzsi">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+          <div class="section-label">1. Ze které žádosti</div>
+          <button type="button" onclick="pmPrepniRucne()" id="pm-prepinac"
+                  style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;padding:0;">vyplnit ručně</button>
+        </div>
+
+        <!-- Po výběru se hledání sbalí do jednoho řádku — seznam i pole už
+             nejsou k ničemu a braly 190 px, kvůli kterým se muselo rolovat. -->
+        <div id="pm-vybrano" style="display:none;" class="hl-row">
+          <span class="hl-badge" id="pm-vybrano-typ"></span>
+          <span class="hl-when" id="pm-vybrano-auto"></span>
+          <span class="hl-sub" id="pm-vybrano-kdo"></span>
+          <button type="button" onclick="pmZmenitZadost()" style="margin-left:auto;background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">změnit</button>
+        </div>
+
+        <div id="pm-ze-zadosti">
+          <input type="text" id="pm-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN nebo jména…"
+                 oninput="renderPmZadosti()" autocomplete="off"
+                 style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+          <div id="pm-zadosti" style="margin-top:8px;max-height:150px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Ruční zmocnitel: plná moc se občas dělá pro někoho, kdo v historii
+             vůbec není (nová firma, člověk z ulice). -->
+        <div id="pm-rucne" style="display:none;">
+          <div class="form-grid">
+            <div class="field pm-sp2"><label>Jméno / název firmy</label>
+              <input type="text" id="pm-r-jmeno" oninput="pmRucneZmena()"></div>
+            <div class="field pm-sp2"><label>RČ / IČO</label>
+              <input type="text" id="pm-r-rcic" oninput="pmRucneZmena()" onblur="pmAres()">
+              <div class="lookup-status" id="pm-ares-status" style="display:none;"></div></div>
+            <div class="field pm-sp4"><label>Adresa</label>
+              <input type="text" id="pm-r-adresa" oninput="pmRucneZmena()"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pm-krok2" style="display:none;" class="pm-uzsi">
+        <hr class="divider">
+        <div id="pm-krok-strany">
+          <div class="section-label">2. Na koho ji vystavit</div>
+          <div id="pm-strany"></div>
+          <hr class="divider">
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+          <div class="section-label" id="pm-krok3-label" style="margin:0;">3. Co v ní bude</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;white-space:nowrap;">
+            <input type="checkbox" id="pm-s-vozidlem" onchange="pmVozidloToggle()"
+                   style="width:18px;height:18px;accent-color:var(--primary);">
+            <span>uvést i <b>RZ a VIN</b> vozidla</span>
+          </label>
+        </div>
+        <div class="hl-detail" id="pm-vozidlo-info" style="margin-top:4px;"></div>
+
+        <!-- Vozidlo se vyplňuje jen v ručním režimu; z historie se bere ze žádosti.
+             VIN má 17 znaků, proto dostal širší kolonku. -->
+        <div id="pm-vozidlo-pole" class="form-grid" style="display:none;margin-top:10px;">
+          <div class="field"><label>RZ</label>
+            <input type="text" id="pm-r-rz"></div>
+          <div class="field pm-sp3"><label>VIN</label>
+            <input type="text" id="pm-r-vin" maxlength="17"></div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <button class="btn btn-primary" id="pm-vystavit" onclick="vystavitPlnouMoc()" disabled
+                  style="width:100%;">Vystavit plnou moc</button>
+        </div>
+      </div>
+
+      <div id="pm-vysledek" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
 </div><!-- /container -->
 
 <!-- Fixed nav bar -->
@@ -1064,6 +1182,8 @@ const FLOWS = {
   // Ostatní úkony (zatím 3RZ) mají stejný tvar jako změna údajů: jedno
   // vozidlo a jedna osoba. Přibude-li další tiskopis, sdílí tenhle flow.
   '3rz':  { panels: [1,4,3,5],   labels: ['Typ','Vozidlo','Vlastník','Generovat'] },
+  // Plná moc nepotřebuje vozidlo ani vlastníka — všechno je v jednom kroku.
+  pm:     { panels: [1,6],       labels: ['Typ','Plná moc'] },
 };
 
 function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
@@ -1163,6 +1283,8 @@ function activatePanel(n) {
     if (c) setTimeout(() => c.focus(), 50);
   }
 
+  if (n === 6) initPlnaMoc();
+
   // Vlastník je "nový" jen u převodu a zápisu; u změny údajů a 3RZ je to
   // pořád tentýž člověk, jen o něco žádá.
   if (n === 3) {
@@ -1193,6 +1315,8 @@ function activatePanel(n) {
   // Nav bar
   document.getElementById('nav-back').style.display = flowIdx > 0 ? '' : 'none';
   document.getElementById('nav-next').textContent = (flowIdx === FLOWS[appMode].panels.length - 1) ? 'Generovat PDF' : 'Pokračovat →';
+  // Plná moc má vlastní tlačítko uvnitř karty — generovat žádost tu nedává smysl.
+  document.getElementById('nav-next').style.display = (n === 6) ? 'none' : '';
 
   if (n === 5) buildSummary();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1441,6 +1565,199 @@ document.addEventListener('keydown', e => {
 // ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
 let _dokladyCache = [];
 let _dokladyDeletedCache = [];
+// ── Plná moc ──────────────────────────────────────────────────────────────────
+// Vybere se dřívější žádost, z ní strana (kupující, prodávající, provozovatel)
+// a plná moc se vystaví na ni. Zmocněnec plyne z profilu v hlavičce — je
+// natištěný v šabloně, takže se nikde nevybírá.
+let _pmZdroj = null;      // {file, ...} vybraná žádost
+let _pmInfo = null;       // {strany, vozidlo} z jejího PDF
+let _pmRole = null;
+
+async function initPlnaMoc() {
+  const who = window.getProfil ? window.getProfil() : '';
+  const info = document.getElementById('pm-zmocnenec');
+  try {
+    const zm = await fetch('/api/pm-zmocnenci').then(r => r.json());
+    const match = zm.find(z => z.profil === who);
+    info.innerHTML = match
+      ? `Vystaví se na <b>${esc(match.kdo)}</b> (podle profilu ${esc(who)}).`
+      : `<b>Pro profil „${esc(who || '—')}" nemám šablonu plné moci.</b> Přepni profil nahoře na Davida nebo Petra.`;
+    document.getElementById('pm-vozidlo-info').textContent =
+      match && !match.ma_vozidlo ? 'Tahle šablona kolonky na RZ a VIN nemá — vozidlo se do ní nedoplní.' : '';
+  } catch (e) {
+    info.textContent = 'Nepodařilo se zjistit, na koho plnou moc vystavit.';
+  }
+  if (!_prefillCache) await loadPrefillList();
+  renderPmZadosti();
+}
+
+function renderPmZadosti() {
+  const box = document.getElementById('pm-zadosti');
+  if (!box || !_prefillCache) return;
+  const fold = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const q = fold(document.getElementById('pm-hledat').value.trim());
+  // Plná moc není žádost — ze seznamu ji vynecháme, nemá strany.
+  const zdroje = _prefillCache.filter(v => v.kind !== 'pm');
+  const rows = (q ? zdroje.filter(v => fold([v.rz, v.vin, v.na, v.od, v.znacka].join(' ')).includes(q))
+                  : zdroje).slice(0, 25);
+  if (!rows.length) { box.innerHTML = '<div class="hl-detail">Nic odpovídajícího.</div>'; return; }
+  box.innerHTML = rows.map(v => `<button type="button" class="hl-row"
+      style="width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;"
+      onclick="pmVyberZadost('${esc(v.file)}')">
+      <span class="hl-badge">${esc(v.typ)}</span>
+      <span class="hl-when">${esc(v.rz || v.vin || '')}</span>
+      <span class="hl-sub">${esc(v.datum)}${v.na ? ' · ' + esc(v.na) : ''}</span></button>`).join('');
+}
+
+function pmZmenitZadost() {
+  _pmZdroj = null; _pmRole = null; _pmInfo = null;
+  document.getElementById('pm-vybrano').style.display = 'none';
+  document.getElementById('pm-ze-zadosti').style.display = '';
+  document.getElementById('pm-krok2').style.display = 'none';
+  document.getElementById('pm-vysledek').innerHTML = '';
+}
+
+async function pmVyberZadost(file) {
+  _pmZdroj = file; _pmRole = null;
+  const box = document.getElementById('pm-strany');
+  document.getElementById('pm-krok2').style.display = '';
+  document.getElementById('pm-vysledek').innerHTML = '';
+  // Hledání se sbalí do jednoho řádku, ať se krok vejde na obrazovku.
+  const zvolena = (_prefillCache || []).find(v => v.file === file) || {};
+  document.getElementById('pm-vybrano-typ').textContent = zvolena.typ || '';
+  document.getElementById('pm-vybrano-auto').textContent = zvolena.rz || zvolena.vin || '';
+  document.getElementById('pm-vybrano-kdo').textContent =
+      [zvolena.datum, zvolena.na].filter(Boolean).join(' · ');
+  document.getElementById('pm-vybrano').style.display = '';
+  document.getElementById('pm-ze-zadosti').style.display = 'none';
+  box.innerHTML = '<div class="hl-detail">Načítám strany…</div>';
+  try {
+    _pmInfo = await fetch('/api/strany/' + encodeURIComponent(file)).then(r => r.json());
+  } catch (e) {
+    box.innerHTML = '<div class="hl-detail">Žádost se nepodařilo přečíst.</div>';
+    return;
+  }
+  if (!_pmInfo.strany.length) {
+    box.innerHTML = '<div class="hl-detail">V téhle žádosti nevidím žádnou vyplněnou stranu.</div>';
+    return;
+  }
+  const voz = _pmInfo.vozidlo || {};
+  document.getElementById('pm-s-vozidlem').disabled = !(voz.rz || voz.vin);
+  box.innerHTML = _pmInfo.strany.map(s => `<button type="button" class="hl-row" data-role="${esc(s.role)}"
+      style="width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;"
+      onclick="pmVyberStranu('${esc(s.role)}')">
+      <span class="hl-badge">${esc(s.role)}</span>
+      <span class="hl-when">${esc(s.jmeno)}</span>
+      <span class="hl-sub">${esc(s.rc_ic || '')}${s.adresa ? ' · ' + esc(s.adresa) : ''}</span></button>`).join('');
+}
+
+// Přepnutí mezi „vybrat z historie" a „vyplnit ručně". Ruční cesta nemá strany
+// — zmocnitel JE to, co se napíše — tak se ten krok schová.
+let _pmRucne = false;
+
+function pmPrepniRucne() {
+  _pmRucne = !_pmRucne;
+  document.getElementById('pm-ze-zadosti').style.display = (_pmRucne || _pmZdroj) ? 'none' : '';
+  document.getElementById('pm-vybrano').style.display = (!_pmRucne && _pmZdroj) ? '' : 'none';
+  document.getElementById('pm-rucne').style.display = _pmRucne ? '' : 'none';
+  document.getElementById('pm-prepinac').textContent = _pmRucne ? 'vybrat z historie' : 'vyplnit ručně';
+  document.getElementById('pm-krok-strany').style.display = _pmRucne ? 'none' : '';
+  document.getElementById('pm-krok3-label').textContent = _pmRucne ? '2. Co v ní bude' : '3. Co v ní bude';
+  document.getElementById('pm-vysledek').innerHTML = '';
+  if (_pmRucne) {
+    document.getElementById('pm-krok2').style.display = '';
+    document.getElementById('pm-s-vozidlem').disabled = false;
+    pmRucneZmena();
+    pmVozidloToggle();
+  } else {
+    pmVozidloToggle();
+    document.getElementById('pm-krok2').style.display = _pmZdroj ? '' : 'none';
+    document.getElementById('pm-vystavit').disabled = !_pmRole;
+  }
+}
+
+// Kolonky na vozidlo dávají smysl, jen když ho v plné moci chceš — jinak jen
+// zabírají výšku a nutí rolovat.
+function pmVozidloToggle() {
+  const on = document.getElementById('pm-s-vozidlem').checked;
+  // Kolonky se ukazují jen v ručním režimu — z historie se vozidlo bere ze žádosti.
+  document.getElementById('pm-vozidlo-pole').style.display = (on && _pmRucne) ? '' : 'none';
+}
+
+// IČO -> ARES: doplní název firmy a adresu, ať se to nemusí opisovat.
+// Osm číslic = IČO; rodné číslo (6+4 s lomítkem) se do ARESu neposílá.
+let _pmAresLast = '';
+async function pmAres() {
+  const raw = (document.getElementById('pm-r-rcic').value || '').trim();
+  const ico = raw.replace(/\D/g, '');
+  const st = document.getElementById('pm-ares-status');
+  if (raw.includes('/') || ico.length !== 8) { st.style.display = 'none'; return; }
+  if (_pmAresLast === ico) return;
+  _pmAresLast = ico;
+  st.style.display = 'block'; st.className = 'lookup-status'; st.textContent = 'Načítám…';
+  try {
+    const d = await fetch('/api/ico', { method: 'POST', headers: {'Content-Type':'application/json'},
+                                        body: JSON.stringify({ico}) }).then(r => r.json());
+    if (!d.success) { st.className = 'lookup-status err'; st.textContent = '✗ ' + (d.error || 'nenalezeno'); return; }
+    const jm = document.getElementById('pm-r-jmeno');
+    const ad = document.getElementById('pm-r-adresa');
+    if (!jm.value) jm.value = d.nazev || '';
+    if (!ad.value) ad.value = [d.adresa, d.psc].filter(Boolean).join(', ');
+    st.className = 'lookup-status ok'; st.textContent = '✓ ' + (d.nazev || '');
+    pmRucneZmena();
+  } catch (e) {
+    st.className = 'lookup-status err'; st.textContent = '✗ ARES nedostupný';
+  }
+}
+
+function pmRucneZmena() {
+  // Bez jména není koho zmocnit; zbytek si úřad doplní z dokladu.
+  const jmeno = (document.getElementById('pm-r-jmeno').value || '').trim();
+  document.getElementById('pm-vystavit').disabled = !jmeno;
+}
+
+function pmVyberStranu(role) {
+  _pmRole = role;
+  document.querySelectorAll('#pm-strany .hl-row').forEach(b => {
+    const on = b.dataset.role === role;
+    b.style.background = on ? 'var(--accent)' : '#fff';
+    b.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+  });
+  document.getElementById('pm-vystavit').disabled = false;
+}
+
+async function vystavitPlnouMoc() {
+  const btn = document.getElementById('pm-vystavit');
+  const out = document.getElementById('pm-vysledek');
+  btn.disabled = true; btn.textContent = 'Vystavuji…';
+  try {
+    const r = await fetch('/api/plna-moc', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        zdroj: _pmZdroj, role: _pmRole,
+        rucne: _pmRucne ? {
+          jmeno:  v('pm-r-jmeno'),  rc_ic: v('pm-r-rcic'), adresa: v('pm-r-adresa'),
+          rz:     v('pm-r-rz'),     vin:   v('pm-r-vin'),
+        } : null,
+        s_vozidlem: document.getElementById('pm-s-vozidlem').checked,
+        profil: window.getProfil ? window.getProfil() : '',
+      })
+    }).then(x => x.json());
+    if (!r.success) {
+      out.innerHTML = `<div class="hl-detail" style="color:var(--error)">${esc(r.error || 'Nepovedlo se.')}</div>`;
+    } else {
+      out.innerHTML = `<a class="btn-download" href="${esc(r.url)}" target="_blank"
+          style="display:inline-flex;align-items:center;gap:8px;">
+          <svg class="ico"><use href="#i-file"></use></svg>
+          Plná moc — ${esc(r.zmocnitel)}</a>
+        <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>`;
+    }
+  } catch (e) {
+    out.innerHTML = '<div class="hl-detail" style="color:var(--error)">Vystavení se nepovedlo.</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Vystavit plnou moc';
+}
+
 // ── 3RZ: navázat na dřívější žádost ───────────────────────────────────────────
 // Seznam vygenerovaných žádostí se načte jednou; vybraná se dotáhne přes
 // /api/prefill, které přečte její PDF. Nikde se kvůli tomu neukládají další
@@ -1496,7 +1813,7 @@ async function prefillFrom(file) {
     // Pozor na <select>: fill_pdf ukládá hodnoty verzálkami ("OSOBNI AUTOMOBIL"),
     // ale options mají malá písmena — přiřazení .value by tiše neudělalo nic.
     const norm = t => String(t || '').toLowerCase().normalize('NFD')
-        .replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+        .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
     const set = (id, val) => {
       const el = document.getElementById(id);
       if (!el || !val) return;
