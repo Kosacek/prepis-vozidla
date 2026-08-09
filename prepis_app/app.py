@@ -16,6 +16,7 @@ import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
 import hledani  # deterministic history search (no AI) — see hledani.py
 import prefill  # read a past žádost back into form data — see prefill.py
+import pm  # plná moc k zastupování na registru vozidel — see pm.py
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -39,7 +40,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1326,6 +1327,80 @@ def api_prefill(filename):
     nezakládá další úložiště osobních údajů.
     """
     return jsonify(prefill.z_pdf(DATA_DIR, filename))
+
+
+@app.route("/api/strany/<path:filename>", methods=["GET"])
+def api_strany(filename):
+    """Strany a vozidlo z dřívější žádosti — nabídka „na koho plnou moc"."""
+    return jsonify(prefill.strany(DATA_DIR, filename))
+
+
+@app.route("/api/plna-moc", methods=["POST"])
+def api_plna_moc():
+    """Vystaví plnou moc na vybranou stranu dřívější žádosti.
+
+    Zmocněnec je natištěný v šabloně a plyne z profilu; datum je DNEŠNÍ, ne
+    zítřejší jako na žádostech — plná moc se podepisuje dnes.
+    """
+    data = request.get_json(silent=True) or {}
+    profil = (data.get("profil") or "").strip()
+    tpl = pm.sablona(BASE_DIR, profil)
+    if not tpl:
+        return jsonify({"success": False,
+                        "error": f"Pro profil „{profil or '—'}“ nemám šablonu plné moci."}), 400
+    path, meta = tpl
+
+    # Dva zdroje dat: strana z dřívější žádosti, nebo ručně vyplněný zmocnitel
+    # (plná moc se občas dělá pro někoho, kdo v historii vůbec není).
+    rucne = data.get("rucne") or {}
+    if rucne.get("jmeno"):
+        strana = {"jmeno": rucne.get("jmeno", ""), "rc_ic": rucne.get("rc_ic", ""),
+                  "adresa": rucne.get("adresa", "")}
+        info_vozidlo = {"rz": rucne.get("rz", ""), "vin": rucne.get("vin", "")}
+    else:
+        zdroj = data.get("zdroj") or ""
+        role = data.get("role") or ""
+        info = prefill.strany(DATA_DIR, zdroj)
+        strana = next((s for s in info["strany"] if s["role"] == role), None)
+        if not strana:
+            return jsonify({"success": False,
+                            "error": "Vyber stranu z žádosti, nebo vyplň zmocnitele ručně."}), 400
+        info_vozidlo = info["vozidlo"]
+
+    # Vozidlo jen když ho uživatel chce A šablona na něj má kolonky.
+    chce_vozidlo = bool(data.get("s_vozidlem"))
+    vozidlo = info_vozidlo if (chce_vozidlo and meta["ma_vozidlo"]) else None
+
+    out_dir = os.path.join(DATA_DIR, "output")
+    os.makedirs(out_dir, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = hledani.nazev_vystupu("pm", {
+        "novy_jmeno": strana["jmeno"],
+        "registracni_znacka": (vozidlo or {}).get("rz", ""),
+        "vin": (vozidlo or {}).get("vin", ""),
+    }, ts, out_dir)
+    try:
+        pdf = fill_pdf(path, pm.build_fields(strana, vozidlo))
+        with open(os.path.join(out_dir, name), "wb") as f:
+            f.write(pdf)
+    except Exception as e:
+        _log.warning("plná moc failed: %s", e)
+        return jsonify({"success": False, "error": "Plnou moc se nepodařilo vytvořit."}), 500
+
+    hledani.zapis_vystup(DATA_DIR, [name], {
+        "novy_jmeno": strana["jmeno"],
+        "registracni_znacka": (vozidlo or {}).get("rz", ""),
+        "vin": (vozidlo or {}).get("vin", ""),
+    })
+    return jsonify({"success": True, "url": f"/download/{name}", "soubor": name,
+                    "zmocnenec": meta["kdo"], "zmocnitel": strana["jmeno"],
+                    "s_vozidlem": bool(vozidlo)})
+
+
+@app.route("/api/pm-zmocnenci", methods=["GET"])
+def api_pm_zmocnenci():
+    """Na koho umíme plnou moc vystavit (kvůli šablonám, ne kvůli profilům)."""
+    return jsonify(pm.dostupni())
 
 
 @app.route("/api/outputs", methods=["GET"])
