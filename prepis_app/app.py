@@ -40,7 +40,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -440,13 +440,22 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
 
     # Group overlays by page
     ID_FONT_SIZE = 11
+    ID_MAX_WIDTH = 250   # bodů; za tím začíná natištěný text formuláře
     pages_needed = max(o[0] for o in overlays) + 1
     for page_idx in range(pages_needed):
         page_overlays = [o for o in overlays if o[0] == page_idx]
         if page_overlays:
-            c.setFont("Helvetica-Bold", ID_FONT_SIZE)
             for _, x, y, text in page_overlays:
-                tw = stringWidth(text, "Helvetica-Bold", ID_FONT_SIZE)
+                # Text se sází zprava od x. Řetěz několika ID je dlouhý, a kdyby
+                # přerostl vyhrazené místo, vjel by do natištěné předlohy — proto
+                # se pro takový případ písmo zmenší (dolní mez 7 b, pod tím už
+                # by to úřednice nepřečetla).
+                size = ID_FONT_SIZE
+                tw = stringWidth(text, "Helvetica-Bold", size)
+                while tw > ID_MAX_WIDTH and size > 7:
+                    size -= 0.5
+                    tw = stringWidth(text, "Helvetica-Bold", size)
+                c.setFont("Helvetica-Bold", size)
                 c.drawString(x - tw, y, text)  # right-align to x
         c.showPage()
     c.save()
@@ -996,9 +1005,15 @@ def api_firmy_add():
     return jsonify({"success": True})
 
 def _normalize_ids(raw: str) -> str:
+    """Seznam ID pro úřad: číslice, oddělené čárkou.
+
+    ŽÁDNÉ zkracování — dřív se každé ID ořezávalo na 10 číslic, jenže leasingovky
+    (Toyota Financial Services) mají delší a řetězí se jich několik za sebou.
+    Ustřižené ID na žádosti pro registr je horší než dlouhé.
+    """
     parts = []
     for seg in str(raw or "").replace(";", ",").split(","):
-        digits = "".join(c for c in seg.strip() if c.isdigit())[:10]
+        digits = "".join(c for c in seg.strip() if c.isdigit())
         if digits:
             parts.append(digits)
     return ", ".join(parts)
