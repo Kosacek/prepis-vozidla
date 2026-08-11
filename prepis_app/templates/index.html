@@ -612,7 +612,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="puvodni_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
+          <input type="text" id="puvodni_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -657,7 +657,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="puvodni_prov_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
+              <input type="text" id="puvodni_prov_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -704,7 +704,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="novy_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
+          <input type="text" id="novy_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -749,7 +749,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="novy_prov_id" placeholder="1234567890, 9876543210" maxlength="32" inputmode="numeric">
+              <input type="text" id="novy_prov_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -2096,7 +2096,7 @@ function startEditId(ico) {
   meta.dataset.originalHtml = meta.innerHTML;
   meta.innerHTML = `
     IČO: ${esc(ico)}${firm && firm.adresa ? ' · '+esc(firm.adresa) : ''}
-    · ID: <input type="text" id="firm-id-input-${esc(ico)}" value="${esc(current)}" maxlength="32" inputmode="numeric" placeholder="1234567890, 9876543210" style="padding:2px 6px;font-size:12px;width:200px" onkeydown="if(event.key==='Enter'){saveEditId('${esc(ico)}')}else if(event.key==='Escape'){cancelEditId('${esc(ico)}')}">
+    · ID: <input type="text" id="firm-id-input-${esc(ico)}" value="${esc(current)}" maxlength="120" inputmode="numeric" placeholder="1234567890, 9876543210" style="padding:2px 6px;font-size:12px;width:200px" onkeydown="if(event.key==='Enter'){saveEditId('${esc(ico)}')}else if(event.key==='Escape'){cancelEditId('${esc(ico)}')}">
     <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="saveEditId('${esc(ico)}')">Uložit</button>
     <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="cancelEditId('${esc(ico)}')">Zrušit</button>
   `;
