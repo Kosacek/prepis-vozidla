@@ -155,7 +155,7 @@ def parse_period(q: str, today: date | None = None) -> tuple[str | None, str | N
 # ppd_<cislo>.pdf nemá v názvu datum, a doklady mají vlastní evidenci s datem,
 # číslem, plátcem i částkou — hledají se přes ni, ne přes mtime souboru.
 TYPY = {"zmeny": "Převod", "zapis": "Nové vozidlo", "zmena": "Změna údajů",
-        "3rz": "Třetí značka", "pm": "Plná moc"}
+        "3rz": "Třetí značka", "pm": "Plná moc", "vyvoz": "Vývoz"}
 
 # Název souboru má DVA tvary a oba musí jít přečíst:
 #   starý  zmeny_20260720_090000.pdf                   (do 2026-08, ~850 souborů)
@@ -163,7 +163,7 @@ TYPY = {"zmeny": "Převod", "zapis": "Nové vozidlo", "zmena": "Změna údajů",
 # Nový nese jméno a vozidlo, aby se žádost dala ve složce najít očima podle toho,
 # pro koho byla — ne podle času, který nikomu nic neřekne. Staré soubory se
 # nepřejmenovávají, jen se dál čtou.
-_KIND = r"(3rz|zmeny|zapis|zmena|pm)"
+_KIND = r"(3rz|zmeny|zapis|zmena|pm|vyvoz)"
 _STARY_RE = re.compile(rf"^{_KIND}_(\d{{8}})_(\d{{6}})\.pdf$", re.I)
 # Prostřední část (jméno + vozidlo) je volitelná: u žádosti bez vyplněného
 # jména i SPZ vznikne jen "zmena_20260808.pdf" a i tu je potřeba přečíst.

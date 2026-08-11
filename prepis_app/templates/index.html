@@ -102,6 +102,17 @@
      The larger element sizes (cards, titles, inputs) are now the app-wide base,
      so every step reads at this bigger, consistent size. */
   .container.gen-wide { max-width: 1180px; }
+  /* Krok 1 vedle sebe: typy vlevo, skenování vpravo. Se šesti typy byla karta
+     vysoká přes 570 px a kamera — pro Davida ta nejdůležitější věc — začínala
+     až pod okrajem obrazovky. Vpravo se přitom plýtvalo skoro 300 px. */
+  .container.step1-wide { max-width: 1180px; }
+  .step1-layout { display: flex; gap: 20px; align-items: flex-start; }
+  .step1-layout > .step1-typy { flex: 1 1 58%; min-width: 0; margin: 0; }
+  .step1-layout > .step1-sken { flex: 1 1 42%; min-width: 0; margin: 0; }
+  @media (max-width: 900px) {
+    .step1-layout { display: block; }
+    .step1-layout > .step1-sken { margin-top: 12px; }
+  }
   .gen-layout { display: flex; gap: 24px; align-items: flex-start; }
   .gen-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .gen-side { width: 380px; flex-shrink: 0; }
@@ -206,14 +217,14 @@
   .step-panel.active { display: block; }
 
   /* Mode cards */
-  .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 18px 22px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 16px; }
+  .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 10px 18px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 16px; }
   .mode-card:hover { border-color: var(--primary); background: var(--accent); }
   .mode-card:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.2); }
   .mode-card.selected { border-color: var(--primary); background: var(--accent); }
   /* Ikona v kartě sedí v jemném čtverci — tři možnosti jdou tím pádem
      rozeznat periferně, bez čtení popisků. Vybraná karta ho obrátí. */
   .mode-icon {
-    flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px;
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 9px;
     background: var(--accent); color: var(--primary);
     display: flex; align-items: center; justify-content: center;
     transition: background .15s, color .15s;
@@ -270,6 +281,21 @@
   .scan-icon { font-size: 26px; }
   .scan-text { font-size: 13px; color: var(--muted); font-weight: 600; }
   .scan-sub  { font-size: 11px; color: var(--muted); }
+  /* Tlačítka pod kamerou: hlavní akce na celou šířku sloupce, vedlejší tři
+     pod ní rovným dílem. Dřív měla hlavní flex:2 a ostatní přirozenou šířku,
+     takže se v užším sloupci "Skenovat ORV" zalomilo na tři řádky a vedle něj
+     působilo "Zavřít" nesmyslně velké. */
+  .vyv-typ { flex: 1; padding: 10px; border: 2px solid var(--border); border-radius: 8px;
+             background: #fff; cursor: pointer; font-size: 14px; font-weight: 600;
+             font-family: inherit; color: var(--text); }
+  .vyv-typ.selected { border-color: var(--primary); background: var(--accent); color: var(--primary); }
+
+  .scan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .scan-actions > #quick-scan-btn { flex: 1 1 100%; justify-content: center; }
+  .scan-actions > button:not(#quick-scan-btn) { flex: 1 1 0; min-width: 88px; }
+  .scan-kbd { opacity: .7; font-weight: 500; font-size: 12px; }
+  @media (max-width: 1100px) { .scan-kbd { display: none; } }
+
   .scan-result { font-size: 12px; padding: 7px 9px; border-radius: 5px; margin-top: 7px; display: none; }
   .scan-result.ok      { background: #d1fae5; color: var(--success); display: block; }
   .scan-result.err     { background: #fee2e2; color: var(--error);   display: block; }
@@ -415,6 +441,7 @@
   <symbol id="i-transfer" viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M13.5 5.5L17 9l-3.5 3.5"/><path d="M20 15H7"/><path d="M10.5 11.5L7 15l3.5 3.5"/></symbol>
   <symbol id="i-plus-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></symbol>
   <symbol id="i-pm" viewBox="0 0 24 24"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 8h3M9 11h6"/><path d="M9 16.5c1-1.5 1.8.8 2.8 0s1.4-1.2 2.3 0"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><rect x="3" y="8" width="13" height="8" rx="2"/><path d="M6.5 8v8"/><path d="M9.5 11.5h4M9.5 13.5h2.5"/><path d="M17 12h5"/><path d="M19.5 9.5L22 12l-2.5 2.5"/></symbol>
   <symbol id="i-plate" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10"/><path d="M10.5 11h7M10.5 13.5h4.5"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 20v-5M5 11V4M12 20v-8M12 8V4M19 20v-4M19 12V4"/><path d="M2.5 15h5M9.5 8h5M16.5 16h5"/></symbol>
   <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></symbol>
@@ -493,14 +520,15 @@
   </div>
 </div>
 
-<div class="container">
+<div class="container step1-wide">
 
   <!-- Stepper (rendered dynamically by renderStepper()) -->
   <div class="stepper" id="stepper"></div>
 
   <!-- ── Step 1: Mode ── -->
   <div class="step-panel active" id="panel-1">
-    <div class="card">
+   <div class="step1-layout">
+    <div class="card step1-typy">
       <div class="card-title">Typ operace</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div class="mode-card selected" data-mode="prevod" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
@@ -532,6 +560,14 @@
           </div>
         </div>
 
+        <div class="mode-card" data-mode="vyvoz" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
+          <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-export"></use></svg></div>
+          <div>
+            <div class="mode-title">Vývoz vozidla</div>
+            <div class="mode-desc">Tabulka s registrační značkou na vývoz. Platnost nejvýš 3 měsíce.</div>
+          </div>
+        </div>
+
         <div class="mode-card" data-mode="zmena" onclick="selectMode(this)" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.stopPropagation();selectMode(this);}">
           <div class="mode-icon"><svg class="ico ico-lg"><use href="#i-sliders"></use></svg></div>
           <div>
@@ -541,15 +577,15 @@
         </div>
       </div>
     </div>
-    <div class="card" style="margin-top:12px;">
+    <div class="card step1-sken">
       <div class="card-title">Naskenovat dokumenty (volitelné)</div>
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Vyfoťte ORV, COC list, OP nebo plnou moc. Aplikace vyplní vše najednou.</p>
 
       <!-- Camera preview -->
       <div id="camera-container" style="display:none;margin-bottom:12px;">
         <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;transform:rotate(180deg);"></video>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="flex:2;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span style="opacity:.7;font-weight:500;font-size:12px;">⌨ NumPad Enter</span></button>
+        <div class="scan-actions">
+          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
           <button onclick="capturePhoto()" title="Přidat fotku do dávky bez skenování" style="padding:10px 14px;background:#fff;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);">+ Foto do dávky</button>
           <button onclick="closeCamera()" style="padding:10px 14px;background:#f3f4f6;border:1.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">✕ Zavřít</button>
           <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-spark"></use></svg> <span id="model-name">Sonnet</span></button>
@@ -571,6 +607,7 @@
       </div>
       <div class="scan-result" id="scan-all-result"></div>
     </div>
+   </div><!-- /step1-layout -->
   </div>
 
   <!-- ── Step 2: Původní vlastník ── -->
@@ -1002,6 +1039,62 @@
     </div>
   </div>
 
+  <!-- ── Step 7: Vývoz — na koho ── -->
+  <div class="step-panel" id="panel-7">
+    <div class="card">
+      <div class="card-title">Vývoz — na koho</div>
+      <div class="hl-detail" style="margin-bottom:14px;">
+        Tiskopis má na příjemce tři volné řádky. Firma se vejde na jeden, u fyzické
+        osoby je potřeba jméno, datum narození i celá adresa.
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button type="button" class="vyv-typ selected" data-typ="firma" onclick="vyvozTyp('firma')">Firma</button>
+        <button type="button" class="vyv-typ" data-typ="osoba" onclick="vyvozTyp('osoba')">Fyzická osoba</button>
+      </div>
+
+      <div id="vyv-firma">
+        <div class="form-grid">
+          <div class="field"><label>DIČ (např. DE123456789)</label>
+            <input type="text" id="vyv_dic" onblur="vyvozVies()" placeholder="DE123456789">
+            <div class="lookup-status" id="vyv-vies-status" style="display:none;"></div></div>
+          <div class="field"><label>Stát</label>
+            <input type="text" id="vyv_stat" placeholder="Německo"></div>
+          <div class="field full"><label>Název firmy</label>
+            <input type="text" id="vyv_nazev"></div>
+          <div class="field full"><label>Adresa (ulice, město, PSČ)</label>
+            <input type="text" id="vyv_adresa"></div>
+        </div>
+      </div>
+
+      <div id="vyv-osoba" style="display:none;">
+        <div class="form-grid">
+          <div class="field"><label>Jméno a příjmení</label>
+            <input type="text" id="vyv_jmeno"></div>
+          <div class="field"><label>Datum narození</label>
+            <input type="text" id="vyv_narozeni" class="no-uc" placeholder="DD.MM.RRRR"></div>
+          <div class="field full"><label>Adresa (ulice, číslo)</label>
+            <input type="text" id="vyv_o_adresa"></div>
+          <div class="field"><label>Město a PSČ</label>
+            <input type="text" id="vyv_o_mesto"></div>
+          <div class="field"><label>Stát</label>
+            <input type="text" id="vyv_o_stat" placeholder="Německo"></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="form-grid">
+        <div class="field"><label>Platnost do</label>
+          <input type="text" id="vyvoz_platnost" class="no-uc" placeholder="DD.MM.RRRR"></div>
+      </div>
+      <div class="hl-detail" id="vyvoz-platnost-info"></div>
+
+      <hr class="divider">
+      <div class="section-label">Jak to bude na tiskopisu</div>
+      <div id="vyv-nahled" class="hl-detail" style="font-family:var(--font-mono,monospace);white-space:pre-line;"></div>
+    </div>
+  </div>
+
   <!-- ── Step 6: Plná moc ── -->
   <div class="step-panel" id="panel-6">
     <div class="card">
@@ -1136,7 +1229,10 @@ function refreshLenCheck(el) {
 function refreshAllLenChecks() {
   document.querySelectorAll('input.len-check').forEach(refreshLenCheck);
 }
-document.addEventListener('input', function (ev) { refreshLenCheck(ev.target); });
+document.addEventListener('input', function (ev) {
+  refreshLenCheck(ev.target);
+  if (ev.target.closest && ev.target.closest('#panel-7')) vyvozNahled();
+});
 
 let appMode = 'prevod';
 let flowIdx = 0;
@@ -1182,6 +1278,7 @@ const FLOWS = {
   // Ostatní úkony (zatím 3RZ) mají stejný tvar jako změna údajů: jedno
   // vozidlo a jedna osoba. Přibude-li další tiskopis, sdílí tenhle flow.
   '3rz':  { panels: [1,4,3,5],   labels: ['Typ','Vozidlo','Vlastník','Generovat'] },
+  vyvoz:  { panels: [1,4,3,7,5], labels: ['Typ','Vozidlo','Vlastník','Na koho','Generovat'] },
   // Plná moc nepotřebuje vozidlo ani vlastníka — všechno je v jednom kroku.
   pm:     { panels: [1,6],       labels: ['Typ','Plná moc'] },
 };
@@ -1273,7 +1370,10 @@ function activatePanel(n) {
   document.getElementById(`panel-${n}`).classList.add('active');
   // The generate step uses a wider two-column layout (inputs + Shrnutí sidebar).
   const container = document.querySelector('.container');
-  if (container) container.classList.toggle('gen-wide', n === 5);
+  if (container) {
+    container.classList.toggle('gen-wide', n === 5);
+    container.classList.toggle('step1-wide', n === 1);
+  }
   if (n === 1) {
     // Try to auto-open camera as soon as Step 1 is active. Browsers may block
     // without a user gesture; tryAutoOpenCamera handles that gracefully (silent
@@ -1284,6 +1384,7 @@ function activatePanel(n) {
   }
 
   if (n === 6) initPlnaMoc();
+  if (n === 7) { vyvozPlatnostDefault(); vyvozNahled(); }
 
   // Vlastník je "nový" jen u převodu a zápisu; u změny údajů a 3RZ je to
   // pořád tentýž člověk, jen o něco žádá.
@@ -1295,7 +1396,7 @@ function activatePanel(n) {
   // Show/hide vehicle sub-sections on the vehicle panel
   if (n === 4) {
     // prevod and zmena share the same vehicle fields panel; subsections inside toggle by mode.
-    document.getElementById('vozidlo-prevod-fields').style.display = (appMode === 'prevod' || appMode === 'zmena' || appMode === '3rz') ? '' : 'none';
+    document.getElementById('vozidlo-prevod-fields').style.display = (appMode === 'prevod' || appMode === 'zmena' || appMode === '3rz' || appMode === 'vyvoz') ? '' : 'none';
     document.getElementById('vozidlo-zapis-fields').style.display  = appMode === 'zapis' ? '' : 'none';
     const pjd = document.getElementById('prevod-jiny-doklad-section');
     const pzt = document.getElementById('prevod-zmena-typ-section');
@@ -1565,6 +1666,79 @@ document.addEventListener('keydown', e => {
 // ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
 let _dokladyCache = [];
 let _dokladyDeletedCache = [];
+// Tiskopis říká „nepřesahující 3 měsíce od data vydání" — předvyplníme přesně
+// tuhle mez, ať se nemusí počítat, a napíšeme k tomu, odkud se bere.
+function vyvozPlatnostDefault() {
+  const el = document.getElementById('vyvoz_platnost');
+  const info = document.getElementById('vyvoz-platnost-info');
+  if (el && !el.value) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 3);
+    el.value = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  }
+  if (info) info.textContent = 'Nejvýš 3 měsíce od vydání — předvyplněno na maximum, klidně zkrať.';
+}
+
+
+// ── Vývoz: na koho ────────────────────────────────────────────────────────────
+// Tiskopis má tři volné řádky. Firma se vejde na jeden ("název, DIČ" + adresa),
+// fyzická osoba potřebuje jméno s datem narození a celou adresu zvlášť.
+let _vyvTyp = 'firma';
+
+function vyvozTyp(t) {
+  _vyvTyp = t;
+  document.querySelectorAll('.vyv-typ').forEach(b =>
+    b.classList.toggle('selected', b.dataset.typ === t));
+  document.getElementById('vyv-firma').style.display = t === 'firma' ? '' : 'none';
+  document.getElementById('vyv-osoba').style.display = t === 'osoba' ? '' : 'none';
+  vyvozNahled();
+}
+
+function vyvozRadky() {
+  const v = id => (document.getElementById(id) || {}).value ? document.getElementById(id).value.trim() : '';
+  const platnost = v('vyvoz_platnost');
+  let l1 = '', l2 = '';
+  if (_vyvTyp === 'firma') {
+    l1 = [v('vyv_nazev'), v('vyv_dic')].filter(Boolean).join(', ');
+    l2 = [v('vyv_adresa'), v('vyv_stat')].filter(Boolean).join(', ');
+  } else {
+    l1 = [v('vyv_jmeno'), v('vyv_narozeni') ? 'nar. ' + v('vyv_narozeni') : ''].filter(Boolean).join(', ');
+    l2 = [v('vyv_o_adresa'), v('vyv_o_mesto'), v('vyv_o_stat')].filter(Boolean).join(', ');
+  }
+  return { l1, l2, l3: platnost ? 'S platností do ' + platnost : '' };
+}
+
+function vyvozNahled() {
+  const r = vyvozRadky();
+  const el = document.getElementById('vyv-nahled');
+  if (el) el.textContent = [r.l1, r.l2, r.l3].filter(Boolean).join('\n') || '(zatím prázdné)';
+}
+
+// DIČ -> VIES. Pozor: Německo a Španělsko přes VIES název ani adresu nevydávají,
+// vrátí jen platnost — proto se při úspěchu bez jména nic nepřepisuje.
+async function vyvozVies() {
+  const raw = (document.getElementById('vyv_dic').value || '').replace(/\s/g, '').toUpperCase();
+  const st = document.getElementById('vyv-vies-status');
+  const m = raw.match(/^([A-Z]{2})([A-Z0-9]{6,14})$/);
+  if (!m) { st.style.display = 'none'; return; }
+  st.style.display = 'block'; st.className = 'lookup-status'; st.textContent = 'Ověřuji v VIES…';
+  try {
+    const d = await fetch('/api/vies', { method: 'POST', headers: {'Content-Type':'application/json'},
+                                         body: JSON.stringify({ dic: raw }) }).then(r => r.json());
+    if (!d.success) { st.className = 'lookup-status err'; st.textContent = '✗ ' + (d.error || 'nedostupné'); return; }
+    if (!d.valid) { st.className = 'lookup-status err'; st.textContent = '✗ DIČ není platné'; return; }
+    const naz = document.getElementById('vyv_nazev'), adr = document.getElementById('vyv_adresa');
+    if (d.nazev && !naz.value) naz.value = d.nazev;
+    if (d.adresa && !adr.value) adr.value = d.adresa;
+    st.className = 'lookup-status ok';
+    st.textContent = d.nazev ? ('✓ ' + d.nazev)
+                             : '✓ DIČ platné — tenhle stát název ani adresu nevydává, vyplň ručně';
+    vyvozNahled();
+  } catch (e) {
+    st.className = 'lookup-status err'; st.textContent = '✗ VIES nedostupný';
+  }
+}
+
 // ── Plná moc ──────────────────────────────────────────────────────────────────
 // Vybere se dřívější žádost, z ní strana (kupující, prodávající, provozovatel)
 // a plná moc se vystaví na ni. Zmocněnec plyne z profilu v hlavičce — je
@@ -2304,7 +2478,7 @@ function buildSummary() {
 }
 
 // ── Evidence úkonu (evidence.spznaklic.cz) ─────────────────────────────────────
-const _MODE_TO_TYP = { prevod: 'PŘEVOD', zapis: 'NOVÉ', zmena: '', '3rz': '3RZ' };
+const _MODE_TO_TYP = { prevod: 'PŘEVOD', zapis: 'NOVÉ', zmena: '', '3rz': '3RZ', vyvoz: 'VÝVOZ' };
 const _digits = s => String(s || '').replace(/\D/g, '');
 
 async function loadEvidenceMeta() {
@@ -2418,6 +2592,8 @@ async function generatePDFs() {
     druh_vozidla:        (appMode === 'zapis') ? v('druh_vozidla_z') : v('druh_vozidla'),
     zadost_zmena:        appMode === 'zmena' ? v('zadost_zmena') : '',
     duvod_3rz:           (document.querySelector('input[name="duvod_3rz"]:checked') || {}).value || 'nosic',
+    vyvoz_radky:         (appMode === 'vyvoz') ? vyvozRadky() : null,
+    vyvoz_platnost:      v('vyvoz_platnost'),
     kategorie_vozidla:   v('kategorie_vozidla'),
     typ_vozidla:         v('typ_vozidla'),
     znacka:              v('znacka'),
@@ -2456,7 +2632,7 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
-      generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, '3rz': result['3rz'], ppd: result.ppd, ppd_print: result.ppd_print, plne_moce: result.plne_moce || [],
+      generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, '3rz': result['3rz'], vyvoz: result.vyvoz, ppd: result.ppd, ppd_print: result.ppd_print, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '' };
       // PPD print button — shown only when a receipt was generated
       const ppdBtn = document.getElementById('btn-ppd');
@@ -2514,12 +2690,12 @@ function printAll() {
   // own tab — Chrome's full PDF viewer, which renders correctly and keeps the
   // form fields editable. (Embedding the PDF to enable auto-close makes Chrome
   // render it in a cramped, broken-looking embedded viewer, so we don't.)
-  const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena', '3rz': '3rz' };
+  const primaryByMode = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena', '3rz': '3rz', vyvoz: 'vyvoz' };
   const key = primaryByMode[generatedUrls.mode];
   if (key && generatedUrls[key]) {
     window.open(generatedUrls[key], '_blank');
   } else {
-    ['zmeny','zapis','zmena','3rz'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
+    ['zmeny','zapis','zmena','3rz','vyvoz'].forEach(k => { if (generatedUrls[k]) window.open(generatedUrls[k], '_blank'); });
   }
   (generatedUrls.plne_moce || []).forEach(url => window.open(url, '_blank'));
 }
