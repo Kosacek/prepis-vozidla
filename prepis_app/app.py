@@ -40,7 +40,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.5.1"
+__version__ = "1.6.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -81,6 +81,7 @@ PDF_ZMENY = os.path.join(BASE_DIR, "pdfs", "zmeny.pdf")
 PDF_ZAPIS = os.path.join(BASE_DIR, "pdfs", "zapis.pdf")
 PDF_ZMENA = os.path.join(BASE_DIR, "pdfs", "zmena_udaju.pdf")
 PDF_3RZ = os.path.join(BASE_DIR, "pdfs", "3rz.pdf")
+PDF_VYVOZ = os.path.join(BASE_DIR, "pdfs", "vyvoz.pdf")
 FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
 PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
 SCANS_DIR = os.path.join(DATA_DIR, "scans")
@@ -492,7 +493,7 @@ VZ_X = 400
 # ostatních tiskopisech. Popisek je tím pádem asi o 13 bodů kratší a tečkovaná
 # linka začíná dřív (≈375 místo ≈388), takže stejné x působí posunuté doprava.
 # Měřeno z pozic textových bloků: zmeny x=383, zapis x=385 (začátky teček).
-VZ_X_PER_DOC = {"3rz": 385}
+VZ_X_PER_DOC = {"3rz": 385, "vyvoz": 385}
 VZ_SIGNATURE_YS = {
     "zmeny": [(0, 95), (1, 37), (2, 163)],
     "zapis": [(0, 53), (1, 105)],
@@ -505,6 +506,10 @@ VZ_SIGNATURE_YS = {
     # s písmem 11, takže účaří vysázené hodnoty vychází přesně na y — tedy PŘESNĚ
     # na tečkovanou linku. Podpis má sedět nad ní, proto +4.
     "3rz": [(0, 123), (1, 174)],
+    # vyvoz.pdf je ze stejné rodiny tiskopisů jako 3rz — účaří "Podpis žadatele"
+    # je 91 (strana 1) a 142 (strana 2 = "Potvrzení o převzetí dokladů"), plus
+    # stejné +4, aby podpis seděl nad linkou a ne na ní.
+    "vyvoz": [(0, 95), (1, 146)],
 }
 
 
@@ -747,6 +752,76 @@ def build_3rz_fields(data: dict) -> dict:
         # Strana 2 — „Potvrzení o převzetí dokladů žadatelem". Místo vyplníme,
         # datum zůstává prázdné: podepisuje se až při přebírání dokladů na
         # úřadě, tak jako podpisové datum na ostatních tiskopisech.
+        "V_2":   "Brně",
+        "dne_2": "",
+    }
+
+
+def build_vyvoz_fields(data: dict) -> dict:
+    """Žádost o vydání tabulky s registrační značkou na vývoz (vyvoz.pdf).
+
+    Stejná rodina tiskopisů jako 3rz.pdf, ale místo důvodu má blok
+    „Žádá o vydání tabulky s RZ na vývoz pro osobu z jiného státu (uveďte
+    identifikaci osoby) s platností (…nepřesahující 3 měsíce od data vydání)"
+    — tři volné řádky, do kterých jde osoba v cizině a doba platnosti.
+
+    Strana 2 je záznam úřadu + „Potvrzení o převzetí dokladů žadatelem";
+    vyplňuje se jen místo, datum až při přebírání.
+    """
+    if data.get("novy_prov_jiny"):
+        prov_jmeno  = data.get("novy_prov_jmeno", "")
+        prov_rc_1   = data.get("novy_prov_rc_1", "")
+        prov_rc_2   = data.get("novy_prov_rc_2", "")
+        prov_ico    = data.get("novy_prov_ico", "")
+        prov_adresa = data.get("novy_prov_adresa", "")
+        prov_psc    = data.get("novy_prov_psc", "")
+    else:
+        prov_jmeno = prov_rc_1 = prov_rc_2 = prov_ico = prov_adresa = prov_psc = ""
+
+    platnost = (data.get("vyvoz_platnost") or "").strip()
+    r = data.get("vyvoz_radky") or {}
+    radky = [
+        (r.get("l1") or data.get("vyvoz_osoba") or "").strip(),
+        (r.get("l2") or "").strip(),
+        (r.get("l3") or (f"S platností do {platnost}" if platnost else "")).strip(),
+    ]
+    return {
+        # Vozidlo
+        "RZ":            data.get("registracni_znacka", ""),
+        "Druh vozidla":  data.get("druh_vozidla", ""),
+        "VIN":           data.get("vin", ""),
+
+        # Vlastník
+        "fill_2":  data.get("novy_jmeno", ""),
+        "fill_3":  "",
+        "comb_1":  data.get("novy_rc_1", ""),
+        "undefined": data.get("novy_rc_2", ""),
+        "comb_4":  data.get("novy_ico", ""),
+        "osoby 1": data.get("novy_adresa", ""),
+        "osoby 2": "",
+        "fill_6":  data.get("novy_psc", ""),
+
+        # Provozovatel (prázdný, když je totožný s vlastníkem)
+        "fill_7":      prov_jmeno,
+        "fill_8":      "",
+        "comb_5":      prov_rc_1,
+        "comb_6":      prov_rc_2,
+        "undefined_2": prov_ico,
+        "osoby 1_2":   prov_adresa,
+        "osoby 2_2":   "",
+        "fill_11":     prov_psc,
+
+        # Komu a na jak dlouho se vyváží — tři volné řádky tiskopisu.
+        # Firma se vejde na dva (název + DIČ, adresa + stát), fyzická osoba
+        # potřebuje jméno s datem narození a celou adresu zvlášť; třetí řádek
+        # nese platnost. Řádky skládá formulář, tady se jen rozdělí.
+        "fill_12": radky[0],
+        "fill_13": radky[1],
+        "fill_14": radky[2],
+
+        # Místo a datum
+        "V":     "Brně",
+        "dne":   _next_working_day(),
         "V_2":   "Brně",
         "dne_2": "",
     }
@@ -1174,7 +1249,7 @@ def api_generate():
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
     mode = data.get("mode", "prevod")
 
-    if mode not in {"prevod", "zapis", "zmena", "3rz"}:
+    if mode not in {"prevod", "zapis", "zmena", "3rz", "vyvoz"}:
         return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
 
     out_dir = os.path.join(DATA_DIR, "output")
@@ -1235,6 +1310,12 @@ def api_generate():
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
+    elif mode == "vyvoz":
+        vyv_bytes = fill_pdf(PDF_VYVOZ, build_vyvoz_fields(data))
+        vyv_bytes = add_vz_fields(vyv_bytes, "vyvoz")
+        name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
+        with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)
+        result["vyvoz"] = f"/download/{name}"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
@@ -1328,7 +1409,7 @@ def api_generate():
     # opening every PDF. Swallows its own errors — search is a convenience.
     hledani.zapis_vystup(
         DATA_DIR,
-        [result[k] for k in ("zmeny", "zapis", "zmena", "3rz") if result.get(k)],
+        [result[k] for k in ("zmeny", "zapis", "zmena", "3rz", "vyvoz") if result.get(k)],
         data,
     )
 
@@ -1342,6 +1423,37 @@ def api_prefill(filename):
     nezakládá další úložiště osobních údajů.
     """
     return jsonify(prefill.z_pdf(DATA_DIR, filename))
+
+
+@app.route("/api/vies", methods=["POST"])
+def api_vies():
+    """Ověření zahraničního DIČ v evropském VIES (obdoba ARESu pro EU).
+
+    Vrací i název a adresu — ale POZOR: některé státy, zejména Německo a
+    Španělsko, je z ochrany údajů nevydávají a odpoví jen platné/neplatné.
+    V takovém případě přijde valid=True s prázdným názvem a uživatel dopíše
+    zbytek ručně; nic si nedomýšlíme.
+    """
+    dic = "".join(ch for ch in str((request.get_json(silent=True) or {}).get("dic", "")).upper()
+                  if ch.isalnum())
+    if len(dic) < 8 or not dic[:2].isalpha():
+        return jsonify({"success": False, "error": "Neplatný tvar DIČ"}), 400
+    stat, cislo = dic[:2], dic[2:]
+    try:
+        r = requests.get(
+            f"https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{stat}/vat/{cislo}",
+            headers={"Accept": "application/json"}, timeout=8)
+        if r.status_code != 200:
+            return jsonify({"success": False, "error": f"VIES HTTP {r.status_code}"})
+        d = r.json()
+    except Exception as e:
+        _log.warning("VIES lookup failed: %s", e)
+        return jsonify({"success": False, "error": "VIES neodpovídá"})
+
+    # VIES vrací "---" tam, kde údaj nezveřejňuje.
+    cist = lambda v: "" if str(v or "").strip() in ("", "---") else str(v).strip()
+    return jsonify({"success": True, "valid": bool(d.get("isValid")),
+                    "nazev": cist(d.get("name")), "adresa": cist(d.get("address"))})
 
 
 @app.route("/api/strany/<path:filename>", methods=["GET"])
