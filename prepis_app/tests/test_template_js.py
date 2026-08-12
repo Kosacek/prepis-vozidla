@@ -50,6 +50,24 @@ def test_inline_scripts_parse(template):
             f"{template} blok {i} se nedá naparsovat:\n{r.stderr[:800]}")
 
 
+def test_owner_wording_is_decided_in_one_place():
+    """„Nový vlastník" má smysl jen u převodu — jinde se vlastník nemění, jen
+    o něco žádá. Dřív to bylo natvrdo v šabloně a na třech místech zvlášť, takže
+    u vývozu zůstalo „Nový provozovatel", i když je pořád tentýž.
+
+    Test hlídá, že se to rozhoduje jednou funkcí a texty nejsou zadrátované.
+    """
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert "function jeNovyVlastnik()" in html
+    for id_ in ("vlastnik-nadpis", "prov-toggle-nadpis", "prov-sekce-nadpis"):
+        assert f'id="{id_}"' in html, f"{id_} chybí — text by nešel přepnout"
+    # O znění nesmí rozhodovat podmínka na mód roztroušená po šabloně —
+    # jinak se při přidání dalšího tiskopisu zase někde zapomene.
+    spatne = [l.strip() for l in html.splitlines()
+              if "appMode ===" in l and ("Nový vlastník" in l or "Nový provozovatel" in l)]
+    assert not spatne, f"znění se rozhoduje mimo jeNovyVlastnik(): {spatne}"
+
+
 def test_every_icon_reference_has_a_symbol():
     """<use href="#i-…"> bez odpovídajícího <symbol> se vykreslí jako prázdno —
     v prohlížeči tiše, bez chyby v konzoli."""

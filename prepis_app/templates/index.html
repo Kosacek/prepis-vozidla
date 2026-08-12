@@ -747,11 +747,11 @@
       <hr class="divider">
       <label class="prov-toggle-row" for="novy_prov_jiny">
         <input type="checkbox" id="novy_prov_jiny" onchange="toggleProvozovatel('novy'); autoZmenaTyp();">
-        <span class="prov-toggle-label">Nový provozovatel je jiná osoba / firma</span>
+        <span class="prov-toggle-label" id="prov-toggle-nadpis">Nový provozovatel je jiná osoba / firma</span>
       </label>
       <div id="novy-prov-section" style="display:none">
         <div class="prov-section">
-          <div class="prov-section-title">Nový provozovatel</div>
+          <div class="prov-section-title" id="prov-sekce-nadpis">Nový provozovatel</div>
           <div class="form-grid">
             <div class="field">
               <label>Jméno / Název firmy</label>
@@ -1325,6 +1325,20 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Mode selection ────────────────────────────────────────────────────────────
+// „Nový" dává smysl jen u převodu — tam proti němu stojí původní vlastník.
+// U zápisu, změny údajů, třetí značky i vývozu se vlastník nemění, jen o něco
+// žádá, takže mluvit o „novém" je matoucí (David na to narazil u vývozu).
+function jeNovyVlastnik() { return appMode === 'prevod'; }
+
+function popiskyVlastnika() {
+  const novy = jeNovyVlastnik();
+  const set = (id, text) => { const e = document.getElementById(id); if (e) e.textContent = text; };
+  set('vlastnik-nadpis',   novy ? 'Nový vlastník' : 'Vlastník');
+  set('prov-toggle-nadpis', novy ? 'Nový provozovatel je jiná osoba / firma'
+                                 : 'Provozovatel je jiná osoba / firma');
+  set('prov-sekce-nadpis',  novy ? 'Nový provozovatel' : 'Provozovatel');
+}
+
 function selectMode(el) {
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
@@ -1388,10 +1402,7 @@ function activatePanel(n) {
 
   // Vlastník je "nový" jen u převodu a zápisu; u změny údajů a 3RZ je to
   // pořád tentýž člověk, jen o něco žádá.
-  if (n === 3) {
-    const h = document.getElementById('vlastnik-nadpis');
-    if (h) h.textContent = (appMode === 'zmena' || appMode === '3rz') ? 'Vlastník' : 'Nový vlastník';
-  }
+  if (n === 3) popiskyVlastnika();
 
   // Show/hide vehicle sub-sections on the vehicle panel
   if (n === 4) {
@@ -2417,11 +2428,11 @@ function buildSummary() {
     }
   }
 
-  html += `<div class="summary-section">${(appMode === 'zmena' || appMode === '3rz') ? 'Vlastník' : 'Nový vlastník'}</div>`;
+  html += `<div class="summary-section">${jeNovyVlastnik() ? 'Nový vlastník' : 'Vlastník'}</div>`;
   html += row('Jméno', v('novy_jmeno'));
   html += row('Adresa', v('novy_adresa') + (v('novy_psc') ? ', '+v('novy_psc') : ''));
   if (cb('novy_prov_jiny')) {
-    html += `<div class="summary-section">${(appMode === 'zmena' || appMode === '3rz') ? 'Provozovatel' : 'Nový provozovatel'}</div>`;
+    html += `<div class="summary-section">${jeNovyVlastnik() ? 'Nový provozovatel' : 'Provozovatel'}</div>`;
     html += row('Jméno', v('novy_prov_jmeno'));
     html += row('Adresa', v('novy_prov_adresa'));
   }
