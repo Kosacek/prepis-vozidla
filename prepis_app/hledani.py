@@ -240,6 +240,8 @@ def zapis_vystup(data_dir: str, files: list[str], data: dict) -> None:
             "znacka": (data.get("znacka") or "").strip(),
             "od": (data.get("puvodni_jmeno") or "").strip(),
             "na": (data.get("novy_jmeno") or "").strip(),
+            # Kdo žádost vyplnil — aby šlo hledat „co dělal Roman dnes".
+            "profil": (data.get("profil") or "").strip(),
         }
         if not rec["files"]:
             return
@@ -265,7 +267,8 @@ def nacti_index(data_dir: str) -> dict:
                     rec = json.loads(line)
                 except ValueError:
                     continue
-                meta = {k: rec.get(k, "") for k in ("rz", "vin", "znacka", "od", "na")}
+                meta = {k: rec.get(k, "") for k in
+                        ("rz", "vin", "znacka", "od", "na", "profil")}
                 for fname in rec.get("files") or []:
                     out[fname] = meta
     except OSError:
@@ -289,8 +292,13 @@ def nacti_vystupy(data_dir: str) -> list[dict]:
             size = os.path.getsize(os.path.join(out_dir, name))
         except OSError:
             size = 0
+        try:
+            mtime = os.path.getmtime(os.path.join(out_dir, name))
+        except OSError:
+            mtime = 0.0
         meta = index.get(name, {})
         rows.append({
+            "mtime": mtime,
             "file": name,
             "typ": TYPY.get(kind, kind),
             "kind": kind,
@@ -303,8 +311,13 @@ def nacti_vystupy(data_dir: str) -> list[dict]:
             "znacka": meta.get("znacka", ""),
             "od": meta.get("od", ""),
             "na": meta.get("na", ""),
+            "profil": meta.get("profil", ""),
         })
-    rows.sort(key=lambda r: (r["datum"], r["cas"]), reverse=True)
+    # Řadí se podle skutečného času vzniku souboru, ne podle názvu: nový tvar
+    # názvu čas nenese (přidává se jen při kolizi), takže se všechny žádosti
+    # z jednoho dne dřív řadily v pořadí, v jakém je vrátila složka — a poslední
+    # vyplněná žádost tak nebyla nahoře.
+    rows.sort(key=lambda r: (r["datum"], r["mtime"]), reverse=True)
     return rows
 
 
@@ -447,11 +460,24 @@ def hledej(q: str, vystupy: list[dict], doklady: list[dict], firmy: list[dict],
         hits = [v for v in hits if v["kind"] == kind]
 
     if hits and (kind or period != "celkem" or "posledni" in f or "vsech" in f):
-        filters = [TYPY[kind]] if kind else []
-        return _ok(f"{_zadosti(len(hits))}{obdobi}"
-                   + (f" — {TYPY[kind]}" if kind else ""),
-                   _rozpad(hits) if not kind else None,
-                   period, filters, hits[:LIMIT], [], [])
+        # Jméno v dotazu se musí uplatnit I když je zadané období — „co dělal
+        # Roman dnes" jinak vrátilo prostě všechno dnešní a jméno se zahodilo.
+        popisky = [TYPY[kind]] if kind else []
+        nalezene = None
+        for term in _text_terms(f):
+            zuzeno = [v for v in hits if sedi_vystup(v, term)]
+            if zuzeno:
+                hits = zuzeno
+                nalezene = term
+                popisky.append(term)
+                break
+        headline = f"{_zadosti(len(hits))}{obdobi}"
+        if kind:
+            headline += f" — {TYPY[kind]}"
+        if nalezene:
+            headline += f" — {nalezene}"
+        return _ok(headline, _rozpad(hits) if not kind else None,
+                   period, popisky, hits[:LIMIT], [], [])
 
     # 5) Volný text — jméno plátce v dokladech nebo název firmy.
     terms = _text_terms(f)
@@ -496,12 +522,26 @@ def _rzkey(s: str | None) -> str:
     return re.sub(r"[^a-z0-9]", "", fold(s))
 
 
+def sedi_vystup(v: dict, term: str) -> bool:
+    """Odpovídá žádost hledanému výrazu?
+
+    Hledá se PODŘETĚZCEM, ne na přesnou shodu — VIN má 17 znaků a nikdo ho
+    nebude opisovat celý, aby našel jedno auto. Prochází SPZ, VIN, obě strany,
+    značku vozidla i to, kdo žádost vyplnil (aby šlo „co dělal Roman dnes").
+    """
+    t = _rzkey(term)
+    ft = fold(term)
+    if t and (t in _rzkey(v.get("rz")) or t in _rzkey(v.get("vin"))):
+        return True
+    return bool(ft) and any(ft in fold(v.get(k)) for k in ("od", "na", "znacka", "profil"))
+
+
 def _podle_vozidla(terms, vystupy, doklady, obdobi, period) -> dict:
     vys, dok = [], []
     for t in terms:
         ft = _rzkey(t)
-        vys += [v for v in vystupy
-                if ft and (ft == _rzkey(v.get("rz")) or ft == _rzkey(v.get("vin")))]
+        vys += [v for v in vystupy if ft and
+                (ft in _rzkey(v.get("rz")) or ft in _rzkey(v.get("vin")))]
         dok += [d for d in doklady if ft and ft in _rzkey(d.get("vozidlo"))]
     # zachovat pořadí, zahodit duplicity
     vys = list({v["file"]: v for v in vys}.values())
@@ -593,8 +633,7 @@ def _volny_text(terms, vystupy, doklady, firmy, od, do, period, obdobi) -> dict:
                if term in fold(d.get("prijato_od"))
                and _in_period(_norm_datum(d.get("datum")), od, do)]
         vys = [v for v in vystupy
-               if (term in fold(v.get("od")) or term in fold(v.get("na")))
-               and _in_period(v["datum"], od, do)]
+               if sedi_vystup(v, term) and _in_period(v["datum"], od, do)]
         fir = [x for x in firmy if term in fold(x.get("nazev"))]
         if dok or vys or fir:
             casti = []

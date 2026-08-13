@@ -1783,7 +1783,7 @@ function renderPmZadosti() {
   const q = fold(document.getElementById('pm-hledat').value.trim());
   // Plná moc není žádost — ze seznamu ji vynecháme, nemá strany.
   const zdroje = _prefillCache.filter(v => v.kind !== 'pm');
-  const rows = (q ? zdroje.filter(v => fold([v.rz, v.vin, v.na, v.od, v.znacka].join(' ')).includes(q))
+  const rows = (q ? zdroje.filter(v => fold([v.rz, v.vin, v.na, v.od, v.znacka, v.profil].join(' ')).includes(q))
                   : zdroje).slice(0, 25);
   if (!rows.length) { box.innerHTML = '<div class="hl-detail">Nic odpovídajícího.</div>'; return; }
   box.innerHTML = rows.map(v => `<button type="button" class="hl-row"
@@ -1970,7 +1970,7 @@ function renderPrefillList() {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const q = fold(document.getElementById('d3rz-hledat').value.trim());
   const rows = (q
-      ? _prefillCache.filter(v => fold([v.rz, v.vin, v.na, v.od, v.znacka].join(' ')).includes(q))
+      ? _prefillCache.filter(v => fold([v.rz, v.vin, v.na, v.od, v.znacka, v.profil].join(' ')).includes(q))
       : _prefillCache).slice(0, 25);
   if (!rows.length) {
     box.innerHTML = '<div class="hl-detail">Nic odpov\u00eddaj\u00edc\u00edho \u2014 vypl\u0148 \u00fadaje ru\u010dn\u011b.</div>';

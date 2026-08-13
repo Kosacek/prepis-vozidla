@@ -374,3 +374,46 @@ def test_route_outputs_lists_generated_pdfs(client):
     r = client.get("/api/outputs")
     assert r.status_code == 200
     assert isinstance(r.get_json(), list)
+
+
+# ── co hlásil David: pořadí, kus VIN, kdo to vyplnil ──────────────────────────
+
+def test_partial_vin_is_enough():
+    """VIN má 17 znaků a nikdo ho neopisuje celý, aby našel jedno auto."""
+    v = [{"file": "a.pdf", "typ": "Nové vozidlo", "kind": "zapis", "datum": "2026-08-13",
+          "cas": "", "url": "/download/a.pdf", "rz": "", "vin": "YARTDG8F4RG091230",
+          "znacka": "", "od": "", "na": "TOYOTA", "profil": "Roman"}]
+    for dotaz in ("YARTDG8F4RG091230", "YARTDG8F4", "YARTDG", "rg091230"):
+        r = hledani.hledej(dotaz, v, [], [], today=TODAY)
+        assert len(r["vystupy"]) == 1, f"{dotaz!r} auto nenašlo"
+
+
+def test_search_by_who_filled_it_in():
+    """„co dělal Roman dnes" — dřív se jméno zahodilo, jakmile bylo v dotazu
+    období, a vrátilo se prostě všechno dnešní."""
+    dnes = TODAY.isoformat()
+    v = [{"file": "a.pdf", "typ": "Převod", "kind": "zmeny", "datum": dnes, "cas": "",
+          "url": "/a", "rz": "1AB2345", "vin": "", "znacka": "", "od": "", "na": "X",
+          "profil": "Roman"},
+         {"file": "b.pdf", "typ": "Převod", "kind": "zmeny", "datum": dnes, "cas": "",
+          "url": "/b", "rz": "9ZZ9999", "vin": "", "znacka": "", "od": "", "na": "Y",
+          "profil": "David"}]
+    r = hledani.hledej("co delal roman dnes", v, [], [], today=TODAY)
+    assert [x["file"] for x in r["vystupy"]] == ["a.pdf"]
+    assert "roman" in r["filters"]
+
+
+def test_newest_first_within_the_same_day(tmp_path):
+    """Nový tvar názvu nenese čas, takže se dnešní žádosti řadily podle pořadí
+    ve složce a poslední vyplněná nebyla nahoře."""
+    import os, time
+    out = tmp_path / "output"
+    out.mkdir()
+    for i, name in enumerate(["zmeny_PRVNI_1AA1111_20260813.pdf",
+                              "zmeny_DRUHA_2BB2222_20260813.pdf",
+                              "zmeny_TRETI_3CC3333_20260813.pdf"]):
+        f = out / name
+        f.write_bytes(b"x")
+        os.utime(f, (1000 + i * 60, 1000 + i * 60))   # rozestup po minutě
+    poradi = [v["file"].split("_")[1] for v in hledani.nacti_vystupy(str(tmp_path))]
+    assert poradi == ["TRETI", "DRUHA", "PRVNI"], poradi
