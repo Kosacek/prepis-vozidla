@@ -805,7 +805,7 @@
            vybere hotová žádost a vlastník i vozidlo se doplní z jejího PDF. -->
       <div id="d3rz-prefill-section" style="display:none;">
         <div class="section-label">Navázat na dřívější žádost</div>
-        <input type="text" id="d3rz-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN nebo jména…"
+        <input type="text" id="d3rz-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN, jména nebo kdo ji dělal…"
                oninput="renderPrefillList()" autocomplete="off"
                style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
         <div id="d3rz-vysledky" style="margin-top:8px;max-height:230px;overflow-y:auto;"></div>
@@ -1118,7 +1118,7 @@
         </div>
 
         <div id="pm-ze-zadosti">
-          <input type="text" id="pm-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN nebo jména…"
+          <input type="text" id="pm-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN, jména nebo kdo ji dělal…"
                  oninput="renderPmZadosti()" autocomplete="off"
                  style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
           <div id="pm-zadosti" style="margin-top:8px;max-height:150px;overflow-y:auto;"></div>
@@ -1417,9 +1417,12 @@ function activatePanel(n) {
     if (zzs) zzs.style.display = appMode === 'zmena'  ? '' : 'none';
     const d3 = document.getElementById('d3rz-duvod-section');
     if (d3) d3.style.display = appMode === '3rz' ? '' : 'none';
+    // Vývoz se skoro vždycky dělá na auto, které jsi právě přepisoval — stejně
+    // jako 3RZ. Sdílí panel Vozidlo i Vlastník, takže mu prefill sedí beze změny.
     const dps = document.getElementById('d3rz-prefill-section');
-    if (dps) { dps.style.display = appMode === '3rz' ? '' : 'none';
-              if (appMode === '3rz') loadPrefillList(); }
+    const chcePrefill = appMode === '3rz' || appMode === 'vyvoz';
+    if (dps) { dps.style.display = chcePrefill ? '' : 'none';
+              if (chcePrefill) loadPrefillList(); }
   }
 
   renderStepper();
@@ -1791,7 +1794,7 @@ function renderPmZadosti() {
       onclick="pmVyberZadost('${esc(v.file)}')">
       <span class="hl-badge">${esc(v.typ)}</span>
       <span class="hl-when">${esc(v.rz || v.vin || '')}</span>
-      <span class="hl-sub">${esc(v.datum)}${v.na ? ' · ' + esc(v.na) : ''}</span></button>`).join('');
+      <span class="hl-sub">${esc(v.datum)}${v.profil ? ' · ' + esc(v.profil) : ''}${v.na ? ' · ' + esc(v.na) : ''}</span></button>`).join('');
 }
 
 function pmZmenitZadost() {
@@ -1979,11 +1982,12 @@ function renderPrefillList() {
   box.innerHTML = rows.map(v => {
     const kdo = v.na || v.od || '';
     const auto = v.rz || v.vin || '';
+    const kym = v.profil ? ' · ' + esc(v.profil) : '';
     return `<button type="button" class="hl-row" style="width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;"
       onclick="prefillFrom('${esc(v.file)}')">
       <span class="hl-badge">${esc(v.typ)}</span>
       <span class="hl-when">${esc(auto)}</span>
-      <span class="hl-sub">${esc(v.datum)}${kdo ? ' · ' + esc(kdo) : ''}</span></button>`;
+      <span class="hl-sub">${esc(v.datum)}${kym}${kdo ? ' · ' + esc(kdo) : ''}</span></button>`;
   }).join('');
 }
 

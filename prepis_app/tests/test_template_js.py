@@ -76,3 +76,24 @@ def test_every_icon_reference_has_a_symbol():
     used = set(re.findall(r'<use href="#(i-[a-z0-9-]+)"', html))
     assert used - defined == set(), f"chybí definice ikon: {sorted(used - defined)}"
     assert defined - used == set(), f"nepoužité ikony: {sorted(defined - used)}"
+
+
+def test_prefill_picker_also_serves_vyvoz():
+    """Vývoz sdílí s 3RZ panel Vozidlo i Vlastník, takže „navázat na dřívější
+    žádost" mu sedí beze změny — jen se mu dřív nezobrazovalo a všechno se
+    přepisovalo ručně. Test hlídá, že se to zase neutrhne na `=== '3rz'`.
+    """
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    i = html.index("const dps = document.getElementById('d3rz-prefill-section')")
+    blok = html[i:i + 400]
+    assert "vyvoz" in blok, "prefill picker se vývozu neukáže"
+    assert "loadPrefillList()" in blok
+
+
+def test_pickers_show_who_filled_it_in():
+    """Hledání „roman" v pickeru je k ničemu, když u řádků není vidět,
+    že jsou opravdu jeho."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    for fn in ("function renderPrefillList()", "function renderPmZadosti()"):
+        blok = html[html.index(fn):][:1500]
+        assert "v.profil" in blok, fn + " neukáže, kdo žádost dělal"
