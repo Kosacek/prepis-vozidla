@@ -35,13 +35,13 @@ os.makedirs(OUT, exist_ok=True)
 _SEED = [
     ("zmeny_20260715_100000.pdf", {"registracni_znacka": "3BR4008", "vin": "",
      "znacka": "Škoda Octavia", "puvodni_jmeno": "AUTO CARDION s. r. o.",
-     "novy_jmeno": "JAN NOVÁK"}),
+     "novy_jmeno": "JAN NOVÁK", "profil": "David"}),
     ("zapis_20260715_113000.pdf", {"registracni_znacka": "", "vin": "TMBJJ7NE5J0123456",
      "znacka": "Toyota Corolla", "puvodni_jmeno": "",
-     "novy_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O."}),
+     "novy_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O.", "profil": "Roman"}),
     ("zmeny_20260720_090000.pdf", {"registracni_znacka": "1AB2345", "vin": "",
      "znacka": "Volvo XC60", "puvodni_jmeno": "AUTO CARDION s. r. o.",
-     "novy_jmeno": "PETR SVOBODA"}),
+     "novy_jmeno": "PETR SVOBODA", "profil": "Petr"}),
 ]
 if not app.read_firmy():
     app.save_firmy([
