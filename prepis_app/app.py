@@ -3,6 +3,8 @@ import requests
 import json
 import os
 import hmac
+import threading
+import time
 from dotenv import load_dotenv
 import sys as _sys
 _base = getattr(_sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -40,7 +42,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.6.3"
+__version__ = "1.6.4"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1019,7 +1021,7 @@ padding:10px;background:#1a56db;color:#fff;border:0;border-radius:8px;
 font-size:14px;font-weight:700;cursor:pointer}.err{color:#dc2626;
 font-size:13px;margin-top:10px}</style></head><body>
 <form method="post"><h1>Přepisy vozidel</h1>
-<input type="password" name="password" placeholder="Heslo" autofocus>
+<input type="password" name="password" placeholder="Heslo" autofocus autocomplete="current-password">
 <button type="submit">Přihlásit</button>__ERR__</form></body></html>"""
 
 
@@ -1032,12 +1034,118 @@ def healthz():
 def login():
     if not ADMIN_PASSWORD:
         return redirect("/")
+    ip = _kdo_zkousi()
     if _rq.method == "POST":
+        zbyva = _zbyva_zamceno(ip)
+        if zbyva:
+            minut = max(1, zbyva // 60)
+            return (_LOGIN_HTML.replace("__ERR__",
+                    '<div class="err">Příliš mnoho pokusů. Zkus to za %d min.</div>' % minut),
+                    429, {"Retry-After": str(zbyva)})
         if hmac.compare_digest(_rq.form.get("password", ""), ADMIN_PASSWORD):
+            _zapomen_pokusy(ip)
             session["authed"] = True
             return redirect("/")
+        _zapis_spatne_heslo(ip)
         return _LOGIN_HTML.replace("__ERR__", '<div class="err">Špatné heslo</div>'), 401
     return _LOGIN_HTML.replace("__ERR__", "")
+
+
+# ── HTTPS, hlavičky, brzda na hádání hesla ────────────────────────────────────
+# Safari na iPhonu u pole s heslem hlásilo „připojení není zabezpečené".
+# Certifikát je v pořádku — jenže stránka šla otevřít i po holém http:// a nic
+# prohlížeč nepostrčilo jinam. Přes http se navíc stejně nedá přihlásit: session
+# cookie je Secure, takže ji prohlížeč zahodí.
+#
+# POZOR na past: nginx v našem server bloku přepisuje X-Forwarded-Proto na
+# $scheme, což je uvnitř dockeru vždycky "http". Podle téhle hlavičky by se
+# přesměrovávalo i na https → nekonečná smyčka. Spolehlivá je jen CF-Visitor
+# od Cloudflare; když nedorazí, radši se nedělá nic.
+_HSTS = "max-age=31536000; includeSubDomains"
+_CSP = ("default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "      # celá aplikace je inline <script>
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "             # fotky z kamery jdou jako data:
+        "media-src 'self' blob:; "
+        "connect-src 'self'; "
+        "object-src 'none'; base-uri 'self'; form-action 'self'; "
+        "frame-ancestors 'none'")
+
+
+def _klientske_schema() -> str:
+    """Čím k nám přišel prohlížeč: "https", "http", nebo "" když se to nedá říct."""
+    cf = (_rq.headers.get("CF-Visitor") or "").replace(" ", "").lower()
+    if '"scheme":"https"' in cf:
+        return "https"
+    if '"scheme":"http"' in cf:
+        return "http"
+    return ""
+
+
+@app.before_request
+def _vynut_https():
+    if not ADMIN_PASSWORD:
+        return                      # lokální běh na počítači, žádná proxy
+    if _rq.path == "/healthz":
+        return                      # healthcheck kontejneru chodí zevnitř po http
+    if _klientske_schema() != "http":
+        return                      # https nebo neznámo — nikdy nesmí vzniknout smyčka
+    cil = "https://" + _rq.host + _rq.full_path.rstrip("?")
+    # 301 by z POSTu udělala GET a zahodila data; 308 metodu zachová.
+    return redirect(cil, code=301 if _rq.method in ("GET", "HEAD") else 308)
+
+
+@app.after_request
+def _bezpecnostni_hlavicky(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    # Jen na HTML. Žádosti se otevírají jako PDF ve vlastní záložce a do
+    # prohlížeče PDF nemá smysl mluvit — není co omezovat a dá se tím jen ublížit.
+    if resp.mimetype == "text/html":
+        resp.headers.setdefault("Content-Security-Policy", _CSP)
+    if ADMIN_PASSWORD:
+        # Po první návštěvě přes https už prohlížeč http nezkusí ani nezobrazí
+        # varování u hesla. Přes http se hlavička podle standardu ignoruje.
+        resp.headers.setdefault("Strict-Transport-Security", _HSTS)
+    return resp
+
+
+# Heslo je jedno sdílené a je na veřejném webu — bez brzdy se dá zkoušet
+# donekonečna. Počítadlo je v paměti procesu: gunicorn běží se 2 workery, takže
+# skutečný strop je až dvojnásobek. Pořád to je z tisíců pokusů za hodinu pár
+# desítek a nic to nevyžaduje navíc (žádný redis, žádný zápis na disk).
+_LOGIN_MAX_POKUSU = 10
+_LOGIN_OKNO_S = 900          # 15 minut
+_login_pokusy: dict[str, list[float]] = {}
+_login_zamek = threading.Lock()
+
+
+def _kdo_zkousi() -> str:
+    """Skutečná IP klienta. Za Cloudflare je pravdivá CF-Connecting-IP —
+    X-Forwarded-For k nám dorazí až přes nginx a dá se do něj psát."""
+    return (_rq.headers.get("CF-Connecting-IP") or _rq.remote_addr or "?").strip()
+
+
+def _zbyva_zamceno(ip: str) -> int:
+    """Kolik sekund ještě nesmí zkoušet; 0 = může."""
+    ted = time.time()
+    with _login_zamek:
+        pokusy = [t for t in _login_pokusy.get(ip, []) if ted - t < _LOGIN_OKNO_S]
+        _login_pokusy[ip] = pokusy
+        if len(pokusy) < _LOGIN_MAX_POKUSU:
+            return 0
+        return max(1, int(_LOGIN_OKNO_S - (ted - pokusy[0])))
+
+
+def _zapis_spatne_heslo(ip: str) -> None:
+    with _login_zamek:
+        _login_pokusy.setdefault(ip, []).append(time.time())
+
+
+def _zapomen_pokusy(ip: str) -> None:
+    with _login_zamek:
+        _login_pokusy.pop(ip, None)
 
 
 @app.before_request
