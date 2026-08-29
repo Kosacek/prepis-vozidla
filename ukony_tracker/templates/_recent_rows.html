@@ -20,10 +20,10 @@
     {# nezaplaceno is the normal state (invoiced monthly) — show nothing for it,
        only the exceptions (paid / partial) get a badge. #}
     {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
-    {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>{% endif %}
+    {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|kc }}</span>{% endif %}
   </span>
   <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
-  <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+  <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
 </a>
 {% else %}
 <p class="muted" style="padding: var(--sp-3);">{{ empty_text|default('Žádné úkony.', true) }}</p>

@@ -23,6 +23,16 @@ def create_app():
         app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # always revalidate static (no stale CSS/JS)
 
+    @app.template_filter("kc")
+    def _kc(value):
+        """1301850 -> '1 301 850'. Bez oddělovače je to na mobilu zeď číslic;
+        mezera je pevná (U+00A0), aby se částka nezalomila uprostřed."""
+        try:
+            n = int(round(float(value or 0)))
+        except (TypeError, ValueError):
+            return value
+        return f"{n:,}".replace(",", " ")
+
     app.teardown_appcontext(db.close_db)
 
     @app.before_request

@@ -17,20 +17,20 @@
   <div class="kpi">
     <div class="kpi-v">{{ dnes.pocet }}</div>
     <div class="kpi-l">Úkonů dnes</div>
-    <div class="kpi-sub">{{ dnes.trzby|int }} Kč</div>
+    <div class="kpi-sub">{{ dnes.trzby|kc }} Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ mesic.trzby|int }} Kč</div>
+    <div class="kpi-v">{{ mesic.trzby|kc }} Kč</div>
     <div class="kpi-l">Tento měsíc</div>
-    <div class="kpi-sub">{{ mesic.pocet }} úkonů · minulý měsíc {{ minuly_mesic.trzby|int }} Kč</div>
+    <div class="kpi-sub">{{ mesic.pocet }} úkonů · minulý měsíc {{ minuly_mesic.trzby|kc }} Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ rok.trzby|int }} Kč</div>
+    <div class="kpi-v">{{ rok.trzby|kc }} Kč</div>
     <div class="kpi-l">Letos {{ aktualni_rok }}</div>
     <div class="kpi-sub">{{ rok.pocet }} úkonů</div>
   </div>
   <a class="kpi kpi-link {{ 'kpi-warn' if nezaplaceno > 0 }}" href="/ukony/vse?stav=nezaplaceno">
-    <div class="kpi-v">{{ nezaplaceno|int }} Kč</div>
+    <div class="kpi-v">{{ nezaplaceno|kc }} Kč</div>
     <div class="kpi-l">Nezaplaceno</div>
     <div class="kpi-sub">{{ 'zobrazit nezaplacené →' if nezaplaceno > 0 else 'vše zaplaceno ✓' }}</div>
   </a>
@@ -56,7 +56,7 @@
       <div class="bar-row">
         <span class="bar-label">{{ r.zkratka }}</span>
         <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
-        <span class="bar-amt">{{ r.trzby|int }}</span>
+        <span class="bar-amt">{{ r.trzby|kc }}</span>
       </div>
       {% else %}<p class="muted">Žádná data.</p>{% endfor %}
     </div>
@@ -92,6 +92,6 @@
   window.PER_TYP = {{ per_typ_chart|tojson }};
   window.FIRMA_COLORS = {{ firma_colors|tojson }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=13"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=14"></script>
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=1"></script>
 {% endblock %}
