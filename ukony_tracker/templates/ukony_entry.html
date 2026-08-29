@@ -2,12 +2,6 @@
 {% block title %}Úkony — {{ firma.zkratka if firma else '' }}{% endblock %}
 {% block content %}
 {% import "_macros.html" as m with context %}
-<div class="pills">
-  {% for f in firmy %}
-    <a class="pill {{ 'on' if firma and f.id==firma.id }}" href="/ukony/{{ f.id }}?mesic={{ mesic }}">{{ f.zkratka }}</a>
-  {% endfor %}
-  <a class="pill more" href="/firmy">+ firma</a>
-</div>
 
 {% if not firma %}
   <div class="card"><p class="muted">Zatím nemáš žádnou aktivní firmu. <a href="/firmy">Přidej firmu →</a></p></div>
@@ -23,6 +17,17 @@
   <h2>Nový úkon</h2>
   <form method="post" action="/ukony/{{ firma.id }}">
     <input type="hidden" name="mesic" value="{{ mesic }}">
+    {# Firma je vlastnost úkonu, takže patří sem, ne do zvláštního pruhu nad
+       formulář. Změna firmy přenačte stránku (ceny i seznam „Tento měsíc" jsou
+       per-firma) a rozepsané hodnoty veze s sebou, ať se nic neztratí. #}
+    <div class="field">
+      <label>Firma <a href="/firmy" class="muted small" style="font-weight:400">+ nová</a></label>
+      <select id="firma-select" onchange="switchFirma(this)">
+        {% for f in firmy %}
+          <option value="{{ f.id }}" {{ 'selected' if f.id == firma.id }}>{{ f.zkratka }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="form-row">
       <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
       <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper" value="{{ sel_rz }}"></div>
@@ -130,6 +135,20 @@
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=1"></script>
 
 <script>
+// Přepnutí firmy = přenačtení stránky (ceny i měsíční seznam jsou per-firma),
+// ale rozepsaný úkon veze s sebou — jinak by výběr firmy uprostřed vyplňování
+// smazal, co už je napsané.
+function switchFirma(sel){
+  var q=new URLSearchParams();
+  q.set('mesic', document.querySelector('input[name=mesic]').value || '');
+  [['datum','datum'],['typ','typ_kod'],['celkem','celkem'],['rz','rz'],
+   ['vin','vin'],['orv','orv'],['poznamka','poznamka']].forEach(function(p){
+    var el=document.getElementById(p[1]); if(el && el.value) q.set(p[0], el.value);
+  });
+  var zp=document.querySelector('select[name=zpracoval]');
+  if(zp && zp.value) q.set('zpracoval', zp.value);
+  location.href='/ukony/'+sel.value+'?'+q.toString();
+}
 (function(){
   var seg=document.getElementById('typ-seg');
   if(seg){ seg.addEventListener('click',function(e){
