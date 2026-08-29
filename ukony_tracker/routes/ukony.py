@@ -102,6 +102,7 @@ def entry(firma_id):
         # on a successful add they stay empty, ready for the next car.
         sel_rz=request.args.get("rz") or "",
         sel_vin=request.args.get("vin") or "",
+        sel_orv=request.args.get("orv") or "",
         sel_zpracoval=request.args.get("zpracoval") or "",
     )
 

@@ -340,3 +340,27 @@ def test_edit_lowering_celkem_to_paid_rederives_to_zaplaceno(client_fid):
     assert float(row["celkem"]) == 800.0
     assert float(row["zaplaceno_kc"]) == 800.0
     assert row["stav_platby"] == "zaplaceno"
+
+
+def test_entry_firma_is_a_field_in_the_form_not_a_pill_strip(client_fid):
+    """Firma se vybírá uvnitř formuláře „Nový úkon", ne v odděleném pruhu nad ním."""
+    c, fid = client_fid
+    with c.application.app_context():
+        firmy_repo.create(db.get_db(), nazev="Albion", zkratka="Albion", ico="2")
+    body = c.get(f"/ukony/{fid}").get_data(as_text=True)
+    assert 'id="firma-select"' in body          # výběr firmy je pole formuláře
+    assert 'class="pills"' not in body          # starý pruh firem je pryč
+    assert "Cardion" in body and "Albion" in body
+    assert "switchFirma" in body                # přepnutí veze rozepsané hodnoty
+    # a je uvnitř karty Nový úkon, tedy až za jejím nadpisem
+    assert body.index("Nový úkon") < body.index('id="firma-select"')
+
+
+def test_entry_carries_typed_values_when_switching_firma(client_fid):
+    """Rozepsaný úkon přežije přepnutí firmy (JS je posílá v URL)."""
+    c, fid = client_fid
+    body = c.get(f"/ukony/{fid}?rz=1AB2345&vin=TMBVIN1&orv=UBP1&poznamka=TZ").get_data(as_text=True)
+    assert 'value="1AB2345"' in body
+    assert 'value="TMBVIN1"' in body
+    assert 'value="UBP1"' in body               # ORV se dřív nepřenášel
+    assert 'value="TZ"' in body
