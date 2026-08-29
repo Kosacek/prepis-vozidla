@@ -9,6 +9,13 @@
   // so a firm has the same color in the chart and the table.
   var FIRMA_COLORS = window.FIRMA_COLORS || {};
 
+  // Chart.js keeps the canvas aspect ratio from its width/height attributes
+  // (300x110 => ~2.7). On a phone the container is ~300px wide, so the chart
+  // collapsed to ~110px tall — with 7+ firm lines it was unreadable. Give the
+  // narrow viewport a much taller ratio.
+  var MOBILE = window.matchMedia("(max-width: 760px)").matches;
+  var TREND_RATIO = MOBILE ? 1.0 : 2.7;
+
   // Typy úkonů — revenue share per type (doughnut). Independent of the trend
   // chart, so render it before the trend-chart early-return.
   var pctx = document.getElementById("typChart");
@@ -90,6 +97,7 @@
           })
         },
         options: {
+          aspectRatio: TREND_RATIO,
           interaction: { mode: "index", intersect: false },
           plugins: {
             legend: {
@@ -119,6 +127,7 @@
         }]
       },
       options: {
+        aspectRatio: TREND_RATIO,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
       }

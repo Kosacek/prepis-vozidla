@@ -1670,3 +1670,58 @@ body.modal-open { overflow: hidden; }
   .ask-form { flex-wrap: wrap; }
   .ask-form .btn { width: 100%; }
 }
+
+/* ── Mobil: čitelnost a iOS ────────────────────────────────────────────────
+   Ověřeno na iPhone viewportu 390×844 proti ostrému webu. */
+@media (max-width: 760px) {
+  /* iOS Safari ZOOMNE celou stránku, jakmile se zaostří pole s fontem < 16px.
+     Všechna pole tu měla 13–15px, takže každé ťuknutí do hledání, filtru nebo
+     do RZ v detailu rozhodilo zobrazení a muselo se zpět odštipovat. */
+  input, select, textarea,
+  .field input, .field select, .field textarea,
+  .ukony-search, .recent-search, .ask-input,
+  .filter-select, .filter-month, .partial-pay__input { font-size: 16px; }
+
+  /* Hlavička karty se na úzké obrazovce mačkala do tří řádků ("Poslední /
+     úkony" + hledání + odkaz). Necháme ji zalomit a roztáhnout hledání. */
+  .card-head { flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+  .card-head h2 { flex: 1 1 auto; }
+  .recent-tools { flex: 1 1 100%; gap: var(--sp-3); }
+  .recent-search { width: auto; flex: 1 1 auto; max-width: none; }
+
+  /* Přepínač Firmy/Tržby/Počet se ořezával o pravý okraj karty. */
+  .card-head .seg { flex: 1 1 100%; }
+
+  /* Řádek úkonu: cena patří na první řádek k SPZ, ne osamoceně pod něj.
+     Pořadí: datum · SPZ ……… cena / typ · firma · platba · kdo / VIN + poznámka */
+  .recent-list .recent-kc, .ukony-list .recent-kc, .mesic-recent .recent-kc { order: 3; }
+  .recent-list .recent-row .tag,
+  .ukony-list .recent-row .tag,
+  .mesic-recent .recent-row .tag { order: 4; }
+  .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 5; }
+  .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 6; }
+  .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 7; }
+
+  /* Zalomení hned za cenou: první řádek = datum · SPZ ……… cena vpravo.
+     Bez toho se za cenu vešel typ s firmou a částka skončila uprostřed. */
+  .recent-list .recent-row::after,
+  .ukony-list .recent-row::after,
+  .mesic-recent .recent-row::after { content: ""; flex: 0 0 100%; height: 0; order: 4; }
+  .recent-list .recent-row .tag,
+  .ukony-list .recent-row .tag,
+  .mesic-recent .recent-row .tag { order: 5; }
+  .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 6; }
+  .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 7; }
+  .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 8; }
+  .recent-list .recent-mid,   .ukony-list .recent-mid,   .mesic-recent .recent-mid   { order: 9; }
+
+  /* Filtry: po zvětšení písma na 16px se rozsypaly do pěti řádků.
+     Dva sloupce = pravidelná mřížka místo náhodného zalamování. */
+  .filter-bar__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+  .filter-bar__fields > .btn { grid-column: 1 / -1; }
+
+  /* Akce u každého řádku byly stejně výrazné jako data — zmenšit, ať se na
+     obrazovku vejde víc úkonů. */
+  .row-actions .btn { padding: 3px 9px; font-size: 0.7rem; }
+  .row-actions { gap: 5px; padding: 0 var(--sp-3) 7px var(--sp-3); }
+}

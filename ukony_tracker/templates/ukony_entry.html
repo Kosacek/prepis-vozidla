@@ -87,7 +87,7 @@
            it's in the edit modal a click away. #}
         <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
         <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
-        <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+        <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
       </a>
       <span class="row-actions actions">
         {# Payment toggle: the badge doubles as the cancel button (existing UX). #}

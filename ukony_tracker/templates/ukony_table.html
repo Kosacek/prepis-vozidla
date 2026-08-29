@@ -40,7 +40,7 @@
       <a href="/ukony/vse" class="btn btn-sm">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
-      <span id="ukony-count">{{ ukony|length }}</span> úkonů · <span id="ukony-sum">{{ total|int }}</span> Kč
+      <span id="ukony-count">{{ ukony|length }}</span> úkonů · <span id="ukony-sum">{{ total|kc }}</span> Kč
     </div>
   </form>
 </div>
@@ -68,10 +68,10 @@
           {# nezaplaceno is the normal state (invoiced monthly) — badge only the
              exceptions, exactly like the dashboard. #}
           {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
-          {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|int }}</span>{% endif %}
+          {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|kc }}</span>{% endif %}
         </span>
         <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
-        <span class="recent-kc"><b>{{ u.celkem|int }} Kč</b></span>
+        <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
       </a>
       <span class="row-actions actions">
         {# Full pay #}
@@ -127,7 +127,7 @@
       if (show) { n++; sum += r._kc; }
     });
     if (countEl) countEl.textContent = n;
-    if (sumEl) sumEl.textContent = sum;
+    if (sumEl) sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
   input.addEventListener('input', apply);
 })();
