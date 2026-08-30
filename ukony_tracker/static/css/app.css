@@ -1781,3 +1781,7 @@ body.modal-open { overflow: hidden; }
   100% { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .recent-row.row-saved { animation: none; } }
+
+/* Přepínání firmy načítá jen spodní seznam — jemné ztlumení, ať je vidět,
+   že se něco děje, ale bez probliknutí celé stránky. */
+body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease; }
