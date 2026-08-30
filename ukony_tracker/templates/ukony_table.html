@@ -104,7 +104,7 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=2"></script>
 
 <script>
 (function () {
@@ -130,6 +130,13 @@
     if (sumEl) sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
   input.addEventListener('input', apply);
+  // Po uložení úkonu bez reloadu se vymění jeden řádek — sem si modal řekne
+  // o přepočet jeho indexu a součtu, ať filtr i suma dál sedí.
+  window.ukonySyncRow = function (item) {
+    item._s = fold(item.getAttribute('data-search'));
+    item._kc = parseInt(item.getAttribute('data-kc'), 10) || 0;
+    apply();
+  };
 })();
 </script>
 {% endblock %}

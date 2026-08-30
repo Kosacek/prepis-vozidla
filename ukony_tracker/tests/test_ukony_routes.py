@@ -364,3 +364,47 @@ def test_entry_carries_typed_values_when_switching_firma(client_fid):
     assert 'value="TMBVIN1"' in body
     assert 'value="UBP1"' in body               # ORV se dřív nepřenášel
     assert 'value="TZ"' in body
+
+
+# ── uložení z modalu bez přenačtení stránky ───────────────────────────────────
+
+def test_edit_save_ajax_returns_rendered_row(client_fid):
+    """Uložení přes fetch vrátí jen ten jeden vykreslený řádek, ne redirect —
+    stránka se pak nepřenačítá a hledání ani filtry se neztratí."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, rz="STARA1")
+    r = c.post(f"/ukony/{uid}/upravit",
+               data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "1800",
+                     "rz": "NOVA99", "back": "/ukony/vse"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["celkem"] == 1800
+    assert "NOVA99" in d["html"] and 'class="recent-row"' in d["html"]
+    assert "nova99" in d["search"]          # index pro živé hledání
+    with c.application.app_context():
+        assert ukony_repo.get(db.get_db(), uid)["rz"] == "NOVA99"
+
+
+def test_edit_save_ajax_reports_error_without_saving(client_fid):
+    """Neplatné hodnoty → 400 a nic se neuloží (JS pak spadne na klasické odeslání)."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    r = c.post(f"/ukony/{uid}/upravit",
+               data={"datum": "", "typ_kod": "PŘEVOD", "celkem": "1300"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 400 and r.get_json()["ok"] is False
+    with c.application.app_context():
+        assert ukony_repo.get(db.get_db(), uid)["datum"] == "2026-05-10"   # beze změny
+
+
+def test_edit_save_without_ajax_still_redirects(client_fid):
+    """Bez JS (klasické odeslání formuláře) zůstává původní chování."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    r = c.post(f"/ukony/{uid}/upravit",
+               data={"datum": "2026-05-10", "typ_kod": "PŘEVOD", "celkem": "1300",
+                     "back": "/ukony/vse"})
+    assert r.status_code in (302, 303)
+    assert r.headers["Location"].endswith("/ukony/vse")

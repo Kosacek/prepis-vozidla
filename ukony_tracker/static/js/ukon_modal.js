@@ -58,6 +58,54 @@
     openModal(href + (href.indexOf("?") >= 0 ? "&" : "?") + "modal=1");
   });
 
+  // Uložení BEZ přenačtení stránky: pošleme formulář fetchem a vyměníme jen
+  // ten jeden řádek. Reload jinak shodil rozepsané hledání i filtry — a při
+  // doplňování SPZ po jednom autě to bylo nepoužitelné.
+  function swapRow(uid, data) {
+    var link = document.querySelector('a.recent-row[href*="/ukony/' + uid + '/upravit"]');
+    if (!link) return false;
+    var tmp = document.createElement("div");
+    tmp.innerHTML = (data.html || "").trim();
+    var fresh = tmp.querySelector("a.recent-row");
+    if (!fresh) return false;
+    var item = link.closest(".ukony-item");
+    link.parentNode.replaceChild(fresh, link);
+    if (item) {
+      // /ukony/vse drží v obalu index pro hledání a cenu pro živý součet
+      if (data.search != null) item.setAttribute("data-search", data.search);
+      if (data.celkem != null) item.setAttribute("data-kc", data.celkem);
+      if (window.ukonySyncRow) window.ukonySyncRow(item);
+    }
+    fresh.classList.add("row-saved");
+    setTimeout(function () { fresh.classList.remove("row-saved"); }, 1200);
+    return true;
+  }
+
+  modalBody.addEventListener("submit", function (e) {
+    var form = e.target.closest("form");
+    if (!form) return;
+    var m = /\/ukony\/(\d+)\/upravit/.exec(form.getAttribute("action") || "");
+    if (!m) return;
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+      method: "POST", body: new FormData(form),
+      headers: { "X-Requested-With": "fetch" }
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.d.ok) throw new Error((res.d && res.d.error) || "chyba");
+        if (!swapRow(m[1], res.d)) { window.location.reload(); return; }
+        closeModal();
+      })
+      .catch(function () {
+        // cokoliv nečekaného → klasické odeslání, ať se změna nikdy neztratí
+        if (btn) btn.disabled = false;
+        form.submit();
+      });
+  });
+
   // Close — backdrop click, the × button, or the form's "Zpět" link.
   modal.addEventListener("click", function (e) {
     if (e.target === modal || e.target.closest("[data-modal-close]")) {

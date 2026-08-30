@@ -1772,3 +1772,12 @@ body.modal-open { overflow: hidden; }
   .firma-pick__btn, .firma-pick__item { font-size: 16px; }
   .firma-pick__item { padding: 11px 10px; }   /* pohodlný cíl pro prst */
 }
+
+/* Krátké zelené bliknutí řádku po uložení bez reloadu — potvrzení, že se
+   změna opravdu zapsala (stránka se už nepřenačítá, tak by jinak chybělo). */
+.recent-row.row-saved { animation: rowSaved 1.2s ease-out; }
+@keyframes rowSaved {
+  0%   { background: var(--flash-success-bg); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .recent-row.row-saved { animation: none; } }
