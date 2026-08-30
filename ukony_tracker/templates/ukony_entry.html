@@ -21,12 +21,17 @@
        formulář. Změna firmy přenačte stránku (ceny i seznam „Tento měsíc" jsou
        per-firma) a rozepsané hodnoty veze s sebou, ať se nic neztratí. #}
     <div class="field">
-      <label>Firma <a href="/firmy" class="muted small" style="font-weight:400">+ nová</a></label>
-      <select id="firma-select" onchange="switchFirma(this)">
-        {% for f in firmy %}
-          <option value="{{ f.id }}" {{ 'selected' if f.id == firma.id }}>{{ f.zkratka }}</option>
-        {% endfor %}
-      </select>
+      <label>Firma</label>
+      {# Nativní select zůstává jako fallback bez JS; skript ho schová a vykreslí
+         vlastní seznam s barevnými tečkami — stejná paleta jako v přehledech. #}
+      <div class="firma-pick" id="firma-pick">
+        <select id="firma-select" onchange="switchFirma(this)">
+          {% for f in firmy %}
+            <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, '#8e8e93') }}"
+                    {{ 'selected' if f.id == firma.id }}>{{ f.zkratka }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
     <div class="form-row">
       <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
@@ -149,6 +154,40 @@ function switchFirma(sel){
   if(zp && zp.value) q.set('zpracoval', zp.value);
   location.href='/ukony/'+sel.value+'?'+q.toString();
 }
+// Vlastní výběr firmy s barevnou tečkou. Nativní <select> zůstává v DOMu
+// (fallback bez JS i zdroj dat), jen se vizuálně schová.
+(function(){
+  var wrap=document.getElementById('firma-pick');
+  var sel=document.getElementById('firma-select');
+  if(!wrap||!sel) return;
+  var opts=Array.prototype.slice.call(sel.options);
+  function dot(c){ return '<span class="firma-dot" style="background:'+c+'"></span>'; }
+
+  var btn=document.createElement('button');
+  btn.type='button'; btn.className='firma-pick__btn';
+  btn.setAttribute('aria-haspopup','listbox'); btn.setAttribute('aria-expanded','false');
+  var cur=sel.options[sel.selectedIndex];
+  btn.innerHTML=dot(cur.dataset.color)+'<span class="firma-pick__name">'+cur.text+'</span>'+
+                '<span class="firma-pick__chev" aria-hidden="true"></span>';
+
+  var list=document.createElement('div');
+  list.className='firma-pick__list'; list.setAttribute('role','listbox'); list.hidden=true;
+  opts.forEach(function(o){
+    var it=document.createElement('button');
+    it.type='button'; it.className='firma-pick__item'+(o.selected?' on':'');
+    it.setAttribute('role','option'); it.setAttribute('aria-selected',o.selected?'true':'false');
+    it.innerHTML=dot(o.dataset.color)+'<span>'+o.text+'</span>';
+    it.addEventListener('click',function(){ sel.value=o.value; switchFirma(sel); });
+    list.appendChild(it);
+  });
+
+  wrap.classList.add('js'); wrap.appendChild(btn); wrap.appendChild(list);
+  function open(v){ list.hidden=!v; btn.setAttribute('aria-expanded',v?'true':'false'); }
+  btn.addEventListener('click',function(e){ e.stopPropagation(); open(list.hidden); });
+  document.addEventListener('click',function(){ open(false); });
+  list.addEventListener('click',function(e){ e.stopPropagation(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') open(false); });
+})();
 (function(){
   var seg=document.getElementById('typ-seg');
   if(seg){ seg.addEventListener('click',function(e){

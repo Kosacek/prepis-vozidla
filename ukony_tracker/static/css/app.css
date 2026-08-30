@@ -1725,3 +1725,47 @@ body.modal-open { overflow: hidden; }
   .row-actions .btn { padding: 3px 9px; font-size: 0.7rem; }
   .row-actions { gap: 5px; padding: 0 var(--sp-3) 7px var(--sp-3); }
 }
+
+/* ── Výběr firmy s barevnou tečkou (formulář Nový úkon) ─────────────────────
+   Nativní <select> neumí obarvit položky spolehlivě (na iOS vůbec), takže ho
+   necháme v DOMu jako fallback bez JS a vykreslíme vlastní seznam. */
+.firma-pick { position: relative; }
+.firma-pick.js > select { position: absolute; opacity: 0; pointer-events: none; height: 0; }
+
+.firma-pick__btn {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 9px 12px;
+  border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font); font-size: 0.9375rem; font-weight: 500;
+  text-align: left; cursor: pointer;
+}
+.firma-pick__btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.18); }
+.firma-pick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.firma-pick__chev {
+  flex: 0 0 auto; width: 9px; height: 9px; margin-right: 2px;
+  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+
+.firma-pick__list {
+  position: absolute; z-index: 60; top: calc(100% + 5px); left: 0; right: 0;
+  max-height: 290px; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); box-shadow: 0 12px 34px rgba(0,0,0,.14);
+  padding: 5px;
+}
+.firma-pick__item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 9px 10px;
+  border: none; border-radius: 7px; background: none; color: var(--ink);
+  font-family: var(--font); font-size: 0.9375rem; text-align: left; cursor: pointer;
+}
+.firma-pick__item:hover { background: var(--bg); }
+.firma-pick__item.on { font-weight: 700; }
+
+@media (max-width: 760px) {
+  /* stejné pravidlo jako u ostatních polí — pod 16px iOS zoomuje stránku */
+  .firma-pick__btn, .firma-pick__item { font-size: 16px; }
+  .firma-pick__item { padding: 11px 10px; }   /* pohodlný cíl pro prst */
+}
