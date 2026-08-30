@@ -97,6 +97,8 @@
       .then(function (res) {
         if (!res.ok || !res.d.ok) throw new Error((res.d && res.d.error) || "chyba");
         if (!swapRow(m[1], res.d)) { window.location.reload(); return; }
+        // stránka s výběrem firmy si drží odpovědi v cache — po editaci ji zahoď
+        document.dispatchEvent(new CustomEvent("ukon:saved", { detail: { id: m[1] } }));
         closeModal();
       })
       .catch(function () {

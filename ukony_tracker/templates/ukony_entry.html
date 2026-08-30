@@ -15,7 +15,7 @@
 
 <div class="card">
   <h2>Nový úkon</h2>
-  <form method="post" action="/ukony/{{ firma.id }}">
+  <form method="post" action="/ukony/{{ firma.id }}" id="ukon-form">
     <input type="hidden" name="mesic" value="{{ mesic }}">
     {# Firma je vlastnost úkonu, takže patří sem, ne do zvláštního pruhu nad
        formulář. Změna firmy přenačte stránku (ceny i seznam „Tento měsíc" jsou
@@ -137,13 +137,14 @@
 {% endif %}
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=3"></script>
 
 <script>
 // Přepnutí firmy = přenačtení stránky (ceny i měsíční seznam jsou per-firma),
 // ale rozepsaný úkon veze s sebou — jinak by výběr firmy uprostřed vyplňování
 // smazal, co už je napsané.
-function switchFirma(sel){
+function firmaParams(){
+  // rozepsaný úkon veze s sebou, ať se přepnutím firmy nic neztratí
   var q=new URLSearchParams();
   q.set('mesic', document.querySelector('input[name=mesic]').value || '');
   [['datum','datum'],['typ','typ_kod'],['celkem','celkem'],['rz','rz'],
@@ -152,7 +153,96 @@ function switchFirma(sel){
   });
   var zp=document.querySelector('select[name=zpracoval]');
   if(zp && zp.value) q.set('zpracoval', zp.value);
-  location.href='/ukony/'+sel.value+'?'+q.toString();
+  return q;
+}
+
+// Přepnutí firmy BEZ přenačtení stránky. Na firmě závisí jen ceník, seznam
+// „Tento měsíc" a jeho součet — vyměníme tedy jen ty části. Dřív to bylo celé
+// načtení stránky a půlvteřinové čekání při každém přepnutí.
+//
+// Odpovědi si držíme v paměti, takže „na CK a zpátky" je podruhé okamžité.
+// Klíč nesmí obsahovat rozepsanou RZ/VIN/poznámku — ty na vyměňované části
+// nemají vliv a cache by kvůli nim nikdy netrefila.
+var firmaCache = {};
+document.addEventListener('ukon:saved', function(){
+  firmaCache = {};
+  // Řádek si vyměnil modal sám, ale součet měsíce v hlavičce o změně neví.
+  // Doptáme se až po doblikání řádku, ať uživatel potvrzení změny stihne vidět.
+  setTimeout(function(){
+    var sel=document.getElementById('firma-select');
+    if(!sel) return;
+    fetch('/ukony/'+sel.value+'?'+firmaParams().toString(),{headers:{'X-Requested-With':'fetch'}})
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(html){
+        if(!html) return;
+        var fresh=new DOMParser().parseFromString(html,'text/html').querySelector('.month-line');
+        var cur=document.querySelector('.month-line');
+        if(cur && fresh) cur.parentNode.replaceChild(fresh,cur);
+      })
+      .catch(function(){});   // součet se srovná při dalším načtení, nic nerozbije
+  }, 1300);
+});
+
+function applyFirma(html, firmaId, url){
+  var doc=new DOMParser().parseFromString(html,'text/html');
+  ['.month-line','.card.recent-card'].forEach(function(s){
+    var cur=document.querySelector(s), fresh=doc.querySelector(s);
+    if(cur && fresh) cur.parentNode.replaceChild(fresh,cur);
+  });
+  var fseg=doc.getElementById('typ-seg');          // ceník nové firmy
+  if(fseg){
+    Array.prototype.forEach.call(fseg.querySelectorAll('span[data-kod]'),function(f){
+      var cur=document.querySelector('#typ-seg span[data-kod="'+f.dataset.kod+'"]');
+      if(cur) cur.dataset.cena=f.dataset.cena||'';
+    });
+  }
+  var fc=doc.getElementById('celkem'), cena=document.getElementById('celkem');
+  if(fc && cena) cena.value=fc.value;
+  var form=document.getElementById('ukon-form');
+  if(form) form.action='/ukony/'+firmaId;
+  if(doc.title) document.title=doc.title;
+  history.replaceState({},'',url);
+}
+
+function switchFirma(sel){
+  var opt=sel.options[sel.selectedIndex];
+  var q=firmaParams();
+  var url='/ukony/'+sel.value+'?'+q.toString();
+  var wrap=document.getElementById('firma-pick');
+  var list=wrap && wrap.querySelector('.firma-pick__list');
+  if(list) list.hidden=true;
+  // okamžitá odezva na kliknutí — název a tečka se přepnou hned
+  var btn=wrap && wrap.querySelector('.firma-pick__btn');
+  if(btn && opt){
+    btn.querySelector('.firma-pick__name').textContent=opt.text;
+    btn.querySelector('.firma-dot').style.background=opt.dataset.color;
+    btn.setAttribute('aria-expanded','false');
+  }
+  if(wrap){
+    Array.prototype.forEach.call(wrap.querySelectorAll('.firma-pick__item'),function(it,i){
+      var on=sel.options[i] && sel.options[i].value===sel.value;
+      it.classList.toggle('on', !!on); it.setAttribute('aria-selected', on?'true':'false');
+    });
+  }
+
+  var key=[sel.value, q.get('mesic')||'', q.get('celkem')||'', q.get('typ')||''].join('|');
+  var cached=firmaCache[key];
+  if(cached) applyFirma(cached, sel.value, url);   // hned, bez čekání na síť
+  else document.body.classList.add('firma-switching');
+
+  // I z cache se na pozadí doptáme — kdyby mezitím přibyl úkon, samo se srovná.
+  fetch(url,{headers:{'X-Requested-With':'fetch'}})
+    .then(function(r){ if(!r.ok) throw new Error('http'); return r.text(); })
+    .then(function(html){
+      firmaCache[key]=html;
+      if(html!==cached) applyFirma(html, sel.value, url);
+      document.body.classList.remove('firma-switching');
+    })
+    .catch(function(){
+      // s cache zůstaneme u zobrazeného, bez ní klasické načtení stránky
+      document.body.classList.remove('firma-switching');
+      if(!cached) location.href=url;
+    });
 }
 // Vlastní výběr firmy s barevnou tečkou. Nativní <select> zůstává v DOMu
 // (fallback bez JS i zdroj dat), jen se vizuálně schová.
