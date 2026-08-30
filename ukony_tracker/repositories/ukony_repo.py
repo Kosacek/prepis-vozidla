@@ -82,6 +82,15 @@ def find_by_vehicle(
     ).fetchone()
 
 
+def get_with_firma(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:
+    """Úkon i se zkratkou firmy — přesně to, co potřebuje partial _recent_rows.html
+    při výměně jednoho řádku po uložení bez reloadu."""
+    return conn.execute(
+        "SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u"
+        " JOIN firmy f ON f.id = u.firma_id WHERE u.id = ?", (uid,)
+    ).fetchone()
+
+
 def count_by_firma(conn: sqlite3.Connection, firma_id: int) -> int:
     return conn.execute(
         "SELECT COUNT(*) n FROM ukony WHERE firma_id=?", (firma_id,)

@@ -194,6 +194,9 @@ def edit_save(uid):
     if not u:
         abort(404)
     f = request.form
+    # Uložení z modalu jde přes fetch — vrátíme jen ten jeden vykreslený řádek,
+    # aby se nemusela přenačítat celá stránka (a ztratit hledání a filtry).
+    ajax = request.headers.get("X-Requested-With") == "fetch"
     try:
         datum = (f.get("datum") or "").strip()
         date.fromisoformat(datum)  # reject blank/invalid so the date can't be wiped
@@ -227,8 +230,23 @@ def edit_save(uid):
             stav_platby=stav,
             zpracoval=ing.normalize_profil(f.get("zpracoval")),
         )
+        if ajax:
+            row = ukony_repo.get_with_firma(conn, uid)
+            html = render_template(
+                "_recent_rows.html", rows=[row],
+                firma_colors=colors_service.firma_color_map(conn),
+                back=_safe_back(f.get("back")) or "/",
+            )
+            # `search` drží index pro živé hledání v /ukony/vse — stejná pole
+            # jako skládá šablona, ať filtr sedí i po výměně řádku.
+            parts = (row["rz"], row["vin"], row["orv"], row["poznamka"], row["prevod"],
+                     row["firma_zkratka"], row["typ_kod"], row["zpracoval"])
+            return jsonify(ok=True, html=html, celkem=int(row["celkem"]),
+                           search=" ".join(p for p in parts if p).lower())
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):
+        if ajax:
+            return jsonify(ok=False, error="Neplatné hodnoty (zkontroluj datum a cenu)."), 400
         flash("Neplatné hodnoty (zkontroluj datum a cenu).", "error")
     return redirect(_safe_back(f.get("back")) or url_for("ukony.table"))
 
