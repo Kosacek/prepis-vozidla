@@ -417,3 +417,94 @@ def test_newest_first_within_the_same_day(tmp_path):
         os.utime(f, (1000 + i * 60, 1000 + i * 60))   # rozestup po minutě
     poradi = [v["file"].split("_")[1] for v in hledani.nacti_vystupy(str(tmp_path))]
     assert poradi == ["TRETI", "DRUHA", "PRVNI"], poradi
+
+
+# ── měsíc číslem ────────────────────────────────────────────────────────────────
+# Z reálného použití: „doklady 8. měsíc" vrátilo DOKLAD Č. 8 — osmička se četla
+# jako číslo dokladu. Uživatel to pochopil tak, že hledání nic nenašlo.
+
+def test_mesic_cislem_je_obdobi():
+    p = lambda q: hledani.parse_period(q, TODAY)
+    assert p("doklady 8. měsíc")[:2] == ("2026-08-01", "2026-08-31")
+    assert p("doklady za 8. měsíc")[:2] == ("2026-08-01", "2026-08-31")
+    assert p("žádosti 6. měsíc 2026")[:2] == ("2026-06-01", "2026-06-30")
+    assert p("doklady 12. měsíci")[:2] == ("2026-12-01", "2026-12-31")
+
+
+def test_mesic_lomeno_rok():
+    p = lambda q: hledani.parse_period(q, TODAY)
+    assert p("doklady 8/2026")[:2] == ("2026-08-01", "2026-08-31")
+    assert p("doklady za 12/2025")[:2] == ("2025-12-01", "2025-12-31")
+
+
+def test_nesmyslny_mesic_se_ignoruje():
+    """18. měsíc neexistuje — radši žádné období než špatné."""
+    assert hledani.parse_period("doklady 18. měsíc", TODAY)[2] == "celkem"
+
+
+def test_cislo_mesice_neni_cislo_dokladu(hledej):
+    """To hlavní: „doklady 7. měsíc" je období, ne doklad č. 7."""
+    r = hledej("doklady 7. měsíc")
+    assert r["understood"]
+    assert "Doklad č." not in r["headline"], r["headline"]
+    assert len(r["doklady"]) == 2, r["headline"]      # 152 a 153 jsou z července
+    assert "2 800" in r["headline"].replace(" ", " "), r["headline"]
+
+
+def test_doklad_podle_cisla_porad_funguje(hledej):
+    """Oprava výše nesmí rozbít hledání konkrétního dokladu."""
+    r = hledej("doklad 152")
+    assert r["understood"] and "152" in r["headline"]
+    assert len(r["doklady"]) == 1 and r["doklady"][0]["cislo"] == 152
+
+
+def test_soucet_za_mesic_pro_ucetnictvi(hledej):
+    """Kvůli tomuhle to David hledal: kolik se za měsíc vybralo."""
+    r = hledej("doklady tento měsíc")
+    assert r["understood"]
+    assert len(r["doklady"]) == 2
+    assert "2 800" in r["headline"].replace(" ", " "), r["headline"]
+
+
+# ── prázdný výsledek není „nerozumím" ────────────────────────────────────────
+# S naklikávacími filtry se na tuhle kombinaci dá kliknout omylem během vteřiny,
+# takže odpověď musí říct „za tohle období nic", ne „tomu nerozumím".
+
+def test_prazdne_obdobi_u_dokladu_je_srozumitelna_odpoved(hledej):
+    r = hledej("doklady dnes")
+    assert r["understood"], r["headline"]
+    assert "doklady" in r["headline"].lower() or "doklad" in r["headline"].lower()
+    assert "dnes" in r["headline"]
+    assert r["doklady"] == []
+
+
+def test_jmeno_v_obdobi_kde_nic_neni(hledej):
+    """„Na novak nic nemam" je lež — Novák tam je, jen ne dneska."""
+    r = hledej("novak dnes")
+    assert r["understood"], r["headline"]
+    assert "novak" in r["headline"].lower()
+    assert "dnes" in r["headline"]
+
+
+def test_nezname_jmeno_bez_obdobi_porad_rekne_ze_nic_nema(hledej):
+    """Tohle je naopak správně: takové jméno v datech opravdu není."""
+    r = hledej("kdovikdo")
+    assert not r["understood"]
+    assert "kdovikdo" in r["headline"]
+
+
+def test_jmeno_ktere_v_obdobi_neni_nevraci_cizi_zadosti(hledej):
+    """Nejhorší možná odpověď: vypsat cizí žádosti tak, že to vypadá, že jsou
+    jeho. 20.7. dělal Petr Svoboda, žádný Novák — ať to tak i řekne."""
+    r = hledej("novak 20.7.")
+    assert r["understood"], r["headline"]
+    assert r["vystupy"] == [], r["vystupy"]
+    assert "novak" in r["headline"].lower()
+
+
+def test_typ_v_dotazu_se_nepovazuje_za_jmeno(hledej):
+    """Pojistka k testu výš: „převody" je typ, ne jméno — nesmí to vyhodnotit
+    jako nenalezené jméno a vrátit prázdno."""
+    r = hledej("převody tento měsíc")
+    assert r["understood"]
+    assert len(r["vystupy"]) == 2, r["headline"]

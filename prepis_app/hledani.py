@@ -125,6 +125,20 @@ def parse_period(q: str, today: date | None = None) -> tuple[str | None, str | N
         start = t - timedelta(days=days - 1)
         return start.isoformat(), t.isoformat(), f"posledních {days} dní"
 
+    # Měsíc číslem: „8. měsíc", „12. měsíci 2025", „8/2026". Takhle o měsíci
+    # mluví většina lidí — a bez tohohle se osmička četla jako číslo dokladu,
+    # takže „doklady 8. měsíc" vrátilo doklad č. 8 (reálná stížnost 31.8.2026).
+    m = re.search(r"\b(\d{1,2})\s*\.?\s*mesic", f) or \
+        re.search(r"\b(\d{1,2})\s*/\s*(20\d{2})\b", f)
+    if m:
+        month = int(m.group(1))
+        if 1 <= month <= 12:
+            rok = m.group(2) if m.re.groups > 1 else None
+            if not rok:
+                r = re.search(r"\b(20\d{2})\b", f)
+                rok = r.group(1) if r else None
+            return _month_range(int(rok) if rok else t.year, month)
+
     # Konkrétní datum: "15.7.", "15.7.2026", "15. 7. 2026"
     m = re.search(r"\b(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(20\d{2})?", q)
     if m:
@@ -352,6 +366,28 @@ def _vehicle_terms(q: str) -> list[str]:
     return out
 
 
+# Kusy dotazu, které už spotřeboval parser období. Bez jejich odstranění se
+# „8" z „8. měsíc" čte jako číslo dokladu a „2026" jako částka.
+_OBDOBI_VZORY = (
+    r"\b\d{1,2}\s*\.?\s*mesic\w*",                       # 8. měsíc
+    r"\b\d{1,2}\s*/\s*20\d{2}\b",                        # 8/2026
+    r"\b\d{1,2}\s*\.\s*\d{1,2}\s*\.\s*(?:20\d{2})?",     # 15.7.2026
+    r"\b20\d{2}\b",                                      # rok
+)
+
+
+# Kmeny slov, ze kterých se pozná typ žádosti — nesmí se plést se jménem.
+_KIND_STEMS = ("prevod", "prepis", "zapis", "zmen", "technick", "udaj",
+               "nove", "nova")
+
+
+def bez_obdobi(f: str) -> str:
+    """Dotaz bez čísel, která znamenají datum — zbylá čísla už jsou o něčem jiném."""
+    for vzor in _OBDOBI_VZORY:
+        f = re.sub(vzor, " ", f)
+    return f
+
+
 def _text_terms(f: str) -> list[str]:
     """Jména, která parser nespotřeboval — volný text pro plátce / firmy."""
     return [w for w in re.findall(r"[a-z0-9]{3,}", f) if w not in _STOP][:3]
@@ -431,7 +467,7 @@ def hledej(q: str, vystupy: list[dict], doklady: list[dict], firmy: list[dict],
 
     # 2) Doklad podle čísla — "doklad 152".
     if chce_doklady:
-        m = re.search(r"\b(\d{1,6})\b", f)
+        m = re.search(r"\b(\d{1,6})\b", bez_obdobi(f))
         cislo = int(m.group(1)) if m else None
         # Rok ani částka nejsou číslo dokladu.
         if cislo is not None and (m.group(1).startswith("20") and len(m.group(1)) == 4):
@@ -464,13 +500,23 @@ def hledej(q: str, vystupy: list[dict], doklady: list[dict], firmy: list[dict],
         # Roman dnes" jinak vrátilo prostě všechno dnešní a jméno se zahodilo.
         popisky = [TYPY[kind]] if kind else []
         nalezene = None
-        for term in _text_terms(f):
+        # Slovo, ze kterého jsme poznali typ, není jméno — jinak by „převody
+        # tento měsíc" hledalo člověka jménem Převody.
+        terms = [t for t in _text_terms(f)
+                 if not (kind and any(t.startswith(s) for s in _KIND_STEMS))]
+        for term in terms:
             zuzeno = [v for v in hits if sedi_vystup(v, term)]
             if zuzeno:
                 hits = zuzeno
                 nalezene = term
                 popisky.append(term)
                 break
+        if terms and not nalezene:
+            # Jméno v dotazu v tomhle období není. Vypsat místo toho cizí
+            # žádosti je nejhorší možná odpověď — vypadaly by jako jeho.
+            return _ok(f"Žádné žádosti{obdobi} — {terms[0]}",
+                       "Za tohle období pro tohle jméno nic nemám.", period,
+                       [terms[0]], [], [], [])
         headline = f"{_zadosti(len(hits))}{obdobi}"
         if kind:
             headline += f" — {TYPY[kind]}"
@@ -485,6 +531,12 @@ def hledej(q: str, vystupy: list[dict], doklady: list[dict], firmy: list[dict],
         alt = _volny_text(terms, vystupy, doklady, firmy, od, do, period, obdobi)
         if alt["understood"]:
             return alt
+        # Se zadaným obdobím je „na X nic nemám" zavádějící — to jméno v datech
+        # nejspíš je, jen ne v tomhle týdnu. Řekni to tak, jak to je.
+        if period != "celkem":
+            return _ok(f"Žádné žádosti{obdobi} — {terms[0]}",
+                       "Za tohle období pro tohle jméno nic nemám.", period,
+                       [terms[0]], [], [], [])
         # Dotaz nesl jméno, které nikde není. Vysypat místo toho celou historii
         # by vypadalo jako odpověď — a to je přesně to hádání, které nechceme.
         if not kind:
@@ -585,7 +637,7 @@ def _dok_out(rows: list[dict]) -> list[dict]:
 def _doklady_vypis(f, doklady, od, do, period, obdobi) -> dict:
     hits = [d for d in doklady if _in_period(_norm_datum(d.get("datum")), od, do)]
     # částka — "kdo platil 1300"
-    m = re.search(r"\b(\d{3,7})\b", f)
+    m = re.search(r"\b(\d{3,7})\b", bez_obdobi(f))
     if m and not (m.group(1).startswith("20") and len(m.group(1)) == 4):
         castka = float(m.group(1))
         podle_castky = [d for d in hits if _castka(d.get("castka")) == castka]
@@ -605,7 +657,10 @@ def _doklady_vypis(f, doklady, od, do, period, obdobi) -> dict:
         total = sum(_castka(d.get("castka")) for d in hits)
         return _ok(f"{_doklady(len(hits))} za {kc(total)}{obdobi}", None, period,
                    [], [], _dok_out(hits), [])
-    return _nic(period, f"Žádné doklady{obdobi}.", None)
+    # Období jsme pochopili, jen v něm nic není — to NENÍ „nerozumím". S
+    # naklikávacími filtry se na takovou kombinaci klikne omylem za vteřinu.
+    return _ok(f"Žádné doklady{obdobi}", "Za tohle období tu žádný doklad není.",
+               period, [], [], [], [])
 
 
 def _firmy_vypis(f, q, firmy, period) -> dict:
