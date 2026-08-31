@@ -397,6 +397,14 @@
   #panel-6 .card-title { font-size: 19px; margin-bottom: 10px; }
   #panel-6 .hl-row { padding: 7px 10px; margin-bottom: 4px; }
   #panel-6 .section-label { margin-top: 0; }
+  /* 11px verzálkami v šedé se čtou mizerně, a zrovna tyhle popisky říkají,
+     v jakém kroku jsi. Větší, tmavší a bez verzálek. */
+  #panel-6 .section-label { font-size: 14px; letter-spacing: 0; text-transform: none;
+                            color: var(--text); font-weight: 700; }
+  /* Obsah byl 620px v 788px kartě zarovnaný doleva — vpravo zbývalo 143px
+     bílého místa a vypadalo to rozbitě. */
+  #panel-6 .pm-uzsi, #panel-6 #pm-vysledek { margin-left: auto; margin-right: auto; }
+  #panel-6 #pm-vysledek { max-width: 620px; }
   #panel-6 hr.divider { margin: 12px 0; }
 
   @media (max-width: 600px) {
@@ -1807,6 +1815,9 @@ function pmZmenitZadost() {
 
 async function pmVyberZadost(file) {
   _pmZdroj = file; _pmRole = null;
+  // Po přepnutí na jinou žádost ještě není vybraná strana — jinak by tlačítko
+  // zůstalo aktivní po předchozím výběru a odeslalo roli, která tu není.
+  document.getElementById('pm-vystavit').disabled = true;
   const box = document.getElementById('pm-strany');
   document.getElementById('pm-krok2').style.display = '';
   document.getElementById('pm-vysledek').innerHTML = '';
@@ -1831,12 +1842,22 @@ async function pmVyberZadost(file) {
   }
   const voz = _pmInfo.vozidlo || {};
   document.getElementById('pm-s-vozidlem').disabled = !(voz.rz || voz.vin);
-  box.innerHTML = _pmInfo.strany.map(s => `<button type="button" class="hl-row" data-role="${esc(s.role)}"
-      style="width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;"
-      onclick="pmVyberStranu('${esc(s.role)}')">
-      <span class="hl-badge">${esc(s.role)}</span>
+
+  // Jediná strana = není z čeho vybírat. Klikat na jedinou možnost, aby se
+  // „potvrdila", je jen práce navíc — vybere se sama a jen se ukáže, kdo to je.
+  const jedina = _pmInfo.strany.length === 1;
+  const radek = s => `<span class="hl-badge">${esc(s.role)}</span>
       <span class="hl-when">${esc(s.jmeno)}</span>
-      <span class="hl-sub">${esc(s.rc_ic || '')}${s.adresa ? ' · ' + esc(s.adresa) : ''}</span></button>`).join('');
+      <span class="hl-sub">${esc(s.rc_ic || '')}${s.adresa ? ' · ' + esc(s.adresa) : ''}</span>`;
+  if (jedina) {
+    const s0 = _pmInfo.strany[0];
+    box.innerHTML = `<div class="hl-row">${radek(s0)}</div>`;
+    pmVyberStranu(s0.role);
+  } else {
+    box.innerHTML = _pmInfo.strany.map(s => `<button type="button" class="hl-row" data-role="${esc(s.role)}"
+      style="width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;"
+      onclick="pmVyberStranu('${esc(s.role)}')">${radek(s)}</button>`).join('');
+  }
 }
 
 // Přepnutí mezi „vybrat z historie" a „vyplnit ručně". Ruční cesta nemá strany
@@ -1938,7 +1959,8 @@ async function vystavitPlnouMoc() {
           style="display:inline-flex;align-items:center;gap:8px;">
           <svg class="ico"><use href="#i-file"></use></svg>
           Plná moc — ${esc(r.zmocnitel)}</a>
-        <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>`;
+        <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>
+        <button class="btn btn-secondary" onclick="resetForm()" style="margin-top:14px;">Nový úkon</button>`;
     }
   } catch (e) {
     out.innerHTML = '<div class="hl-detail" style="color:var(--error)">Vystavení se nepovedlo.</div>';
@@ -1951,19 +1973,29 @@ async function vystavitPlnouMoc() {
 // /api/prefill, které přečte její PDF. Nikde se kvůli tomu neukládají další
 // osobní údaje — viz prefill.py.
 let _prefillCache = null;
+let _prefillNacita = null;
 
 async function loadPrefillList() {
-  if (_prefillCache) { renderPrefillList(); return; }
-  const box = document.getElementById('d3rz-vysledky');
-  box.innerHTML = '<div class="hl-detail">Načítám…</div>';
+  if (_prefillCache) { renderPrefillList(); renderPmZadosti(); return; }
+  // Do obou seznamů, ať je vidět, že se něco děje — prázdný rámeček vypadá
+  // jako „nic tu není" a člověk začne psát zbytečně.
+  ['d3rz-vysledky', 'pm-zadosti'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b && !b.innerHTML) b.innerHTML = '<div class="hl-detail">Načítám historii…</div>';
+  });
+  if (!_prefillNacita) _prefillNacita = fetch('/api/outputs').then(r => r.json());
   try {
-    _prefillCache = await fetch('/api/outputs').then(r => r.json());
+    _prefillCache = await _prefillNacita;
   } catch (e) {
-    _prefillCache = [];
-    box.innerHTML = '<div class="hl-detail">Seznam se nepodařilo načíst — vyplň údaje ručně.</div>';
+    _prefillCache = []; _prefillNacita = null;
+    ['d3rz-vysledky', 'pm-zadosti'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.innerHTML = '<div class="hl-detail">Seznam se nepodařilo načíst — vyplň údaje ručně.</div>';
+    });
     return;
   }
   renderPrefillList();
+  renderPmZadosti();
 }
 
 function renderPrefillList() {

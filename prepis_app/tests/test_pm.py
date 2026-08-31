@@ -6,6 +6,7 @@ je k ničemu a pozná se to až na přepážce. Proto testy jedou přes reálně
 vyplněné žádosti a kontrolují, co skončí v polích šablony.
 """
 import io
+import os
 
 import pypdf
 import pytest
@@ -170,3 +171,52 @@ def test_manual_entry_needs_a_name(client):
 def test_route_lists_available_zmocnenci(client):
     kdo = {z["profil"] for z in client.get("/api/pm-zmocnenci").get_json()}
     assert {"David", "Petr"} <= kdo
+
+
+# ── Bez vozidla se ten řádek z papíru odebere úplně ─────────────────────────────
+def _pole(pdf_bytes):
+    return sorted((pypdf.PdfReader(io.BytesIO(pdf_bytes)).get_fields() or {}).keys())
+
+
+def test_bez_vozidla_odebere_radky_rz_a_vin(zadost):
+    """Nechat kolonky prázdné nestačí — na papíře pak visí dva popisky
+    s prázdnými řádky. Vzorem je Petrova šablona, která je nemá vůbec."""
+    d, f = zadost
+    strana = next(s for s in prefill.strany(d, f)["strany"] if s["role"] == "Nový vlastník")
+    path, _ = pm.sablona(A.BASE_DIR, "David")
+    plny = A.fill_pdf(path, pm.build_fields(strana, None))
+    assert "Text4" in _pole(plny) and "Text5" in _pole(plny), "šablona ta pole má mít"
+
+    orez = pm.bez_vozidla(plny)
+    assert _pole(orez) == ["Text1", "Text2", "Text3", "Text8"]
+    petr_path, _ = pm.sablona(A.BASE_DIR, "Petr")
+    assert _pole(orez) == _pole(A.fill_pdf(petr_path, pm.build_fields(strana, None))),         "má vypadat přesně jako Petrova plná moc"
+
+
+def test_bez_vozidla_nechava_ostatni_udaje(zadost):
+    d, f = zadost
+    strana = next(s for s in prefill.strany(d, f)["strany"] if s["role"] == "Nový vlastník")
+    path, _ = pm.sablona(A.BASE_DIR, "David")
+    orez = pm.bez_vozidla(A.fill_pdf(path, pm.build_fields(strana, None)))
+    hodnoty = pypdf.PdfReader(io.BytesIO(orez)).get_fields()
+    assert hodnoty["Text1"].get("/V") == "JAN NOVÁK"
+
+
+def test_bez_vozidla_neublizi_sablone_ktera_ta_pole_nema():
+    path, _ = pm.sablona(A.BASE_DIR, "Petr")
+    puvodni = A.fill_pdf(path, pm.build_fields({"jmeno": "X", "rc_ic": "1", "adresa": "Y"}))
+    assert pm.bez_vozidla(puvodni) == puvodni
+
+
+def test_route_bez_zaskrtnuti_vyrobi_papir_bez_radku(client, zadost, monkeypatch):
+    """To hlavní: zaškrtávátko rozhoduje, jestli tam ty řádky VŮBEC jsou."""
+    d, f = zadost
+    monkeypatch.setattr(A, "DATA_DIR", d)
+    for chce, ocekavane in ((False, ["Text1", "Text2", "Text3", "Text8"]),
+                            (True, ["Text1", "Text2", "Text3", "Text4", "Text5", "Text8"])):
+        r = client.post("/api/plna-moc", json={
+            "zdroj": f, "role": "Nový vlastník", "s_vozidlem": chce, "profil": "David"})
+        assert r.status_code == 200 and r.get_json()["success"], r.get_json()
+        soubor = r.get_json()["soubor"]
+        with open(os.path.join(d, "output", soubor), "rb") as fh:
+            assert _pole(fh.read()) == ocekavane, "s_vozidlem=%s" % chce

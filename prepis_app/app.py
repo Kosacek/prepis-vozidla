@@ -42,7 +42,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.6.4"
+__version__ = "1.7.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1616,6 +1616,10 @@ def api_plna_moc():
     }, ts, out_dir)
     try:
         pdf = fill_pdf(path, pm.build_fields(strana, vozidlo))
+        # Bez vozidla se řádky RZ/VIN z papíru odeberou úplně — prázdné kolonky
+        # na plné moci nikdo nechtěl. Vzorem je Petrova šablona, která je nemá.
+        if vozidlo is None and meta["ma_vozidlo"]:
+            pdf = pm.bez_vozidla(pdf)
         with open(os.path.join(out_dir, name), "wb") as f:
             f.write(pdf)
     except Exception as e:
