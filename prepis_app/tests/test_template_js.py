@@ -97,3 +97,30 @@ def test_pickers_show_who_filled_it_in():
     for fn in ("function renderPrefillList()", "function renderPmZadosti()"):
         blok = html[html.index(fn):][:1500]
         assert "v.profil" in blok, fn + " neukáže, kdo žádost dělal"
+
+
+def test_pm_jedina_strana_se_vybere_sama():
+    """Klikat na jedinou možnost, aby se „potvrdila", je jen práce navíc —
+    a uživatel to čekal automaticky. Při dvou stranách (převod) se vybírat MUSÍ."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    blok = html[html.index("async function pmVyberZadost("):][:2700]
+    assert "strany.length === 1" in blok, "jediná strana se nerozeznává"
+    assert "pmVyberStranu(s0.role)" in blok, "jediná strana se nevybere sama"
+    assert "onclick=\"pmVyberStranu(" in blok, "u více stran musí jít vybrat"
+    assert "pm-vystavit').disabled = true" in blok,         "po přepnutí žádosti musí být tlačítko zase zamknuté"
+
+
+def test_historie_se_predvyplni_drive_nez_zacnes_psat():
+    """377 kB historie se z NASu taže chvíli; než dorazila, byl seznam prázdný
+    a vypadalo to, že se hledá až od prvního písmene."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    blok = html[html.index("async function loadPrefillList()"):][:1400]
+    assert "pm-zadosti" in blok, "do seznamu plné moci se nic nepíše"
+    assert "Načítám historii" in blok, "chybí hláška, že se načítá"
+    assert "renderPmZadosti()" in blok, "seznam se po načtení nevykreslí"
+
+
+def test_po_vystaveni_plne_moci_jde_zpatky_na_zacatek():
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    blok = html[html.index("async function vystavitPlnouMoc()"):][:2000]
+    assert "resetForm()" in blok, "chybí tlačítko zpět na začátek"
