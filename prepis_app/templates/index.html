@@ -1955,12 +1955,16 @@ async function vystavitPlnouMoc() {
     if (!r.success) {
       out.innerHTML = `<div class="hl-detail" style="color:var(--error)">${esc(r.error || 'Nepovedlo se.')}</div>`;
     } else {
-      out.innerHTML = `<a class="btn-download" href="${esc(r.url)}" target="_blank"
-          style="display:inline-flex;align-items:center;gap:8px;">
-          <svg class="ico"><use href="#i-file"></use></svg>
-          Plná moc — ${esc(r.zmocnitel)}</a>
-        <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>
-        <button class="btn btn-secondary" onclick="resetForm()" style="margin-top:14px;">Nový úkon</button>`;
+      // Hotový papír vlevo, odchod na nový úkon vpravo na témže řádku —
+      // pod sebou to vypadalo, jako by „Nový úkon" patřil k té plné moci.
+      out.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <a class="btn-download" href="${esc(r.url)}" target="_blank"
+             style="display:inline-flex;align-items:center;gap:8px;">
+            <svg class="ico"><use href="#i-file"></use></svg>
+            Plná moc — ${esc(r.zmocnitel)}</a>
+          <button class="btn btn-secondary" onclick="resetForm()" style="margin-left:auto;">Nový úkon</button>
+        </div>
+        <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>`;
     }
   } catch (e) {
     out.innerHTML = '<div class="hl-detail" style="color:var(--error)">Vystavení se nepovedlo.</div>';
