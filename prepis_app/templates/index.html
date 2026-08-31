@@ -362,6 +362,14 @@
   .hl-headline { font-size: 15px; font-weight: 700; }
   .hl-headline.unknown { color: var(--muted); font-weight: 600; }
   .hl-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  /* Naklikávací filtry nad hledáním. Vybraný chip musí být poznat na první
+     pohled — jinak nevíš, jestli se dotaz z něčeho skládá. */
+  .hl-radek { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .hl-radek > b { font-size: 12px; font-weight: 700; color: var(--muted);
+                  min-width: 34px; flex: none; }
+  .hl-chip.on { background: var(--primary); border-color: var(--primary);
+                color: #fff; font-weight: 700; }
+  .hl-chip.off { opacity: .4; cursor: not-allowed; }
   .hl-sec { font-size: 11px; font-weight: 700; color: var(--muted);
             text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
   .hl-row {
@@ -523,6 +531,10 @@
       <input type="text" id="hledani-q" class="no-uc" placeholder="Např. co jsem dělal 15.7."
              autocomplete="off" oninput="hledaniInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();spustHledani();}"
              style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <!-- Naklikat jde totéž, co jde napsat: chipy jen složí českou větu a pošlou
+           ji stejným parserem. Jedna pravda o tom, co která věta znamená —
+           a kdo netrefí formulaci, doklikne se ke stejnému výsledku. -->
+      <div id="hledani-filtry" style="margin-top:10px;"></div>
     </div>
     <div class="modal-body" id="hledani-body"></div>
   </div>
@@ -2073,6 +2085,8 @@ async function openHledaniModal() {
   document.getElementById('hledani-modal').style.display = 'flex';
   const q = document.getElementById('hledani-q');
   q.value = '';
+  _hlVyber = { co: null, kdy: null, kdo: null };
+  renderHledaniFiltry();
   document.getElementById('hledani-body').innerHTML = '';
   if (!_hlPriklady.length) {
     try {
@@ -2091,8 +2105,60 @@ function closeHledaniModal() {
 }
 
 function hledaniInput() {
+  // Ruční psaní přebíjí naklikané — jinak by chipy svítily u dotazu, který
+  // s nimi nemá nic společného.
+  if (document.getElementById('hledani-q').value !== hlSlozDotaz()) {
+    _hlVyber = { co: null, kdy: null, kdo: null };
+    renderHledaniFiltry();
+  }
   if (_hlTimer) clearTimeout(_hlTimer);
   _hlTimer = setTimeout(spustHledani, 250);   // ať se nestřílí dotaz na každé písmeno
+}
+
+// ── Naklikávací filtry ───────────────────────────────────────────────────────
+// Hodnota chipu JE kus české věty; dotaz se z nich složí a jde na server stejnou
+// cestou jako ručně psaný. Vzniklo z toho, že „doklady 8. měsíc" nikdo netrefil
+// napoprvé — a co netrefí David, netrefí ani Petr s Romanem.
+const HL_FILTRY = [
+  { klic: 'co',  popis: 'Co',  volby: [['Žádosti', 'žádosti'], ['Doklady', 'doklady'], ['Firmy', 'firmy']] },
+  { klic: 'kdy', popis: 'Kdy', volby: [['Dnes', 'dnes'], ['Tento týden', 'tento týden'],
+                                       ['Minulý týden', 'minulý týden'], ['Tento měsíc', 'tento měsíc'],
+                                       ['Minulý měsíc', 'minulý měsíc']] },
+  { klic: 'kdo', popis: 'Kdo', volby: [['David', 'David'], ['Petr', 'Petr'], ['Roman', 'Roman']] },
+];
+let _hlVyber = { co: null, kdy: null, kdo: null };
+
+// Doklady si nepamatují, kdo je vystavil (v evidenci je plátce, ne my), takže
+// „kdo" by u nich tiše nic neudělalo a odpověď by vypadala jako platná.
+function hlKdoJdeSCim() { return _hlVyber.co !== 'doklady' && _hlVyber.co !== 'firmy'; }
+
+function hlSlozDotaz() {
+  const kdo = hlKdoJdeSCim() ? _hlVyber.kdo : null;
+  return [kdo, _hlVyber.co, _hlVyber.kdy].filter(Boolean).join(' ');
+}
+
+function renderHledaniFiltry() {
+  const box = document.getElementById('hledani-filtry');
+  if (!box) return;
+  const vypnuto = !hlKdoJdeSCim();
+  box.innerHTML = HL_FILTRY.map(r => `<div class="hl-radek">
+      <b>${esc(r.popis)}</b>
+      <div class="hl-chips">${r.volby.map(([popis, hodnota]) => {
+        const on = _hlVyber[r.klic] === hodnota;
+        const off = r.klic === 'kdo' && vypnuto;
+        return `<button type="button" class="hl-chip${on ? ' on' : ''}${off ? ' off' : ''}"
+          ${off ? 'disabled title="Doklady si nepamatují, kdo je vystavil"' : ''}
+          onclick="hlFiltr('${r.klic}','${esc(hodnota)}')">${esc(popis)}</button>`;
+      }).join('')}</div></div>`).join('');
+}
+
+function hlFiltr(klic, hodnota) {
+  _hlVyber[klic] = _hlVyber[klic] === hodnota ? null : hodnota;   // druhé kliknutí ruší
+  renderHledaniFiltry();
+  const q = hlSlozDotaz();
+  document.getElementById('hledani-q').value = q;
+  if (_hlTimer) { clearTimeout(_hlTimer); _hlTimer = null; }
+  if (q) spustHledani(); else renderHledaniUvod();
 }
 
 function hledejPriklad(p) {
