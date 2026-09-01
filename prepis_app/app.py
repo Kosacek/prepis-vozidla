@@ -42,7 +42,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1602,9 +1602,10 @@ def api_plna_moc():
                             "error": "Vyber stranu z žádosti, nebo vyplň zmocnitele ručně."}), 400
         info_vozidlo = info["vozidlo"]
 
-    # Vozidlo jen když ho uživatel chce A šablona na něj má kolonky.
+    # Vozidlo prostě podle toho, jestli ho uživatel chce — na kolonky v šabloně
+    # už nezáleží, doplní se i tam, kde natištěné nejsou.
     chce_vozidlo = bool(data.get("s_vozidlem"))
-    vozidlo = info_vozidlo if (chce_vozidlo and meta["ma_vozidlo"]) else None
+    vozidlo = info_vozidlo if chce_vozidlo else None
 
     out_dir = os.path.join(DATA_DIR, "output")
     os.makedirs(out_dir, exist_ok=True)
@@ -1616,10 +1617,10 @@ def api_plna_moc():
     }, ts, out_dir)
     try:
         pdf = fill_pdf(path, pm.build_fields(strana, vozidlo))
-        # Bez vozidla se řádky RZ/VIN z papíru odeberou úplně — prázdné kolonky
-        # na plné moci nikdo nechtěl. Vzorem je Petrova šablona, která je nemá.
-        if vozidlo is None and meta["ma_vozidlo"]:
-            pdf = pm.bez_vozidla(pdf)
+        # Papír má vypadat stejně bez ohledu na to, co má která šablona
+        # natištěné: bez vozidla se řádky RZ/VIN odeberou, s vozidlem dokreslí.
+        # Obě funkce nedělají nic, když je šablona už v požadovaném stavu.
+        pdf = pm.bez_vozidla(pdf) if vozidlo is None else pm.s_vozidlem(pdf, vozidlo)
         with open(os.path.join(out_dir, name), "wb") as f:
             f.write(pdf)
     except Exception as e:

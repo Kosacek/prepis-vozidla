@@ -108,10 +108,10 @@ def test_vehicle_left_out_when_not_requested(zadost):
     assert fields[pm.POLE["zmocnitel"]] == "JAN NOVÁK"
 
 
-def test_petr_template_has_no_vehicle_boxes():
-    """Petrova šablona kolonky na RZ/VIN nemá — nesmí se předstírat, že jo."""
+def test_petrova_sablona_kolonky_na_vozidlo_natistene_nema():
+    """Fakt o souboru — dokreslují se až při vystavení, viz testy níž."""
     tpl = pm.sablona(A.BASE_DIR, "Petr")
-    assert tpl and tpl[1]["ma_vozidlo"] is False
+    assert tpl and tpl[1]["kolonky_v_sablone"] is False
     fields, meta = _fill("Petr", {"jmeno": "X", "rc_ic": "1", "adresa": "Y"})
     assert meta["kdo"] == "Petr Kosek"
     assert pm.POLE["rz"] not in fields
@@ -220,3 +220,82 @@ def test_route_bez_zaskrtnuti_vyrobi_papir_bez_radku(client, zadost, monkeypatch
         soubor = r.get_json()["soubor"]
         with open(os.path.join(d, "output", soubor), "rb") as fh:
             assert _pole(fh.read()) == ocekavane, "s_vozidlem=%s" % chce
+
+
+# ── Petr umí RZ a VIN taky ────────────────────────────────────────────────────
+# Reálná stížnost: u Petra se zaškrtnutí „uvést RZ a VIN" neprojevilo, protože
+# jeho šablona ty kolonky natištěné nemá. Dokreslují se tedy stejné jako
+# Davidovy — jinak by jeden z nás dvou vozidlo na plné moci uvést nemohl.
+
+def _rects(pdf_bytes):
+    r = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    out = {}
+    for a in r.pages[0].get("/Annots", []):
+        o = a.get_object()
+        out[str(o.get("/T"))] = [round(float(x), 1) for x in o.get("/Rect")]
+    return out
+
+
+def _hodnoty(pdf_bytes):
+    pole = pypdf.PdfReader(io.BytesIO(pdf_bytes)).get_fields() or {}
+    return {k: str(v.get("/V") or "") for k, v in pole.items()}
+
+
+def test_petr_dostane_rz_a_vin_kdyz_je_chce(client, zadost, monkeypatch):
+    d, f = zadost
+    monkeypatch.setattr(A, "DATA_DIR", d)
+    r = client.post("/api/plna-moc", json={
+        "zdroj": f, "role": "Nový vlastník", "s_vozidlem": True, "profil": "Petr"})
+    assert r.status_code == 200 and r.get_json()["success"], r.get_json()
+    assert r.get_json()["s_vozidlem"] is True
+    with open(os.path.join(d, "output", r.get_json()["soubor"]), "rb") as fh:
+        pdf = fh.read()
+    h = _hodnoty(pdf)
+    assert h["Text4"] == "1AB2345", h
+    assert h["Text5"] == "TMBEK6NW7M3158470", h
+
+
+def test_petr_bez_zaskrtnuti_kolonky_nedostane(client, zadost, monkeypatch):
+    d, f = zadost
+    monkeypatch.setattr(A, "DATA_DIR", d)
+    r = client.post("/api/plna-moc", json={
+        "zdroj": f, "role": "Nový vlastník", "s_vozidlem": False, "profil": "Petr"})
+    with open(os.path.join(d, "output", r.get_json()["soubor"]), "rb") as fh:
+        assert sorted(_hodnoty(fh.read())) == ["Text1", "Text2", "Text3", "Text8"]
+
+
+def test_petrovy_kolonky_sedi_na_davidovy(client, zadost, monkeypatch):
+    """Musí to být tentýž papír, ne dvě různě posazené verze."""
+    d, f = zadost
+    monkeypatch.setattr(A, "DATA_DIR", d)
+    vysledky = {}
+    for profil in ("David", "Petr"):
+        r = client.post("/api/plna-moc", json={
+            "zdroj": f, "role": "Nový vlastník", "s_vozidlem": True, "profil": profil})
+        with open(os.path.join(d, "output", r.get_json()["soubor"]), "rb") as fh:
+            vysledky[profil] = _rects(fh.read())
+    for pole in ("Text4", "Text5"):
+        assert vysledky["Petr"][pole] == vysledky["David"][pole], pole
+
+
+def test_oba_profily_umi_vozidlo():
+    """UI se podle tohohle rozhoduje, jestli má zaškrtávátko vůbec nabízet."""
+    assert all(z["ma_vozidlo"] for z in pm.dostupni()), pm.dostupni()
+
+
+def test_petrovy_popisky_sedi_na_davidovy_na_desetinu_bodu():
+    """Papír má být k nerozeznání — popisky se dokreslují, tak ať sedí.
+    Kontroluje se „VIN:", protože ten je v obou stejným písmem."""
+    fitz = pytest.importorskip("fitz")   # jen pro vývoj, v kontejneru není
+    voz = {"rz": "1AB2345", "vin": "TMBJJ7NE5J0123456"}
+    strana = {"jmeno": "X", "rc_ic": "1", "adresa": "Y"}
+    kde = {}
+    for profil in ("David", "Petr"):
+        path, _ = pm.sablona(A.BASE_DIR, profil)
+        pdf = pm.s_vozidlem(A.fill_pdf(path, pm.build_fields(strana, voz)), voz)
+        d = fitz.open(stream=pdf, filetype="pdf")
+        r = d[0].search_for("VIN:")[0]
+        kde[profil] = (r.x0, r.y1)
+        d.close()
+    assert abs(kde["Petr"][0] - kde["David"][0]) < 0.2, kde
+    assert abs(kde["Petr"][1] - kde["David"][1]) < 0.2, kde
