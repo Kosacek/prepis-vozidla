@@ -1790,8 +1790,8 @@ async function initPlnaMoc() {
     info.innerHTML = match
       ? `Vystaví se na <b>${esc(match.kdo)}</b> (podle profilu ${esc(who)}).`
       : `<b>Pro profil „${esc(who || '—')}" nemám šablonu plné moci.</b> Přepni profil nahoře na Davida nebo Petra.`;
-    document.getElementById('pm-vozidlo-info').textContent =
-      match && !match.ma_vozidlo ? 'Tahle šablona kolonky na RZ a VIN nemá — vozidlo se do ní nedoplní.' : '';
+    // Kolonky na RZ a VIN umí obě šablony — kde nejsou natištěné, dokreslí se.
+    document.getElementById('pm-vozidlo-info').textContent = '';
   } catch (e) {
     info.textContent = 'Nepodařilo se zjistit, na koho plnou moc vystavit.';
   }
