@@ -638,7 +638,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Jméno / Název firmy</label>
-          <div style="position:relative"><input type="text" id="puvodni_jmeno" placeholder="Jan Novák / Firma s.r.o." oninput="openFirmDropdown('puvodni','name')" style="width:100%"><div class="firm-dropdown" id="puvodni-name-firms"></div></div>
+          <div style="position:relative"><input type="text" id="puvodni_jmeno" placeholder="Jan Novák / Firma s.r.o." oninput="if(!icoMistoJmena('puvodni'))openFirmDropdown('puvodni','name')" style="width:100%"><div class="firm-dropdown" id="puvodni-name-firms"></div></div>
         </div>
         <div class="field">
           <label>IČO</label>
@@ -683,7 +683,7 @@
           <div class="form-grid">
             <div class="field">
               <label>Jméno / Název firmy</label>
-              <div style="position:relative"><input type="text" id="puvodni_prov_jmeno" placeholder="Jana Nováková / Firma s.r.o." oninput="openFirmDropdown('puvodni_prov','name')" style="width:100%"><div class="firm-dropdown" id="puvodni_prov-name-firms"></div></div>
+              <div style="position:relative"><input type="text" id="puvodni_prov_jmeno" placeholder="Jana Nováková / Firma s.r.o." oninput="if(!icoMistoJmena('puvodni_prov'))openFirmDropdown('puvodni_prov','name')" style="width:100%"><div class="firm-dropdown" id="puvodni_prov-name-firms"></div></div>
             </div>
             <div class="field">
               <label>IČO</label>
@@ -730,7 +730,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Jméno / Název firmy</label>
-          <div style="position:relative"><input type="text" id="novy_jmeno" placeholder="Marie Nováková / Firma s.r.o." oninput="openFirmDropdown('novy','name')" style="width:100%"><div class="firm-dropdown" id="novy-name-firms"></div></div>
+          <div style="position:relative"><input type="text" id="novy_jmeno" placeholder="Marie Nováková / Firma s.r.o." oninput="if(!icoMistoJmena('novy'))openFirmDropdown('novy','name')" style="width:100%"><div class="firm-dropdown" id="novy-name-firms"></div></div>
         </div>
         <div class="field">
           <label>IČO</label>
@@ -775,7 +775,7 @@
           <div class="form-grid">
             <div class="field">
               <label>Jméno / Název firmy</label>
-              <div style="position:relative"><input type="text" id="novy_prov_jmeno" placeholder="Raiffeisen Leasing s.r.o." oninput="openFirmDropdown('novy_prov','name')" style="width:100%"><div class="firm-dropdown" id="novy_prov-name-firms"></div></div>
+              <div style="position:relative"><input type="text" id="novy_prov_jmeno" placeholder="Raiffeisen Leasing s.r.o." oninput="if(!icoMistoJmena('novy_prov'))openFirmDropdown('novy_prov','name')" style="width:100%"><div class="firm-dropdown" id="novy_prov-name-firms"></div></div>
             </div>
             <div class="field">
               <label>IČO</label>
@@ -1017,7 +1017,7 @@
             </div>
             <div class="field">
               <label>Typ úkonu</label>
-              <select id="evidence_typ" onchange="evidencePriceUpdate()"><option value="">—</option></select>
+              <select id="evidence_typ" onchange="evidencePriceUpdate();elZkontroluj()"><option value="">—</option></select>
             </div>
             <div class="field">
               <label>Cena (Kč)</label>
@@ -1025,7 +1025,7 @@
             </div>
             <div class="field">
               <label>Poznámky</label>
-              <input type="text" id="evidence_poznamka" maxlength="120" placeholder="volitelná poznámka k úkonu">
+              <input type="text" id="evidence_poznamka" maxlength="120" placeholder="volitelná poznámka k úkonu" onblur="elZkontroluj()">
             </div>
           </div>
           <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
@@ -1456,6 +1456,14 @@ function activatePanel(n) {
   if (n === 5) buildSummary();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(() => {
+    // Na generovací stránce se firma, typ i cena doplní samy — jediné, co se
+    // tam doopravdy píše, je poznámka k úkonu, tak kurzor rovnou tam.
+    const pozn = document.getElementById('evidence_poznamka');
+    const karta = document.getElementById('evidence-card');
+    if (n === 5 && pozn && karta && karta.style.display !== 'none' && !pozn.disabled) {
+      pozn.focus();
+      return;
+    }
     const first = document.querySelector(`#panel-${n} input[type=text], #panel-${n} select`);
     if (first) first.focus();
   }, 80);
@@ -2482,6 +2490,24 @@ async function lookupOrv() {
 }
 
 const _icoLast = {};
+// Osm číslic napsaných do políčka pro jméno je IČO — přehodí se do správné
+// kolonky a dotáhne se z ARESu. Firmu člověk často zná číslem dřív než názvem
+// a přepínat se kvůli tomu o pole vedle je zbytečná práce.
+function icoMistoJmena(party) {
+  const el = document.getElementById(party + '_jmeno');
+  if (!el) return false;
+  const text = (el.value || '').trim();
+  if (!/^\d[\d\s]*$/.test(text)) return false;      // musí to být jen číslice
+  const ico = text.replace(/\D/g, '');
+  if (ico.length !== 8) return false;
+  el.value = '';
+  const icoEl = document.getElementById(party + '_ico');
+  if (!icoEl) return false;
+  icoEl.value = ico;
+  lookupIco(party);
+  return true;
+}
+
 async function lookupIco(party) {
   const ico = document.getElementById(`${party}_ico`).value.trim();
   if (!ico || ico.length < 8) return;
@@ -2633,18 +2659,67 @@ async function prepareEvidence() {
       typSel.appendChild(o);
     });
   }
-  // Pre-select the firm by the buyer's IČO (nový provozovatel, else nový vlastník).
+  // Firma se předvybere podle IČO — nejdřív kupující, a když ten v evidenci
+  // není, tak prodávající. Úkon fakturujeme tomu z nich, kdo je náš klient, a
+  // ten je klidně na straně prodávajícího (převod z autobazaru na zákazníka).
   if (!firmaSel.value) {
-    const ico = _digits(cb('novy_prov_jiny') ? (v('novy_prov_ico') || v('novy_ico')) : v('novy_ico'));
-    const match = ico && meta.firmy.find(f => _digits(f.ico) === ico);
-    if (match) firmaSel.value = String(match.id);
+    const strany = [
+      cb('novy_prov_jiny') ? (v('novy_prov_ico') || v('novy_ico')) : v('novy_ico'),
+      cb('puvodni_prov_jiny') ? (v('puvodni_prov_ico') || v('puvodni_ico')) : v('puvodni_ico'),
+    ];
+    for (const raw of strany) {
+      const ico = _digits(raw);
+      const match = ico && meta.firmy.find(f => _digits(f.ico) === ico);
+      if (match) { firmaSel.value = String(match.id); break; }
+    }
   }
   // Default the type from the mode (change mode: leave blank → user picks KOLA / A50-X…).
   if (!typSel.value) typSel.value = _MODE_TO_TYP[appMode] || '';
   evidencePriceUpdate();
+  elZkontroluj();
   // Who will be recorded as zpracoval — the profil chip in the header.
   const who = window.getProfil ? window.getProfil() : '';
   status.textContent = who ? ('Zapíše: ' + who) : 'Vyber nahoře profil — kdo úkon zapisuje.';
+}
+
+// ── Elektrická značka ────────────────────────────────────────────────────────
+// „Žádám o přidělení EL RZ" = elektrická značka. Tabulka je zdarma, platí se
+// jen vyřízení, takže místo 1300 jde do evidence 500 a do poznámky „EL".
+// Vyčteno z evidence: úkony s poznámkou EL jsou skoro vždy NOVÉ za 500 —
+// u DOVOZU vychází jinak (1200), tak se tam cena nesahá a doplní se jen značka.
+//
+// Hledá se EL jako samostatné slovo, jinak by to chytalo „ExELero", „MichaELa"
+// nebo „LEasing" — všechna tři v evidenci reálně jsou.
+const EL_SLOVO = /(^|[^A-Za-zÁ-Žá-ž0-9])EL([^A-Za-zÁ-Žá-ž0-9]|$)/i;
+const EL_VZOR = /(ELRZ|ELEKTRICK)/i;
+const EL_CENA = 500;
+const EL_TYP_S_CENOU = 'NOVÉ';
+
+function jeElektricka(texty) {
+  return (texty || []).some(t => EL_SLOVO.test(String(t || '')) || EL_VZOR.test(String(t || '')));
+}
+
+/** Co se má u úkonu změnit, nebo null když o elektrickou značku nejde. */
+function elUprava(texty, typ, poznamka) {
+  if (!jeElektricka(texty)) return null;
+  const pozn = String(poznamka || '').trim();
+  return {
+    cena: typ === EL_TYP_S_CENOU ? EL_CENA : null,
+    poznamka: EL_SLOVO.test(pozn) ? pozn : (pozn ? pozn + ', EL' : 'EL'),
+  };
+}
+
+function elZkontroluj() {
+  const poznEl = document.getElementById('evidence_poznamka');
+  const cenaEl = document.getElementById('evidence_cena');
+  if (!poznEl || !cenaEl) return;
+  const uprava = elUprava([v('zadost_zmena'), poznEl.value], v('evidence_typ'), poznEl.value);
+  if (!uprava) return;
+  poznEl.value = uprava.poznamka;
+  // Cenu přepisujeme jen dokud si ji uživatel nenapsal sám.
+  if (uprava.cena != null && (!cenaEl.value || cenaEl.dataset.auto === '1')) {
+    cenaEl.value = uprava.cena; cenaEl.dataset.auto = '1';
+  }
 }
 
 function evidencePriceUpdate() {
