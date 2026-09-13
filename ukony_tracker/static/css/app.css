@@ -231,7 +231,10 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
    ------------------------------------------------------------ */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, 1fr), not plain 1fr — .kpi-sub's nowrap text ("Kč · minulý
+     měsíc N") would otherwise set that card's min-content width and steal
+     space from the other three instead of ellipsizing. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-4);
   margin-bottom: var(--sp-5);
 }
@@ -1284,19 +1287,22 @@ a.kpi-link:hover {
   }
 
   /* Dashboard KPI row: four small counts, not worth 2×2 — one tight row reads
-     faster and leaves more of the screen to the chart below. */
+     faster and leaves more of the screen to the chart below. First pass left
+     each box mostly padding around tiny text ("half the square is empty" —
+     David); tighten the gaps between boxes and give the freed width to
+     bigger type instead. */
   .kpis {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
   }
   .kpis .kpi {
-    padding: 8px 5px;
-    gap: 1px;
+    padding: 7px 6px;
+    gap: 2px;
     border-radius: var(--radius-sm);
   }
-  .kpis .kpi-v { font-size: 1.05rem; }
-  .kpis .kpi-l { font-size: 0.5rem; letter-spacing: 0.02em; line-height: 1.2; }
-  .kpis .kpi-sub { font-size: 0.58rem; }
+  .kpis .kpi-v { font-size: 1.35rem; }
+  .kpis .kpi-l { font-size: 0.6rem; letter-spacing: 0.01em; line-height: 1.15; }
+  .kpis .kpi-sub { font-size: 0.7rem; }
 
   /* "Podle firmy" and "Typy úkonů" stay side by side like on desktop — the
      bar list and the doughnut both get a tighter, phone-sized layout instead
