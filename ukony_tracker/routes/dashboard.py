@@ -46,10 +46,10 @@ def index():
         aktualni_rok=today.year,
         mesic_nazev=MESICE[today.month - 1],
         dnes=st.denni_souhrn(conn, today.isoformat()),
+        tyden=st.tydenni_souhrn(conn, today.isoformat()),
         mesic=st.mesicni_souhrn(conn, today.year, today.month),
         minuly_mesic=st.mesicni_souhrn(conn, prev_y, prev_m),
         rok=st.rocni_souhrn(conn, today.year),
-        nezaplaceno=st.nezaplaceno_celkem(conn),
         per_firma=st.podle_firmy(conn, year),
         recent=ukony_repo.list(conn, limit=12),
         # Plain structures — the template serializes them with |tojson, which

@@ -67,12 +67,15 @@ def test_dashboard_firma_zkratka(client):
     assert "TF" in body
 
 
-def test_dashboard_nezaplaceno(client):
-    """Outstanding balance (45700) appears in the KPI block."""
+def test_dashboard_kpi_count_first(client):
+    """KPI row leads with counts (dnes/týden/měsíc/rok) — outstanding balance
+    was dropped from the top-of-page cards per David's 2026-09-13 request
+    (invoicing is monthly, so it wasn't a daily-glance number)."""
     c, _ = client
     r = c.get("/?rok=2026")
     body = r.get_data(as_text=True)
-    assert "45700" in body
+    assert "Tento týden" in body
+    assert "Nezaplaceno" not in body
 
 
 def test_dashboard_has_typy_chart_and_no_kdo_dluzi(client):
