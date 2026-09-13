@@ -1737,9 +1737,14 @@ body.modal-open { overflow: hidden; }
   .recent-list .recent-row::after,
   .ukony-list .recent-row::after,
   .mesic-recent .recent-row::after { content: ""; flex: 0 0 100%; height: 0; order: 4; }
+  /* David: typ nahoře vedle data, SPZ dolů vedle firmy — swap oproti tomu,
+     co bylo (SPZ nahoře, typ dole). */
   .recent-list .recent-row .tag,
   .ukony-list .recent-row .tag,
-  .mesic-recent .recent-row .tag { order: 5; }
+  .mesic-recent .recent-row .tag { order: 2; }
+  .recent-list .recent-rz,
+  .ukony-list .recent-rz,
+  .mesic-recent .recent-rz { order: 5; }
   .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 6; }
   .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 7; }
   .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 8; }
