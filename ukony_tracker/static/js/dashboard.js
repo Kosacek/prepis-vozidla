@@ -37,11 +37,15 @@
         // Chart.js defaults doughnuts to a 1:1 (square) box. Unconstrained by
         // the old grid-stretch, that made the circle balloon to the column's
         // full width — taller than "Podle firmy" next to it. Cap it wider.
-        aspectRatio: 1.3,
+        // On a phone the column itself is only ~140px, so a right-side legend
+        // has no room — drop it below the circle instead, shrunk to match.
+        aspectRatio: MOBILE ? 1.05 : 1.3,
         plugins: {
           legend: {
-            position: "right",
-            labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 10, font: { size: 11 } }
+            position: MOBILE ? "bottom" : "right",
+            labels: MOBILE
+              ? { usePointStyle: true, pointStyle: "circle", boxWidth: 6, boxHeight: 6, padding: 5, font: { size: 8 } }
+              : { usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 10, font: { size: 11 } }
           },
           tooltip: {
             callbacks: {

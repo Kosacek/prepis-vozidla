@@ -982,7 +982,7 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
    by side in one row instead of chart-column + sidebar. */
 .dash-breakdowns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-4);
   margin-top: var(--sp-5);
   margin-bottom: var(--sp-5);
@@ -996,10 +996,9 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
    stacking margin must not also apply between them (it would push the second
    card down and break the row's alignment). */
 .dash-breakdowns .card + .card { margin-top: 0; }
-
-@media (max-width: 900px) {
-  .dash-breakdowns { grid-template-columns: 1fr; }
-}
+/* Stays 2 columns down to phone width — David wants "Podle firmy" and "Typy
+   úkonů" side by side like on desktop, not stacked. The 640px block below
+   shrinks both cards' internals (bar rows, doughnut legend) to fit. */
 
 .kpi-sub {
   font-size: 0.78rem;
@@ -1283,6 +1282,37 @@ a.kpi-link:hover {
   .kpi {
     padding: var(--sp-3) var(--sp-4);
   }
+
+  /* Dashboard KPI row: four small counts, not worth 2×2 — one tight row reads
+     faster and leaves more of the screen to the chart below. */
+  .kpis {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .kpis .kpi {
+    padding: 8px 5px;
+    gap: 1px;
+    border-radius: var(--radius-sm);
+  }
+  .kpis .kpi-v { font-size: 1.05rem; }
+  .kpis .kpi-l { font-size: 0.5rem; letter-spacing: 0.02em; line-height: 1.2; }
+  .kpis .kpi-sub { font-size: 0.58rem; }
+
+  /* "Podle firmy" and "Typy úkonů" stay side by side like on desktop — the
+     bar list and the doughnut both get a tighter, phone-sized layout instead
+     of stacking (there's room if each element shrinks). */
+  .dash-breakdowns { gap: 8px; }
+  .dash-breakdowns .card { padding: var(--sp-3) 10px; }
+  .dash-breakdowns .card h2 { font-size: 0.9375rem; margin-bottom: var(--sp-2); }
+
+  .bar-row {
+    grid-template-columns: 46px 1fr 38px;
+    gap: 5px;
+    padding: 4px 0;
+  }
+  .bar-label { font-size: 0.6875rem; }
+  .bar-amt { font-size: 0.6875rem; }
+  .bar-track { height: 6px; }
 
   /* Segmented type picker: scroll horizontally instead of squishing */
   .seg {
