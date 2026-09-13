@@ -20,20 +20,20 @@
     <div class="kpi-sub">{{ dnes.trzby|kc }} Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ mesic.trzby|kc }} Kč</div>
-    <div class="kpi-l">Tento měsíc</div>
-    <div class="kpi-sub">{{ mesic.pocet }} úkonů · minulý měsíc {{ minuly_mesic.trzby|kc }} Kč</div>
+    <div class="kpi-v">{{ tyden.pocet }}</div>
+    <div class="kpi-l">Tento týden</div>
+    <div class="kpi-sub">{{ tyden.trzby|kc }} Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ rok.trzby|kc }} Kč</div>
-    <div class="kpi-l">Letos {{ aktualni_rok }}</div>
-    <div class="kpi-sub">{{ rok.pocet }} úkonů</div>
+    <div class="kpi-v">{{ mesic.pocet }}</div>
+    <div class="kpi-l">Tento měsíc</div>
+    <div class="kpi-sub">{{ mesic.trzby|kc }} Kč · minulý měsíc {{ minuly_mesic.pocet }}</div>
   </div>
-  <a class="kpi kpi-link {{ 'kpi-warn' if nezaplaceno > 0 }}" href="/ukony/vse?stav=nezaplaceno">
-    <div class="kpi-v">{{ nezaplaceno|kc }} Kč</div>
-    <div class="kpi-l">Nezaplaceno</div>
-    <div class="kpi-sub">{{ 'zobrazit nezaplacené →' if nezaplaceno > 0 else 'vše zaplaceno ✓' }}</div>
-  </a>
+  <div class="kpi">
+    <div class="kpi-v">{{ rok.pocet }}</div>
+    <div class="kpi-l">Letos {{ aktualni_rok }}</div>
+    <div class="kpi-sub">{{ rok.trzby|kc }} Kč</div>
+  </div>
 </div>
 
 <div class="dash-grid">

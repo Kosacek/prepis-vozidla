@@ -48,6 +48,16 @@ def test_rocni_trend_podle_firmy(conn):
     assert rows[0]["zkratka"] == "Cardion"  # ordered by total count desc
 
 
+def test_tydenni_souhrn(conn):
+    _setup(conn)  # rows on Mon 5/4, Tue 5/5, Wed 5/6 — all the same ISO week
+    s = st.tydenni_souhrn(conn, "2026-05-06")  # "today" = Wednesday
+    assert s["pocet"] == 3 and s["trzby"] == 4600
+    # Sunday 5/3 is the last day of the *previous* week — none of the fixture
+    # rows (which start Monday 5/4) should count yet.
+    empty = st.tydenni_souhrn(conn, "2026-05-03")
+    assert empty["pocet"] == 0 and empty["trzby"] == 0
+
+
 def test_denni_souhrn(conn):
     _setup(conn)
     s = st.denni_souhrn(conn, "2026-05-04")

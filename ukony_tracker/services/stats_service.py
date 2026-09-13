@@ -108,6 +108,21 @@ def denni_souhrn(conn: Connection, iso_date: str) -> dict:
     return {"pocet": r["n"], "trzby": r["s"]}
 
 
+def tydenni_souhrn(conn: Connection, today_iso: str) -> dict:
+    """Count and revenue from Monday of the current ISO week through today.
+
+    ``today_iso`` drives the week boundary via SQLite date arithmetic: shift
+    back 6 days first, then round forward to the nearest Monday — this lands
+    on the current week's Monday regardless of which weekday today is.
+    """
+    r = conn.execute(
+        "SELECT COUNT(*) n, COALESCE(SUM(celkem),0) s FROM ukony "
+        "WHERE datum >= date(?, '-6 days', 'weekday 1') AND datum <= ?",
+        (today_iso, today_iso),
+    ).fetchone()
+    return {"pocet": r["n"], "trzby": r["s"]}
+
+
 def denni_trend(conn: Connection, year: int, month: int, days: int) -> list[dict]:
     """Per-day count and revenue for a single month, day slots 1..days.
 
