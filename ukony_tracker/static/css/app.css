@@ -939,7 +939,7 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
   grid-template-columns: 80px 1fr 64px;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-2) 0;
+  padding: 6px 0;
 }
 
 .bar-label {
@@ -986,6 +986,11 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
   gap: var(--sp-4);
   margin-top: var(--sp-5);
   margin-bottom: var(--sp-5);
+  /* Grid rows stretch to the tallest cell by default — with a dozen firms in
+     the bar list, that forced the doughnut card to match its height and left
+     a wall of empty space under the (much shorter) circle + legend. Let each
+     card size to its own content instead. */
+  align-items: start;
 }
 /* The row spaces its two cards with grid `gap`, so the legacy `.card + .card`
    stacking margin must not also apply between them (it would push the second
