@@ -140,6 +140,7 @@ def test_fetch_meta_none_on_failure(monkeypatch):
 def test_push_records_failure_when_unreachable(tmp_path, monkeypatch):
     monkeypatch.setattr(tracker_push, "UKONY_API_URL", "http://127.0.0.1:1")
     monkeypatch.setattr(tracker_push, "TIMEOUT", 0.2)
+    monkeypatch.setattr(tracker_push, "RETRY_DELAYS", ())  # don't actually sleep in tests
     res = tracker_push.push({"mode": "zmena", "registracni_znacka": "X"}, str(tmp_path))
     assert res is None  # never raises
     log = tmp_path / "failed_pushes.jsonl"
@@ -170,3 +171,155 @@ def test_push_success_sends_key_and_returns_json(tmp_path, monkeypatch):
     assert captured["url"].endswith("/api/prichozi")
     assert captured["headers"]["X-Api-Key"] == "s3cret"
     assert not (tmp_path / "failed_pushes.jsonl").exists()  # no failure recorded
+
+
+# ── retries within a single push() ───────────────────────────────────────────
+
+def test_push_retries_before_giving_up(tmp_path, monkeypatch):
+    calls = []
+    # Same NUMBER of retries as production (2), just zero-duration so the test
+    # doesn't actually sleep.
+    monkeypatch.setattr(tracker_push, "RETRY_DELAYS", (0, 0))
+
+    def _flaky(url, json=None, headers=None, timeout=None):
+        calls.append(1)
+        raise ConnectionError("nope")
+
+    monkeypatch.setattr(tracker_push.requests, "post", _flaky)
+    res = tracker_push.push({"mode": "prevod"}, str(tmp_path))
+    assert res is None
+    assert len(calls) == 3  # first attempt + 2 retries (len(RETRY_DELAYS)+1)
+    assert (tmp_path / "failed_pushes.jsonl").exists()
+
+
+def test_push_succeeds_on_second_attempt_without_recording_failure(tmp_path, monkeypatch):
+    attempts = {"n": 0}
+    monkeypatch.setattr(tracker_push, "RETRY_DELAYS", (0,))
+
+    class _Ok:
+        status_code = 201
+        def json(self):
+            return {"status": "auto"}
+
+    def _fake(url, json=None, headers=None, timeout=None):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise TimeoutError("read timed out")
+        return _Ok()
+
+    monkeypatch.setattr(tracker_push.requests, "post", _fake)
+    res = tracker_push.push({"mode": "prevod"}, str(tmp_path))
+    assert res == {"status": "auto"}
+    assert attempts["n"] == 2
+    assert not (tmp_path / "failed_pushes.jsonl").exists()  # never recorded — it landed
+
+
+# ── push_async: /api/generate must never block on the tracker ───────────────
+
+def test_push_async_returns_immediately(tmp_path, monkeypatch):
+    """The whole point: even a tracker that hangs for a full second must not
+    make push_async's CALLER wait — that second-plus used to sit inside
+    every /api/generate response."""
+    import time as _time
+
+    def _slow(url, json=None, headers=None, timeout=None):
+        _time.sleep(1)
+        class _R:
+            status_code = 201
+            def json(self_):
+                return {"status": "auto"}
+        return _R()
+
+    monkeypatch.setattr(tracker_push.requests, "post", _slow)
+    t0 = _time.time()
+    tracker_push.push_async({"mode": "prevod"}, str(tmp_path))
+    assert _time.time() - t0 < 0.2, "push_async must return before the network call finishes"
+
+
+# ── retry_failed: the guarantee David asked for — it really lands ───────────
+
+def test_retry_failed_clears_a_backlog_that_now_succeeds(tmp_path, monkeypatch):
+    log = tmp_path / "failed_pushes.jsonl"
+    log.write_text(
+        json.dumps({"reason": "old timeout", "payload": {"zadost_id": "a", "mode": "prevod"}}) + "\n"
+        + json.dumps({"reason": "old timeout", "payload": {"zadost_id": "b", "mode": "zapis"}}) + "\n",
+        encoding="utf-8",
+    )
+    sent = []
+
+    class _Ok:
+        status_code = 200
+        def json(self):
+            return {"status": "duplicate"}  # tracker already has it — still a success
+
+    def _fake(url, json=None, headers=None, timeout=None):
+        sent.append(json["zadost_id"])
+        return _Ok()
+
+    monkeypatch.setattr(tracker_push.requests, "post", _fake)
+    remaining = tracker_push.retry_failed(str(tmp_path))
+    assert remaining == 0
+    assert sorted(sent) == ["a", "b"]
+    assert not log.exists()  # fully cleared
+
+
+def test_retry_failed_keeps_only_the_ones_still_failing(tmp_path, monkeypatch):
+    log = tmp_path / "failed_pushes.jsonl"
+    log.write_text(
+        json.dumps({"reason": "x", "payload": {"zadost_id": "ok", "mode": "prevod"}}) + "\n"
+        + json.dumps({"reason": "x", "payload": {"zadost_id": "still-down", "mode": "zapis"}}) + "\n",
+        encoding="utf-8",
+    )
+
+    class _Ok:
+        status_code = 200
+        def json(self):
+            return {"status": "auto"}
+
+    def _fake(url, json=None, headers=None, timeout=None):
+        if json["zadost_id"] == "ok":
+            return _Ok()
+        raise ConnectionError("tracker still unreachable")
+
+    monkeypatch.setattr(tracker_push.requests, "post", _fake)
+    remaining = tracker_push.retry_failed(str(tmp_path))
+    assert remaining == 1
+    left = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()]
+    assert [l["payload"]["zadost_id"] for l in left] == ["still-down"]
+
+
+def test_retry_failed_is_a_noop_with_no_backlog(tmp_path):
+    assert tracker_push.retry_failed(str(tmp_path)) == 0
+
+
+def test_retry_failed_skips_a_corrupt_line_instead_of_dying(tmp_path, monkeypatch):
+    log = tmp_path / "failed_pushes.jsonl"
+    log.write_text(
+        "{not valid json\n"
+        + json.dumps({"reason": "x", "payload": {"zadost_id": "ok", "mode": "prevod"}}) + "\n",
+        encoding="utf-8",
+    )
+
+    class _Ok:
+        status_code = 200
+        def json(self):
+            return {"status": "auto"}
+
+    monkeypatch.setattr(tracker_push.requests, "post", lambda *a, **k: _Ok())
+    assert tracker_push.retry_failed(str(tmp_path)) == 0
+    assert not log.exists()
+
+
+# ── start_sweep: idempotent, doesn't block, doesn't crash the process ───────
+
+def test_start_sweep_is_idempotent(tmp_path, monkeypatch):
+    """Two calls (e.g. two gunicorn workers importing app.py) must not start
+    two loops — that would double-send every retry."""
+    starts = []
+    monkeypatch.setattr(tracker_push.threading, "Thread",
+                        lambda target, daemon: starts.append(target) or type(
+                            "T", (), {"start": lambda self: None})())
+    monkeypatch.setattr(tracker_push, "_sweep_started", False)
+    tracker_push.start_sweep(str(tmp_path), interval_s=9999)
+    tracker_push.start_sweep(str(tmp_path), interval_s=9999)
+    assert len(starts) == 1
