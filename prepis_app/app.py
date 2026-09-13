@@ -42,7 +42,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1008,6 +1008,14 @@ from flask import session, redirect, request as _rq, Response
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 _AUTH_EXEMPT = {"/healthz", "/login", "/static"}
 
+# Retry sweep for pushes the tracker never confirmed (see tracker_push.py).
+# Gated the same way as the login wall: production only. Without this guard
+# every `pytest` collection (which imports app.py) and every local-desktop run
+# would spin up a background thread hammering a tracker that isn't there.
+if ADMIN_PASSWORD:
+    import tracker_push
+    tracker_push.start_sweep(DATA_DIR)
+
 _LOGIN_HTML = """<!doctype html><html lang="cs"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Přihlášení — Přepisy</title>
@@ -1500,14 +1508,19 @@ def api_generate():
     if plne_moce:
         result["plne_moce"] = plne_moce
 
-    # ── Push the finished žádost to the Úkony Tracker (best-effort) ──────────
+    # ── Push the finished žádost to the Úkony Tracker (best-effort, async) ───
     # Only when the "Zapsat úkon do evidence" box was left on (default). The
     # profil (who's at the keyboard) and the explicit firm/type/price chosen on
-    # the last page ride along in `data`. Never breaks PDF generation.
+    # the last page ride along in `data`. Never breaks PDF generation, and
+    # never makes the person waiting for their PDF wait on it either — this
+    # used to block here and added ~2s to every /api/generate (measured
+    # 2026-09-13). push_async hands it to a background thread; tracker_push's
+    # own retries + the periodic sweep (started at import time below) make
+    # sure it still lands even if the tracker is briefly unreachable.
     if data.get("evidence_log", True):
         try:
             import tracker_push
-            tracker_push.push(data, DATA_DIR)
+            tracker_push.push_async(data, DATA_DIR)
         except Exception as e:
             _log.warning("tracker push skipped: %s", e)
 
