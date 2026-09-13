@@ -976,34 +976,23 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
 /* --- Dashboard v2 --- */
 
-/* Main + sidebar layout. The left column (chart + breakdowns) and the right
-   rail (Kdo dluží + Poslední úkony) flow independently, so a tall card in one
-   column never pushes the other column's cards down. */
-.dash-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-5);
-  align-items: start;
-}
-.dash-main,
-.dash-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-  min-width: 0;
-}
+/* The month trend chart runs the full content width (David wanted the firm
+   lines stretched edge-to-edge, not squeezed into a ~65% column) — it's a
+   plain top-level .card. Below it, "Podle firmy" and "Typy úkonů" sit side
+   by side in one row instead of chart-column + sidebar. */
 .dash-breakdowns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-4);
+  margin-top: var(--sp-5);
+  margin-bottom: var(--sp-5);
 }
-/* The dashboard spaces cards with container `gap`, so the legacy
-   `.card + .card` stacking margin must not apply here. */
-.dash-grid .card + .card { margin-top: 0; }
+/* The row spaces its two cards with grid `gap`, so the legacy `.card + .card`
+   stacking margin must not also apply between them (it would push the second
+   card down and break the row's alignment). */
+.dash-breakdowns .card + .card { margin-top: 0; }
 
 @media (max-width: 900px) {
-  .dash-grid { grid-template-columns: 1fr; }
   .dash-breakdowns { grid-template-columns: 1fr; }
 }
 

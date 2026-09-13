@@ -79,7 +79,8 @@ def test_dashboard_kpi_count_first(client):
 
 
 def test_dashboard_has_typy_chart_and_no_kdo_dluzi(client):
-    """Typy úkonů wheel moved to the side column; the 'Kdo dluží' panel is gone."""
+    """Typy úkonů wheel still renders (now beside Podle firmy, below the
+    full-width trend chart); the 'Kdo dluží' panel is gone."""
     c, _ = client
     body = c.get("/?rok=2026").get_data(as_text=True)
     assert 'id="typChart"' in body          # types doughnut still rendered

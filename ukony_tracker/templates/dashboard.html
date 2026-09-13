@@ -36,37 +36,33 @@
   </div>
 </div>
 
-<div class="dash-grid">
-  <div class="dash-main">
-    <div class="card">
-      <div class="card-head"><h2>Tento měsíc <span class="muted small">{{ mesic_nazev }} {{ aktualni_rok }}</span></h2>
-        <div class="seg" id="metric-seg">
-          <span class="on" data-mode="firmy">Firmy</span>
-          <span data-mode="trzby">Tržby</span>
-          <span data-mode="pocet">Počet</span>
-        </div>
-      </div>
-      <canvas id="trendChart" height="110"></canvas>
-    </div>
-
-    <div class="card">
-      <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
-      {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
-      {% for r in per_firma %}
-      <div class="bar-row">
-        <span class="bar-label">{{ r.zkratka }}</span>
-        <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
-        <span class="bar-amt">{{ r.trzby|kc }}</span>
-      </div>
-      {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+<div class="card">
+  <div class="card-head"><h2>Tento měsíc <span class="muted small">{{ mesic_nazev }} {{ aktualni_rok }}</span></h2>
+    <div class="seg" id="metric-seg">
+      <span class="on" data-mode="firmy">Firmy</span>
+      <span data-mode="trzby">Tržby</span>
+      <span data-mode="pocet">Počet</span>
     </div>
   </div>
+  <canvas id="trendChart" height="110"></canvas>
+</div>
 
-  <div class="dash-side">
-    <div class="card">
-      <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
-      <canvas id="typChart" height="200"></canvas>
+<div class="dash-breakdowns">
+  <div class="card">
+    <h2>Podle firmy <span class="muted small">{{ year }}</span></h2>
+    {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
+    {% for r in per_firma %}
+    <div class="bar-row">
+      <span class="bar-label">{{ r.zkratka }}</span>
+      <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
+      <span class="bar-amt">{{ r.trzby|kc }}</span>
     </div>
+    {% else %}<p class="muted">Žádná data.</p>{% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>Typy úkonů <span class="muted small">{{ year }}</span></h2>
+    <canvas id="typChart" height="200"></canvas>
   </div>
 </div>
 
