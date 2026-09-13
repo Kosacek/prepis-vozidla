@@ -34,6 +34,10 @@
       },
       options: {
         cutout: "58%",
+        // Chart.js defaults doughnuts to a 1:1 (square) box. Unconstrained by
+        // the old grid-stretch, that made the circle balloon to the column's
+        // full width — taller than "Podle firmy" next to it. Cap it wider.
+        aspectRatio: 1.3,
         plugins: {
           legend: {
             position: "right",
