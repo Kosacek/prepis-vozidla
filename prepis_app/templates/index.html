@@ -1029,14 +1029,16 @@
             </div>
           </div>
           <!-- Bottom-right of the card: check it here instead of opening the
-               dashboard separately to mark the úkon paid after the fact. -->
-          <div id="evidence-paid-row" style="display:flex;justify-content:flex-end;margin-top:14px;">
+               dashboard separately to mark the úkon paid after the fact.
+               "Zapíše: X" and the checkbox share one row — they're both status
+               about the same úkon, no reason for two lines. -->
+          <div id="evidence-paid-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+            <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:0;"></p>
             <label class="ev-toggle" for="evidence_zaplaceno">
               <input type="checkbox" id="evidence_zaplaceno">
               <span>ZAPLACENO</span>
             </label>
           </div>
-          <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
         </div>
       </div>
       <div class="gen-side">
