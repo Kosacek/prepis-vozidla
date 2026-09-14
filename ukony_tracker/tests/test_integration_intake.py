@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+import config
 from repositories import firmy_repo, typy_repo, ukony_repo, prichozi_repo
 from services import matching_service, prichozi_service
 
@@ -407,3 +408,70 @@ def test_find_by_vehicle_matching_rules(conn):
     assert ukony_repo.find_by_vehicle(conn, firma_id=other, vin="TMBEP6PJ7S4066544") is None
     assert ukony_repo.find_by_vehicle(conn, firma_id=c, vin="OTHERVIN000000001") is None
     assert ukony_repo.find_by_vehicle(conn, firma_id=c) is None  # nothing to match on
+
+
+# ── zaplaceno: zadosti's "already paid" checkbox on the generate page ──────
+# zadosti has no concept of partial payment — it's a single checkbox on the
+# last page ("uz zaplaceno"). Intake maps that straight to fully paid: full
+# celkem as zaplaceno_kc, derive_stav() turns that into STAV_ZAPLACENO.
+
+def test_intake_zaplaceno_flag_marks_ukon_fully_paid(conn):
+    c, _ = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "pay1", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111", "zaplaceno": True,
+    })
+    assert res["status"] == "auto"
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["celkem"] == 1300
+    assert u["zaplaceno_kc"] == 1300
+    assert u["stav_platby"] == config.STAV_ZAPLACENO
+
+
+def test_intake_without_zaplaceno_flag_stays_unpaid(conn):
+    """Default behavior must not change for the other 999 žádosti that don't
+    set the flag."""
+    c, _ = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "pay2", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111",
+    })
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["zaplaceno_kc"] == 0
+    assert u["stav_platby"] == config.STAV_NEZAPLACENO
+
+
+def test_intake_zaplaceno_false_stays_unpaid(conn):
+    """Explicit false must behave exactly like absent — JS sends `false` for
+    an unchecked box, not omit the key."""
+    c, _ = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "pay3", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "11111111", "zaplaceno": False,
+    })
+    assert ukony_repo.get(conn, res["ukon_id"])["stav_platby"] == config.STAV_NEZAPLACENO
+
+
+def test_intake_zaplaceno_with_explicit_price(conn):
+    """The checkbox must key off whatever price actually gets used (explicit
+    override), not always the type's default."""
+    _c, a = _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "pay4", "mode": "zmena", "datum": "2026-06-14",
+        "firma_id": a, "typ_kod": "KOLA", "celkem": 450, "zaplaceno": True,
+    })
+    u = ukony_repo.get(conn, res["ukon_id"])
+    assert u["celkem"] == 450
+    assert u["zaplaceno_kc"] == 450
+    assert u["stav_platby"] == config.STAV_ZAPLACENO
+
+
+def test_intake_zaplaceno_ignored_when_queued_pending(conn):
+    """No úkon exists yet when it just goes into the inbox — nothing to mark
+    paid, and it must not crash."""
+    _firms(conn)
+    res = prichozi_service.intake(conn, {
+        "zadost_id": "pay5", "mode": "prevod", "datum": "2026-06-14",
+        "novy_ico": "00000000", "zaplaceno": True,   # no IČO match -> pending
+    })
+    assert res["status"] == "pending"
