@@ -97,6 +97,19 @@ def test_build_payload_explicit_evidence_assignment():
     assert p["celkem"] == "450"                # passed through (tracker coerces)
 
 
+def test_build_payload_forwards_zaplaceno_checkbox():
+    """Last page's 'ÚKON UŽ ZAPLACEN' checkbox → tracker's zaplaceno flag."""
+    p = tracker_push.build_payload({"mode": "prevod", "evidence_zaplaceno": True})
+    assert p["zaplaceno"] is True
+
+
+def test_build_payload_zaplaceno_false_when_unchecked():
+    """An unchecked box (False, not absent — that's what the JS sends) and a
+    payload that never mentions it must both mean 'not paid'."""
+    assert tracker_push.build_payload({"mode": "prevod", "evidence_zaplaceno": False})["zaplaceno"] is False
+    assert tracker_push.build_payload({"mode": "prevod"})["zaplaceno"] is False
+
+
 def test_build_payload_forwards_note():
     p = tracker_push.build_payload({
         "mode": "zmena", "evidence_firma_id": "3", "evidence_typ": "KOLA",

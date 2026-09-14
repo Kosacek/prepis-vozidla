@@ -124,3 +124,16 @@ def test_po_vystaveni_plne_moci_jde_zpatky_na_zacatek():
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
     blok = html[html.index("async function vystavitPlnouMoc()"):][:2000]
     assert "resetForm()" in blok, "chybí tlačítko zpět na začátek"
+
+
+def test_evidence_paid_checkbox_is_wired_end_to_end():
+    """The 2026-09-14 'ÚKON UŽ ZAPLACEN' checkbox: must exist, must feed the
+    /api/generate payload, and must respect the master 'ZAPSAT ÚKON DO
+    EVIDENCE' toggle like the other evidence fields do."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert 'id="evidence_zaplaceno"' in html
+    assert "evidence_zaplaceno:  cb('evidence_zaplaceno')" in html, \
+        "checkbox exists but its value never reaches the generate payload"
+    blok = html[html.index("function toggleEvidence()"):][:500]
+    assert "evidence_zaplaceno" in blok, \
+        "unchecking 'ZAPSAT ÚKON DO EVIDENCE' must also disable the paid checkbox"

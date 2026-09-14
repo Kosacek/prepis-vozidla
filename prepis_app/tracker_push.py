@@ -103,6 +103,9 @@ def build_payload(data: dict) -> dict:
     poznamka = (data.get("evidence_poznamka") or "").strip()
     if poznamka:
         payload["poznamka"] = poznamka
+    # "ÚKON UŽ ZAPLACEN" checkbox — always sent (not just when true), so the
+    # tracker's default of unpaid is an explicit choice, not a gap in the payload.
+    payload["zaplaceno"] = bool(data.get("evidence_zaplaceno"))
     return payload
 
 
