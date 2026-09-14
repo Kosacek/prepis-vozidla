@@ -3,6 +3,11 @@
 Flow (see spec R5): claim the zadost_id row first (UNIQUE backstops idempotency),
 match the firm, then either auto-create the úkon (mode maps to a type AND exactly
 one active firm matched) or leave the row pending for the Příchozí inbox.
+
+``payload["zaplaceno"]`` (bool, added 2026-09-14 for the "už zaplaceno"
+checkbox on zadosti's last page): only takes effect on the auto-create path —
+a pending row has no úkon yet to mark paid. zadosti has no partial-payment
+concept, so True means the full `celkem` was received.
 """
 import sqlite3
 from datetime import date
@@ -131,6 +136,9 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
         # the parties — both are stored and shown independently.
         poznamka = (payload.get("poznamka") or "").strip() or None
         prevod = context_note(payload)
+        # zadosti's last-page "už zaplaceno" checkbox — it has no concept of
+        # partial payment, so True means fully paid: the whole celkem.
+        zaplaceno_kc = celkem if payload.get("zaplaceno") else 0
         try:
             uid = ingest_service.pridat_ukon(
                 conn,
@@ -141,6 +149,7 @@ def intake(conn: sqlite3.Connection, payload: dict) -> dict:
                 rz=rz, vin=vin, orv=orv,
                 poznamka=poznamka,
                 prevod=prevod,
+                zaplaceno_kc=zaplaceno_kc,
                 zdroj="zadosti",
                 zpracoval=payload.get("profil"),  # who filled it out in zadosti
             )
