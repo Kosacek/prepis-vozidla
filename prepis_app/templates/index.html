@@ -1028,6 +1028,14 @@
               <input type="text" id="evidence_poznamka" maxlength="120" placeholder="volitelná poznámka k úkonu" onblur="elZkontroluj()">
             </div>
           </div>
+          <!-- Bottom-right of the card: check it here instead of opening the
+               dashboard separately to mark the úkon paid after the fact. -->
+          <div id="evidence-paid-row" style="display:flex;justify-content:flex-end;margin-top:14px;">
+            <label class="ev-toggle" for="evidence_zaplaceno">
+              <input type="checkbox" id="evidence_zaplaceno">
+              <span>ZAPLACENO</span>
+            </label>
+          </div>
           <p id="evidence-status" style="font-size:12px;color:var(--muted);margin:8px 0 0;"></p>
         </div>
       </div>
@@ -2738,7 +2746,9 @@ function evidencePriceUpdate() {
 function toggleEvidence() {
   const on = cb('evidence_log');
   document.getElementById('evidence-fields').style.opacity = on ? '1' : '.45';
-  ['evidence_firma', 'evidence_typ', 'evidence_cena'].forEach(id => {
+  const paidRow = document.getElementById('evidence-paid-row');
+  if (paidRow) paidRow.style.opacity = on ? '1' : '.45';
+  ['evidence_firma', 'evidence_typ', 'evidence_cena', 'evidence_zaplaceno'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = !on;
   });
 }
@@ -2810,6 +2820,7 @@ async function generatePDFs() {
     evidence_typ:        v('evidence_typ'),
     evidence_cena:       v('evidence_cena'),
     evidence_poznamka:   v('evidence_poznamka'),
+    evidence_zaplaceno:  cb('evidence_zaplaceno'),
   };
   data.zadost_id = zadostIdFor(data);
 
