@@ -105,3 +105,57 @@ def test_zero_amount_skips_ppd(client, tmp_path, monkeypatch):
     assert data["success"] is True
     assert "ppd" not in data            # opt-out
     assert data.get("zmeny")            # žádosti still produced
+
+
+# ── víc vozidel na jednom dokladu ────────────────────────────────────────────
+# Reálný případ: jeden PPD kryje víc aut najednou. Primární vozidlo je to ze
+# žádosti (registracni_znacka); "+ Přidat vozidlo" v UI přidává další SPZ do
+# ppd_extra_spz (čárkou oddělené), server je spojí do jednoho řádku.
+
+def test_ppd_joins_extra_spz_from_the_expander(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    r = client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789, 3EF1234"))
+    assert r.get_json()["success"] is True
+
+    import openpyxl
+    import ppd as ppdmod
+    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
+    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
+    assert row[5] == "1AB2345, 2CD6789, 3EF1234"   # Vozidlo column
+
+
+def test_ppd_ignores_blank_extra_entries(client, tmp_path, monkeypatch):
+    """Trailing commas / empty rows left in the UI must not leave gaps like
+    '1AB2345, , 3EF1234'."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    r = client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789, , "))
+    assert r.get_json()["success"] is True
+    import openpyxl
+    import ppd as ppdmod
+    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
+    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
+    assert row[5] == "1AB2345, 2CD6789"
+
+
+def test_ppd_works_with_no_extra_spz(client, tmp_path, monkeypatch):
+    """Default case (no expander touched) must be unchanged: just the one plate."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    r = client.post("/api/generate", json=_payload())
+    import openpyxl
+    import ppd as ppdmod
+    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
+    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
+    assert row[5] == "1AB2345"
+
+
+def test_ppd_slovy_endpoint(client):
+    r = client.get("/api/ppd-slovy?castka=1300")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "tisíc" in body["slovy"].lower()
+
+
+def test_ppd_slovy_endpoint_zero_and_bad_input(client):
+    assert client.get("/api/ppd-slovy?castka=0").get_json()["slovy"]
+    r = client.get("/api/ppd-slovy?castka=neplatne")
+    assert r.status_code == 400
