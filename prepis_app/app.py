@@ -42,7 +42,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.9.3"
+__version__ = "1.10.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1450,6 +1450,11 @@ def api_generate():
         if amount > 0:
             rz = data.get("registracni_znacka", "")
             vin = data.get("vin", "")
+            # "+ Přidat vozidlo" v náhledu dokladu: jeden PPD občas kryje víc
+            # aut najednou. Extra SPZ přijdou jako jeden čárkou oddělený
+            # řetězec; prázdné položky (rozklikl a nevyplnil) se zahodí.
+            extra_spz = [s.strip() for s in (data.get("ppd_extra_spz") or "").split(",")]
+            rz_full = ", ".join(p for p in [rz.strip()] + extra_spz if p)
             purpose = "Zastupování na MMB"  # fixed — ALSETA represents the client at Magistrát města Brna
             # Explicit payer (from the field) keeps only its explicit IČO (set
             # when a saved firm / ARES result was picked; empty for a hand-typed
@@ -1469,11 +1474,11 @@ def api_generate():
             today = datetime.now().strftime("%d.%m.%Y")
             number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
                 "date": today, "payer": payer, "payer_ico": payer_ico,
-                "amount": amount, "purpose": purpose, "vehicle": rz or vin,
+                "amount": amount, "purpose": purpose, "vehicle": rz_full or vin,
             })
             ppd_bytes = ppd.build_ppd_pdf({
                 "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
-                "payer_address": payer_address, "spz": rz, "vin": vin,
+                "payer_address": payer_address, "spz": rz_full, "vin": vin,
                 "amount": amount, "purpose": purpose,
             })
             # Name the PDF by receipt number (numbers never repeat) so the
@@ -1677,6 +1682,19 @@ def api_hledat():
         ppd.read_ppd_log(DATA_DIR),
         read_firmy(),
     ))
+
+
+@app.route("/api/ppd-slovy", methods=["GET"])
+def api_ppd_slovy():
+    """Amount → Czech words, for the live 'Náhled dokladu' preview.
+
+    A tiny endpoint instead of duplicating amount_to_words_cs in JS — one
+    place, one truth, and it's exactly what the printed PPD will say."""
+    try:
+        castka = int(float(request.args.get("castka", "0")))
+    except (TypeError, ValueError):
+        return jsonify({"error": "neplatná částka"}), 400
+    return jsonify({"slovy": ppd.amount_to_words_cs(max(0, castka))})
 
 
 @app.route("/api/ppd-list", methods=["GET"])

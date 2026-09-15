@@ -137,3 +137,18 @@ def test_evidence_paid_checkbox_is_wired_end_to_end():
     blok = html[html.index("function toggleEvidence()"):][:500]
     assert "evidence_zaplaceno" in blok, \
         "unchecking 'ZAPSAT ÚKON DO EVIDENCE' must also disable the paid checkbox"
+
+
+def test_ppd_nahled_a_extra_vozidla_jsou_zapojena():
+    """Náhled dokladu + „Přidat vozidlo" (2026-09-15): musí existovat, musí
+    dorazit do generate payloadu jako ppd_extra_spz, a nový castka field musí
+    mít placeholder „0", ne skutečnou hodnotu 0 (kterou by musel mazat)."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert 'id="ppd-extra-vozidla"' in html
+    assert 'onclick="ppdPridatVozidlo()"' in html
+    assert "function ppdNahledUpdate()" in html
+    assert "ppd_extra_spz:       ppdExtraSpzList().join(', ')" in html
+    assert 'id="ppd_castka"' in html
+    castka_tag = html[html.index('id="ppd_castka"') - 40: html.index('id="ppd_castka"') + 150]
+    assert 'placeholder="0"' in castka_tag
+    assert 'value="0"' not in castka_tag

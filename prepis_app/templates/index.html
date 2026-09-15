@@ -988,12 +988,12 @@
           <div class="form-grid">
             <div class="field">
               <label>Částka za vyřízení (Kč)</label>
-              <input type="number" id="ppd_castka" value="0" min="0" step="50" inputmode="numeric">
+              <input type="number" id="ppd_castka" class="no-uc" min="0" step="50" inputmode="numeric" placeholder="0" oninput="ppdNahledScheduled()">
             </div>
             <div class="field">
               <label>Přijato od</label>
               <div style="position:relative">
-                <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest()" style="width:100%">
+                <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest();ppdNahledScheduled()" style="width:100%">
                 <input type="hidden" id="ppd_prijato_ico">
                 <input type="hidden" id="ppd_prijato_adresa">
                 <div class="firm-dropdown" id="ppd-payer-firms"></div>
@@ -1001,6 +1001,20 @@
             </div>
           </div>
           <p style="font-size:12px;color:var(--muted);margin:8px 0 0;">Doklad se vystaví jen když zadáš částku (např. 1300). Při 0 se nevystaví.</p>
+          <!-- Jeden PPD občas kryje víc aut najednou. Rozbalení ukáže přesně
+               to, co bude na dokladu (v gen-side je jen souhrn žádosti, ne
+               dokladu), a tady se dá přidat další SPZ bez odchodu z kroku. -->
+          <details class="ppd-nahled" style="margin-top:12px;" ontoggle="if(this.open)ppdNahledUpdate()">
+            <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 4px;user-select:none">
+              <svg class="ico"><use href="#i-receipt"></use></svg> Náhled dokladu a další vozidla
+            </summary>
+            <div id="ppd-preview-box" style="background:#fafbfc;border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-top:8px;font-size:13.5px;line-height:1.7;"></div>
+            <div id="ppd-extra-vozidla" style="margin-top:10px;"></div>
+            <button type="button" onclick="ppdPridatVozidlo()"
+                    style="margin-top:2px;padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+              <svg class="ico" style="width:14px;height:14px;"><use href="#i-plus-circle"></use></svg> Přidat vozidlo
+            </button>
+          </details>
         </div>
         <div class="card" id="evidence-card">
           <div class="evidence-head">
@@ -1400,6 +1414,7 @@ function navBack() {
     document.getElementById('nav-next').disabled = false;
     document.getElementById('nav-back').textContent = '← Zpět';
     buildSummary();
+    ppdNahledUpdate();
     return;
   }
   if (flowIdx <= 0) return;
@@ -1463,7 +1478,7 @@ function activatePanel(n) {
   // Plná moc má vlastní tlačítko uvnitř karty — generovat žádost tu nedává smysl.
   document.getElementById('nav-next').style.display = (n === 6) ? 'none' : '';
 
-  if (n === 5) buildSummary();
+  if (n === 5) { buildSummary(); ppdNahledUpdate(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(() => {
     // Na generovací stránce se firma, typ i cena doplní samy — jediné, co se
@@ -1688,6 +1703,7 @@ function ppdPayerPick(name, ico, adresa) {
   document.getElementById('ppd_prijato_ico').value = ico || '';
   document.getElementById('ppd_prijato_adresa').value = adresa || '';
   document.getElementById('ppd-payer-firms').classList.remove('open');
+  ppdNahledScheduled();
 }
 async function ppdPayerAres(ico) {
   try {
@@ -1701,6 +1717,66 @@ async function ppdPayerAres(ico) {
       dd.classList.add('open');
     }
   } catch (e) { /* ignore — ARES optional */ }
+}
+
+// ── Náhled dokladu (PPD) + víc vozidel na jednom dokladu ────────────────────
+// "Slovy" se počítá na serveru (ppd.amount_to_words_cs) — nedává smysl mít
+// česká číslovky rozepsané ještě jednou v JS, jen aby se to jednou rozešlo.
+let _ppdPreviewTimer = null;
+let _ppdPreviewSeq = 0;
+
+function ppdNahledScheduled() {
+  if (_ppdPreviewTimer) clearTimeout(_ppdPreviewTimer);
+  _ppdPreviewTimer = setTimeout(ppdNahledUpdate, 250);
+}
+
+function ppdExtraSpzList() {
+  return [...document.querySelectorAll('.ppd-extra-spz')].map(i => i.value.trim()).filter(Boolean);
+}
+
+function ppdPridatVozidlo() {
+  const box = document.getElementById('ppd-extra-vozidla');
+  const row = document.createElement('div');
+  row.className = 'ppd-extra-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+  row.innerHTML = `<input type="text" class="ppd-extra-spz" placeholder="další SPZ, např. 2CD6789" style="flex:1;">
+    <button type="button" title="Odebrat" onclick="this.closest('.ppd-extra-row').remove();ppdNahledScheduled()"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;display:flex;">
+      <svg class="ico"><use href="#i-trash"></use></svg>
+    </button>`;
+  box.appendChild(row);
+  row.querySelector('input').addEventListener('input', ppdNahledScheduled);
+  row.querySelector('input').focus();
+  ppdNahledUpdate();
+}
+
+async function ppdNahledUpdate() {
+  const box = document.getElementById('ppd-preview-box');
+  if (!box) return;
+  const mySeq = ++_ppdPreviewSeq;   // zahodit odpověď, kterou předběhl novější dotaz
+  const castka = parseInt(v('ppd_castka') || '0', 10) || 0;
+  const prijato = (v('ppd_prijato_od') || '').trim();
+  const hlavniSpz = (v('registracni_znacka') || '').trim();
+  const spzList = [hlavniSpz, ...ppdExtraSpzList()].filter(Boolean);
+
+  let slovy = '';
+  if (castka > 0) {
+    try {
+      const r = await fetch('/api/ppd-slovy?castka=' + castka).then(x => x.json());
+      if (mySeq !== _ppdPreviewSeq) return;   // psalo se dál, tohle už neplatí
+      slovy = r.slovy || '';
+    } catch (e) { /* náhled bez slovního vyjádření, nic se tím nerozbije */ }
+  }
+  if (mySeq !== _ppdPreviewSeq) return;
+
+  const radek = (k, val) => `<div><b>${k}:</b> ${val}</div>`;
+  box.innerHTML = [
+    radek('Přijato od', prijato ? esc(prijato) : '<i style="color:var(--muted)">doplní se podle kupujícího</i>'),
+    radek('SPZ', spzList.length ? esc(spzList.join(', ')) : '<i style="color:var(--muted)">—</i>'),
+    radek('Částka', castka > 0 ? castka + ' Kč' : '<i style="color:var(--muted)">doklad se nevystaví</i>'),
+    slovy ? radek('Slovy', esc(slovy)) : '',
+    radek('Účel platby', 'Zastupování na MMB'),
+  ].join('');
 }
 
 // ── Firma modal (Správa firem + plné moci) ───────────────────────────────────
@@ -2814,6 +2890,7 @@ async function generatePDFs() {
     ppd_prijato_od:      v('ppd_prijato_od'),
     ppd_prijato_ico:     v('ppd_prijato_ico'),
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
+    ppd_extra_spz:       ppdExtraSpzList().join(', '),
     profil:              (window.getProfil ? window.getProfil() : ''),
     // Evidence úkonu (evidence.spznaklic.cz) — stable id + the explicit choice.
     zadost_id:           '',            // filled in below from the identity fields
