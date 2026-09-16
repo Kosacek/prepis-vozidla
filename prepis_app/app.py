@@ -12,7 +12,8 @@ load_dotenv(os.path.join(_base, '.env'))
 import io
 import base64
 from PIL import Image
-from datetime import datetime
+from datetime import datetime, timedelta
+from datetime import time as _time_of_day
 from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
@@ -42,7 +43,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.10.1"
+__version__ = "1.11.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -564,15 +565,35 @@ def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
         return pdf_bytes
 
 
-def _next_working_day() -> str:
-    from datetime import timedelta
-    d = datetime.now()
-    d += timedelta(days=1)
-    # If landed on Saturday (5) go to Monday; if Sunday (6) go to Monday
-    if d.weekday() == 5:
-        d += timedelta(days=2)
-    elif d.weekday() == 6:
-        d += timedelta(days=1)
+def _prepazkova_hodina(vaha_den: int) -> _time_of_day | None:
+    """Kdy zavírá přepážka registru vozidel na Magistrátu města Brna — má
+    kratší úřední hodiny než celý úřad. None = zavřeno celý den (víkend)."""
+    if vaha_den in (0, 2):        # pondělí, středa
+        return _time_of_day(17, 0)
+    if vaha_den in (1, 3, 4):     # úterý, čtvrtek, pátek — jen dopoledne
+        return _time_of_day(12, 0)
+    return None                   # sobota, neděle
+
+
+def _next_working_day(now: datetime | None = None) -> str:
+    """Datum na tiskopis: DNEŠEK, když se žádost ještě stihne odnést na
+    přepážku; jinak nejbližší den, kdy má přepážka otevřeno.
+
+    Dřív to bylo vždycky "zítra" bez ohledu na čas — problém, když se žádosti
+    píšou ráno pro odpolední návštěvu úřadu (reálná stížnost 2026-09-16):
+    appka dala pozítří místo zítřka, i když se to ten den v klidu stihlo.
+    """
+    now = now or datetime.now()
+    zavira = _prepazkova_hodina(now.weekday())
+    if zavira is not None and now.time() < zavira:
+        d = now
+    else:
+        d = now + timedelta(days=1)
+        # Přistane-li na sobotě/neděli, posunout na pondělí.
+        if d.weekday() == 5:
+            d += timedelta(days=2)
+        elif d.weekday() == 6:
+            d += timedelta(days=1)
     return d.strftime("%d.%m.%Y")
 
 def build_zmeny_fields(data: dict) -> dict:
@@ -1419,15 +1440,35 @@ def api_generate():
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/{name}"
     elif mode == "3rz":
-        # Žádost o vydání tabulky s registrační značkou — jeden formulář, žádné
-        # ID overlaye (na tomhle tiskopisu není kolonka na číslo dokladu).
+        # ID pro úřad chybělo úplně — sbíralo se (panel „Vlastník" je stejný
+        # jako u ostatních režimů), jen se sem nikdy nedokreslilo (reálná
+        # stížnost 2026-09-16). Souřadnice změřené proti fill_2/fill_6 na
+        # 3rz.pdf (bottom-origin y = pata pole + 3, stejná konvence jako u
+        # zmeny.pdf/zapis.pdf výš).
         trz_bytes = fill_pdf(PDF_3RZ, build_3rz_fields(data))
+        trz_overlays = []
+        if _id_text(data.get("novy_id")):
+            trz_overlays.append((0, 554, 631, _id_text(data["novy_id"])))
+        if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
+            trz_overlays.append((0, 554, 422, _id_text(data["novy_prov_id"])))
+        if trz_overlays:
+            trz_bytes = add_id_overlay(trz_bytes, trz_overlays)
         trz_bytes = add_vz_fields(trz_bytes, "3rz")
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
     elif mode == "vyvoz":
+        # Stejná chyba, stejná oprava jako u 3rz výš — souřadnice změřené
+        # proti fill_2/fill_7 na vyvoz.pdf (provozovatel jméno je tu fill_7,
+        # ne fill_6 jako na 3rz.pdf — jiný formulář, jiné číslování polí).
         vyv_bytes = fill_pdf(PDF_VYVOZ, build_vyvoz_fields(data))
+        vyv_overlays = []
+        if _id_text(data.get("novy_id")):
+            vyv_overlays.append((0, 554, 621, _id_text(data["novy_id"])))
+        if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
+            vyv_overlays.append((0, 554, 397, _id_text(data["novy_prov_id"])))
+        if vyv_overlays:
+            vyv_bytes = add_id_overlay(vyv_bytes, vyv_overlays)
         vyv_bytes = add_vz_fields(vyv_bytes, "vyvoz")
         name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)

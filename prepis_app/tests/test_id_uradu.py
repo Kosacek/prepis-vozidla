@@ -7,6 +7,7 @@ Ustřižené ID na žádosti pro registr je horší chyba než dlouhý řetěz �
 až na přepážce.
 """
 import io
+import os
 import re
 import pathlib
 
@@ -70,3 +71,81 @@ def test_long_id_shrinks_instead_of_running_off():
         size -= 0.5
     assert stringWidth(text, "Helvetica-Bold", size) <= 250
     assert size >= 7, "písmo by kleslo pod čitelnost"
+
+
+# ── 3RZ a Vývoz — ID pro úřad úplně chybí ────────────────────────────────────
+# Reálná stížnost: u třetí RZ a u vývozu se ID firmy na papír nedostane vůbec.
+# Panel „Vlastník" (kde se ID píše) sdílí appka i s těmito dvěma režimy, takže
+# se to sesbírá — jenže /api/generate pro ně add_id_overlay nikdy nezavolal.
+def _over_client(client, tmp_path, monkeypatch):
+    import app as appmod
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    os.makedirs(os.path.join(str(tmp_path), "output"), exist_ok=True)
+
+
+def _text_of(tmp_path, url):
+    fname = url.split("/")[-1]
+    with open(os.path.join(str(tmp_path), "output", fname), "rb") as f:
+        return pypdf.PdfReader(f).pages[0].extract_text() or ""
+
+
+def test_3rz_prints_the_owner_id(client, tmp_path, monkeypatch):
+    _over_client(client, tmp_path, monkeypatch)
+    r = client.post("/api/generate", json={
+        "mode": "3rz", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "novy_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O.", "novy_id": "1599800894",
+    })
+    body = r.get_json()
+    assert body["success"] is True, body
+    assert "ID: 1599800894" in _text_of(tmp_path, body["3rz"])
+
+
+def test_3rz_prints_the_operator_id_when_jiny(client, tmp_path, monkeypatch):
+    _over_client(client, tmp_path, monkeypatch)
+    r = client.post("/api/generate", json={
+        "mode": "3rz", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "novy_jmeno": "JAN NOVÁK", "novy_id": "1111111111",
+        "novy_prov_jiny": True, "novy_prov_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O.",
+        "novy_prov_id": "2222222222",
+    })
+    text = _text_of(tmp_path, r.get_json()["3rz"])
+    assert "ID: 1111111111" in text
+    assert "ID: 2222222222" in text
+
+
+def test_3rz_skips_operator_id_when_not_jiny(client, tmp_path, monkeypatch):
+    """Provozovatel je prázdný, když je totožný s vlastníkem — ID by tam
+    plavalo nad prázdným polem."""
+    _over_client(client, tmp_path, monkeypatch)
+    r = client.post("/api/generate", json={
+        "mode": "3rz", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "novy_jmeno": "JAN NOVÁK", "novy_id": "1111111111",
+        "novy_prov_id": "2222222222",   # zadané, ale jiny provozovatel NENÍ zaškrtnutý
+    })
+    text = _text_of(tmp_path, r.get_json()["3rz"])
+    assert "ID: 1111111111" in text
+    assert "2222222222" not in text
+
+
+def test_vyvoz_prints_the_owner_id(client, tmp_path, monkeypatch):
+    _over_client(client, tmp_path, monkeypatch)
+    r = client.post("/api/generate", json={
+        "mode": "vyvoz", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "novy_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O.", "novy_id": "1599800894",
+    })
+    body = r.get_json()
+    assert body["success"] is True, body
+    assert "ID: 1599800894" in _text_of(tmp_path, body["vyvoz"])
+
+
+def test_vyvoz_prints_the_operator_id_when_jiny(client, tmp_path, monkeypatch):
+    _over_client(client, tmp_path, monkeypatch)
+    r = client.post("/api/generate", json={
+        "mode": "vyvoz", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "novy_jmeno": "JAN NOVÁK", "novy_id": "1111111111",
+        "novy_prov_jiny": True, "novy_prov_jmeno": "TOYOTA FINANCIAL SERVICES CZECH S.R.O.",
+        "novy_prov_id": "2222222222",
+    })
+    text = _text_of(tmp_path, r.get_json()["vyvoz"])
+    assert "ID: 1111111111" in text
+    assert "ID: 2222222222" in text
