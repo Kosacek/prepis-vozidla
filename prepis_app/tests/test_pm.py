@@ -118,12 +118,18 @@ def test_petrova_sablona_kolonky_na_vozidlo_natistene_nema():
 
 
 def test_date_is_today_not_the_zadost_date():
-    """Žádosti se post-datují na nejbližší pracovní den, plná moc se ale
-    podepisuje ten den, kdy ji vyplňuješ."""
+    """Žádosti se post-datují na nejbližší den, kdy má přepážka otevřeno;
+    plná moc se ale podepisuje ten den, kdy ji vyplňuješ — i když žádost si
+    sama dá zítřek (po zavírací hodině přepážky).
+
+    23:59 je po zavírací hodině přepážky kterýkoliv den v týdnu (nejpozději
+    zavírá v 17:00, o víkendu má zavřeno celý den) — takže "_next_working_day
+    v 23:59 dnes" je vždycky zítřek nebo později, ať test běží kdykoliv."""
     from datetime import datetime
     fields, _ = _fill("David", {"jmeno": "X", "rc_ic": "1", "adresa": "Y"})
-    assert fields[pm.POLE["datum"]] == datetime.now().strftime("%d.%m.%Y")
-    assert fields[pm.POLE["datum"]] != A._next_working_day()
+    dnes = datetime.now()
+    assert fields[pm.POLE["datum"]] == dnes.strftime("%d.%m.%Y")
+    assert fields[pm.POLE["datum"]] != A._next_working_day(dnes.replace(hour=23, minute=59))
 
 
 def test_unknown_profil_has_no_template():
