@@ -1,0 +1,24 @@
+{# Payment toggle for the per-firm "Tento měsíc" list (ukony_entry.html) — the
+   badge doubles as the cancel button. Expects u.id / u.stav_platby /
+   u.zaplaceno_kc and back_url. Extracted so the AJAX pay/unpay response
+   (routes/ukony.py mark_paid) can re-render the exact same markup the page
+   renders on load — one source of truth, no drift. #}
+{% if u.stav_platby == 'zaplaceno' %}
+<form method="post" action="/ukony/{{ u.id }}/zaplaceno">
+  <input type="hidden" name="castka" value="0">
+  <input type="hidden" name="back" value="{{ back_url }}">
+  <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
+</form>
+{% elif u.stav_platby == 'castecne' %}
+<form method="post" action="/ukony/{{ u.id }}/zaplaceno"
+  onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
+  <input type="hidden" name="castka" value="0">
+  <input type="hidden" name="back" value="{{ back_url }}">
+  <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
+</form>
+{% else %}
+<form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
+  <input type="hidden" name="back" value="{{ back_url }}">
+  <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
+</form>
+{% endif %}

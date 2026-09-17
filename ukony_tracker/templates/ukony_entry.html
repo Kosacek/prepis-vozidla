@@ -101,27 +101,7 @@
       </a>
       <span class="row-actions actions">
         {# Payment toggle: the badge doubles as the cancel button (existing UX). #}
-        <span class="stav-slot">
-          {% if u.stav_platby == 'zaplaceno' %}
-          <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
-            <input type="hidden" name="castka" value="0">
-            <input type="hidden" name="back" value="{{ back_url }}">
-            <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
-          </form>
-          {% elif u.stav_platby == 'castecne' %}
-          <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
-            onsubmit="return confirm('Zrušit částečnou platbu {{ u.zaplaceno_kc|int }} Kč?')">
-            <input type="hidden" name="castka" value="0">
-            <input type="hidden" name="back" value="{{ back_url }}">
-            <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
-          </form>
-          {% else %}
-          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
-            <input type="hidden" name="back" value="{{ back_url }}">
-            <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
-          </form>
-          {% endif %}
-        </span>
+        <span class="stav-slot">{% include "_stav_slot.html" %}</span>
         <form method="post" action="/ukony/{{ u.id }}/smazat"
           onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
           <input type="hidden" name="back" value="{{ back_url }}">
@@ -137,7 +117,7 @@
 {% endif %}
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=4"></script>
 
 <script>
 // Přepnutí firmy = přenačtení stránky (ceny i měsíční seznam jsou per-firma),

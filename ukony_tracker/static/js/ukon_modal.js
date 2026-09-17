@@ -108,6 +108,86 @@
       });
   });
 
+  // Pay / částečná platba / smazat BEZ přenačtení — na /ukony/vse smaže plný
+  // reload rozepsané hledání v poli i scroll pozici při KAŽDÉ takové akci,
+  // takže je uživatel po každém "✓ zapl." musel zadávat filtr i scroll znovu.
+  // Delegace na document — pokrývá i řádky, které tu ještě nebyly při načtení
+  // stránky (živé hledání je bere z rows[] zachyceného na startu, ale nové
+  // submity na nich zachytí tenhle listener stejně, protože je na documentu).
+  function applyPayResult(item, d) {
+    if (!item) { window.location.reload(); return; }
+    var payEl = item.querySelector(".recent-pay");
+    if (payEl && d.pay_badge_html != null) payEl.innerHTML = d.pay_badge_html;
+    var slotEl = item.querySelector(".stav-slot");
+    if (slotEl && d.stav_slot_html != null) slotEl.innerHTML = d.stav_slot_html;
+    var details = item.querySelector("details.partial-pay");
+    if (details) details.open = false;
+    var flashEl = item.querySelector("a.recent-row") || item;
+    flashEl.classList.add("row-saved");
+    setTimeout(function () { flashEl.classList.remove("row-saved"); }, 1200);
+  }
+
+  function removeItem(item) {
+    if (!item) { window.location.reload(); return; }
+    // /ukony/vse drží si vlastní rows[] pro živé hledání a součet — bez
+    // vyřazení by smazaný řádek strašil v počtu i součtu, dokud se nehledá.
+    if (window.ukonyRemoveRow) window.ukonyRemoveRow(item);
+    item.style.transition = "opacity .15s ease";
+    item.style.opacity = "0";
+    setTimeout(function () { item.remove(); }, 160);
+  }
+
+  document.addEventListener("submit", function (e) {
+    var form = e.target.closest("form");
+    if (!form) return;
+    var action = form.getAttribute("action") || "";
+
+    var mPay = /\/ukony\/(\d+)\/zaplaceno$/.exec(action);
+    if (mPay) {
+      e.preventDefault();
+      var item = form.closest(".ukony-item");
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+      fetch(action, {
+        method: "POST", body: new FormData(form),
+        headers: { "X-Requested-With": "fetch" }
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.d.ok) throw new Error("chyba");
+          applyPayResult(item, res.d);
+          // firma-výběr si drží součet měsíce v cache — platba ho mění
+          document.dispatchEvent(new CustomEvent("ukon:saved", { detail: { id: mPay[1] } }));
+        })
+        .catch(function () {
+          // cokoliv nečekaného → klasické odeslání, ať se platba nikdy neztratí
+          if (btn) btn.disabled = false;
+          form.submit();
+        });
+      return;
+    }
+
+    var mDel = /\/ukony\/(\d+)\/smazat$/.exec(action);
+    if (mDel) {
+      // Smazat má inline onsubmit="return confirm(...)" — pokud uživatel dal
+      // Zrušit, ten handler už submit zamítl (e.defaultPrevented). Nic nedělej.
+      if (e.defaultPrevented) return;
+      e.preventDefault();
+      var item2 = form.closest(".ukony-item");
+      fetch(action, {
+        method: "POST", body: new FormData(form),
+        headers: { "X-Requested-With": "fetch" }
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.d.ok) throw new Error("chyba");
+          removeItem(item2);
+          document.dispatchEvent(new CustomEvent("ukon:saved", { detail: { id: mDel[1] } }));
+        })
+        .catch(function () { form.submit(); });
+    }
+  });
+
   // Close — backdrop click, the × button, or the form's "Zpět" link.
   modal.addEventListener("click", function (e) {
     if (e.target === modal || e.target.closest("[data-modal-close]")) {

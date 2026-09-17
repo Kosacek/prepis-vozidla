@@ -408,3 +408,66 @@ def test_edit_save_without_ajax_still_redirects(client_fid):
                      "back": "/ukony/vse"})
     assert r.status_code in (302, 303)
     assert r.headers["Location"].endswith("/ukony/vse")
+
+
+# ── platba a smazání bez přenačtení stránky ───────────────────────────────────
+# Stejný důvod jako u uložení z modalu: /ukony/vse drží rozepsané hledání a
+# scroll pozici jen v prohlížeči, takže plný redirect po "✓ zapl." je smazal.
+
+def test_mark_paid_ajax_returns_both_fragments(client_fid):
+    """Fetch na /zaplaceno vrátí oba fragmenty (badge pro /ukony/vse, tlačítko
+    pro per-firm stránku) místo redirectu — klient si vezme, který v řádku má."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    r = c.post(f"/ukony/{uid}/zaplaceno", data={"back": "/ukony/vse"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True and d["stav_platby"] == "zaplaceno" and d["zaplaceno_kc"] == 1300
+    assert 'class="badge ok"' in d["pay_badge_html"]
+    assert "zapl. ✕" in d["stav_slot_html"] and f"/ukony/{uid}/zaplaceno" in d["stav_slot_html"]
+    with c.application.app_context():
+        assert ukony_repo.get(db.get_db(), uid)["stav_platby"] == "zaplaceno"
+
+
+def test_mark_paid_ajax_partial(client_fid):
+    """Částečná platba přes fetch vrátí fragmenty se stavem 'castecne'."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid, celkem=1300)
+    r = c.post(f"/ukony/{uid}/zaplaceno", data={"castka": "500", "back": "/ukony/vse"},
+               headers={"X-Requested-With": "fetch"})
+    d = r.get_json()
+    assert d["ok"] is True and d["stav_platby"] == "castecne" and d["zaplaceno_kc"] == 500
+    assert 'class="badge warn"' in d["pay_badge_html"]
+    assert "500" in d["stav_slot_html"]
+
+
+def test_mark_paid_without_ajax_still_redirects(client_fid):
+    """Bez JS zůstává původní chování — redirect na `back`."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    r = c.post(f"/ukony/{uid}/zaplaceno", data={"back": "/ukony/vse"})
+    assert r.status_code in (302, 303)
+    assert r.headers["Location"].endswith("/ukony/vse")
+
+
+def test_delete_ajax_returns_json_and_removes_row(client_fid):
+    """Fetch na /smazat vrátí {ok:true} místo redirectu a úkon zmizí z DB —
+    klient pak sám odstraní řádek z DOMu."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    r = c.post(f"/ukony/{uid}/smazat", data={"back": "/ukony/vse"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    assert r.get_json() == {"ok": True, "id": uid}
+    with c.application.app_context():
+        assert ukony_repo.get(db.get_db(), uid) is None
+
+
+def test_delete_without_ajax_still_redirects(client_fid):
+    """Bez JS zůstává původní chování — redirect na `back`."""
+    c, fid = client_fid
+    uid = _seed_ukon(c.application, fid)
+    r = c.post(f"/ukony/{uid}/smazat", data={"back": "/ukony/vse"})
+    assert r.status_code in (302, 303)
+    assert r.headers["Location"].endswith("/ukony/vse")

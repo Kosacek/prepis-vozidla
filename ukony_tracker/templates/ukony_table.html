@@ -64,12 +64,7 @@
            the notes start at the same x. User's poznámka FIRST (it must survive
            the ellipsis), then the auto převod arrow. #}
         <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
-        <span class="recent-pay">
-          {# nezaplaceno is the normal state (invoiced monthly) — badge only the
-             exceptions, exactly like the dashboard. #}
-          {% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>
-          {% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|kc }}</span>{% endif %}
-        </span>
+        <span class="recent-pay">{% include "_pay_badge.html" %}</span>
         <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
         <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
       </a>
@@ -104,7 +99,7 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=4"></script>
 
 <script>
 (function () {
@@ -135,6 +130,13 @@
   window.ukonySyncRow = function (item) {
     item._s = fold(item.getAttribute('data-search'));
     item._kc = parseInt(item.getAttribute('data-kc'), 10) || 0;
+    apply();
+  };
+  // Smazání bez reloadu odebere řádek z DOMu — musí zmizet i odtud, jinak by
+  // ho hledání a součet dál počítaly, dokud se stránka příště nenačte.
+  window.ukonyRemoveRow = function (item) {
+    var i = rows.indexOf(item);
+    if (i >= 0) rows.splice(i, 1);
     apply();
   };
 })();
