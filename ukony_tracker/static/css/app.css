@@ -248,10 +248,10 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: var(--sp-4) var(--sp-5);
+  padding: var(--sp-5);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
 }
 
 .kpi__label {
@@ -921,15 +921,18 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
 /* KPI value and label (used in .kpi blocks) */
 .kpi-v {
-  font-size: 1.9rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--ink);
-  line-height: 1.1;
+  line-height: 1.05;
+  /* Digits change every frame during the count-up — tabular widths keep the
+     card from jittering as narrower/wider glyphs (1 vs 8) swap in. */
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi-l {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1004,11 +1007,25 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
    shrinks both cards' internals (bar rows, doughnut legend) to fit. */
 
 .kpi-sub {
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The money figure is the second thing your eye should land on after the
+   count — give it the accent color and real weight instead of blending into
+   the muted sub-line like the comparison text next to it. */
+.kpi-money {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.kpi-compare {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 a.kpi-link {

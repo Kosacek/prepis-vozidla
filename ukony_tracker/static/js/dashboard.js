@@ -9,6 +9,29 @@
   // so a firm has the same color in the chart and the table.
   var FIRMA_COLORS = window.FIRMA_COLORS || {};
 
+  // KPI count-up — the four hero numbers (and their blue Kč figures) animate
+  // up from 0 on load instead of just appearing. Server renders the real
+  // value into the element up front (so it's correct with JS off or if this
+  // throws), and this only takes over once it's confirmed the DOM is ready.
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function formatKc(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  function animateCount(el) {
+    var target = parseInt(el.getAttribute("data-count"), 10);
+    if (isNaN(target)) return;
+    if (REDUCE_MOTION) { el.textContent = formatKc(target); return; }
+    var duration = 800, start = null;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / duration);
+      var eased = 1 - Math.pow(1 - p, 3);  // ease-out cubic — fast start, gentle landing
+      el.textContent = formatKc(Math.round(target * eased));
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    el.textContent = "0";
+    requestAnimationFrame(frame);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".kpis [data-count]"), animateCount);
+
   // Chart.js keeps the canvas aspect ratio from its width/height attributes
   // (300x110 => ~2.7). On a phone the container is ~300px wide, so the chart
   // collapsed to ~110px tall — with 7+ firm lines it was unreadable. Give the
