@@ -921,11 +921,14 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
 /* KPI value and label (used in .kpi blocks) */
 .kpi-v {
-  font-size: 2.75rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 2.25rem;
+  /* 700, not 800 — Segoe UI (the Windows leg of --font) has no real 800 cut,
+     so the browser faked it with synthetic bold. That's the "AI font" look —
+     just render the same weight the rest of the page already uses for bold. */
+  font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--ink);
-  line-height: 1.05;
+  line-height: 1.1;
   /* Digits change every frame during the count-up — tabular widths keep the
      card from jittering as narrower/wider glyphs (1 vs 8) swap in. */
   font-variant-numeric: tabular-nums;
