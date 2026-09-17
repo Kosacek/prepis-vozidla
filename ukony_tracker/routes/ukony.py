@@ -255,6 +255,11 @@ def edit_save(uid):
 def delete(uid):
     conn = db.get_db()
     ukony_repo.delete(conn, uid)
+    # AJAX branch: /ukony/vse's search box and scroll position live entirely in
+    # the browser, so a full-page redirect here was wiping both on every
+    # delete — the row just disappears from the DOM instead.
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify(ok=True, id=uid)
     flash("Úkon smazán.", "success")
     return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))
 
@@ -273,5 +278,18 @@ def mark_paid(uid):
     z = max(0.0, min(z, float(u["celkem"])))
     stav = ing.derive_stav(float(u["celkem"]), z)
     ukony_repo.update(conn, uid, zaplaceno_kc=z, stav_platby=stav)
+    # AJAX branch: same reasoning as delete — re-render just the two small
+    # fragments that can show a payment state (_pay_badge.html on /ukony/vse,
+    # _stav_slot.html on the per-firm page) instead of a full-page redirect.
+    # Both are cheap to render, and the client applies whichever is present in
+    # the row it's updating, so this one endpoint serves both page layouts.
+    if request.headers.get("X-Requested-With") == "fetch":
+        back_url = _safe_back(request.form.get("back")) or ""
+        row = {"id": uid, "stav_platby": stav, "zaplaceno_kc": z}
+        return jsonify(
+            ok=True, id=uid, stav_platby=stav, zaplaceno_kc=z,
+            pay_badge_html=render_template("_pay_badge.html", u=row),
+            stav_slot_html=render_template("_stav_slot.html", u=row, back_url=back_url),
+        )
     flash("Platba zaznamenána.", "success")
     return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))
