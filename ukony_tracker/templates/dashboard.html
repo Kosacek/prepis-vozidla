@@ -15,24 +15,24 @@
 
 <div class="kpis">
   <div class="kpi">
-    <div class="kpi-v">{{ dnes.pocet }}</div>
+    <div class="kpi-v" data-count="{{ dnes.pocet }}">{{ dnes.pocet }}</div>
     <div class="kpi-l">Úkonů dnes</div>
-    <div class="kpi-sub">{{ dnes.trzby|kc }} Kč</div>
+    <div class="kpi-sub"><span class="kpi-money" data-count="{{ dnes.trzby|round|int }}">{{ dnes.trzby|kc }}</span> Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ tyden.pocet }}</div>
+    <div class="kpi-v" data-count="{{ tyden.pocet }}">{{ tyden.pocet }}</div>
     <div class="kpi-l">Tento týden</div>
-    <div class="kpi-sub">{{ tyden.trzby|kc }} Kč</div>
+    <div class="kpi-sub"><span class="kpi-money" data-count="{{ tyden.trzby|round|int }}">{{ tyden.trzby|kc }}</span> Kč</div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ mesic.pocet }}</div>
+    <div class="kpi-v" data-count="{{ mesic.pocet }}">{{ mesic.pocet }}</div>
     <div class="kpi-l">Tento měsíc</div>
-    <div class="kpi-sub">{{ mesic.trzby|kc }} Kč · minulý měsíc {{ minuly_mesic.pocet }}</div>
+    <div class="kpi-sub"><span class="kpi-money" data-count="{{ mesic.trzby|round|int }}">{{ mesic.trzby|kc }}</span> Kč <span class="kpi-compare">· minulý měsíc {{ minuly_mesic.pocet }}</span></div>
   </div>
   <div class="kpi">
-    <div class="kpi-v">{{ rok.pocet }}</div>
+    <div class="kpi-v" data-count="{{ rok.pocet }}">{{ rok.pocet }}</div>
     <div class="kpi-l">Letos {{ aktualni_rok }}</div>
-    <div class="kpi-sub">{{ rok.trzby|kc }} Kč</div>
+    <div class="kpi-sub"><span class="kpi-money" data-count="{{ rok.trzby|round|int }}">{{ rok.trzby|kc }}</span> Kč</div>
   </div>
 </div>
 
@@ -88,6 +88,6 @@
   window.PER_TYP = {{ per_typ_chart|tojson }};
   window.FIRMA_COLORS = {{ firma_colors|tojson }};
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=17"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=18"></script>
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=4"></script>
 {% endblock %}
