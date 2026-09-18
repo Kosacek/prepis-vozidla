@@ -57,7 +57,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.13.0"
+__version__ = "1.14.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1202,7 +1202,7 @@ _KOD_OKNO_S = 600            # 10 minut
 _kod_chyby: dict[str, list[float]] = {}
 _kod_zamek = threading.Lock()
 
-_KOD_CESTA = re.compile(r"^/\d{4}$")
+_KOD_CESTA = re.compile(r"^/\d{4}(/\d+)?$")
 
 
 def _JE_SDILECI_KOD(path: str) -> bool:
@@ -1447,6 +1447,10 @@ def api_generate():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     result = {"success": True}
+    # Co všechno půjde otevřít přes sdílecí odkaz. Plní se postupně, jak
+    # dokumenty vznikají; kód se razí až na konci, aby jeden odkaz pokryl
+    # celý balík (žádost + plné moci + doklad), ne jen tu první žádost.
+    sdilene: list[dict] = []
 
     # Build ID overlays — right-aligned to x=554, y = bottom of name field + 3
     # zmeny.pdf: page0 původní(y=628), dos_prov(y=420); page1 nový(y=545), novy_prov(y=350)
@@ -1479,7 +1483,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmeny", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmeny_bytes)
         result["zmeny"] = f"/download/{name}"
-        result["zmeny_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
+        sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Žádost o změnu vlastníka"})
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
@@ -1493,7 +1497,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmena", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/{name}"
-        result["zmena_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
+        sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Změna technických údajů"})
     elif mode == "3rz":
         # ID pro úřad chybělo úplně — sbíralo se (panel „Vlastník" je stejný
         # jako u ostatních režimů), jen se sem nikdy nedokreslilo (reálná
@@ -1512,7 +1516,7 @@ def api_generate():
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
-        result["3rz_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
+        sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Tabulka s registrační značkou (3RZ)"})
     elif mode == "vyvoz":
         # Stejná chyba, stejná oprava jako u 3rz výš — souřadnice změřené
         # proti fill_2/fill_7 na vyvoz.pdf (provozovatel jméno je tu fill_7,
@@ -1529,7 +1533,7 @@ def api_generate():
         name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)
         result["vyvoz"] = f"/download/{name}"
-        result["vyvoz_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
+        sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Vývoz vozidla"})
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
@@ -1537,7 +1541,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zapis", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/{name}"
-        result["zapis_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
+        sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Zápis nového vozidla"})
 
     # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
     try:
@@ -1587,6 +1591,8 @@ def api_generate():
                 f.write(ppd_bytes)
             result["ppd"] = f"/download/{ppd_name}"
             result["ppd_print"] = f"/ppd-print/{number}"   # A5-preset print page
+            sdilene.append({"file": ppd_name, "kde": sdileni.KDE_OUTPUT,
+                            "popis": f"Příjmový pokladní doklad č. {number}"})
             # Append-only backup — the write-only safety net. A row is written
             # here for every receipt and is NEVER removed, so an accidental
             # delete in the dashboard stays recoverable.
@@ -1611,6 +1617,15 @@ def api_generate():
                     plne_moce.append(url)
     if plne_moce:
         result["plne_moce"] = plne_moce
+        for url in plne_moce:
+            ico = url.rsplit("/", 1)[-1]
+            sdilene.append({"file": f"{ico}.pdf", "kde": sdileni.KDE_PLNE_MOCE,
+                            "popis": f"Plná moc (IČO {ico})"})
+
+    # Jeden odkaz na celý balík. Sdílet jen žádost bylo k ničemu — protějšek
+    # potřebuje vytisknout i plnou moc a doklad.
+    if sdilene:
+        result["sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, sdilene)}"
 
     # ── Push the finished žádost to the Úkony Tracker (best-effort, async) ───
     # Only when the "Zapsat úkon do evidence" box was left on (default). The
@@ -1986,26 +2001,56 @@ def download(filename):
     return send_file(path, as_attachment=False, mimetype="application/pdf")
 
 
-def _posli_sdilenou(token: str):
-    """Sdílecí odkaz — bez přihlášení, jen na jeden soubor, jen po omezenou
+_SDILENI_NEPLATI = "Odkaz už neplatí — vypršel, nebo je špatně opsaný."
+
+
+def _sdilena_cesta(polozka: dict) -> str:
+    return os.path.join(DATA_DIR, polozka.get("kde") or "output", polozka.get("file") or "")
+
+
+def _posli_sdilenou(token: str, index=None):
+    """Sdílecí odkaz — bez přihlášení, jen na jeden balík, jen po omezenou
     dobu (viz sdileni.py). Kód neexistuje/vypršel → stejná zpráva pro obojí,
-    ať se venku nedá rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho"."""
+    ať se venku nedá rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho".
+
+    Jeden dokument se otevře rovnou — mezistránka s jedním tlačítkem je jen
+    klik navíc. Víc dokumentů dostane rozcestník, kde si protějšek vybere,
+    co tiskne."""
     ip = _kdo_zkousi()
     zbyva = _kod_zablokovan(ip)
     if zbyva:
         return ("Moc pokusů. Zkus to za chvíli.", 429, {"Retry-After": str(zbyva)})
-    filename = sdileni.najdi_soubor(DATA_DIR, token)
-    path = os.path.join(DATA_DIR, "output", filename) if filename else None
-    if not path or not os.path.exists(path):
+
+    polozky = sdileni.najdi(DATA_DIR, token) or []
+    polozky = [x for x in polozky if os.path.exists(_sdilena_cesta(x))]
+    if not polozky:
         _kod_netrefa(ip)
-        return "Odkaz už neplatí — vypršel, nebo je špatně opsaný.", 404
-    return send_file(path, as_attachment=False, mimetype="application/pdf")
+        return _SDILENI_NEPLATI, 404
+
+    if index is None and len(polozky) > 1:
+        return render_template("sdilene.html", kod=token, polozky=[
+            {"popis": x["popis"] or x["file"], "url": f"/{token}/{i}"}
+            for i, x in enumerate(polozky)
+        ])
+
+    i = 0 if index is None else index
+    if i >= len(polozky):
+        _kod_netrefa(ip)
+        return _SDILENI_NEPLATI, 404
+    return send_file(_sdilena_cesta(polozky[i]), as_attachment=False,
+                     mimetype="application/pdf")
 
 
 @app.route("/<kod:kod>")
 def sdilena_zadost_kod(kod):
     """Krátký odkaz, co se dá nadiktovat: zadosti.spznaklic.cz/1234."""
     return _posli_sdilenou(kod)
+
+
+@app.route("/<kod:kod>/<int:index>")
+def sdilena_zadost_polozka(kod, index):
+    """Jeden dokument z balíku — na tohle míří tlačítka na rozcestníku."""
+    return _posli_sdilenou(kod, index)
 
 
 @app.route("/s/<token>")

@@ -161,7 +161,7 @@ def test_sdileni_tlacitko_je_zapojene():
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
     assert 'id="btn-sdilet"' in html
     assert "function otevriSdileni()" in html
-    assert "zmeny_sdilet" in html and "vyvoz_sdilet" in html
+    assert "result.sdilet" in html, "odkaz se bere z jednoho pole na balik"
     blok = html[html.index("function sdileciOdkaz()"):][:400]
     assert "location.host" in blok, "odkaz musí být i s doménou, jinak je k ničemu"
 

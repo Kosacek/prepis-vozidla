@@ -2945,10 +2945,8 @@ async function generatePDFs() {
     if (result.success) {
       generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, '3rz': result['3rz'], vyvoz: result.vyvoz, ppd: result.ppd, ppd_print: result.ppd_print, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '',
-                        // Sdílecí odkazy (/s/<token>) — jeden ke každé vygenerované žádosti.
-                        sdilet: { zmeny: result.zmeny_sdilet, zapis: result.zapis_sdilet,
-                                  zmena: result.zmena_sdilet, '3rz': result['3rz_sdilet'],
-                                  vyvoz: result.vyvoz_sdilet } };
+                        // JEDEN sdílecí odkaz na celý balík (žádost + plné moci + doklad).
+                        sdilet: result.sdilet || '' };
       const sdiletBtn = document.getElementById('btn-sdilet');
       if (sdiletBtn) {
         sdiletBtn.style.display = sdileciOdkaz() ? '' : 'none';
@@ -3005,21 +3003,20 @@ function checkInsurance() {
 }
 
 // ── Sdílení hotové žádosti ───────────────────────────────────────────────────
-// Odkaz je krátký (zadosti.spznaklic.cz/1234) a otevře PDF i bez přihlášení —
-// viz sdileni.py. Většinou se neposílá, ale ukazuje z displeje nebo diktuje,
+// Odkaz je krátký (zadosti.spznaklic.cz/1234) a otevře i bez přihlášení
+// VŠECHNO, co se vygenerovalo — žádost, plné moci i pokladní doklad (viz
+// sdileni.py). Jeden dokument se otevře rovnou, u víc dokumentů přijde
+// rozcestník. Většinou se neposílá, ale ukazuje z displeje nebo diktuje,
 // proto je číslo rovnou na tlačítku a v okně přes celou obrazovku.
 const PRIMARNI_PODLE_MODU = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena', '3rz': '3rz', vyvoz: 'vyvoz' };
 
 function sdileciOdkaz() {
-  const key = PRIMARNI_PODLE_MODU[generatedUrls.mode];
-  const cesta = key && (generatedUrls.sdilet || {})[key];
-  return cesta ? location.host + cesta : '';
+  const kod = sdileciKod();
+  return kod ? location.host + '/' + kod : '';
 }
 
 function sdileciKod() {
-  const key = PRIMARNI_PODLE_MODU[generatedUrls.mode];
-  const cesta = key && (generatedUrls.sdilet || {})[key];
-  return cesta ? String(cesta).replace(/^\//, '') : '';
+  return String(generatedUrls.sdilet || '').replace(/^\//, '');
 }
 
 async function otevriSdileni() {
