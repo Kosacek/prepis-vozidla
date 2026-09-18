@@ -29,3 +29,5 @@ scripts/_*.pdf
 # Personal / unrelated content that ended up in the folder
 tahaky/
 failed_pushes.jsonl.lock
+share_tokens.jsonl
+share_tokens.jsonl.lock

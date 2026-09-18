@@ -17,6 +17,7 @@ from datetime import time as _time_of_day
 from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
+import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import hledani  # deterministic history search (no AI) — see hledani.py
 import prefill  # read a past žádost back into form data — see prefill.py
 import pm  # plná moc k zastupování na registru vozidel — see pm.py
@@ -43,7 +44,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.11.0"
+__version__ = "1.12.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1184,6 +1185,11 @@ def _require_login():
     path = _rq.path
     if path == "/login" or path == "/healthz" or path.startswith("/static"):
         return
+    # Sdílecí odkaz musí jít otevřít bez hesla — to je celý smysl (poslat
+    # hotovou žádost mimo appku). Bezpečné jen díky tomu, že token je
+    # neuhádnutelný náhodný řetězec a časem vyprší — viz sdileni.py.
+    if path.startswith("/s/"):
+        return
     if not session.get("authed"):
         return redirect("/login")
 
@@ -1426,6 +1432,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmeny", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmeny_bytes)
         result["zmeny"] = f"/download/{name}"
+        result["zmeny_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
@@ -1439,6 +1446,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmena", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/{name}"
+        result["zmena_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
     elif mode == "3rz":
         # ID pro úřad chybělo úplně — sbíralo se (panel „Vlastník" je stejný
         # jako u ostatních režimů), jen se sem nikdy nedokreslilo (reálná
@@ -1457,6 +1465,7 @@ def api_generate():
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
+        result["3rz_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
     elif mode == "vyvoz":
         # Stejná chyba, stejná oprava jako u 3rz výš — souřadnice změřené
         # proti fill_2/fill_7 na vyvoz.pdf (provozovatel jméno je tu fill_7,
@@ -1473,6 +1482,7 @@ def api_generate():
         name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)
         result["vyvoz"] = f"/download/{name}"
+        result["vyvoz_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
@@ -1480,6 +1490,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zapis", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/{name}"
+        result["zapis_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
 
     # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
     try:
@@ -1925,6 +1936,20 @@ def download(filename):
     path = os.path.join(DATA_DIR, "output", filename)
     if not os.path.exists(path):
         return "File not found", 404
+    return send_file(path, as_attachment=False, mimetype="application/pdf")
+
+
+@app.route("/s/<token>")
+def sdilena_zadost(token):
+    """Sdílecí odkaz — bez přihlášení, jen na jeden soubor, jen po omezenou
+    dobu (viz sdileni.py). Token neexistuje/vypršel → stejná zpráva pro obojí,
+    ať se venku nedá rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho"."""
+    filename = sdileni.najdi_soubor(DATA_DIR, token)
+    if not filename:
+        return "Odkaz už neplatí — vypršel, nebo je špatně opsaný.", 404
+    path = os.path.join(DATA_DIR, "output", filename)
+    if not os.path.exists(path):
+        return "Odkaz už neplatí — vypršel, nebo je špatně opsaný.", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
 
 # ── Update endpoints ─────────────────────────────────────────────────────────

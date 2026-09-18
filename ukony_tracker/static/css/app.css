@@ -841,52 +841,6 @@ ul.list li > span:last-child {
    the leftover width goes to the flexible columns (RZ, VIN, Poznámka). */
 th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
-/* Partial-pay disclosure widget */
-.partial-pay {
-  display: inline-block;
-  position: relative;
-}
-
-.partial-pay summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.partial-pay summary::-webkit-details-marker { display: none; }
-
-.partial-pay__form {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  background: var(--card);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
-  padding: var(--sp-2) var(--sp-3);
-  min-width: 200px;
-}
-
-.partial-pay__input {
-  flex: 1;
-  min-width: 80px;
-  padding: 5px 8px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font);
-  font-size: 0.8125rem;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-.partial-pay__input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, .18);
-}
 
 /* ------------------------------------------------------------
    19. Dashboard layout
@@ -1616,8 +1570,6 @@ body.modal-open { overflow: hidden; }
 .ukony-item .recent-row { padding-right: 4px; }
 .row-actions { display: flex; align-items: center; gap: 6px; padding: 0 var(--sp-3) 0 2px; flex: 0 0 auto; }
 .row-actions form { display: inline; }
-/* near the right edge — anchor the partial-pay popup right so it can't overflow */
-.row-actions .partial-pay__form { left: auto; right: 0; }
 @media (max-width: 760px) {
   .ukony-item { flex-wrap: wrap; }                 /* actions drop to a second line */
   .row-actions { padding: 0 var(--sp-3) 8px var(--sp-3); }
@@ -1730,7 +1682,7 @@ body.modal-open { overflow: hidden; }
   input, select, textarea,
   .field input, .field select, .field textarea,
   .ukony-search, .recent-search, .ask-input,
-  .filter-select, .filter-month, .partial-pay__input { font-size: 16px; }
+  .filter-select, .filter-month { font-size: 16px; }
 
   /* Hlavička karty se na úzké obrazovce mačkala do tří řádků ("Poslední /
      úkony" + hledání + odkaz). Necháme ji zalomit a roztáhnout hledání. */

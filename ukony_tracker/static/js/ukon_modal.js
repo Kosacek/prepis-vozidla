@@ -120,8 +120,6 @@
     if (payEl && d.pay_badge_html != null) payEl.innerHTML = d.pay_badge_html;
     var slotEl = item.querySelector(".stav-slot");
     if (slotEl && d.stav_slot_html != null) slotEl.innerHTML = d.stav_slot_html;
-    var details = item.querySelector("details.partial-pay");
-    if (details) details.open = false;
     var flashEl = item.querySelector("a.recent-row") || item;
     flashEl.classList.add("row-saved");
     setTimeout(function () { flashEl.classList.remove("row-saved"); }, 1200);
