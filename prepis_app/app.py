@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import requests
 import json
 import os
+import re
 import hmac
 import threading
 import time
@@ -40,11 +41,23 @@ if os.environ.get("ADMIN_PASSWORD"):  # prod: behind Cloudflare/nginx TLS → ma
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+# Sdílecí odkaz je jen čtyřmístné číslo hned za doménou (/1234), aby šel
+# nadiktovat. Vlastní converter ho drží přesně na čtyřech číslicích — kdyby
+# route byla /<cokoliv>, spolkla by i překlepy v ostatních adresách.
+from werkzeug.routing import BaseConverter
+
+
+class _KodConverter(BaseConverter):
+    regex = r"\d{4}"
+
+
+app.url_map.converters["kod"] = _KodConverter
+
 import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1178,6 +1191,40 @@ def _zapomen_pokusy(ip: str) -> None:
         _login_pokusy.pop(ip, None)
 
 
+# ── Sdílecí kódy: brzda proti projíždění všech čísel ─────────────────────────
+# Odkaz je jen čtyřmístný (/1234), aby šel nadiktovat — to je ale jen 9000
+# možností a stroj by je prošel za pár minut. Krátkost kódu proto musí
+# dorovnat appka: po pár špatných trefách z jedné IP přestane odpovídat.
+# Člověk, co jedno číslo opíše z displeje, se do limitu nikdy nedostane;
+# skript, co zkouší 1000, 1001, 1002…, ano.
+_KOD_MAX_CHYB = 12
+_KOD_OKNO_S = 600            # 10 minut
+_kod_chyby: dict[str, list[float]] = {}
+_kod_zamek = threading.Lock()
+
+_KOD_CESTA = re.compile(r"^/\d{4}$")
+
+
+def _JE_SDILECI_KOD(path: str) -> bool:
+    return bool(_KOD_CESTA.match(path))
+
+
+def _kod_zablokovan(ip: str) -> int:
+    """Kolik sekund ještě nesmí zkoušet sdílecí kódy; 0 = může."""
+    ted = time.time()
+    with _kod_zamek:
+        chyby = [t for t in _kod_chyby.get(ip, []) if ted - t < _KOD_OKNO_S]
+        _kod_chyby[ip] = chyby
+        if len(chyby) < _KOD_MAX_CHYB:
+            return 0
+        return max(1, int(_KOD_OKNO_S - (ted - chyby[0])))
+
+
+def _kod_netrefa(ip: str) -> None:
+    with _kod_zamek:
+        _kod_chyby.setdefault(ip, []).append(time.time())
+
+
 @app.before_request
 def _require_login():
     if not ADMIN_PASSWORD:
@@ -1188,7 +1235,7 @@ def _require_login():
     # Sdílecí odkaz musí jít otevřít bez hesla — to je celý smysl (poslat
     # hotovou žádost mimo appku). Bezpečné jen díky tomu, že token je
     # neuhádnutelný náhodný řetězec a časem vyprší — viz sdileni.py.
-    if path.startswith("/s/"):
+    if path.startswith("/s/") or _JE_SDILECI_KOD(path):
         return
     if not session.get("authed"):
         return redirect("/login")
@@ -1432,7 +1479,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmeny", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmeny_bytes)
         result["zmeny"] = f"/download/{name}"
-        result["zmeny_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
+        result["zmeny_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
     elif mode == "zmena":
         zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
@@ -1446,7 +1493,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zmena", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/{name}"
-        result["zmena_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
+        result["zmena_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
     elif mode == "3rz":
         # ID pro úřad chybělo úplně — sbíralo se (panel „Vlastník" je stejný
         # jako u ostatních režimů), jen se sem nikdy nedokreslilo (reálná
@@ -1465,7 +1512,7 @@ def api_generate():
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
-        result["3rz_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
+        result["3rz_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
     elif mode == "vyvoz":
         # Stejná chyba, stejná oprava jako u 3rz výš — souřadnice změřené
         # proti fill_2/fill_7 na vyvoz.pdf (provozovatel jméno je tu fill_7,
@@ -1482,7 +1529,7 @@ def api_generate():
         name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)
         result["vyvoz"] = f"/download/{name}"
-        result["vyvoz_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
+        result["vyvoz_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
     else:  # zapis noveho vozidla
         zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
         if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
@@ -1490,7 +1537,7 @@ def api_generate():
         name = hledani.nazev_vystupu("zapis", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/{name}"
-        result["zapis_sdilet"] = f"/s/{sdileni.vytvor_token(DATA_DIR, name)}"
+        result["zapis_sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, name)}"
 
     # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
     try:
@@ -1939,18 +1986,32 @@ def download(filename):
     return send_file(path, as_attachment=False, mimetype="application/pdf")
 
 
-@app.route("/s/<token>")
-def sdilena_zadost(token):
+def _posli_sdilenou(token: str):
     """Sdílecí odkaz — bez přihlášení, jen na jeden soubor, jen po omezenou
-    dobu (viz sdileni.py). Token neexistuje/vypršel → stejná zpráva pro obojí,
+    dobu (viz sdileni.py). Kód neexistuje/vypršel → stejná zpráva pro obojí,
     ať se venku nedá rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho"."""
+    ip = _kdo_zkousi()
+    zbyva = _kod_zablokovan(ip)
+    if zbyva:
+        return ("Moc pokusů. Zkus to za chvíli.", 429, {"Retry-After": str(zbyva)})
     filename = sdileni.najdi_soubor(DATA_DIR, token)
-    if not filename:
-        return "Odkaz už neplatí — vypršel, nebo je špatně opsaný.", 404
-    path = os.path.join(DATA_DIR, "output", filename)
-    if not os.path.exists(path):
+    path = os.path.join(DATA_DIR, "output", filename) if filename else None
+    if not path or not os.path.exists(path):
+        _kod_netrefa(ip)
         return "Odkaz už neplatí — vypršel, nebo je špatně opsaný.", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
+
+
+@app.route("/<kod:kod>")
+def sdilena_zadost_kod(kod):
+    """Krátký odkaz, co se dá nadiktovat: zadosti.spznaklic.cz/1234."""
+    return _posli_sdilenou(kod)
+
+
+@app.route("/s/<token>")
+def sdilena_zadost(token):
+    """Původní dlouhý tvar odkazu — drží při životě, co už je rozeslané."""
+    return _posli_sdilenou(token)
 
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")
