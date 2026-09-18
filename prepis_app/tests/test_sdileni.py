@@ -140,7 +140,7 @@ def _generuj(prod):
 def test_generate_vraci_i_sdilecí_odkaz(prod):
     body = _generuj(prod)
     assert body["success"] is True
-    kod = body["zmeny_sdilet"]
+    kod = body["sdilet"]
     assert re.fullmatch(r"/\d{4}", kod), f"odkaz má být /1234, je {kod}"
 
 
@@ -154,7 +154,7 @@ def _cizinec(prod):
 def test_sdileny_odkaz_funguje_bez_prihlaseni(prod):
     """Celý smysl té funkce: cizí prohlížeč bez session cookie a bez hesla."""
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["zmeny_sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 200
     assert r.mimetype == "application/pdf"
 
@@ -177,7 +177,7 @@ def test_sdileny_odkaz_nema_bezpecnostni_hlavicky_pro_html(prod):
     """CSP se lepí jen na HTML (viz test_bezpecnost.py) — PDF přes /s/ musí
     dopadnout stejně jako přes /download/, jinak by šlo poznat rozdíl."""
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["zmeny_sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert "Content-Security-Policy" not in r.headers
 
 
@@ -209,7 +209,102 @@ def test_spravny_kod_projde_i_kdyz_nekdo_jiny_zkousel(prod):
     """Brzda nesmí zavřít odkaz tomu, kdo má správné číslo."""
     A._kod_chyby.clear()
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["zmeny_sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 200
     assert r.mimetype == "application/pdf"
     A._kod_chyby.clear()
+
+
+# ── Balík: odkaz otevře VŠECHNO, co se vygenerovalo ────────────────────────
+# David to formuloval jasně: sdílet jen žádost a plnou moc si nechat v appce
+# je k ničemu — protějšek potřebuje vytisknout celý balík.
+
+def _plna_moc(tmp_dir, ico):
+    """Položí plnou moc tam, kde ji appka hledá (DATA_DIR/plne_moce/<ico>.pdf)."""
+    slozka = os.path.join(tmp_dir, "plne_moce")
+    os.makedirs(slozka, exist_ok=True)
+    zdroj = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "pdfs", "zmeny.pdf")
+    with open(zdroj, "rb") as f, open(os.path.join(slozka, f"{ico}.pdf"), "wb") as out:
+        out.write(f.read())
+
+
+def _generuj_balik(prod, tmp_path, monkeypatch):
+    """Žádost + plná moc kupujícího + pokladní doklad = tři dokumenty."""
+    monkeypatch.setattr(A, "PLNE_MOCE_DIR", os.path.join(str(tmp_path), "plne_moce"))
+    _plna_moc(str(tmp_path), "27082440")
+    prod.post("/login", data={"password": "heslo-jen-pro-test"},
+              base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = prod.post("/api/generate", json={
+        "mode": "prevod", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+        "puvodni_jmeno": "PRODEJCE S.R.O.", "novy_jmeno": "KUPUJICI S.R.O.",
+        "novy_ico": "27082440", "ppd_castka": "1300", "evidence_log": False,
+    }, base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    return r.get_json()
+
+
+def test_balik_nese_zadost_plnou_moc_i_doklad(prod, tmp_path, monkeypatch):
+    body = _generuj_balik(prod, tmp_path, monkeypatch)
+    polozky = sdileni.najdi(str(tmp_path), body["sdilet"].lstrip("/"))
+    popisy = " | ".join(p["popis"] for p in polozky)
+    assert len(polozky) == 3, popisy
+    assert "Žádost" in popisy and "Plná moc" in popisy and "doklad" in popisy
+
+
+def test_vic_dokumentu_ukaze_rozcestnik_ne_rovnou_pdf(prod, tmp_path, monkeypatch):
+    body = _generuj_balik(prod, tmp_path, monkeypatch)
+    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 200
+    assert r.mimetype == "text/html"
+    html = r.get_data(as_text=True)
+    assert "Plná moc" in html and "Žádost" in html
+
+
+def test_rozcestnik_je_slepa_ulicka_do_appky_nepusti(prod, tmp_path, monkeypatch):
+    """Kdo přijde přes sdílený odkaz, nesmí se proklikat do průvodce ani
+    generovat nové žádosti — vidí jen dokumenty k tisku."""
+    body = _generuj_balik(prod, tmp_path, monkeypatch)
+    kod = body["sdilet"].lstrip("/")
+    html = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz",
+                              headers=HTTPS).get_data(as_text=True)
+    for zakazane in ['href="/"', "Nová žádost", "api/generate", "Pokračovat"]:
+        assert zakazane not in html, f"rozcestník pouští dál do appky: {zakazane}"
+    # Odkazy vedou výhradně na dokumenty toho jednoho balíku.
+    odkazy = re.findall(r'href="([^"]+)"', html)
+    assert odkazy and all(re.fullmatch(rf"/{kod}/\d+", u) for u in odkazy), odkazy
+
+
+def test_jednotlive_dokumenty_z_baliku_jdou_otevrit(prod, tmp_path, monkeypatch):
+    body = _generuj_balik(prod, tmp_path, monkeypatch)
+    kod = body["sdilet"].lstrip("/")
+    cizi = _cizinec(prod)
+    for i in range(3):
+        r = cizi.get(f"/{kod}/{i}", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+        assert r.status_code == 200, i
+        assert r.mimetype == "application/pdf", i
+
+
+def test_jeden_dokument_se_otevre_rovnou_bez_mezistranky(prod):
+    """Rozcestník s jediným tlačítkem by byl jen klik navíc."""
+    body = _generuj(prod)   # bez plné moci a bez PPD = jeden dokument
+    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 200
+    assert r.mimetype == "application/pdf"
+
+
+def test_index_mimo_balik_nic_nevyda(prod, tmp_path, monkeypatch):
+    body = _generuj_balik(prod, tmp_path, monkeypatch)
+    kod = body["sdilet"].lstrip("/")
+    A._kod_chyby.clear()
+    r = _cizinec(prod).get(f"/{kod}/99", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 404
+    A._kod_chyby.clear()
+
+
+def test_plna_moc_pres_appku_porad_chce_prihlaseni(prod, tmp_path, monkeypatch):
+    """Sdílený balík otevírá plnou moc jen skrz svůj kód — původní cesta
+    do appky zůstává za heslem."""
+    _generuj_balik(prod, tmp_path, monkeypatch)
+    r = _cizinec(prod).get("/plna-moc/27082440", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/login"

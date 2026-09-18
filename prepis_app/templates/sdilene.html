@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!--
+  Rozcestník sdíleného balíku. Vědomě slepá ulička: žádná navigace zpátky do
+  appky, žádné generování, žádné kroky průvodce — kdo přijde přes sdílecí
+  odkaz, má jen otevřít a vytisknout. Jeden dokument tuhle stránku vůbec
+  nevidí (otevře se rovnou PDF), viz _posli_sdilenou v app.py.
+-->
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Dokumenty k vytištění</title>
+<style>
+  :root { --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#64748b;
+          --border:#e2e8f0; --primary:#2563eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:520px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .pod { font-size:13px; color:var(--muted); margin:0 0 20px; }
+  .doklad { display:flex; align-items:center; gap:12px; width:100%;
+            background:var(--card); border:1px solid var(--border); border-radius:12px;
+            padding:16px 18px; margin-bottom:10px; text-decoration:none; color:inherit;
+            font-size:15px; font-weight:600; }
+  .doklad:hover { border-color:var(--primary); }
+  .sipka { margin-left:auto; color:var(--primary); font-weight:700; }
+  .pata { margin-top:18px; font-size:12px; color:var(--muted); text-align:center; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f172a; --card:#1e293b; --text:#f1f5f9; --muted:#94a3b8; --border:#334155; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Dokumenty k vytištění</h1>
+    <p class="pod">Klikni na dokument, otevře se v novém okně. Tisk pak přes Ctrl+P.</p>
+    {% for p in polozky %}
+      <a class="doklad" href="{{ p.url }}" target="_blank" rel="noopener">
+        {{ p.popis }}<span class="sipka">Otevřít →</span>
+      </a>
+    {% endfor %}
+    <p class="pata">Odkaz platí 30 dní od vystavení.</p>
+  </div>
+</body>
+</html>
