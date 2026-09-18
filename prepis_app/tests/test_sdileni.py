@@ -3,9 +3,48 @@ přesně ten jeden soubor, jen po omezenou dobu, a jít neuhádnout.
 """
 import json
 import os
+import re
 from datetime import datetime, timedelta
 
 import sdileni
+
+
+def test_kod_je_ctyrmistne_cislo(tmp_path):
+    """David ho diktuje a píše rukou — musí to být přesně čtyři číslice."""
+    kod = sdileni.vytvor_kod(str(tmp_path), "x.pdf")
+    assert len(kod) == 4 and kod.isdigit()
+
+
+def test_kod_neni_poradovy(tmp_path):
+    """Kdyby šly kódy po řadě, stačí napsat 1, 2, 3... a projít všechny
+    žádosti, co appka kdy vygenerovala."""
+    kody = [int(sdileni.vytvor_kod(str(tmp_path), "x.pdf")) for _ in range(12)]
+    assert kody != sorted(kody), "kódy jdou vzestupně — to je řada, ne náhoda"
+    rozdily = {b - a for a, b in zip(kody, kody[1:])}
+    assert rozdily != {1}, "každý další kód je o 1 větší — čistá řada"
+
+
+def test_dva_kody_nikdy_neukazuji_na_dve_zadosti_naraz(tmp_path):
+    """Kolize by tiše přepsala odkaz na starší žádost."""
+    kody = [sdileni.vytvor_kod(str(tmp_path), f"z{i}.pdf") for i in range(60)]
+    assert len(set(kody)) == 60
+    for i, kod in enumerate(kody):
+        assert sdileni.najdi_soubor(str(tmp_path), kod) == f"z{i}.pdf"
+
+
+def test_vyprsely_kod_jde_zase_pouzit_a_plati_ten_novy(tmp_path):
+    """Čísel je jen 9000, takže se po 30 dnech recyklují — pak musí platit
+    poslední zápis, ne ten starý vypršelý."""
+    _zapis_stary(tmp_path, "4242", 40)
+    with open(sdileni._cesta(str(tmp_path)), "a", encoding="utf-8") as f:
+        f.write(json.dumps({"token": "4242", "file": "nova.pdf",
+                            "vytvoreno": datetime.now().isoformat(timespec="seconds")}) + "\n")
+    assert sdileni.najdi_soubor(str(tmp_path), "4242") == "nova.pdf"
+
+
+def test_vytvor_kod_nespadne_ani_bez_pristupu_k_disku(tmp_path):
+    kod = sdileni.vytvor_kod(os.path.join(str(tmp_path), "neexistujici", "hloub"), "x.pdf")
+    assert len(kod) == 4 and kod.isdigit()
 
 
 def test_token_je_dost_dlouhy_a_bezpecny_pro_url():
@@ -101,7 +140,8 @@ def _generuj(prod):
 def test_generate_vraci_i_sdilecí_odkaz(prod):
     body = _generuj(prod)
     assert body["success"] is True
-    assert body["zmeny_sdilet"].startswith("/s/")
+    kod = body["zmeny_sdilet"]
+    assert re.fullmatch(r"/\d{4}", kod), f"odkaz má být /1234, je {kod}"
 
 
 def _cizinec(prod):
@@ -139,3 +179,37 @@ def test_sdileny_odkaz_nema_bezpecnostni_hlavicky_pro_html(prod):
     body = _generuj(prod)
     r = _cizinec(prod).get(body["zmeny_sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert "Content-Security-Policy" not in r.headers
+
+
+def test_ctyrmistny_odkaz_nestini_ostatni_adresy(prod):
+    """Route /<kod> sedí hned za doménou — nesmí spolknout /login."""
+    r = prod.get("/login", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 200
+    r2 = _cizinec(prod).get("/abcd", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r2.status_code in (302, 404)  # ne PDF
+
+
+def test_projizdeni_vsech_cisel_se_zablokuje(prod):
+    """Čtyři číslice je jen 9000 možností — po pár netrefách musí appka
+    přestat odpovídat, jinak je projde skript za pár minut."""
+    A._kod_chyby.clear()
+    c = _cizinec(prod)
+    kody = [str(1000 + i) for i in range(A._KOD_MAX_CHYB + 3)]
+    stavy = [c.get("/" + k, base_url="https://zadosti.spznaklic.cz", headers=HTTPS).status_code
+             for k in kody]
+    assert stavy[0] == 404
+    assert 429 in stavy, "projíždění všech čísel nic nebrzdí"
+    posledni = c.get("/" + kody[-1], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert posledni.status_code == 429
+    assert posledni.headers.get("Retry-After")
+    A._kod_chyby.clear()
+
+
+def test_spravny_kod_projde_i_kdyz_nekdo_jiny_zkousel(prod):
+    """Brzda nesmí zavřít odkaz tomu, kdo má správné číslo."""
+    A._kod_chyby.clear()
+    body = _generuj(prod)
+    r = _cizinec(prod).get(body["zmeny_sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 200
+    assert r.mimetype == "application/pdf"
+    A._kod_chyby.clear()

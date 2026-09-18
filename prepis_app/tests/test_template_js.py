@@ -156,14 +156,36 @@ def test_ppd_nahled_a_extra_vozidla_jsou_zapojena():
 
 def test_sdileni_tlacitko_je_zapojene():
     """Sdílecí odkaz (2026-09-17): tlačítko musí existovat, brát URL z
-    result.<mode>_sdilet a skládat absolutní odkaz (ne jen /s/<token>, ten
-    by se z SMS neotevřel)."""
+    result.<mode>_sdilet a ukazovat celou adresu i s doménou — samotné
+    /1234 se z SMS ani z displeje přečíst nedá."""
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
     assert 'id="btn-sdilet"' in html
-    assert "function kopirujSdileni()" in html
+    assert "function otevriSdileni()" in html
     assert "zmeny_sdilet" in html and "vyvoz_sdilet" in html
     blok = html[html.index("function sdileciOdkaz()"):][:400]
-    assert "location.origin" in blok, "odkaz musí být absolutní, jinak je k ničemu"
+    assert "location.host" in blok, "odkaz musí být i s doménou, jinak je k ničemu"
+
+
+def test_sdileni_ukaze_kod_na_tlacitku_i_v_okne():
+    """David odkaz většinou neposílá — přečte ho z displeje nebo nadiktuje.
+    Číslo proto musí být vidět na tlačítku a okno musí jít otevřít přes
+    celou obrazovku, s tlačítkem odeslat."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert 'id="btn-sdilet-kod"' in html
+    assert 'id="sdilet-modal"' in html and 'id="sdilet-url"' in html
+    assert "function odesliSdileni()" in html
+    assert "navigator.share" in html, "na mobilu ať to nabídne SMS/WhatsApp"
+    assert "function zavriSdileni()" in html
+
+
+def test_sdileni_a_pojisteni_jsou_na_jednom_radku():
+    """Obě tlačítka mají být vedle sebe půl na půl (.out-row je flex 1:1)."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    zacatek = html.index('id="btn-sdilet"')
+    radek = html.rindex('<div class="out-row">', 0, zacatek)
+    konec = html.index("</div>", html.index('id="btn-pojisteni"'))
+    assert html.index('id="btn-pojisteni"') > radek
+    assert konec > html.index('id="btn-pojisteni"')
 
 
 def test_primarni_zadost_ma_jen_jednu_definici():

@@ -184,6 +184,14 @@
   .modal-header h3 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; min-width: 0; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
   .modal-body { padding: 16px 22px; overflow-y: auto; }
+  /* Sdílecí odkaz: čte se z displeje přes stůl, tak ať je co největší. */
+  .sdilet-kod { font-weight: 800; letter-spacing: 0.5px; }
+  .sdilet-box { max-width: 720px; }
+  .sdilet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+  .sdilet-send { background: var(--primary, #2563eb); color: #fff; border: none; border-radius: 10px; padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 7px; }
+  .sdilet-telo { padding: 8px 24px 34px; text-align: center; }
+  .sdilet-url { font-size: clamp(22px, 6vw, 40px); font-weight: 800; word-break: break-all; line-height: 1.25; }
+  .sdilet-pod { margin-top: 14px; font-size: 13px; color: var(--muted); }
   /* Doklady (PPD) table */
   .doklady-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .doklady-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: #fff; }
@@ -504,6 +512,20 @@
       <button class="modal-close" onclick="closeFirmyModal()">✕</button>
     </div>
     <div class="modal-body" id="firmy-modal-body">Načítám...</div>
+  </div>
+</div>
+
+<!-- Sdílecí odkaz — přes celou obrazovku, aby šel ukázat z displeje -->
+<div class="modal-overlay" id="sdilet-modal" onclick="if(event.target===this)zavriSdileni()">
+  <div class="modal-box sdilet-box">
+    <div class="sdilet-head">
+      <button class="modal-close" onclick="zavriSdileni()">✕</button>
+      <button class="sdilet-send" onclick="odesliSdileni()" title="Odeslat odkaz"><svg class="ico"><use href="#i-share"></use></svg> Odeslat</button>
+    </div>
+    <div class="sdilet-telo">
+      <div class="sdilet-url" id="sdilet-url"></div>
+      <div class="sdilet-pod" id="sdilet-stav">Zkopírováno ✓ &nbsp;·&nbsp; platí 30 dní</div>
+    </div>
   </div>
 </div>
 
@@ -1072,10 +1094,13 @@
           <button class="btn-download btn-print" onclick="printAll()"><svg class="ico"><use href="#i-printer"></use></svg> Vytisknout žádost</button>
         </div>
         <!-- Odkaz, který jde poslat i někomu, kdo do appky nemá přístup —
-             platí 30 dní, pak je potřeba žádost vygenerovat znovu. -->
-        <button id="btn-sdilet" class="btn-download btn-ckp" onclick="kopirujSdileni()" style="display:none;"
-                title="Zkopíruje odkaz na tuhle žádost — příjemce nepotřebuje heslo. Platí 30 dní."><svg class="ico"><use href="#i-share"></use></svg> <span id="btn-sdilet-text">Kopírovat odkaz ke sdílení</span></button>
-        <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám"><svg class="ico"><use href="#i-shield"></use></svg> Zkontrolovat pojištění (ČKP)</button>
+             platí 30 dní, pak je potřeba žádost vygenerovat znovu. Číslo je
+             rovnou na tlačítku: David ho většinou neposílá, jen přečte. -->
+        <div class="out-row">
+          <button id="btn-sdilet" class="btn-download btn-ckp" onclick="otevriSdileni()" style="display:none;"
+                  title="Ukáže odkaz na tuhle žádost — příjemce nepotřebuje heslo. Platí 30 dní."><svg class="ico"><use href="#i-share"></use></svg> Kopírovat odkaz <b id="btn-sdilet-kod" class="sdilet-kod"></b></button>
+          <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám"><svg class="ico"><use href="#i-shield"></use></svg> Pojištění (ČKP)</button>
+        </div>
       </div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
       <div class="out-reset">
@@ -2925,7 +2950,10 @@ async function generatePDFs() {
                                   zmena: result.zmena_sdilet, '3rz': result['3rz_sdilet'],
                                   vyvoz: result.vyvoz_sdilet } };
       const sdiletBtn = document.getElementById('btn-sdilet');
-      if (sdiletBtn) sdiletBtn.style.display = sdileciOdkaz() ? '' : 'none';
+      if (sdiletBtn) {
+        sdiletBtn.style.display = sdileciOdkaz() ? '' : 'none';
+        document.getElementById('btn-sdilet-kod').textContent = sdileciKod();
+      }
       // PPD print button — shown only when a receipt was generated
       const ppdBtn = document.getElementById('btn-ppd');
       if (ppdBtn) ppdBtn.style.display = result.ppd ? '' : 'none';
@@ -2977,33 +3005,59 @@ function checkInsurance() {
 }
 
 // ── Sdílení hotové žádosti ───────────────────────────────────────────────────
-// Odkaz /s/<token> otevře PDF i bez přihlášení (token je náhodný a po 30 dnech
-// vyprší — viz sdileni.py). Kvůli tomu už není potřeba stahovat PDF a posílat
-// ho přes Gmail; stačí poslat odkaz.
+// Odkaz je krátký (zadosti.spznaklic.cz/1234) a otevře PDF i bez přihlášení —
+// viz sdileni.py. Většinou se neposílá, ale ukazuje z displeje nebo diktuje,
+// proto je číslo rovnou na tlačítku a v okně přes celou obrazovku.
 const PRIMARNI_PODLE_MODU = { prevod: 'zmeny', zapis: 'zapis', zmena: 'zmena', '3rz': '3rz', vyvoz: 'vyvoz' };
 
 function sdileciOdkaz() {
   const key = PRIMARNI_PODLE_MODU[generatedUrls.mode];
   const cesta = key && (generatedUrls.sdilet || {})[key];
-  return cesta ? location.origin + cesta : '';
+  return cesta ? location.host + cesta : '';
 }
 
-async function kopirujSdileni() {
+function sdileciKod() {
+  const key = PRIMARNI_PODLE_MODU[generatedUrls.mode];
+  const cesta = key && (generatedUrls.sdilet || {})[key];
+  return cesta ? String(cesta).replace(/^\//, '') : '';
+}
+
+async function otevriSdileni() {
   const url = sdileciOdkaz();
   if (!url) return;
-  const popisek = document.getElementById('btn-sdilet-text');
-  const puvodni = popisek.textContent;
+  document.getElementById('sdilet-url').textContent = url;
+  const stav = document.getElementById('sdilet-stav');
+  document.getElementById('sdilet-modal').classList.add('open');
+  // Zkopírovat rovnou: tlačítko pořád slibuje "Kopírovat odkaz", okno je
+  // navíc pro případ, kdy ho David jen ukazuje nebo diktuje.
+  try {
+    await navigator.clipboard.writeText(location.origin + '/' + sdileciKod());
+    stav.textContent = 'Zkopírováno ✓  ·  platí 30 dní';
+  } catch (e) {
+    // Schránka umí selhat (starší prohlížeč, bez https) — okno s odkazem
+    // funguje dál, jen se nezkopíroval.
+    stav.textContent = 'Opiš ho z displeje  ·  platí 30 dní';
+  }
+}
+
+function zavriSdileni() {
+  document.getElementById('sdilet-modal').classList.remove('open');
+}
+
+// Odeslat: na mobilu vyvolá systémové sdílení (SMS/WhatsApp/mail), na
+// desktopu ho prohlížeč nemá — tam odkaz aspoň zkopíruje.
+async function odesliSdileni() {
+  const url = location.origin + '/' + sdileciKod();
+  if (!sdileciKod()) return;
+  if (navigator.share) {
+    try { await navigator.share({ text: url }); return; } catch (e) { return; }
+  }
   try {
     await navigator.clipboard.writeText(url);
-    popisek.textContent = 'Zkopírováno ✓';
+    document.getElementById('sdilet-stav').textContent = 'Zkopírováno ✓  ·  platí 30 dní';
   } catch (e) {
-    // Schránka umí selhat (starší prohlížeč, bez https) — ať se odkaz aspoň
-    // dá vzít ručně, místo aby tlačítko jen tiše nic neudělalo.
     window.prompt('Zkopíruj odkaz ručně:', url);
-    popisek.textContent = puvodni;
-    return;
   }
-  setTimeout(() => { popisek.textContent = puvodni; }, 2000);
 }
 
 function printAll() {
