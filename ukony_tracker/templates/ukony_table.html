@@ -12,32 +12,32 @@
 <div class="card" style="margin-bottom: var(--sp-5);">
   <input type="search" id="ukony-search" class="ukony-search" autocomplete="off"
          placeholder="Hledat — RZ, VIN, poznámka, firma, typ…">
-  <form method="get" action="/ukony/vse" class="filter-bar">
+  <form method="get" action="/ukony/vse" class="filter-bar" id="filter-form">
     <div class="filter-bar__fields">
-      <select name="firma" class="filter-select" onchange="this.form.submit()">
+      <select name="firma" class="filter-select">
         <option value="">Všechny firmy</option>
         {% for f in firmy %}
           <option value="{{ f.id }}" {{ 'selected' if sel.firma == f.id }}>{{ f.zkratka }}</option>
         {% endfor %}
       </select>
 
-      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month" onchange="this.form.submit()">
+      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month">
 
-      <select name="typ" class="filter-select" onchange="this.form.submit()">
+      <select name="typ" class="filter-select">
         <option value="">Všechny typy</option>
         {% for t in typy %}
           <option value="{{ t.kod }}" {{ 'selected' if sel.typ == t.kod }}>{{ t.kod }}</option>
         {% endfor %}
       </select>
 
-      <select name="stav" class="filter-select" onchange="this.form.submit()">
+      <select name="stav" class="filter-select">
         <option value="">Vše</option>
         <option value="nezaplaceno" {{ 'selected' if sel.stav == 'nezaplaceno' }}>Nezaplaceno</option>
         <option value="zaplaceno"   {{ 'selected' if sel.stav == 'zaplaceno'   }}>Zaplaceno</option>
         <option value="castecne"    {{ 'selected' if sel.stav == 'castecne'    }}>Částečně</option>
       </select>
 
-      <a href="/ukony/vse" class="btn btn-sm">Vše</a>
+      <a href="/ukony/vse" class="btn btn-sm" id="filter-reset">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
       <span id="ukony-count">{{ ukony|length }}</span> úkonů · <span id="ukony-sum">{{ total|kc }}</span> Kč
@@ -48,6 +48,7 @@
 {# ── List — same row design as the dashboard's "Poslední úkony" (whole row is a
      link opening the edit modal), plus a trailing action cluster per row. ── #}
 {% import "_macros.html" as m with context %}
+{% set back_url = request.full_path %}
 <div class="card recent-card">
   <div class="recent-list ukony-list">
     {% for u in ukony %}
@@ -69,21 +70,11 @@
         <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
       </a>
       <span class="row-actions actions">
-        {# Full pay #}
-        <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
-          <input type="hidden" name="back" value="{{ request.full_path }}">
-          <button type="submit" class="btn btn-sm" title="Označit zaplaceno">✓ zapl.</button>
-        </form>
-        {# Partial pay #}
-        <details class="partial-pay">
-          <summary class="btn btn-sm">část.</summary>
-          <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="partial-pay__form">
-            <input type="hidden" name="back" value="{{ request.full_path }}">
-            <input type="number" name="castka" inputmode="numeric" placeholder="část. Kč"
-                   min="0" max="{{ u.celkem }}" class="partial-pay__input">
-            <button type="submit" class="btn btn-sm btn-primary">OK</button>
-          </form>
-        </details>
+        {# Payment toggle: click marks paid; click again unmarks — same as the
+           per-firm "Tento měsíc" list. Replaces the old always-present "✓
+           zapl." + "část." popup, which had no way back to unpaid from here
+           and offered a partial-pay entry David didn't want on this page. #}
+        <span class="stav-slot">{% include "_stav_slot.html" %}</span>
         {# Delete #}
         <form method="post" action="/ukony/{{ u.id }}/smazat"
               onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
@@ -99,20 +90,26 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=5"></script>
 
 <script>
 (function () {
   var input = document.getElementById('ukony-search');
   if (!input) return;
-  var rows = Array.prototype.slice.call(document.querySelectorAll('.ukony-item[data-search]'));
+  var listEl = document.querySelector('.ukony-list');
   var countEl = document.getElementById('ukony-count');
   var sumEl = document.getElementById('ukony-sum');
+  var rows = [];
   function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
-  rows.forEach(function (r) {
-    r._s = fold(r.getAttribute('data-search'));
-    r._kc = parseInt(r.getAttribute('data-kc'), 10) || 0;
-  });
+  // Znovu posbira radky z DOMu -- vola se pri startu a po kazde vymene seznamu
+  // (filtr firma/mesic/typ/stav), at hledani porad vidi ty spravne elementy.
+  function rebuildRows() {
+    rows = Array.prototype.slice.call(document.querySelectorAll('.ukony-item[data-search]'));
+    rows.forEach(function (r) {
+      r._s = fold(r.getAttribute('data-search'));
+      r._kc = parseInt(r.getAttribute('data-kc'), 10) || 0;
+    });
+  }
   function apply() {
     var q = fold(input.value.trim());
     var n = 0, sum = 0;
@@ -122,23 +119,64 @@
       if (show) { n++; sum += r._kc; }
     });
     if (countEl) countEl.textContent = n;
-    if (sumEl) sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    if (sumEl) sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
+  rebuildRows();
   input.addEventListener('input', apply);
-  // Po uložení úkonu bez reloadu se vymění jeden řádek — sem si modal řekne
-  // o přepočet jeho indexu a součtu, ať filtr i suma dál sedí.
+  // Po ulozeni ukonu bez reloadu se vymeni jeden radek -- sem si modal rekne
+  // o prepocet jeho indexu a souctu, at filtr i suma dal sedi.
   window.ukonySyncRow = function (item) {
     item._s = fold(item.getAttribute('data-search'));
     item._kc = parseInt(item.getAttribute('data-kc'), 10) || 0;
     apply();
   };
-  // Smazání bez reloadu odebere řádek z DOMu — musí zmizet i odtud, jinak by
-  // ho hledání a součet dál počítaly, dokud se stránka příště nenačte.
+  // Smazani bez reloadu odebere radek z DOMu -- musi zmizet i odtud, jinak by
+  // ho hledani a soucet dal pocitaly, dokud se stranka pristi nenacte.
   window.ukonyRemoveRow = function (item) {
     var i = rows.indexOf(item);
     if (i >= 0) rows.splice(i, 1);
     apply();
   };
+
+  // -- Filtr (firma / mesic / typ / stav) BEZ prenacteni stranky --------------
+  // Zmena kterehokoliv filtru drivi odeslala formular = plna navigace, ktera
+  // smazala rozepsane hledani v poli i scroll pozici -- presne ten samy problem,
+  // ktery mely pay/smazat, nez dostaly stejne osetreni. Nactame novou stranku
+  // fetchem, vymenime jen seznam -- hlavicka formulare zustava, jak je (prohlizec
+  // do ni hodnotu vybraneho filtru napise sam jeste pred tim, nez fetch dobehne).
+  var filterForm = document.getElementById('filter-form');
+  var resetLink = document.getElementById('filter-reset');
+
+  function loadFiltered(url) {
+    document.body.classList.add('firma-switching');  // stejne ztlumeni jako firma-switch
+    fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { if (!r.ok) throw new Error('http'); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var freshList = doc.querySelector('.ukony-list');
+        if (!freshList || !listEl) throw new Error('no-list');
+        listEl.innerHTML = freshList.innerHTML;
+        if (doc.title) document.title = doc.title;
+        history.replaceState({}, '', url);
+        rebuildRows();
+        apply();
+      })
+      .catch(function () { window.location.href = url; })  // cokoliv se pokazi -> klasicke nacteni
+      .then(function () { document.body.classList.remove('firma-switching'); });
+  }
+
+  if (filterForm) {
+    filterForm.addEventListener('change', function () {
+      var q = new URLSearchParams(new FormData(filterForm));
+      loadFiltered('/ukony/vse?' + q.toString());
+    });
+  }
+  if (resetLink) {
+    resetLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      loadFiltered(resetLink.getAttribute('href'));
+    });
+  }
 })();
 </script>
 {% endblock %}

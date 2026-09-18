@@ -152,3 +152,22 @@ def test_ppd_nahled_a_extra_vozidla_jsou_zapojena():
     castka_tag = html[html.index('id="ppd_castka"') - 40: html.index('id="ppd_castka"') + 150]
     assert 'placeholder="0"' in castka_tag
     assert 'value="0"' not in castka_tag
+
+
+def test_sdileni_tlacitko_je_zapojene():
+    """Sdílecí odkaz (2026-09-17): tlačítko musí existovat, brát URL z
+    result.<mode>_sdilet a skládat absolutní odkaz (ne jen /s/<token>, ten
+    by se z SMS neotevřel)."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert 'id="btn-sdilet"' in html
+    assert "function kopirujSdileni()" in html
+    assert "zmeny_sdilet" in html and "vyvoz_sdilet" in html
+    blok = html[html.index("function sdileciOdkaz()"):][:400]
+    assert "location.origin" in blok, "odkaz musí být absolutní, jinak je k ničemu"
+
+
+def test_primarni_zadost_ma_jen_jednu_definici():
+    """Mapování mód→soubor bylo dřív zkopírované ve dvou funkcích; ať se
+    zase nerozejde."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert html.count("prevod: 'zmeny', zapis: 'zapis'") == 1
