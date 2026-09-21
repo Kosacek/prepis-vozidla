@@ -57,7 +57,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.14.0"
+__version__ = "1.15.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -396,16 +396,32 @@ def lookup_ico(ico: str) -> dict:
     return {"success": False, "error": "Subjekt nenalezen nebo chyba spojení"}
 
 # ── PDF filling helpers ───────────────────────────────────────────────────────
-def fill_pdf(template_path: str, field_map: dict) -> bytes:
+def _vytvor_writer(zdroj) -> PdfWriter:
+    """PdfWriter nad šablonou (cesta) nebo už hotovými bajty.
+
+    Každé `PdfWriter.append(PdfReader(...))` znamená celý dokument rozebrat a
+    znovu složit — na ARMu NASky ~0,6 s. Proto se kroky (vyplnění, ID, „v z.")
+    dělají nad JEDNÍM writerem a serializuje se až nakonec; viz sestav_zadost.
+    """
+    writer = PdfWriter()
+    writer.append(PdfReader(zdroj) if isinstance(zdroj, str)
+                  else PdfReader(stream=io.BytesIO(zdroj)))
+    return writer
+
+
+def _bajty(writer: PdfWriter) -> bytes:
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def _napln_pole(writer: PdfWriter, field_map: dict) -> None:
     from pypdf.generic import NameObject, BooleanObject, TextStringObject, NumberObject
     NO_UPPER = {'V', 'V_2', 'V_3', 'V_4', 'dne', 'dne_2', 'dne_3', 'dne_4'}
     # AcroForm /Q values: 0=left, 1=center, 2=right. Center the Osvědčení o
     # registraci vozidla (serie + číslo) on page 2/3 of zmena_udaju.pdf and
     # zmeny.pdf so values land in the middle of the dotted underline.
     CENTER_FIELDS = {'fill_3_2', 'fill_4', 'fill_4_2'}
-    reader = PdfReader(template_path)
-    writer = PdfWriter()
-    writer.append(reader)
     if '/AcroForm' in writer._root_object:
         writer._root_object['/AcroForm'].update({NameObject('/NeedAppearances'): BooleanObject(True)})
     for page in writer.pages:
@@ -440,11 +456,14 @@ def fill_pdf(template_path: str, field_map: dict) -> bytes:
                 if str(field_name) in CENTER_FIELDS:
                     update[NameObject('/Q')] = NumberObject(1)
                 annot_obj.update(update)
-    buf = io.BytesIO()
-    writer.write(buf)
-    return buf.getvalue()
 
-def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
+
+def fill_pdf(template_path: str, field_map: dict) -> bytes:
+    writer = _vytvor_writer(template_path)
+    _napln_pole(writer, field_map)
+    return _bajty(writer)
+
+def _nakresli_id(writer: PdfWriter, overlays: list) -> None:
     """overlays: list of (page_index, x, y, text)"""
     import io as _io
     from reportlab.pdfgen import canvas
@@ -481,20 +500,19 @@ def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
 
     # Merge overlay onto filled PDF
     from pypdf.generic import NameObject, BooleanObject
-    base = _R(stream=_io.BytesIO(pdf_bytes))
     overlay_reader = _R(stream=overlay_buf)
-    writer = _W()
-    writer.append(base)
     for i, page in enumerate(writer.pages):
         if i < len(overlay_reader.pages):
             page.merge_page(overlay_reader.pages[i])
     # Ensure NeedAppearances is preserved
     if '/AcroForm' in writer._root_object:
         writer._root_object['/AcroForm'].update({NameObject('/NeedAppearances'): BooleanObject(True)})
-    out = _io.BytesIO()
-    writer.write(out)
-    out.seek(0)
-    return out.read()
+
+
+def add_id_overlay(pdf_bytes: bytes, overlays: list) -> bytes:
+    writer = _vytvor_writer(pdf_bytes)
+    _nakresli_id(writer, overlays)
+    return _bajty(writer)
 
 
 # "v z." (v zastoupení) pre-filled on the APPLICANT signature line at the end
@@ -530,53 +548,129 @@ VZ_SIGNATURE_YS = {
 }
 
 
-def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
+def _vloz_vz(writer: PdfWriter, doc: str) -> bool:
     """Insert an editable text field valued 'v z.' on each applicant signature
     line of the given form. Regular Helvetica via the form's own /Helv resource;
     NeedAppearances (already required for Czech diacritics) makes viewers render
-    the value. Best-effort: returns the input unchanged on any failure."""
-    import io as _io
-    from pypdf import PdfReader as _R, PdfWriter as _W
+    the value. Best-effort: False = nic se nezměnilo."""
     from pypdf.generic import (
         ArrayObject, BooleanObject, DictionaryObject, FloatObject,
         NameObject, NumberObject, TextStringObject,
     )
+    acro = writer._root_object.get("/AcroForm")
+    if acro is None:
+        return False
+    acro = acro.get_object()
+    fields = acro.setdefault(NameObject("/Fields"), ArrayObject())
+    vz_x = VZ_X_PER_DOC.get(doc, VZ_X)
+    for i, (page_idx, y) in enumerate(VZ_SIGNATURE_YS[doc], start=1):
+        field = DictionaryObject({
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Widget"),
+            NameObject("/FT"): NameObject("/Tx"),
+            NameObject("/T"): TextStringObject(f"vz_podpis_{i}"),
+            NameObject("/V"): TextStringObject(VZ_TEXT),
+            NameObject("/DA"): TextStringObject("/Helv 11 Tf 0 g"),
+            NameObject("/Rect"): ArrayObject([
+                FloatObject(vz_x), FloatObject(y - 3),
+                FloatObject(vz_x + 80), FloatObject(y + 11),
+            ]),
+            NameObject("/Ff"): NumberObject(0),     # editable text field
+            NameObject("/F"): NumberObject(4),      # print flag
+        })
+        ref = writer._add_object(field)
+        page = writer.pages[page_idx]
+        field[NameObject("/P")] = page.indirect_reference
+        annots = page.setdefault(NameObject("/Annots"), ArrayObject())
+        annots.append(ref)
+        fields.append(ref)
+    acro[NameObject("/NeedAppearances")] = BooleanObject(True)
+    return True
+
+
+def add_vz_fields(pdf_bytes: bytes, doc: str) -> bytes:
     try:
-        writer = _W()
-        writer.append(_R(stream=_io.BytesIO(pdf_bytes)))
-        acro = writer._root_object.get("/AcroForm")
-        if acro is None:
+        writer = _vytvor_writer(pdf_bytes)
+        if not _vloz_vz(writer, doc):
             return pdf_bytes
-        acro = acro.get_object()
-        fields = acro.setdefault(NameObject("/Fields"), ArrayObject())
-        vz_x = VZ_X_PER_DOC.get(doc, VZ_X)
-        for i, (page_idx, y) in enumerate(VZ_SIGNATURE_YS[doc], start=1):
-            field = DictionaryObject({
-                NameObject("/Type"): NameObject("/Annot"),
-                NameObject("/Subtype"): NameObject("/Widget"),
-                NameObject("/FT"): NameObject("/Tx"),
-                NameObject("/T"): TextStringObject(f"vz_podpis_{i}"),
-                NameObject("/V"): TextStringObject(VZ_TEXT),
-                NameObject("/DA"): TextStringObject("/Helv 11 Tf 0 g"),
-                NameObject("/Rect"): ArrayObject([
-                    FloatObject(vz_x), FloatObject(y - 3),
-                    FloatObject(vz_x + 80), FloatObject(y + 11),
-                ]),
-                NameObject("/Ff"): NumberObject(0),     # editable text field
-                NameObject("/F"): NumberObject(4),      # print flag
-            })
-            ref = writer._add_object(field)
-            page = writer.pages[page_idx]
-            field[NameObject("/P")] = page.indirect_reference
-            annots = page.setdefault(NameObject("/Annots"), ArrayObject())
-            annots.append(ref)
-            fields.append(ref)
-        acro[NameObject("/NeedAppearances")] = BooleanObject(True)
-        out = _io.BytesIO()
-        writer.write(out)
-        return out.getvalue()
+        return _bajty(writer)
     except Exception:
         return pdf_bytes
+
+
+def sestav_zadost(template_path: str, field_map: dict, overlays: list, doc: str) -> bytes:
+    """Celý tiskopis na JEDEN průchod: vyplnit pole, dokreslit ID, přidat
+    „v z." — a teprve pak serializovat.
+
+    Dřív to byly tři samostatné funkce po bajtech za sebou, takže se PDF
+    rozebíralo a skládalo třikrát. Na NASce (ARM Cortex-A55) stál každý
+    průchod ~0,6 s, tedy ~1,2 s navíc na každé žádosti úplně zbytečně
+    (změřeno 2026-09-21 přímo v produkčním kontejneru)."""
+    writer = _vytvor_writer(template_path)
+    _napln_pole(writer, field_map)
+    if overlays:
+        _nakresli_id(writer, overlays)
+    try:
+        _vloz_vz(writer, doc)
+    except Exception:
+        pass   # „v z." je pohodlí, ne podmínka — žádost musí vzniknout i bez něj
+    return _bajty(writer)
+
+
+# ── Udržování v teple ────────────────────────────────────────────────────────
+# NASka má 1961 MB RAM a přes 2 GB odloženo do swapu. Když appka chvíli nic
+# nedělá, jádro její stránky vyhodí na disk: naměřeno 2026-09-21 přímo v
+# produkci — worker měl 15 MB v paměti a 33 MB ve swapu. První žádost po
+# pauze pak čeká, než se to všechno načte zpátky, a místo dvou sekund trvá
+# deset patnáct (přesně to, co David hlásil).
+#
+# Proti tomu pomáhá jediné: občas ten kód použít, aby ho jádro nepovažovalo
+# za zapomenutý. Každé probuzení proto naprázdno sestaví tiskopis a zahodí
+# ho. Stojí to necelou sekundu procesoru jednou za pár minut (na NASce je
+# 90 % času volno), a šetří to sekundy člověku, který kouká na spinner.
+ZAHRIVANI_S = int(os.environ.get("ZAHRIVANI_S", "150"))
+_posledni_prace = 0.0
+_zahrivani_bezi = False
+_zahrivani_zamek = threading.Lock()
+
+
+def oznac_praci() -> None:
+    """Zaznamená skutečný požadavek — zahřívání pak nemá co dohánět."""
+    global _posledni_prace
+    _posledni_prace = time.time()
+
+
+def _zahrej() -> None:
+    """Projde přesně tu cestu, která je jinak studená: pypdf i reportlab."""
+    try:
+        sestav_zadost(PDF_ZMENY, {}, [(0, 554, 628, "ID: 0")], "zmeny")
+    except Exception:
+        pass   # zahřívání nesmí nikdy shodit worker
+
+
+def start_zahrivani(interval_s: int | None = None) -> None:
+    """Spustí udržovací vlákno, jednou za proces (gunicorn má 2 workery a
+    každý si drží vlastní paměť, takže se to spustí v obou)."""
+    global _zahrivani_bezi
+    # Pozor na `or`: nula je taky hodnota (= vypnuto), ne „nezadáno".
+    interval = ZAHRIVANI_S if interval_s is None else interval_s
+    if interval <= 0:
+        return
+    with _zahrivani_zamek:
+        if _zahrivani_bezi:
+            return
+        _zahrivani_bezi = True
+
+    def _smycka():
+        while True:
+            time.sleep(interval)
+            # Když se právě pracovalo, je paměť teplá sama od sebe.
+            if time.time() - _posledni_prace < interval:
+                continue
+            _zahrej()
+            oznac_praci()
+
+    threading.Thread(target=_smycka, daemon=True, name="zahrivani").start()
 
 
 def _prepazkova_hodina(vaha_den: int) -> _time_of_day | None:
@@ -1050,6 +1144,9 @@ _AUTH_EXEMPT = {"/healthz", "/login", "/static"}
 if ADMIN_PASSWORD:
     import tracker_push
     tracker_push.start_sweep(DATA_DIR)
+    # Stejná brána jako u sweepu: jen produkce. Při pytestu ani lokálně nemá
+    # smysl na pozadí přežvykovat tiskopisy.
+    start_zahrivani()
 
 _LOGIN_HTML = """<!doctype html><html lang="cs"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1442,6 +1539,7 @@ def api_generate():
     if mode not in {"prevod", "zapis", "zmena", "3rz", "vyvoz"}:
         return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
 
+    oznac_praci()
     out_dir = os.path.join(DATA_DIR, "output")
     os.makedirs(out_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1477,23 +1575,18 @@ def api_generate():
     if mode == "prevod":
         # Převod vlastnictví = JEN žádost o změnu vlastníka (zmeny.pdf).
         # Zápis do registru (zapis.pdf) se u převodu NEgeneruje.
-        zmeny_bytes = fill_pdf(PDF_ZMENY, build_zmeny_fields(data))
-        if zmeny_overlays: zmeny_bytes = add_id_overlay(zmeny_bytes, zmeny_overlays)
-        zmeny_bytes = add_vz_fields(zmeny_bytes, "zmeny")
+        zmeny_bytes = sestav_zadost(PDF_ZMENY, build_zmeny_fields(data), zmeny_overlays, "zmeny")
         name = hledani.nazev_vystupu("zmeny", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmeny_bytes)
         result["zmeny"] = f"/download/{name}"
         sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Žádost o změnu vlastníka"})
     elif mode == "zmena":
-        zmena_bytes = fill_pdf(PDF_ZMENA, build_zmena_fields(data))
         zmena_overlays = []
         if _id_text(data.get("novy_id")):
             zmena_overlays.append((0, 540, 630, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
             zmena_overlays.append((0, 540, 438, _id_text(data["novy_prov_id"])))
-        if zmena_overlays:
-            zmena_bytes = add_id_overlay(zmena_bytes, zmena_overlays)
-        zmena_bytes = add_vz_fields(zmena_bytes, "zmena")
+        zmena_bytes = sestav_zadost(PDF_ZMENA, build_zmena_fields(data), zmena_overlays, "zmena")
         name = hledani.nazev_vystupu("zmena", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zmena_bytes)
         result["zmena"] = f"/download/{name}"
@@ -1504,15 +1597,12 @@ def api_generate():
         # stížnost 2026-09-16). Souřadnice změřené proti fill_2/fill_6 na
         # 3rz.pdf (bottom-origin y = pata pole + 3, stejná konvence jako u
         # zmeny.pdf/zapis.pdf výš).
-        trz_bytes = fill_pdf(PDF_3RZ, build_3rz_fields(data))
         trz_overlays = []
         if _id_text(data.get("novy_id")):
             trz_overlays.append((0, 554, 631, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
             trz_overlays.append((0, 554, 422, _id_text(data["novy_prov_id"])))
-        if trz_overlays:
-            trz_bytes = add_id_overlay(trz_bytes, trz_overlays)
-        trz_bytes = add_vz_fields(trz_bytes, "3rz")
+        trz_bytes = sestav_zadost(PDF_3RZ, build_3rz_fields(data), trz_overlays, "3rz")
         name = hledani.nazev_vystupu("3rz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(trz_bytes)
         result["3rz"] = f"/download/{name}"
@@ -1521,23 +1611,18 @@ def api_generate():
         # Stejná chyba, stejná oprava jako u 3rz výš — souřadnice změřené
         # proti fill_2/fill_7 na vyvoz.pdf (provozovatel jméno je tu fill_7,
         # ne fill_6 jako na 3rz.pdf — jiný formulář, jiné číslování polí).
-        vyv_bytes = fill_pdf(PDF_VYVOZ, build_vyvoz_fields(data))
         vyv_overlays = []
         if _id_text(data.get("novy_id")):
             vyv_overlays.append((0, 554, 621, _id_text(data["novy_id"])))
         if data.get("novy_prov_jiny") and _id_text(data.get("novy_prov_id")):
             vyv_overlays.append((0, 554, 397, _id_text(data["novy_prov_id"])))
-        if vyv_overlays:
-            vyv_bytes = add_id_overlay(vyv_bytes, vyv_overlays)
-        vyv_bytes = add_vz_fields(vyv_bytes, "vyvoz")
+        vyv_bytes = sestav_zadost(PDF_VYVOZ, build_vyvoz_fields(data), vyv_overlays, "vyvoz")
         name = hledani.nazev_vystupu("vyvoz", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(vyv_bytes)
         result["vyvoz"] = f"/download/{name}"
         sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Vývoz vozidla"})
     else:  # zapis noveho vozidla
-        zapis_bytes = fill_pdf(PDF_ZAPIS, build_zapis_fields(data))
-        if zapis_overlays: zapis_bytes = add_id_overlay(zapis_bytes, zapis_overlays)
-        zapis_bytes = add_vz_fields(zapis_bytes, "zapis")
+        zapis_bytes = sestav_zadost(PDF_ZAPIS, build_zapis_fields(data), zapis_overlays, "zapis")
         name = hledani.nazev_vystupu("zapis", data, ts, out_dir)
         with open(os.path.join(out_dir, name), "wb") as f: f.write(zapis_bytes)
         result["zapis"] = f"/download/{name}"
