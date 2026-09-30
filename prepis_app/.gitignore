@@ -31,3 +31,7 @@ tahaky/
 failed_pushes.jsonl.lock
 share_tokens.jsonl
 share_tokens.jsonl.lock
+
+# Šablona plné moci s osobními údaji (adresa, datum narození) — repo je veřejné.
+# Staví se přes scripts/postav_plnou_moc.py a nahrává rovnou na NAS.
+pdfs/plna_moc_roman.pdf

@@ -149,6 +149,23 @@ def test_uspesne_prihlaseni_smaze_pocitadlo(prod):
     assert znovu.status_code == 401, "po úspěchu se má počítadlo vynulovat"
 
 
+def test_mezera_kolem_hesla_neprekazi(prod):
+    """Reálná stížnost 2026-09-30: David zadával správné heslo a appka ho
+    13× odmítla. Server správné heslo bere — prohlížeč posílal něco jiného.
+    Nejčastější viník je mezera na konci z kopírování nebo automatického
+    vyplnění, a tu nemá smysl trestat: heslo mezeru nikdy neobsahuje."""
+    r = prod.post("/login", data={"password": "  heslo-jen-pro-test "},
+                  base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 302
+
+
+def test_orezani_mezer_nepovoluje_jine_heslo(prod):
+    """Tolerance jen na bílé znaky — velikost písmen se dál hlídá přesně."""
+    r = prod.post("/login", data={"password": "HESLO-JEN-PRO-TEST"},
+                  base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 401
+
+
 def test_heslo_se_porovnava_v_konstantnim_case():
     """Naivní == prozradí heslo po znacích měřením času."""
     import inspect

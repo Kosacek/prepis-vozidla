@@ -44,9 +44,12 @@ ZMOCNENCI: dict[str, dict] = {
               "kolonky_v_sablone": True},
     "Petr": {"soubor": "plna_moc_petr.pdf", "kdo": "Petr Kosek",
              "kolonky_v_sablone": False},
-    # Roman zatím vlastní šablonu nemá — David ji dodá. Do té doby si musí
-    # vybrat, na koho plnou moc vystavit; radši to přiznat než mlčky použít
-    # cizí jméno na dokumentu, který jde na úřad.
+    # Postavená z Petrovy šablony přes scripts/postav_plnou_moc.py — stejný
+    # papír, jen jiný natištěný zmocněnec. Soubor je jen na NASce, NE v gitu
+    # (adresa + datum narození, repo je veřejné); lokálně ho postavíš tím
+    # skriptem. Když chybí, sablona() vrátí None a UI to řekne na rovinu.
+    "Roman": {"soubor": "plna_moc_roman.pdf", "kdo": "Roman Kosek",
+              "kolonky_v_sablone": False},
 }
 
 

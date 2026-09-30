@@ -133,16 +133,86 @@ def test_date_is_today_not_the_zadost_date():
 
 
 def test_unknown_profil_has_no_template():
-    """Roman zatím šablonu nemá — radši to přiznat než použít cizí jméno
-    na dokumentu, který jde na úřad."""
-    assert pm.sablona(A.BASE_DIR, "Roman") is None
+    """Profil bez šablony — radši to přiznat než použít cizí jméno na
+    dokumentu, který jde na úřad."""
+    assert pm.sablona(A.BASE_DIR, "Neznamy") is None
     assert pm.sablona(A.BASE_DIR, "") is None
+
+
+def test_znamy_profil_bez_souboru_nic_nevrati(tmp_path):
+    """Romanova šablona NENÍ v gitu (adresa + datum narození, repo je
+    veřejné). Kdo si repo naklonuje, ten soubor nemá — a appka pak nesmí
+    spadnout ani potichu podstrčit cizí papír."""
+    (tmp_path / "pdfs").mkdir()
+    assert pm.sablona(str(tmp_path), "Roman") is None
+
+
+# ── Roman ─────────────────────────────────────────────────────────────────────
+import os as _os
+
+_ROMAN = _os.path.join(A.BASE_DIR, "pdfs", "plna_moc_roman.pdf")
+potrebuje_romana = pytest.mark.skipif(
+    not _os.path.exists(_ROMAN),
+    reason="plna_moc_roman.pdf je jen na NASce (není v gitu) — postav ji "
+           "přes scripts/postav_plnou_moc.py")
+
+
+@potrebuje_romana
+def test_roman_ma_sablonu():
+    path, z = pm.sablona(A.BASE_DIR, "Roman")
+    assert path.endswith("plna_moc_roman.pdf")
+    assert z["kdo"] == "Roman Kosek"
+
+
+@potrebuje_romana
+def test_roman_je_v_nabidce_zmocnencu():
+    assert "Roman" in {z["profil"] for z in pm.dostupni()}
+
+
+@potrebuje_romana
+def test_na_romanove_plne_moci_je_natisteny_roman_ne_petr():
+    """Šablona vznikla z Petrovy — Petrovo jméno na ní nesmí zůstat."""
+    import fitz
+    text = fitz.open(_ROMAN)[0].get_text()
+    assert "Romana" in text and "Koska" in text
+    assert "Petra" not in text
+    # Adresu schválně nevypisujeme (veřejné repo) — stačí ověřit, že se
+    # vysázelo „ň“, které Petrova nevložená Helvetica neumí.
+    assert "ň" in text, "„ň“ se musí vysázet, ne vypadnout"
+
+
+@potrebuje_romana
+def test_romanova_sablona_je_stejny_papir_jako_petrova():
+    """Úřad má dostat stejný tiskopis, ať ho tiskne kdokoliv — stejná pole
+    na stejných místech."""
+    import fitz
+    def pole(cesta):
+        return {w.field_name: tuple(round(v, 1) for v in w.rect)
+                for w in fitz.open(cesta)[0].widgets()}
+    assert pole(_ROMAN) == pole(_os.path.join(A.BASE_DIR, "pdfs", "plna_moc_petr.pdf"))
+
+
+@potrebuje_romana
+@pytest.mark.parametrize("s_vozidlem", [True, False])
+def test_roman_vyplni_plnou_moc(s_vozidlem):
+    strana = {"jmeno": "AUTO TEST S.R.O.", "rc_ic": "12345678", "adresa": "HLAVNI 1, BRNO"}
+    voz = {"rz": "1AB2345", "vin": "TMBEK6NW7M3158470"} if s_vozidlem else None
+    path, _ = pm.sablona(A.BASE_DIR, "Roman")
+    raw = A.fill_pdf(path, pm.build_fields(strana, voz))
+    pdf = pm.s_vozidlem(raw, voz) if voz else pm.bez_vozidla(raw)
+    hodnoty = {k: str(v.get("/V", "")) for k, v in
+               (pypdf.PdfReader(io.BytesIO(pdf)).get_fields() or {}).items()}
+    assert hodnoty[pm.POLE["zmocnitel"]] == "AUTO TEST S.R.O."
+    if s_vozidlem:
+        assert hodnoty[pm.POLE["vin"]] == "TMBEK6NW7M3158470"
+    else:
+        assert pm.POLE["vin"] not in hodnoty
 
 
 # ── route ─────────────────────────────────────────────────────────────────────
 
 def test_route_rejects_profil_without_template(client):
-    r = client.post("/api/plna-moc", json={"profil": "Roman", "zdroj": "x", "role": "y"})
+    r = client.post("/api/plna-moc", json={"profil": "Neznamy", "zdroj": "x", "role": "y"})
     assert r.status_code == 400
     assert "šablonu" in r.get_json()["error"]
 

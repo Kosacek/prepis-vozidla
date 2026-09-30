@@ -57,7 +57,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.15.0"
+__version__ = "1.16.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1182,7 +1182,9 @@ def login():
             return (_LOGIN_HTML.replace("__ERR__",
                     '<div class="err">Příliš mnoho pokusů. Zkus to za %d min.</div>' % minut),
                     429, {"Retry-After": str(zbyva)})
-        if hmac.compare_digest(_rq.form.get("password", ""), ADMIN_PASSWORD):
+        # strip(): mezera navíc z kopírování / automatického vyplnění nemá
+        # zamknout správné heslo (heslo samo mezeru nikdy neobsahuje).
+        if hmac.compare_digest(_rq.form.get("password", "").strip(), ADMIN_PASSWORD):
             _zapomen_pokusy(ip)
             session["authed"] = True
             return redirect("/")
