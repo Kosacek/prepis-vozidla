@@ -15,6 +15,14 @@ import app as A
 import pm
 import prefill
 
+# Šablony plné moci nejsou v gitu (adresa + datum narození, repo je veřejné —
+# 2026-10-01 vyřezány z historie). Na Davidově PC a na NASce leží; v čerstvém
+# klonu chybí a testy by padaly na None místo cesty. Radši je přeskočit.
+_SABLONY = [os.path.join(A.BASE_DIR, "pdfs", f"plna_moc_{k}.pdf") for k in ("david", "petr")]
+pytestmark = pytest.mark.skipif(
+    not all(os.path.exists(p) for p in _SABLONY),
+    reason="šablony plné moci nejsou v gitu — leží jen na disku a na NASce")
+
 PREVOD = {
     "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
     "puvodni_jmeno": "PRODEJCE S.R.O.", "puvodni_ico": "27082440",

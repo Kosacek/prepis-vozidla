@@ -32,6 +32,8 @@ failed_pushes.jsonl.lock
 share_tokens.jsonl
 share_tokens.jsonl.lock
 
-# Šablona plné moci s osobními údaji (adresa, datum narození) — repo je veřejné.
-# Staví se přes scripts/postav_plnou_moc.py a nahrává rovnou na NAS.
-pdfs/plna_moc_roman.pdf
+# Šablony plné moci mají natištěnou adresu a datum narození zmocněnce — repo
+# je veřejné. Davidova a Petrova tu dřív byly a 2026-10-01 se musely vyřezat
+# z celé historie (force-push). Leží jen na disku a na NASce; nové se staví
+# přes scripts/postav_plnou_moc.py. NIKDY je nepřidávat (ani `git add -A`).
+pdfs/plna_moc_*.pdf
