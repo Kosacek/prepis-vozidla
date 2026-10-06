@@ -57,7 +57,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.16.0"
+__version__ = "1.16.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1687,7 +1687,9 @@ def api_generate():
                 "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
                 "date": today, "payer": payer, "payer_ico": payer_ico,
                 "payer_address": payer_address, "amount": amount, "purpose": purpose,
-                "spz": rz, "vin": vin,
+                # rz_full, ne rz: tisková stránka se staví ze zálohy, a s holou
+                # hlavní SPZ zmizela auta z „+ Přidat vozidlo" (doklad č. 174).
+                "spz": rz_full, "vin": vin,
             })
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
@@ -1924,6 +1926,12 @@ def ppd_print(number):
             rec = {**live, "ico": "", "adresa": "", "spz": live.get("vozidlo", ""), "vin": ""}
     if rec is None:
         return Response("Doklad nenalezen.", status=404, mimetype="text/plain")
+    if not rec.get("spz") and not rec.get("vin"):
+        # Doklady vystavené před opravou mají v záloze jen hlavní SPZ — a když
+        # byla prázdná, nevytisklo se žádné auto. Ledger je má celé (vozidlo).
+        live = next((r for r in ppd.read_ppd_log(DATA_DIR) if r.get("cislo") == number), None)
+        if live and live.get("vozidlo"):
+            rec = {**rec, "spz": live["vozidlo"]}
     words = ppd.amount_to_words_cs(rec.get("castka") or 0)
     from flask import make_response
     resp = make_response(render_template("ppd_print.html", r=rec, words=words,

@@ -148,6 +148,72 @@ def test_ppd_works_with_no_extra_spz(client, tmp_path, monkeypatch):
     assert row[5] == "1AB2345"
 
 
+# ── Tisk dokladu s víc auty ──────────────────────────────────────────────────
+# Reálná chyba 2026-10-06 (doklad č. 174, 3 auta, 3900 Kč): PDF auta mělo,
+# ale tlačítko „Vytisknout PPD" je vynechalo. Tisková stránka se staví ze
+# ZÁLOHY a do ní se ukládala jen hlavní SPZ — u Davida prázdná, protože
+# všechna tři auta přidal přes „+ Přidat vozidlo". Testy výš hlídaly jen
+# ledger, ne to, co se opravdu tiskne.
+
+def _tisk(client, payload):
+    data = client.post("/api/generate", json=payload).get_json()
+    return client.get(data["ppd_print"]).get_data(as_text=True)
+
+
+def test_tisk_ukaze_vsechna_auta(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    html = _tisk(client, _payload(ppd_extra_spz="2CD6789, 3EF1234"))
+    for spz in ("1AB2345", "2CD6789", "3EF1234"):
+        assert spz in html, f"{spz} chybí na tištěném dokladu"
+
+
+def test_tisk_ukaze_auta_i_bez_hlavni_spz(client, tmp_path, monkeypatch):
+    """Přesně Davidův případ: hlavní SPZ prázdná, všechna auta z rozbalovátka."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    html = _tisk(client, _payload(registracni_znacka="", vin="",
+                                  ppd_extra_spz="1AKB126, 3BP3109, 1AKT148"))
+    for spz in ("1AKB126", "3BP3109", "1AKT148"):
+        assert spz in html, f"{spz} chybí na tištěném dokladu"
+
+
+def test_zaloha_nese_vsechna_auta(client, tmp_path, monkeypatch):
+    """Záloha je zdroj pravdy pro tisk i pro obnovu smazaného dokladu."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789"))
+    import ppd as ppdmod
+    assert ppdmod.read_backup(str(tmp_path))[0]["spz"] == "1AB2345, 2CD6789"
+
+
+def test_tisk_a_pdf_maji_stejna_auta(client, tmp_path, monkeypatch):
+    """PDF a tisková stránka jsou dvě různá vykreslení — nesmí se rozejít."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    data = client.post("/api/generate", json=_payload(
+        registracni_znacka="", ppd_extra_spz="1AKB126, 3BP3109")).get_json()
+    from pypdf import PdfReader
+    pdf = PdfReader(os.path.join(str(tmp_path), "output", data["ppd"].split("/")[-1]))
+    pdf_text = pdf.pages[0].extract_text()
+    html = client.get(data["ppd_print"]).get_data(as_text=True)
+    for spz in ("1AKB126", "3BP3109"):
+        assert spz in pdf_text and spz in html
+
+
+def test_tisk_starsiho_poskozeneho_zaznamu_vezme_auta_z_ledgeru(client, tmp_path, monkeypatch):
+    """Doklady vystavené před opravou mají v záloze SPZ prázdnou. Ledger auta
+    má správně — tisk si je má vzít odtud, místo aby nevytiskl nic."""
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    import ppd as ppdmod
+    n = ppdmod.reserve_ppd_number_and_log(str(tmp_path), {
+        "date": "06.10.2026", "payer": "JE & NE", "amount": 3900,
+        "purpose": "Zastupování na MMB", "vehicle": "1AKB126, 3BP3109, 1AKT148"})
+    ppdmod.append_backup(str(tmp_path), {
+        "cislo": n, "ts": "2026-10-06T10:19:54", "date": "06.10.2026", "payer": "JE & NE",
+        "payer_ico": "", "payer_address": "", "amount": 3900,
+        "purpose": "Zastupování na MMB", "spz": "", "vin": ""})   # tak to zapsala chyba
+    html = client.get(f"/ppd-print/{n}").get_data(as_text=True)
+    for spz in ("1AKB126", "3BP3109", "1AKT148"):
+        assert spz in html
+
+
 def test_ppd_slovy_endpoint(client):
     r = client.get("/api/ppd-slovy?castka=1300")
     assert r.status_code == 200
