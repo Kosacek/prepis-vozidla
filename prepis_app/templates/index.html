@@ -1453,7 +1453,8 @@ function navBack() {
 
 function activatePanel(n) {
   // Close camera when leaving panel-1 so the device is fully released
-  if (n !== 1 && cameraStream) closeCamera();
+  // (i když se zrovna otevírá — jinak by dorazila až po odchodu a běžela skrytá)
+  if (n !== 1 && (cameraStream || _camOpening)) closeCamera();
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
   // The generate step uses a wider two-column layout (inputs + Shrnutí sidebar).
@@ -3081,32 +3082,72 @@ function printPpd() {
 }
 
 // ── Camera ────────────────────────────────────────────────────────────────────
+// Reálná stížnost 2026-10-07: po pár žádostech kamera přestala fungovat a
+// pomohlo jen vytáhnout USB a obnovit stránku. Příčina: proudy z kamery se
+// otevíraly a NEZAVÍRALY. getUserMedia trvá u USB kamery 0,5–2 s a stará
+// pojistka `if (cameraStream) return` platila až PO jeho dokončení — dvě
+// otevření těsně po sobě (automatika + klik na Kamera / opakovací handler)
+// otevřela dva proudy, druhý přepsal první a ten běžel dál navždy. Proud,
+// který dorazil až po odchodu z kroku 1, běžel skrytý. A „Nová žádost"
+// stránku obnovila, aniž kameru pustila. Každý takový proud drží ovladač a
+// po pár kusech se Windows ovladač kamery zasekne.
+//
+// Proto: nejvýš jedno otevírání naráz (_camOpening), zavření zneplatní i
+// otevírání, které ještě běží (_camGen), a před obnovením stránky / jejím
+// opuštěním se kamera vždycky pustí.
 let cameraStream = null;
+let _camOpening = null;       // probíhající getUserMedia — další žádosti se k němu připojí
+let _camGen = 0;              // closeCamera ho zvýší; proud ze starší generace se hned zastaví
 let _scanInFlight = false;
 let _camRetryArmed = false;   // a pointerdown retry is already waiting
+
+function _zastavProud(s) {
+  try { s.getTracks().forEach(t => t.stop()); } catch (_) {}
+}
+
+// Jediné místo, které kameru opravdu otevírá.
+function _otevriProud() {
+  if (cameraStream) return Promise.resolve(cameraStream);
+  if (_camOpening) return _camOpening;
+  const gen = _camGen;
+  const p = (async () => {
+    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    // Mezitím se kamera zavřela nebo se odešlo z kroku 1 → hned pustit,
+    // jinak by běžela skrytá a držela ovladač.
+    if (gen !== _camGen || currentPanel() !== 1) { _zastavProud(s); return null; }
+    cameraStream = s;
+    const video = document.getElementById('camera-video');
+    video.srcObject = s;
+    try { await video.play(); } catch (_) { /* play may need user gesture later */ }
+    document.getElementById('camera-container').style.display = '';
+    return s;
+  })();
+  // Uklízet AŽ zvenku: kdyby getUserMedia selhal synchronně (třeba stránka
+  // bez https nemá mediaDevices), vnitřní finally by proběhlo dřív než
+  // přiřazení — _camOpening by navždy zůstal viset a kamera by už nešla.
+  _camOpening = p;
+  p.then(() => {}, () => {}).then(() => { if (_camOpening === p) _camOpening = null; });
+  return p;
+}
 
 // Try to auto-open the camera silently — meant to be on whenever Step 1 is
 // showing (initial load, after "Nová žádost", and on Back to Step 1). Once the
 // site has camera permission, getUserMedia resolves with no user gesture, so
-// this opens by itself. Two fallbacks: a short retry for a transient device
-// hiccup (device still releasing right after a reload/scan), and a one-shot
-// click retry when the browser insists on a user gesture.
+// this opens by itself. Two fallbacks: a retry with growing pauses for a busy
+// device (still releasing right after a reload/scan — NotReadableError), and a
+// one-shot click retry when the browser insists on a user gesture.
 async function tryAutoOpenCamera(attempt = 0) {
-  if (cameraStream) return;                                   // already open
+  if (cameraStream || _camOpening) return;                    // open / opening
   if (typeof currentPanel === 'function' && currentPanel() !== 1) return;  // only on the scan step
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    cameraStream = stream;
+    await _otevriProud();
     _camRetryArmed = false;
-    const video = document.getElementById('camera-video');
-    video.srcObject = stream;
-    try { await video.play(); } catch(_) { /* play may need user gesture later */ }
-    document.getElementById('camera-container').style.display = '';
   } catch (e) {
     const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    if (!blocked && attempt < 3 && currentPanel() === 1) {
-      // Transient (device busy right after a reload) — retry shortly.
-      setTimeout(() => tryAutoOpenCamera(attempt + 1), 400);
+    if (!blocked && attempt < 5 && currentPanel() === 1) {
+      // Zařízení se ještě uvolňuje — dát mu víc času než dřív (0,5 → 2,5 s),
+      // místo aby se do napůl uvolněné kamery bušilo každých 400 ms.
+      setTimeout(() => tryAutoOpenCamera(attempt + 1), 500 * (attempt + 1));
       return;
     }
     if (_camRetryArmed) return;     // don't stack handlers
@@ -3189,39 +3230,40 @@ document.addEventListener('keydown', (e) => {
   quickScanOrv();
 });
 
+// Tlačítko „Kamera": vždycky čistý restart — pustit, co je otevřené i co se
+// zrovna otevírá, chvíli počkat na uvolnění zařízení a otevřít znovu.
 async function openCamera() {
-  const container = document.getElementById('camera-container');
-  const video = document.getElementById('camera-video');
-  // Fully tear down any previous stream
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(t => t.stop());
-    cameraStream = null;
-  }
-  video.srcObject = null;
-  // Small delay to let the browser fully release the device
-  await new Promise(r => setTimeout(r, 300));
+  closeCamera();
+  // Otevírání, které ještě běží, po closeCamera samo skončí a pustí proud;
+  // počkat na něj, jinak by se k němu nové otevření jen připojilo.
+  if (_camOpening) { try { await _camOpening; } catch (_) {} }
+  await new Promise(r => setTimeout(r, 300));   // let the browser fully release the device
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    video.srcObject = cameraStream;
-    await video.play();
-    container.style.display = '';
+    await _otevriProud();
   } catch(e) {
     alert('Kamera není dostupná: ' + e.message);
   }
 }
 
 function closeCamera() {
+  _camGen++;                     // zneplatní i otevírání, které ještě běží
   const video = document.getElementById('camera-video');
   if (video) {
     video.pause();
     video.srcObject = null;
   }
   if (cameraStream) {
-    cameraStream.getTracks().forEach(t => t.stop());
+    _zastavProud(cameraStream);
     cameraStream = null;
   }
-  document.getElementById('camera-container').style.display = 'none';
+  const container = document.getElementById('camera-container');
+  if (container) container.style.display = 'none';
 }
+
+// Obnovení stránky („Nová žádost"), zavření záložky, odchod jinam — kameru
+// pustit výslovně. Spoléhat na úklid prohlížeče nestačí: nová stránka pak
+// sahá po kameře, kterou stará ještě nepustila.
+window.addEventListener('pagehide', () => { closeCamera(); });
 
 async function capturePhoto() {
   const video = document.getElementById('camera-video');
@@ -3435,7 +3477,10 @@ async function scanDoc(input, target) {
   }
 }
 
-function resetForm() { location.reload(); }
+function resetForm() {
+  closeCamera();       // pustit kameru dřív, než ji nová stránka bude chtít
+  location.reload();
+}
 
 // ── Model toggle ──────────────────────────────────────────────────────────────
 function getModel() { return localStorage.getItem('scan_model') || 'sonnet'; }
