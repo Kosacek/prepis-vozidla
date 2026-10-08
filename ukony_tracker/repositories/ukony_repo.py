@@ -82,6 +82,31 @@ def find_by_vehicle(
     ).fetchone()
 
 
+def find_by_vehicle_any_firm(
+    conn: sqlite3.Connection,
+    vin: str | None = None,
+    rz: str | None = None,
+    limit: int = 20,
+) -> list[sqlite3.Row]:
+    """Newest matching úkony across all firms; VIN takes precedence over RZ."""
+    v = (vin or "").strip().replace(" ", "")
+    r = (rz or "").strip().replace(" ", "")
+    if v:
+        col, val = "vin", v
+    elif r:
+        col, val = "rz", r
+    else:
+        return []
+    # `col` is one of our own two literals above, never user input.
+    return conn.execute(
+        "SELECT u.*, f.nazev AS firma, f.zkratka AS firma_zkratka"
+        " FROM ukony u JOIN firmy f ON f.id=u.firma_id"
+        f" WHERE REPLACE(UPPER(TRIM(u.{col})), ' ', '')=UPPER(TRIM(?))"
+        " ORDER BY u.datum DESC, u.id DESC LIMIT ?",
+        (val, limit),
+    ).fetchall()
+
+
 def get_with_firma(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:
     """Úkon i se zkratkou firmy — přesně to, co potřebuje partial _recent_rows.html
     při výměně jednoho řádku po uložení bez reloadu."""
