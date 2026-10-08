@@ -2,7 +2,7 @@ import pytest
 import app as appmod
 import db
 import config
-from repositories import firmy_repo, typy_repo, ukony_repo
+from repositories import firma_ceny_repo, firmy_repo, typy_repo, ukony_repo
 
 
 @pytest.fixture
@@ -24,6 +24,57 @@ def test_entry_page_renders(client_fid):
     r = c.get(f"/ukony/{fid}")
     assert r.status_code == 200
     assert "Nový úkon" in r.get_data(as_text=True)
+
+
+def test_navigation_opens_full_list_and_dashboard_add_opens_overlay(client_fid):
+    c, _ = client_fid
+    assert '<a href="/ukony/vse">Úkony</a>' in c.get('/ukony/vse').get_data(as_text=True)
+    assert 'data-new-ukon' in c.get('/ukony/vse').get_data(as_text=True)
+    assert 'href="/ukony/vse?novy=1"' in c.get('/').get_data(as_text=True)
+
+
+def test_new_modal_fragment_uses_first_active_firma_and_selected_prices(client_fid):
+    c, fid = client_fid
+    with c.application.app_context():
+        conn = db.get_db()
+        other = firmy_repo.create(conn, nazev="Albion", zkratka="Albion", ico="2")
+        firma_ceny_repo.set_price(conn, other, "PŘEVOD", 1750)
+        firma_ceny_repo.set_price(conn, fid, "PŘEVOD", 1500)
+    first = c.get('/ukony/novy?modal=1')
+    body = first.get_data(as_text=True)
+    assert first.status_code == 200 and '<html' not in body
+    assert f'action="/ukony/{other}"' in body  # first active in list order
+    assert 'data-cena="1750"' in body and 'name="celkem" id="celkem" inputmode="numeric" value="1750"' in body
+    selected = c.get(f'/ukony/novy?modal=1&firma={fid}&rz=1AB2345&vin=VIN123')
+    body = selected.get_data(as_text=True)
+    assert f'action="/ukony/{fid}"' in body and 'data-cena="1500"' in body
+    assert 'value="1AB2345"' in body and 'value="VIN123"' in body
+
+
+def test_add_ajax_returns_full_list_item_and_saves(client_fid):
+    c, fid = client_fid
+    r = c.post(f'/ukony/{fid}', data={
+        'datum': '2026-05-04', 'typ_kod': 'PŘEVOD', 'celkem': '1300',
+        'rz': '3BP3552', 'orv': 'ORV123', 'poznamka': 'TZ',
+    }, headers={'X-Requested-With': 'fetch'})
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data['ok'] is True and data['id']
+    assert 'class="ukony-item"' in data['html'] and 'data-search=' in data['html']
+    assert '3BP3552' in data['html'] and f'/ukony/{data["id"]}/upravit' in data['html']
+    with c.application.app_context():
+        assert ukony_repo.get(db.get_db(), data['id'])['rz'] == '3BP3552'
+
+
+def test_add_ajax_invalid_data_is_json_and_does_not_save(client_fid):
+    c, fid = client_fid
+    r = c.post(f'/ukony/{fid}', data={
+        'datum': '2026-05-04', 'typ_kod': 'PŘEVOD', 'celkem': 'abc', 'rz': '3BP3552',
+    }, headers={'X-Requested-With': 'fetch'})
+    assert r.status_code == 400
+    assert r.get_json()['ok'] is False and r.get_json()['error']
+    with c.application.app_context():
+        assert ukony_repo.list(db.get_db(), firma_id=fid) == []
 
 
 def test_post_creates_ukon(client_fid):

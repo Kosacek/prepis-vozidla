@@ -1527,6 +1527,15 @@ a.kpi-link:hover {
 }
 .modal-close:hover { background: var(--bg); color: var(--ink); }
 
+.ukon-new-message { margin: 0 0 var(--sp-3); font-weight: 600; }
+.ukon-new-message.success { color: var(--success, #21834b); }
+.ukon-new-message.error { color: var(--danger, #bf3434); }
+
+@media (max-width: 560px) {
+  .modal-backdrop { padding: var(--sp-2); }
+  .modal-card { max-height: calc(100dvh - 2 * var(--sp-2)); }
+}
+
 body.modal-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {

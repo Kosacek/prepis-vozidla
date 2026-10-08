@@ -70,6 +70,33 @@ def entry_default():
     return redirect(url_for("ukony.entry", firma_id=firmy[0]["id"]))
 
 
+@bp.get("/ukony/novy")
+def new_form():
+    """The add form alone, for the full-list overlay."""
+    conn = db.get_db()
+    firmy = firmy_repo.list_all(conn, only_active=True)
+    if not firmy:
+        return '<p class="muted">Zatím nemáš žádnou aktivní firmu. <a href="/firmy">Přidej firmu →</a></p>'
+    requested = request.args.get("firma", type=int)
+    firma = next((f for f in firmy if f["id"] == requested), firmy[0])
+    return render_template(
+        "_ukon_new_modal.html", firma=firma, firmy=firmy,
+        typy=typy_repo.list_active(conn),
+        ceny=pricing_service.firm_price_map(conn, firma["id"]),
+        firma_colors=colors_service.firma_color_map(conn),
+        mesic=request.args.get("mesic") or _this_month(),
+        dnes=request.args.get("datum") or date.today().isoformat(),
+        sel_typ=request.args.get("typ") or "",
+        sel_celkem=request.args.get("celkem"),
+        sel_rz=request.args.get("rz") or "",
+        sel_vin=request.args.get("vin") or "",
+        sel_orv=request.args.get("orv") or "",
+        sel_pozn=request.args.get("poznamka") or "",
+        sel_zpracoval=request.args.get("zpracoval") or "",
+        form_context="modal",
+    )
+
+
 @bp.get("/ukony/<int:firma_id>")
 def entry(firma_id):
     conn = db.get_db()
@@ -113,6 +140,7 @@ def add(firma_id):
     if not firmy_repo.get(conn, firma_id):
         abort(404)
     f = request.form
+    ajax = request.headers.get("X-Requested-With") == "fetch"
     # Carry the typ/date/price/note back so the next car of the same kind can be
     # added with just a new RZ/VIN — those two fields are the only ones cleared.
     carry = {"mesic": f.get("mesic"), "datum": f.get("datum"),
@@ -122,7 +150,7 @@ def add(firma_id):
     if f.get("zpracoval"):
         carry["zpracoval"] = f.get("zpracoval")  # keep the person for the next car
     try:
-        ing.pridat_ukon(
+        uid = ing.pridat_ukon(
             conn,
             firma_id=firma_id,
             datum=f.get("datum"),
@@ -134,8 +162,20 @@ def add(firma_id):
             poznamka=f.get("poznamka") or None,
             zpracoval=f.get("zpracoval") or None,
         )
+        if ajax:
+            u = ukony_repo.get_with_firma(conn, uid)
+            return jsonify(
+                ok=True, id=uid,
+                html=render_template(
+                    "_ukony_item.html", u=u,
+                    firma_colors=colors_service.firma_color_map(conn),
+                    back_url=url_for("ukony.table"),
+                ),
+            )
         flash("Úkon přidán.", "success")
-    except ing.IngestError as e:
+    except (ing.IngestError, sqlite3.IntegrityError) as e:
+        if ajax:
+            return jsonify(ok=False, error=str(e)), 400
         flash(str(e), "error")
         # Nothing was saved — also keep RZ/VIN so the typed input isn't lost.
         if f.get("rz"):

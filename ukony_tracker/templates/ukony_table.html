@@ -6,6 +6,7 @@
 
 <div class="page-header">
   <h1>Úkony</h1>
+  <div class="header-actions"><a href="/ukony" class="btn btn-primary" data-new-ukon>+ Nový úkon</a></div>
 </div>
 
 {# ── Filter bar ── #}
@@ -47,42 +48,11 @@
 
 {# ── List — same row design as the dashboard's "Poslední úkony" (whole row is a
      link opening the edit modal), plus a trailing action cluster per row. ── #}
-{% import "_macros.html" as m with context %}
 {% set back_url = request.full_path %}
 <div class="card recent-card">
   <div class="recent-list ukony-list">
     {% for u in ukony %}
-    <div class="ukony-item" data-kc="{{ u.celkem|int }}"
-         data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ (u.prevod or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
-      <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ request.full_path | urlencode }}">
-        <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</span>
-        <b class="recent-rz">{{ u.rz or '—' }}</b>
-        <span class="tag">{{ u.typ_kod }}</span>
-        <span class="recent-firma">
-          <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
-        </span>
-        {# VIN span is always rendered (even empty) — fixed-width flex column, so
-           the notes start at the same x. User's poznámka FIRST (it must survive
-           the ellipsis), then the auto převod arrow. #}
-        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
-        <span class="recent-pay">{% include "_pay_badge.html" %}</span>
-        <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
-        <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
-      </a>
-      <span class="row-actions actions">
-        {# Payment toggle: click marks paid; click again unmarks — same as the
-           per-firm "Tento měsíc" list. Replaces the old always-present "✓
-           zapl." + "část." popup, which had no way back to unpaid from here
-           and offered a partial-pay entry David didn't want on this page. #}
-        <span class="stav-slot">{% include "_stav_slot.html" %}</span>
-        {# Delete #}
-        <form method="post" action="/ukony/{{ u.id }}/smazat"
-              onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
-          <input type="hidden" name="back" value="{{ request.full_path }}">
-          <button type="submit" class="btn btn-sm btn-danger">smazat</button>
-        </form>
-      </span>
-    </div>
+    {% include "_ukony_item.html" %}
     {% else %}
     <p class="center muted" style="padding: var(--sp-6);">Žádné úkony neodpovídají filtru.</p>
     {% endfor %}
@@ -90,7 +60,8 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/ukon_new_form.js') }}?v=1"></script>
 
 <script>
 (function () {
@@ -136,6 +107,28 @@
     var i = rows.indexOf(item);
     if (i >= 0) rows.splice(i, 1);
     apply();
+  };
+  window.ukonyAddRow = function (html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html.trim();
+    var item = tmp.querySelector('.ukony-item');
+    if (!item || !listEl) return false;
+    var fields = filterForm.elements;
+    if ((fields.firma.value && fields.firma.value !== item.dataset.firma) ||
+        (fields.mesic.value && fields.mesic.value !== item.dataset.mesic) ||
+        (fields.typ.value && fields.typ.value !== item.dataset.typ) ||
+        (fields.stav.value && fields.stav.value !== item.dataset.stav)) return false;
+    var empty = listEl.querySelector('p.center.muted');
+    if (empty) empty.remove();
+    listEl.prepend(item);
+    rebuildRows();
+    apply();
+    var link = item.querySelector('.recent-row');
+    if (link) {
+      link.classList.add('row-saved');
+      setTimeout(function () { link.classList.remove('row-saved'); }, 1200);
+    }
+    return true;
   };
 
   // -- Filtr (firma / mesic / typ / stav) BEZ prenacteni stranky --------------

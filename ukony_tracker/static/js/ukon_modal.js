@@ -1,17 +1,13 @@
-// Shared inline úkon-edit modal (dashboard + /ukony list).
-// Clicking any a.recent-row edit link opens its form fragment (?modal=1) in a
-// blurred overlay instead of navigating away. Saving submits normally (full
-// reload via the form's hidden `back`, so the page reflects the change). Falls
-// back to the plain edit page when the fetch fails or JS is off (real links).
-// Extracted from dashboard.js so the /ukony list gets the exact same behavior;
-// delegation is document-level, covering rows swapped in by either search box.
+// Shared úkon overlay (dashboard + full list). Edit links and the new-úkon
+// button fetch their form fragments into the same dialog. Delegation covers
+// rows swapped in later by search and filters.
 (function () {
   var modal = document.getElementById("ukon-modal");
   var modalBody = document.getElementById("ukon-modal-body");
   if (!modal || !modalBody) return;
   var lastFocused = null;
 
-  function openModal(url) {
+  function openModal(url, isNew) {
     fetch(url, { headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
         // Non-OK (e.g. the úkon was deleted meanwhile) → fall back to plain
@@ -21,6 +17,7 @@
       })
       .then(function (html) {
         modalBody.innerHTML = html;
+        if (isNew) document.dispatchEvent(new CustomEvent('ukon:new-form-shown', { detail: { form: modalBody.querySelector('#ukon-form') } }));
         lastFocused = document.activeElement;
         modal.hidden = false;
         // Reserve the width the scrollbar occupied before overflow:hidden hides
@@ -32,11 +29,12 @@
           modal.classList.add("is-open");
           // Skip the hidden `back` input — focusing it silently does nothing,
           // so the intended "cursor in first field" never happened.
-          var first = modalBody.querySelector("input:not([type=hidden]), select, button");
+          var first = isNew ? modalBody.querySelector('#rz') :
+            modalBody.querySelector("input:not([type=hidden]), select, button");
           if (first) first.focus();
         });
       })
-      .catch(function () { window.location.href = url.replace(/[?&]modal=1/, ""); });
+      .catch(function () { window.location.href = isNew ? '/ukony' : url.replace(/[?&]modal=1/, ""); });
   }
 
   function closeModal() {
@@ -45,6 +43,11 @@
     document.body.style.paddingRight = "";
     setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
     if (lastFocused && lastFocused.focus) lastFocused.focus();
+    var url = new URL(window.location.href);
+    if (url.searchParams.has('novy')) {
+      url.searchParams.delete('novy');
+      history.replaceState({}, '', url.pathname + url.search + url.hash);
+    }
   }
 
   // Open — delegated on document so it covers the dashboard recent list, the
@@ -57,6 +60,24 @@
     e.preventDefault();
     openModal(href + (href.indexOf("?") >= 0 ? "&" : "?") + "modal=1");
   });
+
+  document.addEventListener('click', function (e) {
+    var trigger = e.target.closest('[data-new-ukon]');
+    if (!trigger) return;
+    e.preventDefault();
+    var filter = document.querySelector('#filter-form select[name=firma]');
+    var q = new URLSearchParams({ modal: '1' });
+    if (filter && filter.value) q.set('firma', filter.value);
+    openModal('/ukony/novy?' + q.toString(), true);
+  });
+
+  if (new URLSearchParams(window.location.search).get('novy') === '1' &&
+      window.location.pathname === '/ukony/vse') {
+    var filter = document.querySelector('#filter-form select[name=firma]');
+    var q = new URLSearchParams({ modal: '1' });
+    if (filter && filter.value) q.set('firma', filter.value);
+    openModal('/ukony/novy?' + q.toString(), true);
+  }
 
   // Uložení BEZ přenačtení stránky: pošleme formulář fetchem a vyměníme jen
   // ten jeden řádek. Reload jinak shodil rozepsané hledání i filtry — a při

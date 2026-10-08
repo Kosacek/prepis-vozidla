@@ -1,0 +1,57 @@
+{% import "_macros.html" as m with context %}
+  <form method="post" action="/ukony/{{ firma.id }}" id="ukon-form" data-context="{{ form_context|default('entry') }}">
+    <input type="hidden" name="mesic" value="{{ mesic }}">
+    {# Firma patří k úkonu. Přepnutí zachová rozepsaná pole a načte její ceny. #}
+    <div class="field">
+      <label>Firma</label>
+      {# Nativní select zůstává jako fallback bez JS; skript ho schová a vykreslí
+         vlastní seznam s barevnými tečkami — stejná paleta jako v přehledech. #}
+      <div class="firma-pick" id="firma-pick">
+        <select id="firma-select" data-action="switchFirma">
+          {% for f in firmy %}
+            <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, '#8e8e93') }}"
+                    {{ 'selected' if f.id == firma.id }}>{{ f.zkratka }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
+      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper" value="{{ sel_rz }}"></div>
+    </div>
+    <div class="field">
+      <label>Typ úkonu</label>
+      <div class="seg" id="typ-seg">
+        {% for t in typy %}
+        <span data-kod="{{ t.kod }}" data-cena="{{ ceny.get(t.kod)|int if ceny.get(t.kod) is not none else '' }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="typ_kod" id="typ_kod" value="{{ sel_typ if sel_typ else (typy[0].kod if typy) }}">
+    </div>
+    {% set init_typ = sel_typ if sel_typ else (typy[0].kod if typy else none) %}
+    <div class="form-row">
+      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else (ceny.get(init_typ)|int if ceny.get(init_typ) is not none else '') }}"></div>
+      <div class="field"><label>VIN</label><input name="vin" id="vin" class="input-upper" value="{{ sel_vin }}"></div>
+    </div>
+    <div class="field">
+      <label>ORV <span class="muted small">(číslo OTP)</span></label>
+      <input name="orv" id="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}"
+             oninput="if(this.value.replace(/\s/g,'').length>=9)orvLookupFrom(this)" onblur="orvLookupFrom(this)">
+      <div class="orv-status muted small" style="display:none;margin-top:4px"></div>
+    </div>
+    <div class="field">
+      <label>Poznámka</label>
+      <input name="poznamka" id="poznamka" value="{{ sel_pozn }}">
+      <div class="chips">
+        <span class="chip" data-tag="TZ">+ TZ</span>
+        <span class="chip" data-tag="PM">+ PM</span>
+        <span class="chip" data-tag="RZ">+ RZ</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Kdo vyplnil</label>
+      {{ m.person_select(sel_zpracoval) }}
+    </div>
+    <div class="ukon-new-message" role="status" aria-live="polite" hidden></div>
+    <button type="submit" class="btn btn-primary">Přidat úkon</button>
+  </form>
