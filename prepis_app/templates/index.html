@@ -200,13 +200,45 @@
   .doklady-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: #fff; }
   .doklady-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
   .doklady-table tr:hover td { background: #f9fafb; }
-  .firm-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .firm-row:last-child { border-bottom: none; }
-  .firm-row-info { flex: 1; min-width: 0; }
-  .firm-row-name { font-weight: 600; font-size: 14px; }
-  .firm-row-sub { font-size: 11px; color: var(--muted); }
-  .pm-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: #d1fae5; color: var(--success); white-space: nowrap; }
-  .pm-badge.missing { background: #fee2e2; color: var(--error); }
+  #firmy-modal { padding: 16px; }
+  #firmy-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
+  .firm-count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--accent); color: var(--primary); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .firm-search { position: relative; margin: 0 22px 14px; flex-shrink: 0; min-width: 0; }
+  .firm-search > .ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  #firmy-search { padding: 10px 12px 10px 38px; font-family: inherit; font-size: 14px; }
+  #firmy-modal-body { display: flex; flex-direction: column; gap: 8px; padding-top: 0; flex: 1 1 auto; min-height: 0; overflow-x: hidden; }
+  .firm-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) 32px; align-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; flex-shrink: 0; transition: border-color .15s, background .15s; }
+  .firm-card:hover, .firm-card:focus-within { border-color: #b5caf5; background: #f7faff; }
+  .firm-avatar { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .firm-info { min-width: 0; }
+  .firm-card-name { font-weight: 600; font-size: 14px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .firm-card-sub { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .firm-ico { font-variant-numeric: tabular-nums; }
+  .firm-ico-label { font-size: 10px; font-weight: 700; letter-spacing: .04em; margin-right: 4px; }
+  .firm-chips, .firm-id-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
+  .firm-chips { margin-top: 8px; }
+  .firm-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font: 600 12px 'Segoe UI', system-ui, sans-serif; line-height: 1.4; white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+  .firm-chip:hover, .firm-chip:focus-visible, .firm-pm-chip:focus-within { border-color: var(--primary); background: var(--accent); color: var(--primary); }
+  .firm-chip:focus-visible, .firm-pm-chip a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .firm-chip .ico { width: 16px; height: 16px; }
+  .firm-chip-ghost { border-style: dashed; color: var(--muted); background: transparent; }
+  .firm-id-chip { font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .firm-id-chips.editing { flex: 1 1 180px; }
+  input.firm-id-input { min-width: 0; padding: 5px 8px; font-family: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .firm-pm-chip { padding: 0 4px 0 0; border-color: #b9e5d1; background: #ecfdf5; color: var(--success); gap: 0; }
+  .firm-pm-chip a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 8px; color: inherit; text-decoration: none; border-radius: 6px; }
+  .firm-pm-remove { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; border: none; border-radius: 6px; background: transparent; color: inherit; font-size: 17px; cursor: pointer; }
+  .firm-pm-remove:hover, .firm-pm-remove:focus-visible { color: var(--error); background: #fee2e2; }
+  .firm-delete { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 6px; border: 1.5px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: opacity .15s, border-color .15s, background .15s, color .15s; }
+  .firm-delete:hover, .firm-delete:focus-visible { border-color: var(--error); background: #fee2e2; color: var(--error); }
+  .firm-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 12px; color: var(--muted); text-align: center; font-size: 14px; }
+  @media (hover: hover) and (pointer: fine) {
+    .firm-delete { opacity: 0; }
+    .firm-card:hover .firm-delete, .firm-card:focus-within .firm-delete { opacity: 1; }
+  }
+  @media (hover: none) {
+    .firm-delete { opacity: 1; }
+  }
   .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; border: 1.5px solid var(--border); background: #fff; cursor: pointer; white-space: nowrap; }
   .btn-sm:hover { background: var(--bg); }
   .btn-sm.danger { border-color: var(--error); color: var(--error); }
@@ -350,6 +382,14 @@
   .hbtn:hover .ico { color: var(--primary); }
   .hbtn-icon { padding: 8px 10px; }
 
+  .cam-otocit { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; width: 34px; max-width: calc(100% - 16px); height: 34px; padding: 0 6.5px; border: 1.5px solid transparent; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); font: 600 12px 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; transition: width .18s ease, border-color .15s, background .15s; }
+  .cam-otocit-label { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .18s ease, margin-right .18s ease, opacity .18s ease; }
+  .cam-otocit:hover, .cam-otocit:focus-visible { width: 92px; border-color: var(--primary); background: var(--primary); }
+  .cam-otocit:hover .cam-otocit-label, .cam-otocit:focus-visible .cam-otocit-label { max-width: 52px; margin-right: 7px; opacity: 1; }
+  .cam-otocit:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .cam-otocit .ico { transition: transform .25s ease; }
+  .cam-otocit.on .ico { transform: rotate(180deg); }
+
   /* ── Ikony ────────────────────────────────────────────────────────────────
      Tah se nescaluje s velikostí (vector-effect by ztenčil velké ikony), proto
      má .ico-lg vlastní, o něco tenčí stroke — jinak by 26px ikona působila
@@ -425,6 +465,11 @@
                             color: var(--text); font-weight: 700; }
 
   @media (max-width: 600px) {
+    #firmy-modal { padding: 12px; }
+    #firmy-modal .modal-header { padding: 16px 16px 12px; }
+    .firm-search { margin: 0 16px 12px; }
+    #firmy-modal-body { padding: 0 16px 16px; }
+    .firm-card { column-gap: 8px; }
     .form-grid { grid-template-columns: 1fr; }
     .nav-bar { padding: 0 16px; }
     .step-lbl { display: none; }
@@ -458,6 +503,7 @@
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
   <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 8h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="3.2"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></symbol>
   <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="15" width="10" height="6" rx="1"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/><path d="M9 13h6M9 17h4"/></symbol>
@@ -481,7 +527,7 @@
     <button onclick="openProfilModal()" id="profil-chip" class="hbtn" title="Kdo vyplňuje — kliknutím změníš"><svg class="ico"><use href="#i-user"></use></svg> <span id="profil-name">—</span></button>
     <button onclick="openHledaniModal()" class="hbtn hbtn-icon" title="Hledat v historii — žádosti, doklady, firmy" aria-label="Hledat v historii"><svg class="ico"><use href="#i-search"></use></svg></button>
     <button onclick="openDokladyModal()" class="hbtn" title="Vystavené doklady"><svg class="ico"><use href="#i-receipt"></use></svg><span class="hbtn-lbl">Doklady</span></button>
-    <button onclick="openFirmyModal()" class="hbtn" title="Správa firem a plných mocí"><svg class="ico"><use href="#i-building"></use></svg><span class="hbtn-lbl">Správa firem</span></button>
+    <button onclick="openFirmyModal()" class="hbtn" title="Firmy" aria-label="Firmy"><svg class="ico"><use href="#i-building"></use></svg><span class="hbtn-lbl">Správa firem</span></button>
   </div>
 </header>
 
@@ -505,11 +551,15 @@
 </div>
 
 <!-- Správa firem modal -->
-<div class="modal-overlay" id="firmy-modal">
+<div class="modal-overlay" id="firmy-modal" onkeydown="event.stopPropagation();if(event.key==='Escape')closeFirmyModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <h3><svg class="ico"><use href="#i-building"></use></svg> Správa firem a plných mocí</h3>
-      <button class="modal-close" onclick="closeFirmyModal()">✕</button>
+      <h3><svg class="ico" aria-hidden="true"><use href="#i-building"></use></svg> Firmy <span class="firm-count" id="firmy-count" title="Počet firem">0</span></h3>
+      <button type="button" class="modal-close" onclick="closeFirmyModal()" title="Zavřít" aria-label="Zavřít">×</button>
+    </div>
+    <div class="firm-search">
+      <svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>
+      <input type="text" id="firmy-search" class="no-uc" placeholder="Hledat" aria-label="Hledat firmy" autocomplete="off" oninput="_renderFirmyBody()">
     </div>
     <div class="modal-body" id="firmy-modal-body">Načítám...</div>
   </div>
@@ -642,7 +692,10 @@
           <video id="camera-video" autoplay playsinline onclick="prepniOtoceniKamery()"
                  title="Klepnutím otočíš obraz o 180°"
                  style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;cursor:pointer;transform:rotate(180deg);"></video>
-          <span aria-hidden="true" style="position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;pointer-events:none;">⟲ klepni = otočit</span>
+          <button type="button" class="cam-otocit" id="camera-otocit" onclick="prepniOtoceniKamery()" onkeydown="event.stopPropagation()" title="Otočit obraz o 180°" aria-label="Otočit obraz o 180°">
+            <span class="cam-otocit-label" aria-hidden="true">Otočit</span>
+            <svg class="ico" aria-hidden="true"><use href="#i-rotate"></use></svg>
+          </button>
         </div>
         <div class="scan-actions">
           <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
@@ -2538,32 +2591,73 @@ async function restoreDoklad(cislo) {
   } catch { alert('Chyba při obnovování dokladu.'); }
 }
 
+function _firmSearchText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function _firmInitials(name) {
+  const words = String(name || '')
+    .replace(/\b(?:s\.?\s*r\.?\s*o\.?|a\.?\s*s\.?|spol\.?)(?=\s|,|$)/gi, '')
+    .match(/[\p{L}\p{N}]+/gu) || [];
+  return words.slice(0, 2).map(word => word[0]).join('').toUpperCase() || '—';
+}
+
+function _firmTint(ico) {
+  const tints = ['#e8eefb', '#e5f2ed', '#f6ecd9', '#f0e8f6', '#f9e7e9', '#e4f0f3'];
+  let hash = 0;
+  for (const char of String(ico)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return tints[hash % tints.length];
+}
+
 function _renderFirmyBody() {
   const body = document.getElementById('firmy-modal-body');
+  const editing = body.querySelector('.firm-id-input:focus:not([data-saving="1"])');
+  const draft = editing ? { ico: editing.dataset.ico, value: editing.value,
+    start: editing.selectionStart, end: editing.selectionEnd } : null;
+  if (editing) editing.onblur = null;
   const firms = _firmsCache || [];
-  if (!firms.length) { body.innerHTML = '<p style="color:var(--muted);padding:16px">Žádné uložené firmy.</p>'; return; }
-  body.innerHTML = firms.map(f => `
-    <div class="firm-row" id="firm-row-${esc(f.ico)}">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:14px">${esc(f.nazev)}</div>
-        <div style="font-size:12px;color:var(--muted)" id="firm-meta-${esc(f.ico)}">
-          IČO: ${esc(f.ico)}${f.adresa ? ' · '+esc(f.adresa) : ''}
-          · ID: <span id="firm-id-text-${esc(f.ico)}">${f.id ? esc(f.id) : '—'}</span>
-          <button class="btn-sm" style="padding:2px 8px;margin-left:4px;font-size:11px" onclick="startEditId('${esc(f.ico)}')" title="Upravit ID">✏️</button>
+  document.getElementById('firmy-count').textContent = firms.length;
+  const query = _firmSearchText(document.getElementById('firmy-search').value.trim());
+  const filtered = firms.filter(f => [f.nazev, f.ico, f.id].some(value => _firmSearchText(value).includes(query)));
+  if (!filtered.length) {
+    body.innerHTML = `<div class="firm-empty"><svg class="ico ico-lg" aria-hidden="true"><use href="#i-building"></use></svg><span>${esc(firms.length ? 'Nic nenalezeno' : 'Žádné firmy')}</span></div>`;
+    return;
+  }
+  body.innerHTML = filtered.map(f => {
+    const ids = String(f.id || '').split(',').map(id => id.trim()).filter(Boolean);
+    return `
+    <div class="firm-card" id="firm-card-${esc(f.ico)}">
+      <div class="firm-avatar" style="background:${esc(_firmTint(f.ico))}" aria-hidden="true">${esc(_firmInitials(f.nazev))}</div>
+      <div class="firm-info">
+        <div class="firm-card-name" title="${esc(f.nazev)}">${esc(f.nazev)}</div>
+        <div class="firm-card-sub" title="IČO ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}">
+          <span class="firm-ico"><span class="firm-ico-label">IČO</span>${esc(f.ico)}</span>${f.adresa ? ' · ' + esc(f.adresa) : ''}
         </div>
-        <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+        <div class="firm-chips">
+          <span class="firm-id-chips" id="firm-id-chips-${esc(f.ico)}">
+            ${ids.length
+              ? ids.map(id => `<button type="button" class="firm-chip firm-id-chip" onclick="startEditId('${esc(f.ico)}')" title="Upravit ID" aria-label="Upravit ID ${esc(id)}">ID ${esc(id)}</button>`).join('')
+              : `<button type="button" class="firm-chip firm-chip-ghost" onclick="startEditId('${esc(f.ico)}')" title="Přidat ID" aria-label="Přidat ID">+ ID</button>`}
+          </span>
           ${f.has_plna_moc
-            ? `<span class="pm-badge"><svg class="ico"><use href="#i-file"></use></svg> Plná moc</span>
-               <a href="/plna-moc/${esc(f.ico)}" target="_blank" class="btn-sm" style="text-decoration:none">Zobrazit</a>
-               <button class="btn-sm danger" onclick="deletePlnaMoc('${esc(f.ico)}')">Odstranit</button>`
-            : `<label class="btn-sm" style="cursor:pointer">➕ Nahrát plnou moc
-                 <input type="file" accept="application/pdf" style="display:none" onchange="uploadPlnaMoc('${esc(f.ico)}', this)">
-               </label>`
+            ? `<span class="firm-chip firm-pm-chip">
+                 <a href="/plna-moc/${esc(f.ico)}" target="_blank" rel="noopener" title="Otevřít plnou moc" aria-label="Otevřít plnou moc"><svg class="ico" aria-hidden="true"><use href="#i-pm"></use></svg>Plná moc</a>
+                 <button type="button" class="firm-pm-remove" onclick="deletePlnaMoc('${esc(f.ico)}')" title="Odstranit plnou moc" aria-label="Odstranit plnou moc">×</button>
+               </span>`
+            : `<button type="button" class="firm-chip firm-chip-ghost" onclick="document.getElementById('firm-pm-input-${esc(f.ico)}').click()" title="Nahrát plnou moc" aria-label="Nahrát plnou moc">+ Plná moc</button>
+               <input type="file" id="firm-pm-input-${esc(f.ico)}" accept="application/pdf" hidden onchange="uploadPlnaMoc('${esc(f.ico)}', this)">`
           }
         </div>
       </div>
-      <button class="btn-sm danger" onclick="deleteFirmModal('${esc(f.ico)}')"><svg class="ico"><use href="#i-trash"></use></svg> Smazat</button>
-    </div>`).join('');
+      <button type="button" class="firm-delete" onclick="deleteFirmModal('${esc(f.ico)}')" title="Smazat firmu" aria-label="Smazat firmu"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>
+    </div>`;
+  }).join('');
+  // Doběhnutí zápisu jiné firmy nesmí zahodit právě rozepsané ID.
+  if (draft) {
+    startEditId(draft.ico);
+    const inp = document.getElementById(`firm-id-input-${draft.ico}`);
+    if (inp) { inp.value = draft.value; inp.setSelectionRange(draft.start, draft.end); }
+  }
 }
 
 async function renderFirmyModal() {
@@ -2576,41 +2670,55 @@ async function renderFirmyModal() {
 }
 
 function startEditId(ico) {
-  const span = document.getElementById(`firm-id-text-${ico}`);
-  if (!span) return;
+  const chips = document.getElementById(`firm-id-chips-${ico}`);
+  if (!chips || document.getElementById(`firm-id-input-${ico}`)) return;
   const firm = (_firmsCache || []).find(x => x.ico === ico);
   const current = firm && firm.id ? firm.id : '';
-  const meta = document.getElementById(`firm-meta-${ico}`);
-  meta.dataset.originalHtml = meta.innerHTML;
-  meta.innerHTML = `
-    IČO: ${esc(ico)}${firm && firm.adresa ? ' · '+esc(firm.adresa) : ''}
-    · ID: <input type="text" id="firm-id-input-${esc(ico)}" value="${esc(current)}" maxlength="120" inputmode="numeric" placeholder="1234567890, 9876543210" style="padding:2px 6px;font-size:12px;width:200px" onkeydown="if(event.key==='Enter'){saveEditId('${esc(ico)}')}else if(event.key==='Escape'){cancelEditId('${esc(ico)}')}">
-    <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="saveEditId('${esc(ico)}')">Uložit</button>
-    <button class="btn-sm" style="padding:2px 8px;font-size:11px" onclick="cancelEditId('${esc(ico)}')">Zrušit</button>
-  `;
+  chips.dataset.originalHtml = chips.innerHTML;
+  chips.classList.add('editing');
+  chips.innerHTML = `<input type="text" class="firm-id-input no-uc" id="firm-id-input-${esc(ico)}" data-ico="${esc(ico)}" value="${esc(current)}" maxlength="120" inputmode="numeric" placeholder="ID" title="Upravit ID" aria-label="ID firmy"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();saveEditId('${esc(ico)}')}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();cancelEditId('${esc(ico)}')}"
+    onblur="saveEditId('${esc(ico)}', false)">`;
   const inp = document.getElementById(`firm-id-input-${ico}`);
   if (inp) { inp.focus(); inp.select(); }
 }
 
-function cancelEditId(ico) {
-  const meta = document.getElementById(`firm-meta-${ico}`);
-  if (meta && meta.dataset.originalHtml) meta.innerHTML = meta.dataset.originalHtml;
+function cancelEditId(ico, focusChip = true) {
+  const chips = document.getElementById(`firm-id-chips-${ico}`);
+  const inp = document.getElementById(`firm-id-input-${ico}`);
+  if (inp) inp.onblur = null;
+  if (chips && chips.dataset.originalHtml) {
+    chips.classList.remove('editing');
+    chips.innerHTML = chips.dataset.originalHtml;
+    if (focusChip) chips.querySelector('button').focus();
+  }
 }
 
-async function saveEditId(ico) {
+async function saveEditId(ico, focusChip = true) {
   const inp = document.getElementById(`firm-id-input-${ico}`);
-  if (!inp) return;
+  if (!inp || inp.dataset.saving === '1') return;
   const raw = inp.value;
   const normalized = raw.replace(/;/g, ',').split(',')
     .map(s => s.replace(/\D/g, '').slice(0,10)).filter(Boolean).join(', ');
-  const res = await fetch(`/api/firmy/${ico}`, {
-    method: 'PATCH', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ id: normalized })
-  });
-  const data = await res.json();
-  if (!data.success) { alert('Chyba: ' + (data.error || 'neznámá')); return; }
-  if (_firmsCache) { const f = _firmsCache.find(x => x.ico === ico); if (f) f.id = data.firm.id; }
-  _renderFirmyBody();
+  const firm = (_firmsCache || []).find(x => x.ico === ico);
+  const current = firm && firm.id ? firm.id : '';
+  if (raw === current || normalized === current) { cancelEditId(ico, focusChip); return; }
+  inp.dataset.saving = '1';
+  inp.readOnly = true;
+  try {
+    const res = await fetch(`/api/firmy/${ico}`, {
+      method: 'PATCH', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: normalized })
+    });
+    const data = await res.json();
+    if (!data.success) { alert('Chyba: ' + (data.error || 'neznámá')); return; }
+    if (firm) firm.id = data.firm.id;
+    const restoreFocus = focusChip && document.activeElement === inp;
+    _renderFirmyBody();
+    const chips = document.getElementById(`firm-id-chips-${ico}`);
+    if (restoreFocus && chips) chips.querySelector('button').focus();
+  } catch { alert('Chyba při ukládání ID.'); }
+  finally { delete inp.dataset.saving; inp.readOnly = false; }
 }
 
 async function uploadPlnaMoc(ico, input) {
@@ -3282,6 +3390,11 @@ function kameraOtocena() {
 function _kameraOtoceniUI() {
   const v = document.getElementById('camera-video');
   if (v) v.style.transform = kameraOtocena() ? 'rotate(180deg)' : 'none';
+  const button = document.getElementById('camera-otocit');
+  if (button && button.classList) {
+    button.classList.toggle('on', kameraOtocena());
+    button.setAttribute('aria-pressed', String(kameraOtocena()));
+  }
 }
 function prepniOtoceniKamery() {
   try { localStorage.setItem(KAMERA_OTOC_KLIC, kameraOtocena() ? '0' : '1'); } catch (_) {}

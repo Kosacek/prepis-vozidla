@@ -276,3 +276,29 @@ def test_klepnuti_otoci_nahled_i_fotku_pro_sken():
     sken = html[html.index("async function _naskenujOrv()"):][:900]
     assert "if (kameraOtocena())" in sken and "ctx.rotate(Math.PI)" in sken
     assert "!== '0'" in html[html.index("function kameraOtocena()"):][:200], "výchozí = otočeno (doma)"
+
+
+def test_camera_rotate_badge_is_an_accessible_icon_button():
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    start = html.index('id="camera-container"')
+    camera = html[start:html.index('<div class="scan-actions">', start)]
+    buttons = re.findall(r'<button\b[^>]*>', camera)
+    assert "klepni" not in html.lower()
+    assert any('onclick="prepniOtoceniKamery()"' in button
+               and 'aria-label="Otočit obraz o 180°"' in button
+               and 'title="Otočit obraz o 180°"' in button for button in buttons)
+    assert '<use href="#i-rotate">' in camera
+
+
+def test_firmy_modal_has_search_and_compact_svg_controls():
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    modal = html[html.index('id="firmy-modal"'):html.index('id="sdilet-modal"')]
+    search = re.search(r'<input\b[^>]*id="firmy-search"[^>]*>', modal)
+    assert search, "chybí vyhledávání firem"
+    classes = re.search(r'class="([^"]*)"', search.group()).group(1).split()
+    assert "no-uc" in classes
+    assert 'placeholder="Hledat"' in search.group()
+    assert "plných mocí" not in modal.lower()
+    render = html[html.index("function _renderFirmyBody()"):
+                  html.index("async function renderFirmyModal()")]
+    assert "✏️" not in render and "➕" not in render
