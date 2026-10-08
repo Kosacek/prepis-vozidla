@@ -1,0 +1,32 @@
+{% import "_macros.html" as m with context %}
+    <div class="ukony-item" data-kc="{{ u.celkem|int }}" data-firma="{{ u.firma_id }}" data-mesic="{{ u.datum[:7] }}" data-typ="{{ u.typ_kod }}" data-stav="{{ u.stav_platby }}"
+         data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ (u.prevod or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
+      <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ back_url | urlencode }}">
+        <span class="recent-date muted">{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}</span>
+        <b class="recent-rz">{{ u.rz or '—' }}</b>
+        <span class="tag">{{ u.typ_kod }}</span>
+        <span class="recent-firma">
+          <span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}
+        </span>
+        {# VIN span is always rendered (even empty) — fixed-width flex column, so
+           the notes start at the same x. User's poznámka FIRST (it must survive
+           the ellipsis), then the auto převod arrow. #}
+        <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
+        <span class="recent-pay">{% include "_pay_badge.html" %}</span>
+        <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
+        <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
+      </a>
+      <span class="row-actions actions">
+        {# Payment toggle: click marks paid; click again unmarks — same as the
+           per-firm "Tento měsíc" list. Replaces the old always-present "✓
+           zapl." + "část." popup, which had no way back to unpaid from here
+           and offered a partial-pay entry David didn't want on this page. #}
+        <span class="stav-slot">{% include "_stav_slot.html" %}</span>
+        {# Delete #}
+        <form method="post" action="/ukony/{{ u.id }}/smazat"
+              onsubmit="return confirm('Opravdu smazat úkon {{ u.rz or u.id }}?')">
+          <input type="hidden" name="back" value="{{ back_url }}">
+          <button type="submit" class="btn btn-sm btn-danger">smazat</button>
+        </form>
+      </span>
+    </div>

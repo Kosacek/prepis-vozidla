@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=57">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=58">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
@@ -14,7 +14,7 @@
       {% if authed %}
       <nav>
         <a href="/">Přehled</a>
-        <a href="/ukony">Úkony</a>
+        <a href="/ukony/vse">Úkony</a>
         <a href="/doklady">Doklady</a>
         <a href="/prichozi">Příchozí{% if nav_prichozi_count %} <span class="nav-badge">{{ nav_prichozi_count }}</span>{% endif %}</a>
         <a href="/firmy">Firmy</a>
@@ -51,13 +51,14 @@
     try{
       var res = await fetch('/orv-lookup?orv=' + encodeURIComponent(raw));
       var d = await res.json();
+      if((el.value || '').replace(/\s/g,'').toUpperCase() !== raw) return;
       if(d.success){
         if(vin && d.vin) vin.value = d.vin;
         if(st){ st.style.color='#2a7'; st.textContent='✓ ' + (d.znacka || d.vin || 'Načteno'); }
       } else {
         if(st){ st.style.color='#c33'; st.textContent='✗ ' + (d.error || 'Nenačteno'); }
       }
-    }catch(e){ if(st){ st.style.color='#c33'; st.textContent='✗ Chyba spojení'; } }
+    }catch(e){ if(st && (el.value || '').replace(/\s/g,'').toUpperCase() === raw){ st.style.color='#c33'; st.textContent='✗ Chyba spojení'; } }
   }
   </script>
 </body>
