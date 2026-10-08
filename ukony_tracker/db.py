@@ -92,6 +92,23 @@ CREATE TABLE IF NOT EXISTS prichozi (
   CHECK (status IN ('pending','approved','discarded','auto'))
 );
 CREATE INDEX IF NOT EXISTS idx_prichozi_status ON prichozi(status);
+-- Příjmové pokladní doklady ze zadosti; číslo dokladu se nikdy znovu nepoužije.
+CREATE TABLE IF NOT EXISTS ppd (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cislo INTEGER UNIQUE NOT NULL,
+  datum TEXT NOT NULL,
+  prijato_od TEXT,
+  prijato_ico TEXT,
+  castka INTEGER NOT NULL,
+  ucel TEXT,
+  vozidlo TEXT,
+  zadost_id TEXT,
+  ukon_id INTEGER NULL,
+  smazano INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ppd_datum ON ppd(datum);
 """
 
 

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Doklady — PPD{% endblock %}
+{% block main_class %}container-wide{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Doklady</h1>
+  <div class="muted">
+    <span id="doklady-count">{{ total.pocet }}</span> dokladů ·
+    <span id="doklady-sum">{{ total.castka|kc }}</span> Kč
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--sp-5);">
+  <form method="get" action="{{ url_for('ppd.doklady') }}" class="filter-bar">
+    <input type="search" name="q" value="{{ q }}" class="ukony-search" autocomplete="off"
+           aria-label="Hledat doklady" placeholder="Hledat — přijato od, vozidlo, číslo…">
+    <div class="filter-bar__fields">
+      <input type="month" name="mesic" value="{{ mesic }}" class="filter-month" aria-label="Měsíc">
+      <label class="small">
+        <input type="checkbox" name="smazane" value="1" {{ 'checked' if smazane }}>
+        Zobrazit smazané
+      </label>
+      <button type="submit" class="btn btn-sm">Filtrovat</button>
+      <a href="{{ url_for('ppd.doklady') }}" class="btn btn-sm">Vše</a>
+    </div>
+  </form>
+</div>
+
+<div class="card recent-card">
+  <div class="recent-list doklady-list">
+    {% for p in doklady %}
+    <div class="recent-row" data-cislo="{{ p.cislo }}">
+      <b class="recent-rz">č. {{ p.cislo }}</b>
+      <span class="recent-date muted">{{ p.datum[8:10] }}.{{ p.datum[5:7] }}.{{ p.datum[0:4] }}</span>
+      <span class="recent-firma" title="{{ p.prijato_od or '' }}">
+        {{ p.prijato_od or '—' }}{% if p.smazano %} <span class="tag">smazaný</span>{% endif %}
+      </span>
+      <span class="recent-mid"><b class="recent-pozn" title="{{ p.vozidlo or '' }}">{{ p.vozidlo or '—' }}</b></span>
+      <span class="recent-kc"><b>{{ p.castka|kc }} Kč</b></span>
+      <span class="recent-kdo">
+        {% if p.ukon_id %}<a class="btn btn-sm" href="{{ url_for('ukony.edit_form', uid=p.ukon_id) }}">Úkon #{{ p.ukon_id }}</a>{% endif %}
+      </span>
+    </div>
+    {% else %}
+    <p class="center muted" style="padding: var(--sp-6);">Žádné doklady neodpovídají filtru.</p>
+    {% endfor %}
+  </div>
+  {% if total.pocet > doklady|length %}
+  <p class="muted small">Zobrazeno posledních {{ doklady|length }} dokladů. Souhrn zahrnuje celý filtr.</p>
+  {% endif %}
+</div>
+{% endblock %}
