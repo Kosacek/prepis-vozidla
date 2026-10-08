@@ -187,6 +187,9 @@
   /* Sdílecí odkaz: čte se z displeje přes stůl, tak ať je co největší. */
   .sdilet-kod { font-weight: 800; letter-spacing: 0.5px; }
   .sdilet-box { max-width: 720px; }
+  /* Sdílet jde i z okna historie a z Dokladů — ta mají z-index 500, takže by
+     se okno s kódem otevřelo POD nimi a nebylo by vidět. */
+  #sdilet-modal { z-index: 600; }
   .sdilet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
   .sdilet-send { background: var(--primary, #2563eb); color: #fff; border: none; border-radius: 10px; padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 7px; }
   .sdilet-telo { padding: 8px 24px 34px; text-align: center; }
@@ -396,32 +399,30 @@
   .hl-sub  { color: var(--muted); font-size: 12px; min-width: 0;
              overflow-wrap: anywhere; }
   .hl-kc   { margin-left: auto; font-weight: 700; white-space: nowrap; }
+  /* Řádek historie + tlačítko „sdílet" vedle něj (tlačítko nesmí být uvnitř
+     odkazu — klik by zároveň otevřel PDF). */
+  .hl-radek { display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px; }
+  .hl-radek > .hl-row { flex: 1; min-width: 0; margin-bottom: 0; }
+  .hl-sdilet { flex-shrink: 0; display: flex; align-items: center; padding: 0 10px;
+               border: 1px solid var(--border); border-radius: 8px; background: #fff;
+               color: var(--muted); cursor: pointer; }
+  .hl-sdilet:hover { color: var(--primary); border-color: var(--primary); background: var(--accent); }
 
-  /* Plná moc — obsah drží užší sloupec (jako formulář), ne celou kartu. */
-  #panel-6 .pm-uzsi { max-width: 620px; }
-  #panel-6 .card { padding: 18px 24px; }
-  /* Ruční zadání má o řádek polí víc než zbytek kroku — bez zhuštění by
-     tlačítko spadlo pod okraj obrazovky na 768px notebooku. */
-  #panel-6 .form-grid { gap: 10px 22px; }
+  /* Plná moc má STEJNÉ velikosti jako ostatní kroky (karta, nadpis, pole,
+     popisky, řádky). Dřív byla zhuštěná — menší padding, 19px nadpis, 36px
+     pole, 12px popisky a sloupec 620 px — a David si 2026-10-08 všiml, že
+     plná moc a vývoz vypadají menší než převod a zápis. Zůstává jen rozvržení
+     ručního zadání do 4 sloupců (šetří řádky) a čitelné nadpisy kroků 1–3. */
   #panel-6 #pm-rucne .form-grid { grid-template-columns: repeat(4, 1fr); }
   #panel-6 #pm-rucne .pm-sp2 { grid-column: span 2; }
   #panel-6 #pm-rucne .pm-sp4 { grid-column: span 4; }
   #panel-6 #pm-vozidlo-pole { grid-template-columns: repeat(4, 1fr); }
   #panel-6 .pm-sp3 { grid-column: span 3; }
-  #panel-6 .field input { padding: 9px 13px; }
-  #panel-6 .field label { font-size: 12px; }
-  #panel-6 .card-title { font-size: 19px; margin-bottom: 10px; }
-  #panel-6 .hl-row { padding: 7px 10px; margin-bottom: 4px; }
   #panel-6 .section-label { margin-top: 0; }
   /* 11px verzálkami v šedé se čtou mizerně, a zrovna tyhle popisky říkají,
      v jakém kroku jsi. Větší, tmavší a bez verzálek. */
   #panel-6 .section-label { font-size: 14px; letter-spacing: 0; text-transform: none;
                             color: var(--text); font-weight: 700; }
-  /* Obsah byl 620px v 788px kartě zarovnaný doleva — vpravo zbývalo 143px
-     bílého místa a vypadalo to rozbitě. */
-  #panel-6 .pm-uzsi, #panel-6 #pm-vysledek { margin-left: auto; margin-right: auto; }
-  #panel-6 #pm-vysledek { max-width: 620px; }
-  #panel-6 hr.divider { margin: 12px 0; }
 
   @media (max-width: 600px) {
     .form-grid { grid-template-columns: 1fr; }
@@ -846,8 +847,7 @@
       <div id="d3rz-prefill-section" style="display:none;">
         <div class="section-label">Navázat na dřívější žádost</div>
         <input type="text" id="d3rz-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN, jména nebo kdo ji dělal…"
-               oninput="renderPrefillList()" autocomplete="off"
-               style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+               oninput="renderPrefillList()" autocomplete="off">
         <div id="d3rz-vysledky" style="margin-top:8px;max-height:230px;overflow-y:auto;"></div>
         <hr class="divider">
       </div>
@@ -902,7 +902,7 @@
           <div class="section-label">Žádá o provedení změny</div>
           <div class="form-grid">
             <div class="field full">
-              <input type="text" id="zadost_zmena" maxlength="80" placeholder="napr. zápis A50-X" style="font-size:14px;">
+              <input type="text" id="zadost_zmena" maxlength="80" placeholder="napr. zápis A50-X">
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:8px;">
@@ -1189,8 +1189,7 @@
 
         <div id="pm-ze-zadosti">
           <input type="text" id="pm-hledat" class="no-uc" placeholder="Hledat podle SPZ, VIN, jména nebo kdo ji dělal…"
-                 oninput="renderPmZadosti()" autocomplete="off"
-                 style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+                 oninput="renderPmZadosti()" autocomplete="off">
           <div id="pm-zadosti" style="margin-top:8px;max-height:150px;overflow-y:auto;"></div>
         </div>
 
@@ -2095,6 +2094,10 @@ async function vystavitPlnouMoc() {
              style="display:inline-flex;align-items:center;gap:8px;">
             <svg class="ico"><use href="#i-file"></use></svg>
             Plná moc — ${esc(r.zmocnitel)}</a>
+          ${r.sdilet ? `<button class="btn-download btn-ckp" onclick="ukazSdileni('${esc(r.sdilet)}')"
+             title="Odkaz na tuhle plnou moc — příjemce nepotřebuje heslo. Platí 30 dní."
+             style="display:inline-flex;align-items:center;gap:8px;"><svg class="ico"><use href="#i-share"></use></svg>
+             Kopírovat odkaz <b class="sdilet-kod">${esc(String(r.sdilet).replace(/^\//, ''))}</b></button>` : ''}
           <button class="btn btn-secondary" onclick="resetForm()" style="margin-left:auto;">Nový úkon</button>
         </div>
         <div class="hl-detail" style="margin-top:6px;">Zmocněnec ${esc(r.zmocnenec)}${r.s_vozidlem ? ' · s RZ a VIN' : ''}</div>`;
@@ -2321,6 +2324,14 @@ function _czDate(iso) {
   return (iso && iso.length >= 10) ? `${iso.slice(8,10)}.${iso.slice(5,7)}.${iso.slice(0,4)}` : (iso || '');
 }
 
+// Tlačítko „sdílet" k řádku historie — kód pro ten jeden dokument.
+function _hlSdilet(url) {
+  const soubor = String(url || '').split('/').pop();
+  if (!soubor) return '';
+  return `<button class="hl-sdilet" data-soubor="${esc(soubor)}" onclick="sdiletSoubory([this.dataset.soubor], this)"
+    title="Kód pro sdílení — příjemce nepotřebuje heslo"><svg class="ico"><use href="#i-share"></use></svg></button>`;
+}
+
 function renderHledani(res) {
   let h = '<div class="hl-answer">';
   h += `<div class="hl-headline${res.understood ? '' : ' unknown'}">${esc(res.headline || '')}</div>`;
@@ -2334,20 +2345,20 @@ function renderHledani(res) {
     h += `<div class="hl-sec">Žádosti (${res.vystupy.length})${orez}</div>`;
     h += res.vystupy.map(v => {
       const kdo = [v.rz || v.vin, v.na].filter(Boolean).join(' · ');
-      return `<a class="hl-row" href="${esc(v.url)}" target="_blank">
+      return `<div class="hl-radek"><a class="hl-row" href="${esc(v.url)}" target="_blank">
         <span class="hl-badge">${esc(v.typ)}</span>
         <span class="hl-when">${_czDate(v.datum)}</span>
-        <span class="hl-sub">${esc(v.cas)}${kdo ? ' · ' + esc(kdo) : ''}</span></a>`;
+        <span class="hl-sub">${esc(v.cas)}${kdo ? ' · ' + esc(kdo) : ''}</span></a>${_hlSdilet(v.url)}</div>`;
     }).join('');
   }
 
   if ((res.doklady || []).length) {
     h += `<div class="hl-sec">Doklady (${res.doklady.length})</div>`;
-    h += res.doklady.map(d => `<a class="hl-row" href="${esc(d.url)}" target="_blank">
+    h += res.doklady.map(d => `<div class="hl-radek"><a class="hl-row" href="${esc(d.url)}" target="_blank">
         <span class="hl-badge">č. ${esc(d.cislo)}</span>
         <span class="hl-when">${_czDate(d.datum)}</span>
         <span class="hl-sub">${esc(d.prijato_od || '')}${d.vozidlo ? ' · ' + esc(d.vozidlo) : ''}</span>
-        <span class="hl-kc">${_kcFmt(d.castka)}</span></a>`).join('');
+        <span class="hl-kc">${_kcFmt(d.castka)}</span></a>${_hlSdilet(d.url)}</div>`).join('');
   }
 
   if ((res.firmy || []).length) {
@@ -2415,6 +2426,7 @@ function renderDoklady() {
           <td style="white-space:nowrap">
             <a href="/ppd-print/${esc(String(d.cislo))}" target="_blank" class="btn-sm" style="text-decoration:none" title="Vytisknout na A5"><svg class="ico"><use href="#i-printer"></use></svg> Tisk</a>
             <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;margin-left:4px"><svg class="ico"><use href="#i-receipt"></use></svg> PDF</a>
+            <button class="btn-sm" style="margin-left:4px" data-soubor="ppd_${esc(String(d.cislo))}.pdf" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico"><use href="#i-share"></use></svg> Sdílet</button>
             <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
           </td>
         </tr>`).join('')}</tbody>
@@ -3017,21 +3029,46 @@ function sdileciKod() {
   return String(generatedUrls.sdilet || '').replace(/^\//, '');
 }
 
+// Kód, který právě ukazuje okno sdílení. Okno už neslouží jen hotové žádosti:
+// stejně se sdílí plná moc a cokoli z historie nebo z Dokladů.
+let _sdiletKod = '';
+
 async function otevriSdileni() {
-  const url = sdileciOdkaz();
-  if (!url) return;
-  document.getElementById('sdilet-url').textContent = url;
+  return ukazSdileni(generatedUrls.sdilet);
+}
+
+async function ukazSdileni(cesta) {
+  _sdiletKod = String(cesta || '').replace(/^\//, '');
+  if (!_sdiletKod) return;
+  document.getElementById('sdilet-url').textContent = location.host + '/' + _sdiletKod;
   const stav = document.getElementById('sdilet-stav');
   document.getElementById('sdilet-modal').classList.add('open');
   // Zkopírovat rovnou: tlačítko pořád slibuje "Kopírovat odkaz", okno je
   // navíc pro případ, kdy ho David jen ukazuje nebo diktuje.
   try {
-    await navigator.clipboard.writeText(location.origin + '/' + sdileciKod());
+    await navigator.clipboard.writeText(location.origin + '/' + _sdiletKod);
     stav.textContent = 'Zkopírováno ✓  ·  platí 30 dní';
   } catch (e) {
     // Schránka umí selhat (starší prohlížeč, bez https) — okno s odkazem
     // funguje dál, jen se nezkopíroval.
     stav.textContent = 'Opiš ho z displeje  ·  platí 30 dní';
+  }
+}
+
+// Kód pro dokument, který už existuje (historie, Doklady) — vyrobí ho server.
+async function sdiletSoubory(soubory, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await (await fetch('/api/sdilet', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ soubory }),
+    })).json();
+    if (r.success) await ukazSdileni(r.sdilet);
+    else alert(r.error || 'Kód se nepodařilo vytvořit.');
+  } catch (e) {
+    alert('Kód se nepodařilo vytvořit: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -3042,8 +3079,8 @@ function zavriSdileni() {
 // Odeslat: na mobilu vyvolá systémové sdílení (SMS/WhatsApp/mail), na
 // desktopu ho prohlížeč nemá — tam odkaz aspoň zkopíruje.
 async function odesliSdileni() {
-  const url = location.origin + '/' + sdileciKod();
-  if (!sdileciKod()) return;
+  const url = location.origin + '/' + _sdiletKod;
+  if (!_sdiletKod) return;
   if (navigator.share) {
     try { await navigator.share({ text: url }); return; } catch (e) { return; }
   }

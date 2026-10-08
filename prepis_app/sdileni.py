@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 
@@ -46,6 +47,25 @@ KOD_MAX = 9999
 # output/, plné moci mají vlastní složku a přežívají jednotlivá generování.
 KDE_OUTPUT = "output"
 KDE_PLNE_MOCE = "plne_moce"
+
+
+_POPISY = {
+    "zmeny": "Žádost o změnu vlastníka",
+    "zapis": "Zápis nového vozidla",
+    "zmena": "Změna technických údajů",
+    "3rz": "Tabulka s registrační značkou (3RZ)",
+    "vyvoz": "Vývoz vozidla",
+    "pm": "Plná moc",
+}
+
+
+def popis_souboru(nazev: str) -> str:
+    """Lidský popisek dokumentu podle jména souboru — pro rozcestník u
+    dokumentů sdílených dodatečně (z historie, z Dokladů, plná moc)."""
+    m = re.match(r"ppd_(\d+)\.pdf$", nazev)
+    if m:
+        return f"Příjmový pokladní doklad č. {m.group(1)}"
+    return _POPISY.get(nazev.split("_", 1)[0].lower(), "Dokument")
 
 
 def _cesta(data_dir: str) -> str:

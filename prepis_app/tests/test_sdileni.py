@@ -308,3 +308,80 @@ def test_plna_moc_pres_appku_porad_chce_prihlaseni(prod, tmp_path, monkeypatch):
     r = _cizinec(prod).get("/plna-moc/27082440", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 302
     assert r.headers["Location"] == "/login"
+
+
+# ── Sdílení dokumentů, které už existují (historie, Doklady, plná moc) ───────
+# 2026-10-08: kód šel dostat jen z hlavního generování — plná moc, doklad nebo
+# starší žádost z historie se sdílet nedaly.
+
+def _soubor(tmp_path, nazev, obsah=b"%PDF-1.4 test"):
+    p = os.path.join(str(tmp_path), "output", nazev)
+    with open(p, "wb") as f:
+        f.write(obsah)
+    return nazev
+
+
+def _prihlas(prod):
+    prod.post("/login", data={"password": "heslo-jen-pro-test"},
+              base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+
+
+def test_existujici_doklad_dostane_kod_a_otevre_se_bez_hesla(prod, tmp_path):
+    _soubor(tmp_path, "ppd_174.pdf")
+    _prihlas(prod)
+    r = prod.post("/api/sdilet", json={"soubory": ["ppd_174.pdf"]},
+                  base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    kod = r.get_json()["sdilet"]
+    assert re.fullmatch(r"/\d{4}", kod)
+    out = _cizinec(prod).get(kod, base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert out.status_code == 200 and out.mimetype == "application/pdf"
+
+
+def test_vic_dokumentu_z_historie_ma_spravne_popisky(prod, tmp_path):
+    _soubor(tmp_path, "zmeny_JAN-NOVAK_1AB2345_20261008.pdf")
+    _soubor(tmp_path, "pm_FIRMA-S-R-O_20261008.pdf")
+    _prihlas(prod)
+    kod = prod.post("/api/sdilet", json={"soubory": ["zmeny_JAN-NOVAK_1AB2345_20261008.pdf",
+                                                     "pm_FIRMA-S-R-O_20261008.pdf"]},
+                    base_url="https://zadosti.spznaklic.cz", headers=HTTPS).get_json()["sdilet"]
+    html = _cizinec(prod).get(kod, base_url="https://zadosti.spznaklic.cz",
+                              headers=HTTPS).get_data(as_text=True)
+    assert "Žádost o změnu vlastníka" in html and "Plná moc" in html
+
+
+@pytest.mark.parametrize("soubor", [
+    "../share_tokens.jsonl", "..\\x.pdf", "/etc/passwd", ".skryty.pdf",
+    "firmy.xlsx", "neexistuje.pdf", "", None,
+])
+def test_mimo_slozku_output_ani_neexistujici_kod_nevznikne(prod, tmp_path, soubor):
+    _prihlas(prod)
+    r = prod.post("/api/sdilet", json={"soubory": [soubor]},
+                  base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code in (400, 404)
+    assert not os.path.exists(sdileni._cesta(str(tmp_path))), "nesmí vzniknout žádný kód"
+
+
+def test_prazdny_nebo_prilis_velky_vyber_se_odmitne(prod, tmp_path):
+    _prihlas(prod)
+    for soubory in ([], ["a.pdf"] * 11, "ppd_1.pdf"):
+        r = prod.post("/api/sdilet", json={"soubory": soubory},
+                      base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+        assert r.status_code == 400
+
+
+def test_kod_pro_existujici_dokument_jde_vyrobit_jen_prihlasenym(prod, tmp_path):
+    _soubor(tmp_path, "ppd_1.pdf")
+    r = _cizinec(prod).post("/api/sdilet", json={"soubory": ["ppd_1.pdf"]},
+                            base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 302 and r.headers["Location"] == "/login"
+
+
+@pytest.mark.parametrize("nazev, popis", [
+    ("ppd_174.pdf", "Příjmový pokladní doklad č. 174"),
+    ("zapis_X_20261008.pdf", "Zápis nového vozidla"),
+    ("3rz_X_20261008.pdf", "Tabulka s registrační značkou (3RZ)"),
+    ("vyvoz_X.pdf", "Vývoz vozidla"),
+    ("cosi_jineho.pdf", "Dokument"),
+])
+def test_popisky_dokumentu(nazev, popis):
+    assert sdileni.popis_souboru(nazev) == popis

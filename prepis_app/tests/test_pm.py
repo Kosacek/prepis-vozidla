@@ -243,6 +243,11 @@ def test_route_accepts_a_manual_zmocnitel(client):
     assert body["zmocnitel"] == "NOVÁ FIRMA S.R.O."
     assert body["s_vozidlem"] is True
     assert "NOVA-FIRMA" in body["soubor"]
+    # 2026-10-08: plná moc se sdílí 4místným kódem stejně jako žádost
+    import re
+    assert re.fullmatch(r"/\d{4}", body["sdilet"])
+    import sdileni
+    assert sdileni.najdi_soubor(A.DATA_DIR, body["sdilet"][1:]) == body["soubor"]
 
 
 def test_manual_entry_needs_a_name(client):

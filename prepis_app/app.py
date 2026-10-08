@@ -58,7 +58,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.17.1"
+__version__ = "1.18.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1905,9 +1905,37 @@ def api_plna_moc():
         "registracni_znacka": (vozidlo or {}).get("rz", ""),
         "vin": (vozidlo or {}).get("vin", ""),
     })
+    # Plná moc se sdílí stejně jako žádost — 4místný kód (sdileni.py).
+    kod = sdileni.vytvor_kod(DATA_DIR, [{"file": name, "kde": sdileni.KDE_OUTPUT,
+                                         "popis": f"Plná moc — {strana['jmeno']}"}])
     return jsonify({"success": True, "url": f"/download/{name}", "soubor": name,
                     "zmocnenec": meta["kdo"], "zmocnitel": strana["jmeno"],
-                    "s_vozidlem": bool(vozidlo)})
+                    "s_vozidlem": bool(vozidlo), "sdilet": f"/{kod}"})
+
+
+_SDILET_MAX_SOUBORU = 10
+
+
+@app.route("/api/sdilet", methods=["POST"])
+def api_sdilet():
+    """Sdílecí kód pro dokument(y), které už existují — z historie, z Dokladů.
+
+    Smí jen soubory přímo ve složce output/ (žádosti, plné moci, doklady):
+    holé jméno bez cesty, .pdf, a soubor musí existovat. Za přihlášením jako
+    všechno pod /api — kód se dá vyrobit jen zevnitř appky."""
+    soubory = (request.get_json(silent=True) or {}).get("soubory")
+    if not isinstance(soubory, list) or not 1 <= len(soubory) <= _SDILET_MAX_SOUBORU:
+        return jsonify({"success": False, "error": "Vyber 1 až %d dokumentů." % _SDILET_MAX_SOUBORU}), 400
+    polozky = []
+    for s in soubory:
+        nazev = os.path.basename(str(s or ""))
+        cesta = os.path.join(DATA_DIR, "output", nazev)
+        if (nazev != str(s) or nazev.startswith(".") or not nazev.lower().endswith(".pdf")
+                or not os.path.isfile(cesta)):
+            return jsonify({"success": False, "error": "Dokument nenalezen."}), 404
+        polozky.append({"file": nazev, "kde": sdileni.KDE_OUTPUT,
+                        "popis": sdileni.popis_souboru(nazev)})
+    return jsonify({"success": True, "sdilet": f"/{sdileni.vytvor_kod(DATA_DIR, polozky)}"})
 
 
 @app.route("/api/pm-zmocnenci", methods=["GET"])

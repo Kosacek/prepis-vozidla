@@ -203,3 +203,26 @@ def test_vychozi_model_skenu_je_haiku_i_se_starou_volbou():
     assert "localStorage.removeItem('scan_model')" in html
     assert "localStorage.getItem(MODEL_KLIC) || 'haiku'" in html
     assert "localStorage.setItem('scan_model'," not in html, "zápis pod starým klíčem by vracel Sonnet"
+
+
+def test_okno_sdileni_je_nad_ostatnimi_okny():
+    """Sdílet jde z okna historie a z Dokladů (z-index 500) — okno s kódem
+    se dřív otevřelo POD nimi a nebylo vidět (nalezeno v prohlížeči 2026-10-08)."""
+    import re as _re
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    ostatni = max(int(z) for z in _re.findall(r"\.modal-overlay \{[^}]*z-index:\s*(\d+)", html))
+    sdileni = int(_re.search(r"#sdilet-modal \{ z-index:\s*(\d+)", html).group(1))
+    assert sdileni > ostatni
+
+
+def test_niche_kroky_nemaji_vlastni_mensi_velikosti():
+    """2026-10-08: plná moc a vývoz vypadaly menší než převod a zápis —
+    plná moc měla zmenšený padding, nadpis i pole, vyhledávání v 3RZ/vývozu/
+    plné moci natvrdo 14px. Všechny kroky mají mít stejné základní velikosti."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    for zakazane in ("#panel-6 .card {", "#panel-6 .card-title {", "#panel-6 .field input {",
+                     "#panel-6 .field label {", "#panel-6 .hl-row {"):
+        assert zakazane not in html, zakazane
+    for pole in ('id="d3rz-hledat"', 'id="pm-hledat"', 'id="zadost_zmena"'):
+        radek = html[html.index(pole):html.index(">", html.index(pole))]
+        assert "font-size" not in radek and "padding" not in radek, pole
