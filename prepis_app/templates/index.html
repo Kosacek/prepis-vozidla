@@ -3588,15 +3588,23 @@ function resetForm() {
 // ── Model toggle ──────────────────────────────────────────────────────────────
 // Výchozí Haiku 5.5: benchmark 2026-10-08 na 203 reálných ORV proti podaným
 // žádostem — čte stejně dobře jako Sonnet 4.6 (RZ 180 vs 178, č. ORV 189 vs
-// 188), je ~40 % rychlejší (3,5 vs 5,9 s) a ~20× levnější. Kdo si přepnul na
-// Sonnet, tomu volba zůstane (localStorage).
-function getModel() { return localStorage.getItem('scan_model') || 'haiku'; }
+// 188), je ~40 % rychlejší (3,5 vs 5,9 s) a ~20× levnější.
+//
+// Nový klíč `scan_model_v2`: ve starém `scan_model` měl skoro každý z dřívějška
+// uložené „sonnet" (stačilo jednou přepnout), takže by nový výchozí Haiku
+// nikdo neviděl — David to tak hned po nasazení dostal. Staré volby se proto
+// jednou zahodí; každé další přepnutí se pamatuje dál.
+const MODEL_KLIC = 'scan_model_v2';
+try { localStorage.removeItem('scan_model'); } catch (_) {}
+function getModel() {
+  try { return localStorage.getItem(MODEL_KLIC) || 'haiku'; } catch (_) { return 'haiku'; }
+}
 // Popisky musí sedět s MODELS v app.py (sonnet → claude-sonnet-4-6,
 // haiku → claude-haiku-5-5), ať je jasné, který model zrovna čte.
 const MODEL_POPISEK = { sonnet: 'Sonnet 4.6', haiku: 'Haiku 5.5' };
 function toggleModel() {
   const next = getModel() === 'sonnet' ? 'haiku' : 'sonnet';
-  localStorage.setItem('scan_model', next);
+  try { localStorage.setItem(MODEL_KLIC, next); } catch (_) {}
   document.getElementById('model-name').textContent = MODEL_POPISEK[next];
 }
 document.addEventListener('DOMContentLoaded', () => {

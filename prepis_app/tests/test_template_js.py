@@ -193,3 +193,13 @@ def test_primarni_zadost_ma_jen_jednu_definici():
     zase nerozejde."""
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
     assert html.count("prevod: 'zmeny', zapis: 'zapis'") == 1
+
+
+def test_vychozi_model_skenu_je_haiku_i_se_starou_volbou():
+    """2026-10-08: po přepnutí výchozího modelu na Haiku 5.5 David pořád viděl
+    Sonnet 4.6 — v prohlížeči měl ze staré verze uložené „sonnet". Stará
+    volba se proto jednou zahodí a ukládá se pod novým klíčem."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert "localStorage.removeItem('scan_model')" in html
+    assert "localStorage.getItem(MODEL_KLIC) || 'haiku'" in html
+    assert "localStorage.setItem('scan_model'," not in html, "zápis pod starým klíčem by vracel Sonnet"
