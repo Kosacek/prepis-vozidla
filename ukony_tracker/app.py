@@ -92,6 +92,8 @@ def create_app():
     app.register_blueprint(api_bp)
     from routes.prichozi import bp as prichozi_bp
     app.register_blueprint(prichozi_bp)
+    from routes.ppd import bp as ppd_bp
+    app.register_blueprint(ppd_bp)
     from routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
     from routes.ask import bp as ask_bp
