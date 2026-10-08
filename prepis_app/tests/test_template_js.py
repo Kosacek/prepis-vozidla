@@ -264,3 +264,15 @@ def test_volitelna_pole_auto_skok_preskoci():
     for pole in ("jiny_doklad", "poznamky", "puvodni_id", "novy_id", "puvodni_prov_id", "novy_prov_id"):
         tag = html[html.index(f'id="{pole}"'):][:120]
         assert "data-volitelne" in tag, pole
+
+
+def test_klepnuti_otoci_nahled_i_fotku_pro_sken():
+    """Doma visí kamera vzhůru nohama (výchozí otočení), na mobilu ne —
+    klepnutí do náhledu otočí obraz. Otočit se musí i FOTKA, která jde na
+    sken, jinak by model dostal jiný obraz, než je vidět."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    video = html[html.index('id="camera-video"'):][:300]
+    assert 'onclick="prepniOtoceniKamery()"' in video
+    sken = html[html.index("async function _naskenujOrv()"):][:900]
+    assert "if (kameraOtocena())" in sken and "ctx.rotate(Math.PI)" in sken
+    assert "!== '0'" in html[html.index("function kameraOtocena()"):][:200], "výchozí = otočeno (doma)"

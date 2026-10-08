@@ -636,7 +636,14 @@
     <div class="card step1-sken">
       <div class="card-title">Sken ORV</div>
       <div id="camera-container" style="display:none;margin-bottom:12px;">
-        <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;transform:rotate(180deg);"></video>
+        <!-- Klepnutím se obraz otočí o 180° (doma visí kamera nahoře vzhůru
+             nohama, na mobilu ne). Otočení drží i fotka, která jde na sken. -->
+        <div style="position:relative;">
+          <video id="camera-video" autoplay playsinline onclick="prepniOtoceniKamery()"
+                 title="Klepnutím otočíš obraz o 180°"
+                 style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;cursor:pointer;transform:rotate(180deg);"></video>
+          <span aria-hidden="true" style="position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;pointer-events:none;">⟲ klepni = otočit</span>
+        </div>
         <div class="scan-actions">
           <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
           <button id="evidence-scan-btn" onclick="pridatDoEvidence()" title="Najde auto v evidenci a doplní RZ, nebo založí nový úkon" style="padding:10px 14px;background:#fff;border:1.5px solid var(--primary);color:var(--primary);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Přidat do evidence</button>
@@ -3264,6 +3271,24 @@ async function tryAutoOpenCamera(attempt = 0) {
 
 // One-press capture + scan + advance. Bound to NumPad Enter and the
 // "Skenovat ORV" button. Single-shot only; in-flight guard ignores re-entry.
+// ── Otočení kamery ───────────────────────────────────────────────────────────
+// Doma visí kamera nahoře vzhůru nohama → výchozí otočení o 180°. Na mobilu
+// je obraz rovně, tak stačí klepnout do náhledu. Pamatuje si to každé zařízení
+// zvlášť (localStorage), takže doma i na mobilu zůstane nastavené.
+const KAMERA_OTOC_KLIC = 'kamera_otocit_180';
+function kameraOtocena() {
+  try { return localStorage.getItem(KAMERA_OTOC_KLIC) !== '0'; } catch (_) { return true; }
+}
+function _kameraOtoceniUI() {
+  const v = document.getElementById('camera-video');
+  if (v) v.style.transform = kameraOtocena() ? 'rotate(180deg)' : 'none';
+}
+function prepniOtoceniKamery() {
+  try { localStorage.setItem(KAMERA_OTOC_KLIC, kameraOtocena() ? '0' : '1'); } catch (_) {}
+  _kameraOtoceniUI();
+}
+_kameraOtoceniUI();
+
 /** Posunout po skenu na další krok jen tehdy, když je uživatel pořád tam, kde
     sken spustil (krok 1, stejný typ úkonu). Jinak už se posunul sám. */
 function skenPosunoutDal(startIdx, startMode) {
@@ -3278,8 +3303,11 @@ async function _naskenujOrv() {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
-  ctx.translate(canvas.width, canvas.height);
-  ctx.rotate(Math.PI);
+  // Fotka se otáčí stejně jako náhled — co vidíš na obrazovce, jde na sken.
+  if (kameraOtocena()) {
+    ctx.translate(canvas.width, canvas.height);
+    ctx.rotate(Math.PI);
+  }
   ctx.drawImage(video, 0, 0);
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
   const fd = new FormData();
