@@ -226,3 +226,41 @@ def test_niche_kroky_nemaji_vlastni_mensi_velikosti():
     for pole in ('id="d3rz-hledat"', 'id="pm-hledat"', 'id="zadost_zmena"'):
         radek = html[html.index(pole):html.index(">", html.index(pole))]
         assert "font-size" not in radek and "padding" not in radek, pole
+
+
+# ── Plynulé vyplňování z klávesnice (2026-10-08) ─────────────────────────────
+
+def test_sken_posune_dal_jen_kdyz_uzivatel_porad_stoji_na_kroku_1():
+    """Sken trvá pár vteřin; když David mezitím sám pokračoval (Enter),
+    navNext() po skenu přeskočil další krok a ten se v liště označil jako
+    hotový. Posun smí jen přes skenPosunoutDal (pořád krok 1, stejný typ)."""
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    sken = html[html.index("async function quickScanOrv()"):]
+    sken = sken[:sken.index("\n}\n")]
+    assert "skenPosunoutDal(startIdx, startMode)" in sken
+    assert "closeCamera();\n    navNext();" not in sken, "nepodmíněný posun je zpátky"
+    assert "currentPanel() === 1" in html[html.index("function skenPosunoutDal"):][:300]
+
+
+def test_auto_skok_jen_pri_psani_na_konci_pole():
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    f = html[html.index("function autoDal(ev)"):][:1400]
+    assert "/^insert/.test(ev.inputType" in f, "mazání nesmí skákat"
+    assert "el.selectionStart !== el.value.length" in f, "oprava uprostřed nesmí skákat"
+    assert "ev.isTrusted" in f, "vyplnění skriptem (sken, registr) nesmí skákat"
+    for pole in ("'vin'", "'vin_z'", "_rc_1", "_rc_2", "'osvedceni_orv'"):
+        assert pole in f, pole
+
+
+def test_ares_tlacitka_nejsou_v_ceste_tabulatoru():
+    import re as _re
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    tlacitka = _re.findall(r'<button class="btn-lookup"[^>]*lookupIco', html)
+    assert tlacitka and all('tabindex="-1"' in t for t in tlacitka)
+
+
+def test_volitelna_pole_auto_skok_preskoci():
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    for pole in ("jiny_doklad", "poznamky", "puvodni_id", "novy_id", "puvodni_prov_id", "novy_prov_id"):
+        tag = html[html.index(f'id="{pole}"'):][:120]
+        assert "data-volitelne" in tag, pole

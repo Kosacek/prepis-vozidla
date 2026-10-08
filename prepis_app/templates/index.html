@@ -668,7 +668,7 @@
               <input type="text" id="puvodni_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni','ico');if(this.value.length>=8)lookupIco('puvodni')" onblur="if(this.value.length>=8)lookupIco('puvodni')">
               <div class="firm-dropdown" id="puvodni-firms"></div>
             </div>
-            <button class="btn-lookup" onclick="lookupIco('puvodni')">ARES</button>
+            <button class="btn-lookup" tabindex="-1" onclick="lookupIco('puvodni')">ARES</button>
           </div>
           <div class="lookup-status" id="puvodni-status"></div>
         </div>
@@ -690,7 +690,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="puvodni_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
+          <input type="text" id="puvodni_id" data-volitelne placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -713,7 +713,7 @@
                   <input type="text" id="puvodni_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('puvodni_prov','ico');if(this.value.length>=8)lookupIco('puvodni_prov')" onblur="if(this.value.length>=8)lookupIco('puvodni_prov')">
                   <div class="firm-dropdown" id="puvodni_prov-firms"></div>
                 </div>
-                <button class="btn-lookup" onclick="lookupIco('puvodni_prov')">ARES</button>
+                <button class="btn-lookup" tabindex="-1" onclick="lookupIco('puvodni_prov')">ARES</button>
               </div>
               <div class="lookup-status" id="puvodni_prov-status"></div>
             </div>
@@ -735,7 +735,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="puvodni_prov_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
+              <input type="text" id="puvodni_prov_id" data-volitelne placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -760,7 +760,7 @@
               <input type="text" id="novy_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy','ico');if(this.value.length>=8)lookupIco('novy')" onblur="if(this.value.length>=8)lookupIco('novy')">
               <div class="firm-dropdown" id="novy-firms"></div>
             </div>
-            <button class="btn-lookup" onclick="lookupIco('novy')">ARES</button>
+            <button class="btn-lookup" tabindex="-1" onclick="lookupIco('novy')">ARES</button>
           </div>
           <div class="lookup-status" id="novy-status"></div>
         </div>
@@ -782,7 +782,7 @@
         </div>
         <div class="field">
           <label>ID (pro úřad)</label>
-          <input type="text" id="novy_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
+          <input type="text" id="novy_id" data-volitelne placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
         </div>
       </div>
       <hr class="divider">
@@ -805,7 +805,7 @@
                   <input type="text" id="novy_prov_ico" placeholder="12345678" maxlength="8" oninput="openFirmDropdown('novy_prov','ico');if(this.value.length>=8)lookupIco('novy_prov')" onblur="if(this.value.length>=8)lookupIco('novy_prov')">
                   <div class="firm-dropdown" id="novy_prov-firms"></div>
                 </div>
-                <button class="btn-lookup" onclick="lookupIco('novy_prov')">ARES</button>
+                <button class="btn-lookup" tabindex="-1" onclick="lookupIco('novy_prov')">ARES</button>
               </div>
               <div class="lookup-status" id="novy_prov-status"></div>
             </div>
@@ -827,7 +827,7 @@
             </div>
             <div class="field">
               <label>ID (pro úřad)</label>
-              <input type="text" id="novy_prov_id" placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
+              <input type="text" id="novy_prov_id" data-volitelne placeholder="1234567890, 9876543210" maxlength="120" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -891,7 +891,7 @@
           <div class="form-grid">
             <div class="field full">
               <label>Jiný doklad k silničnímu vozidlu</label>
-              <input type="text" id="jiny_doklad" placeholder="napr. ZAPIS A50-X">
+              <input type="text" id="jiny_doklad" data-volitelne placeholder="napr. ZAPIS A50-X">
             </div>
           </div>
         </div>
@@ -991,7 +991,7 @@
           </div>
           <div class="field full-width">
             <label>Poznámky</label>
-            <input type="text" id="poznamky" placeholder="ZAPIS A50-X">
+            <input type="text" id="poznamky" data-volitelne placeholder="ZAPIS A50-X">
           </div>
         </div>
       </div>
@@ -1301,7 +1301,64 @@ function refreshAllLenChecks() {
 document.addEventListener('input', function (ev) {
   refreshLenCheck(ev.target);
   if (ev.target.closest && ev.target.closest('#panel-7')) vyvozNahled();
+  autoDal(ev);
 });
+
+// ── Plynulé vyplňování z klávesnice ──────────────────────────────────────────
+// David chce vyplňovat jen klávesnicí (2026-10-08): když je pole s pevnou
+// délkou kompletní (VIN zezelená), kurzor sám skočí na další PRÁZDNÉ pole —
+// přeskočí, co už hodnotu má (druh vozidla, kategorie M1, nebo co doplnil
+// registr či sken). Skáče se jen při psaní na konci pole: oprava uprostřed
+// nebo mazání kurzorem nehne.
+function _jeVyplnitelne(e) {
+  return !!e.offsetParent && !e.disabled && !e.readOnly && e.tabIndex >= 0 &&
+    (e.tagName === 'SELECT' || e.tagName === 'TEXTAREA' ||
+     (e.tagName === 'INPUT' && ['text', 'number', ''].includes(e.type)));
+}
+
+/** První prázdné pole za `od` v tomtéž kroku (nebo null). */
+function dalsiPrazdne(od) {
+  const panel = od.closest('.step-panel');
+  if (!panel) return null;
+  const pole = [...panel.querySelectorAll('input, select, textarea')].filter(_jeVyplnitelne);
+  // Volitelná pole (data-volitelne: jiný doklad, poznámky, ID pro úřad) se
+  // vyplňují zřídka — skok na ně by kurzor posadil někam, kam nikdo nepíše.
+  return pole.slice(pole.indexOf(od) + 1)
+    .find(e => !e.hasAttribute('data-volitelne') && !String(e.value || '').trim()) || null;
+}
+
+function _skoc(cil) {
+  if (!cil) return;
+  cil.focus();
+  if (cil.select) cil.select();
+}
+
+function autoDal(ev) {
+  const el = ev.target;
+  if (!el || el.tagName !== 'INPUT' || !ev.isTrusted) return;
+  if (!/^insert/.test(ev.inputType || '')) return;              // psaní / vložení, ne mazání
+  const max = el.maxLength;
+  if (!(max > 0) || el.value.length !== max) return;            // ještě není kompletní
+  if (el.selectionStart !== el.value.length) return;           // opravuje se uprostřed
+  const id = el.id || '';
+  if (id === 'vin' || id === 'vin_z' || /_rc_2$/.test(id)) {
+    _skoc(dalsiPrazdne(el));
+  } else if (/_rc_1$/.test(id)) {
+    _skoc(document.getElementById(id.replace(/_rc_1$/, '_rc_2')));   // RČ: druhá půlka
+  } else if (id === 'osvedceni_orv') {
+    // Registr podle čísla ORV doplní VIN, typ i značku — počkat na něj, ať se
+    // přeskočí i to. Jen pokud uživatel mezitím neodešel jinam.
+    lookupOrv().then(() => { if (document.activeElement === el) _skoc(dalsiPrazdne(el)); });
+  }
+}
+
+/** Při vstupu do kroku: první PRÁZDNÉ pole, ne první pole vůbec — co vyplnil
+    sken, se přeskočí. Když je vše vyplněné, první pole jako dřív. */
+function prvniPrazdne(panelEl) {
+  const pole = [...panelEl.querySelectorAll('input, select, textarea')].filter(_jeVyplnitelne);
+  return pole.find(e => e.tagName !== 'SELECT' && !e.hasAttribute('data-volitelne') && !String(e.value || '').trim())
+    || pole[0] || null;
+}
 
 let appMode = 'prevod';
 let flowIdx = 0;
@@ -1515,7 +1572,7 @@ function activatePanel(n) {
       pozn.focus();
       return;
     }
-    const first = document.querySelector(`#panel-${n} input[type=text], #panel-${n} select`);
+    const first = prvniPrazdne(document.getElementById(`panel-${n}`));
     if (first) first.focus();
   }, 80);
 }
@@ -2577,11 +2634,18 @@ async function deleteFirmModal(ico) {
 
 // ── ARES lookup ──────────────────────────────────────────────────────────────
 let _orvLast = '';
-async function lookupOrv() {
+// Probíhající dotaz do registru — auto-skok z pole ORV na něj počká, ať
+// přeskočí i pole, která dotaz právě vyplnil (VIN, typ, značka…).
+let _orvBezi = Promise.resolve();
+function lookupOrv() {
   const raw   = (document.getElementById('osvedceni_orv').value || '').replace(/\s/g,'').toUpperCase();
-  if (raw.length < 9) return;
-  if (raw === _orvLast) return;
+  if (raw.length < 9) return _orvBezi;
+  if (raw === _orvLast) return _orvBezi;
   _orvLast = raw;
+  _orvBezi = _nactiOrv(raw);
+  return _orvBezi;
+}
+async function _nactiOrv(raw) {
   const serie = raw.slice(0, 3);
   const cislo = raw.slice(3);
   const st = document.getElementById('orv-status');
@@ -3200,6 +3264,12 @@ async function tryAutoOpenCamera(attempt = 0) {
 
 // One-press capture + scan + advance. Bound to NumPad Enter and the
 // "Skenovat ORV" button. Single-shot only; in-flight guard ignores re-entry.
+/** Posunout po skenu na další krok jen tehdy, když je uživatel pořád tam, kde
+    sken spustil (krok 1, stejný typ úkonu). Jinak už se posunul sám. */
+function skenPosunoutDal(startIdx, startMode) {
+  return flowIdx === startIdx && appMode === startMode && currentPanel() === 1;
+}
+
 // Vyfotí, co je zrovna v kameře, a pošle to na sken ORV. Sdílí to
 // „Skenovat ORV" i „Přidat do evidence" — ať obě čtou úplně stejně.
 async function _naskenujOrv() {
@@ -3232,6 +3302,12 @@ async function quickScanOrv() {
   const resultEl = document.getElementById('scan-all-result');
   if (resultEl) { resultEl.className = 'scan-result loading'; resultEl.textContent = 'Skenuji ORV…'; }
 
+  // Kde byl uživatel, když sken začal. Sken trvá pár vteřin a David mezitím
+  // často sám pokračuje dál (Enter) — dřív pak navNext() po doběhnutí skenu
+  // přeskočil ještě jeden krok a ten se v liště označil jako hotový, i když ho
+  // nikdo neviděl (stížnost 2026-10-08).
+  const startIdx = flowIdx, startMode = appMode;
+
   try {
     const result = await _naskenujOrv();
 
@@ -3247,8 +3323,14 @@ async function quickScanOrv() {
     }
 
     if (resultEl) { resultEl.className = 'scan-result ok'; resultEl.textContent = '✓ ' + filled.join(', '); }
-    closeCamera();
-    navNext();
+    if (skenPosunoutDal(startIdx, startMode)) {
+      closeCamera();
+      navNext();
+    } else {
+      // Už je jinde: data se vyplnila, ale nikam se neskáče — jen se obnoví
+      // stav lišty (doplněná pole mohla shodit varování „chybí údaje").
+      renderStepper();
+    }
   } catch (e) {
     if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + e.message; }
   } finally {
