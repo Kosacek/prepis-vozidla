@@ -457,7 +457,6 @@
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
   <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 8h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="3.2"/></symbol>
-  <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M4 17l4.5-4.5 3 3L15 12l5 5"/></symbol>
   <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="15" width="10" height="6" rx="1"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/><path d="M9 13h6M9 17h4"/></symbol>
@@ -526,6 +525,17 @@
       <div class="sdilet-url" id="sdilet-url"></div>
       <div class="sdilet-pod" id="sdilet-stav">Zkopírováno ✓ &nbsp;·&nbsp; platí 30 dní</div>
     </div>
+  </div>
+</div>
+
+<!-- Přidat do evidence ze skenu ORV -->
+<div class="modal-overlay" id="evidence-orv-modal" onclick="if(event.target===this)zavriEvidenceOrv()">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3>Přidat do evidence</h3>
+      <button class="modal-close" onclick="zavriEvidenceOrv()">✕</button>
+    </div>
+    <div class="modal-body" id="evidence-orv-body"></div>
   </div>
 </div>
 
@@ -620,34 +630,21 @@
         </div>
       </div>
     </div>
+    <!-- Sken ORV: jen to, co se reálně používá — skenovat, zapsat do evidence,
+         přepnout model. (Dávkové focení, nahrání ze souboru a „Zavřít" pryč.) -->
     <div class="card step1-sken">
-      <div class="card-title">Naskenovat dokumenty (volitelné)</div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Vyfoťte ORV, COC list, OP nebo plnou moc. Aplikace vyplní vše najednou.</p>
-
-      <!-- Camera preview -->
+      <div class="card-title">Sken ORV</div>
       <div id="camera-container" style="display:none;margin-bottom:12px;">
         <video id="camera-video" autoplay playsinline style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;transform:rotate(180deg);"></video>
         <div class="scan-actions">
-          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Skenuje ORV jednou fotkou a posune wizard dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
-          <button onclick="capturePhoto()" title="Přidat fotku do dávky bez skenování" style="padding:10px 14px;background:#fff;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);">+ Foto do dávky</button>
-          <button onclick="closeCamera()" style="padding:10px 14px;background:#f3f4f6;border:1.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">✕ Zavřít</button>
-          <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-spark"></use></svg> <span id="model-name">Sonnet</span></button>
+          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
+          <button id="evidence-scan-btn" onclick="pridatDoEvidence()" title="Najde auto v evidenci a doplní RZ, nebo založí nový úkon" style="padding:10px 14px;background:#fff;border:1.5px solid var(--primary);color:var(--primary);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Přidat do evidence</button>
+          <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;"><svg class="ico"><use href="#i-spark"></use></svg> <span id="model-name">Haiku 5.5</span></button>
         </div>
       </div>
+      <!-- Jen když kamera neběží (zamítnuté povolení, zaseknuté zařízení). -->
+      <button id="camera-zapnout" onclick="openCamera()" style="padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-camera"></use></svg> Zapnout kameru</button>
       <canvas id="camera-canvas" style="display:none;"></canvas>
-
-      <!-- Thumbnails -->
-      <div id="scan-all-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
-
-      <!-- Action buttons -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button onclick="openCamera()" style="padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;"><svg class="ico"><use href="#i-camera"></use></svg> Kamera</button>
-        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;background:#fff;">
-          <span><svg class="ico"><use href="#i-photo"></use></svg> Ze souboru</span>
-          <input type="file" id="scan-all-input" accept="image/*" multiple style="display:none" onchange="addScanFiles(this)">
-        </label>
-        <button id="scan-all-btn" onclick="scanAll()" style="padding:8px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:none;align-items:center;gap:6px;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat vše</button>
-      </div>
       <div class="scan-result" id="scan-all-result"></div>
     </div>
    </div><!-- /step1-layout -->
@@ -3119,7 +3116,7 @@ function _otevriProud() {
     const video = document.getElementById('camera-video');
     video.srcObject = s;
     try { await video.play(); } catch (_) { /* play may need user gesture later */ }
-    document.getElementById('camera-container').style.display = '';
+    _kameraUI(true);
     return s;
   })();
   // Uklízet AŽ zvenku: kdyby getUserMedia selhal synchronně (třeba stránka
@@ -3166,10 +3163,29 @@ async function tryAutoOpenCamera(attempt = 0) {
 
 // One-press capture + scan + advance. Bound to NumPad Enter and the
 // "Skenovat ORV" button. Single-shot only; in-flight guard ignores re-entry.
+// Vyfotí, co je zrovna v kameře, a pošle to na sken ORV. Sdílí to
+// „Skenovat ORV" i „Přidat do evidence" — ať obě čtou úplně stejně.
+async function _naskenujOrv() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('camera-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, canvas.height);
+  ctx.rotate(Math.PI);
+  ctx.drawImage(video, 0, 0);
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+  const fd = new FormData();
+  fd.append('image', blob, 'capture.jpg');
+  fd.append('model', getModel());
+  const resp = await fetch('/api/scan-orv', { method: 'POST', body: fd });
+  return resp.json();
+}
+
 async function quickScanOrv() {
   if (_scanInFlight) return;
   if (!cameraStream) {
-    alert('Kamera není zapnutá. Klikni na Kamera nebo dej povolení v prohlížeči.');
+    alert('Kamera není zapnutá. Klikni na Zapnout kameru nebo dej povolení v prohlížeči.');
     return;
   }
   _scanInFlight = true;
@@ -3180,21 +3196,7 @@ async function quickScanOrv() {
   if (resultEl) { resultEl.className = 'scan-result loading'; resultEl.textContent = 'Skenuji ORV…'; }
 
   try {
-    const video = document.getElementById('camera-video');
-    const canvas = document.getElementById('camera-canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.translate(canvas.width, canvas.height);
-    ctx.rotate(Math.PI);
-    ctx.drawImage(video, 0, 0);
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
-
-    const fd = new FormData();
-    fd.append('image', blob, 'capture.jpg');
-    fd.append('model', getModel());
-    const resp = await fetch('/api/scan-orv', { method: 'POST', body: fd });
-    const result = await resp.json();
+    const result = await _naskenujOrv();
 
     if (!result.success || !result.data) {
       if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + (result.error || 'sken selhal'); }
@@ -3230,6 +3232,190 @@ document.addEventListener('keydown', (e) => {
   quickScanOrv();
 });
 
+// ── Přidat do evidence ze skenu ORV ──────────────────────────────────────────
+// Typický případ: auto se nejdřív zapsalo (úkon v evidenci bez RZ), teď přišlo
+// ORV s přidělenou RZ. Sken ho najde podle VIN a jedním klikem doplní RZ a číslo
+// ORV. Když auto v evidenci není, založí se nový úkon (firma/typ/cena jako na
+// poslední straně). Serverová strana: evidence_orv.py.
+let _evOrv = null;   // {vozidlo, nonce, meta}
+
+async function pridatDoEvidence() {
+  if (_scanInFlight) return;
+  if (!cameraStream) {
+    alert('Kamera není zapnutá. Klikni na Zapnout kameru nebo dej povolení v prohlížeči.');
+    return;
+  }
+  _scanInFlight = true;
+  const btn = document.getElementById('evidence-scan-btn');
+  const puvodni = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Skenuji…';
+  const resultEl = document.getElementById('scan-all-result');
+  resultEl.className = 'scan-result loading'; resultEl.textContent = 'Skenuji ORV…';
+  try {
+    const [scan, meta] = await Promise.all([_naskenujOrv(), loadEvidenceMeta()]);
+    if (!scan.success || !scan.data) {
+      resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + (scan.error || 'sken selhal');
+      return;
+    }
+    if (!meta) {
+      resultEl.className = 'scan-result err'; resultEl.textContent = '✗ Evidence je teď nedostupná.';
+      return;
+    }
+    const d = scan.data;
+    const vozidlo = {
+      rz: d.registracni_znacka || '',
+      vin: d.vin || '',
+      orv: (d.osvedceni_serie || '') + (d.osvedceni_cislo || ''),
+      znacka: d.znacka || '',
+    };
+    // VIN na nafocené straně ORV skoro nikdy není (benchmark 2026-10-08:
+    // chyběl u 196 z 203 fotek) — bere se z registru podle čísla ORV, stejně
+    // jako v žádosti. Bez VIN by se zapsané auto bez RZ v evidenci nenašlo.
+    if (!vozidlo.vin && /^[A-Z]{3}\d{6}$/.test(vozidlo.orv.toUpperCase())) {
+      resultEl.textContent = 'Hledám VIN v registru…';
+      try {
+        const reg = await (await fetch('/api/orv', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serie: vozidlo.orv.slice(0, 3), cislo: vozidlo.orv.slice(3) }) })).json();
+        if (reg.success) { vozidlo.vin = reg.vin || ''; vozidlo.znacka = vozidlo.znacka || reg.znacka || ''; }
+      } catch { /* registr nedostupný → hledá se aspoň podle RZ */ }
+    }
+    _evOrv = {
+      vozidlo,
+      // jedna hodnota na otevření okna → dvojklik na „Zapsat" nezaloží dva úkony
+      nonce: Math.random().toString(36).slice(2, 10),
+      meta,
+      ico: [(d.provozovatel || {}).ico, (d.vlastnik || {}).ico],   // provozovatel první (leasing)
+    };
+    resultEl.className = 'scan-result'; resultEl.textContent = '';
+    vykresliEvidenceOrv();
+    document.getElementById('evidence-orv-modal').classList.add('open');
+    await hledejVEvidenci();
+  } catch (e) {
+    resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + e.message;
+  } finally {
+    _scanInFlight = false;
+    btn.disabled = false; btn.textContent = puvodni;
+  }
+}
+
+function zavriEvidenceOrv() {
+  document.getElementById('evidence-orv-modal').classList.remove('open');
+}
+
+const _evoVal = id => (document.getElementById(id) || {}).value || '';
+
+function vykresliEvidenceOrv() {
+  const { vozidlo: v, meta } = _evOrv;
+  const firmy = meta.firmy.map(f => `<option value="${esc(f.id)}">${esc(f.nazev)}${f.ico ? ' (' + esc(f.ico) + ')' : ''}</option>`).join('');
+  const typy = meta.typy.map(t => `<option value="${esc(t.kod)}">${esc(t.kod)}</option>`).join('');
+  document.getElementById('evidence-orv-body').innerHTML = `
+    <div class="form-grid">
+      <div class="field"><label>RZ</label><input type="text" id="evo_rz" maxlength="8" value="${esc(v.rz)}"></div>
+      <div class="field"><label>Číslo ORV</label><input type="text" id="evo_orv" maxlength="9" value="${esc(v.orv)}"></div>
+      <div class="field" style="grid-column:1/-1"><label>VIN${v.znacka ? ' · ' + esc(v.znacka) : ''}</label><input type="text" id="evo_vin" maxlength="17" value="${esc(v.vin)}"></div>
+    </div>
+    <div class="card-title" style="margin:18px 0 8px;font-size:14px">V evidenci</div>
+    <div id="evo-nalezene" style="font-size:13px;color:var(--muted)">Hledám…</div>
+    <div class="card-title" style="margin:18px 0 8px;font-size:14px">Nový úkon</div>
+    <div class="form-grid">
+      <div class="field"><label>Firma</label><select id="evo_firma" onchange="evoCena()"><option value="">— vyber firmu —</option>${firmy}</select></div>
+      <div class="field"><label>Typ úkonu</label><select id="evo_typ" onchange="evoCena()"><option value="">—</option>${typy}</select></div>
+      <div class="field"><label>Cena (Kč)</label><input type="number" id="evo_cena" class="no-uc" min="0" step="50" inputmode="numeric" placeholder="0" oninput="this.dataset.auto=''"></div>
+      <div class="field"><label>Poznámky</label><input type="text" id="evo_poznamka" maxlength="120"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:10px">
+      <label class="ev-toggle" for="evo_zaplaceno"><input type="checkbox" id="evo_zaplaceno"><span>ZAPLACENO</span></label>
+      <button id="evo-zapsat" onclick="zapisNovyUkon()" style="padding:10px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Zapsat úkon</button>
+    </div>
+    <div id="evo-vysledek" class="scan-result" style="margin-top:10px"></div>`;
+  // Firma podle IČO ze skenu (provozovatel dřív než vlastník — leasing).
+  for (const raw of _evOrv.ico) {
+    const ico = _digits(raw);
+    const f = ico && meta.firmy.find(x => _digits(x.ico) === ico);
+    if (f) { document.getElementById('evo_firma').value = String(f.id); break; }
+  }
+  evoCena();
+}
+
+function evoCena() {
+  const meta = _evOrv && _evOrv.meta;
+  const cena = document.getElementById('evo_cena');
+  if (!meta || !cena) return;
+  const fid = _evoVal('evo_firma'), typ = _evoVal('evo_typ');
+  const p = fid && typ && meta.ceny[fid] ? meta.ceny[fid][typ] : null;
+  if (p != null && (!cena.value || cena.dataset.auto === '1')) { cena.value = p; cena.dataset.auto = '1'; }
+}
+
+async function hledejVEvidenci() {
+  const box = document.getElementById('evo-nalezene');
+  const q = new URLSearchParams();
+  if (_evoVal('evo_vin')) q.set('vin', _evoVal('evo_vin'));
+  else if (_evoVal('evo_rz')) q.set('rz', _evoVal('evo_rz'));
+  else { box.textContent = 'Ze skenu nevyšel VIN ani RZ.'; return; }
+  try {
+    const r = await (await fetch('/api/evidence/hledat?' + q)).json();
+    if (!r.success) { box.textContent = '✗ ' + r.error; return; }
+    if (!r.k_dispozici) { box.textContent = 'Hledání v evidenci zatím není k dispozici — můžeš rovnou založit nový úkon.'; return; }
+    if (!r.ukony.length) { box.textContent = 'Auto v evidenci není.'; return; }
+    box.innerHTML = r.ukony.map(u => {
+      const chybi = !u.rz || !u.orv;
+      const datum = String(u.datum || '').split('-').reverse().join('.');
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);color:var(--text)">
+        <span>${esc(datum)} · <b>${esc(u.firma_zkratka || u.firma || '')}</b> · ${esc(u.typ_kod || '')} · RZ ${u.rz ? esc(u.rz) : '<i style="color:var(--muted)">chybí</i>'}</span>
+        ${chybi ? `<button onclick="doplnUkon(${Number(u.id)}, this)" style="padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Doplnit SPZ</button>` : '<span style="color:var(--muted);font-size:12px">✓ má SPZ</span>'}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    box.textContent = '✗ ' + e.message;
+  }
+}
+
+async function doplnUkon(id, btn) {
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const r = await (await fetch('/api/evidence/doplnit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, rz: _evoVal('evo_rz'), orv: _evoVal('evo_orv') }),
+    })).json();
+    if (r.success) { btn.outerHTML = '<span style="color:var(--success);font-weight:700;font-size:12px">✓ Doplněno</span>'; return; }
+    btn.disabled = false; btn.textContent = 'Doplnit SPZ';
+    alert(r.stavajici ? `${r.error}\nV evidenci je: ${r.stavajici}` : r.error);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Doplnit SPZ';
+    alert('Chyba: ' + e.message);
+  }
+}
+
+async function zapisNovyUkon() {
+  const out = document.getElementById('evo-vysledek');
+  const btn = document.getElementById('evo-zapsat');
+  const typ = _evoVal('evo_typ');
+  btn.disabled = true;
+  out.className = 'scan-result loading'; out.textContent = 'Zapisuji…';
+  try {
+    const r = await (await fetch('/api/evidence/zalozit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vin: _evoVal('evo_vin'), rz: _evoVal('evo_rz'), orv: _evoVal('evo_orv'),
+        firma_id: _evoVal('evo_firma'), typ_kod: typ, celkem: _evoVal('evo_cena'),
+        poznamka: _evoVal('evo_poznamka'),
+        zaplaceno: document.getElementById('evo_zaplaceno').checked,
+        profil: window.getProfil ? window.getProfil() : '',
+        zadost_id: 'orv-' + _evOrv.nonce + '-' + typ,
+      }),
+    })).json();
+    if (!r.success) { out.className = 'scan-result err'; out.textContent = '✗ ' + r.error; btn.disabled = false; return; }
+    if (r.status === 'auto') { out.className = 'scan-result ok'; out.textContent = '✓ Zapsáno jako úkon č. ' + r.ukon_id; return; }
+    if (r.status === 'duplicate') { out.className = 'scan-result ok'; out.textContent = '✓ Už zapsáno.'; return; }
+    out.className = 'scan-result err';
+    out.textContent = r.duplicate_ukon_id
+      ? `Čeká v Příchozí — tohle auto už u této firmy má úkon č. ${r.duplicate_ukon_id}. Potvrď ho v evidenci, jestli je to opravdu druhý úkon.`
+      : 'Čeká v Příchozí v evidenci.';
+  } catch (e) {
+    out.className = 'scan-result err'; out.textContent = '✗ ' + e.message; btn.disabled = false;
+  }
+}
+
 // Tlačítko „Kamera": vždycky čistý restart — pustit, co je otevřené i co se
 // zrovna otevírá, chvíli počkat na uvolnění zařízení a otevřít znovu.
 async function openCamera() {
@@ -3256,82 +3442,21 @@ function closeCamera() {
     _zastavProud(cameraStream);
     cameraStream = null;
   }
+  _kameraUI(false);
+}
+
+// Kamera běží → náhled + tlačítka; neběží → jen „Zapnout kameru".
+function _kameraUI(bezi) {
   const container = document.getElementById('camera-container');
-  if (container) container.style.display = 'none';
+  const zapnout = document.getElementById('camera-zapnout');
+  if (container) container.style.display = bezi ? '' : 'none';
+  if (zapnout) zapnout.style.display = bezi ? 'none' : 'inline-flex';
 }
 
 // Obnovení stránky („Nová žádost"), zavření záložky, odchod jinam — kameru
 // pustit výslovně. Spoléhat na úklid prohlížeče nestačí: nová stránka pak
 // sahá po kameře, kterou stará ještě nepustila.
 window.addEventListener('pagehide', () => { closeCamera(); });
-
-async function capturePhoto() {
-  const video = document.getElementById('camera-video');
-  const canvas = document.getElementById('camera-canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.translate(canvas.width, canvas.height);
-  ctx.rotate(Math.PI);
-  ctx.drawImage(video, 0, 0);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-
-  // Save to server
-  try {
-    const res = await fetch('/api/save-scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl })
-    });
-    const result = await res.json();
-    if (result.success) {
-      scanAllItems.push({ filename: result.filename, dataUrl });
-      renderScanPreviews();
-      document.getElementById('scan-all-btn').style.display = '';
-    }
-  } catch(e) { alert('Chyba při ukládání: ' + e.message); }
-}
-
-// ── Scan all documents ────────────────────────────────────────────────────────
-let scanAllItems = []; // { filename, dataUrl }
-
-async function addScanFiles(input) {
-  for (const file of input.files) {
-    const dataUrl = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.readAsDataURL(file);
-    });
-    // Save to server
-    try {
-      const res = await fetch('/api/save-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: dataUrl })
-      });
-      const result = await res.json();
-      if (result.success) scanAllItems.push({ filename: result.filename, dataUrl });
-    } catch(e) { console.error(e); }
-  }
-  input.value = '';
-  renderScanPreviews();
-  document.getElementById('scan-all-btn').style.display = scanAllItems.length ? '' : 'none';
-}
-
-function removeScanFile(idx) {
-  scanAllItems.splice(idx, 1);
-  renderScanPreviews();
-  document.getElementById('scan-all-btn').style.display = scanAllItems.length ? '' : 'none';
-}
-
-function renderScanPreviews() {
-  const container = document.getElementById('scan-all-previews');
-  container.innerHTML = scanAllItems.map((item, i) => `
-    <div style="position:relative;display:inline-block;">
-      <img src="${item.dataUrl}" style="height:72px;width:72px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);">
-      <button onclick="removeScanFile(${i})" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0;">✕</button>
-    </div>`).join('');
-}
 
 function setVal(id, val) {
   const el = document.getElementById(id);
@@ -3392,28 +3517,6 @@ async function applyOrvData(d) {
   }
   refreshAllLenChecks();   // a scan-filled VIN should light up green too
   return filled;
-}
-
-async function scanAll() {
-  if (!scanAllItems.length) return;
-  const resultEl = document.getElementById('scan-all-result');
-  resultEl.className = 'scan-result loading';
-  resultEl.textContent = `Skenuji ${scanAllItems.length} dokument${scanAllItems.length > 1 ? 'y' : ''}…`;
-
-  const formData = new FormData();
-  for (const item of scanAllItems) formData.append('filenames', item.filename);
-  formData.append('model', getModel());
-  try {
-    const res = await fetch('/api/scan-all', { method: 'POST', body: formData });
-    const result = await res.json();
-    if (!result.success) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + result.error; return; }
-    const filled = await applyOrvData(result.data);
-    resultEl.className = filled.length ? 'scan-result ok' : 'scan-result err';
-    resultEl.textContent = filled.length ? '✓ Vyplněno: ' + filled.join(', ') : 'Žádná data nenalezena';
-  } catch(e) {
-    resultEl.className = 'scan-result err';
-    resultEl.textContent = '✗ Chyba: ' + e.message;
-  }
 }
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
@@ -3483,15 +3586,21 @@ function resetForm() {
 }
 
 // ── Model toggle ──────────────────────────────────────────────────────────────
-function getModel() { return localStorage.getItem('scan_model') || 'sonnet'; }
+// Výchozí Haiku 5.5: benchmark 2026-10-08 na 203 reálných ORV proti podaným
+// žádostem — čte stejně dobře jako Sonnet 4.6 (RZ 180 vs 178, č. ORV 189 vs
+// 188), je ~40 % rychlejší (3,5 vs 5,9 s) a ~20× levnější. Kdo si přepnul na
+// Sonnet, tomu volba zůstane (localStorage).
+function getModel() { return localStorage.getItem('scan_model') || 'haiku'; }
+// Popisky musí sedět s MODELS v app.py (sonnet → claude-sonnet-4-6,
+// haiku → claude-haiku-5-5), ať je jasné, který model zrovna čte.
+const MODEL_POPISEK = { sonnet: 'Sonnet 4.6', haiku: 'Haiku 5.5' };
 function toggleModel() {
   const next = getModel() === 'sonnet' ? 'haiku' : 'sonnet';
   localStorage.setItem('scan_model', next);
-  document.getElementById('model-name').textContent = next === 'sonnet' ? 'Sonnet' : 'Haiku';
+  document.getElementById('model-name').textContent = MODEL_POPISEK[next];
 }
 document.addEventListener('DOMContentLoaded', () => {
-  const m = getModel();
-  document.getElementById('model-name').textContent = m === 'sonnet' ? 'Sonnet' : 'Haiku';
+  document.getElementById('model-name').textContent = MODEL_POPISEK[getModel()] || MODEL_POPISEK.haiku;
 });
 
 // ── Auto-update check ─────────────────────────────────────────────────────────

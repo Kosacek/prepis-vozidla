@@ -19,6 +19,7 @@ from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
+import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
 import hledani  # deterministic history search (no AI) — see hledani.py
 import prefill  # read a past žádost back into form data — see prefill.py
 import pm  # plná moc k zastupování na registru vozidel — see pm.py
@@ -57,7 +58,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.16.2"
+__version__ = "1.17.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -101,9 +102,7 @@ PDF_3RZ = os.path.join(BASE_DIR, "pdfs", "3rz.pdf")
 PDF_VYVOZ = os.path.join(BASE_DIR, "pdfs", "vyvoz.pdf")
 FIRMY_XLSX = os.path.join(DATA_DIR, "firmy.xlsx")
 PLNE_MOCE_DIR = os.path.join(DATA_DIR, "plne_moce")
-SCANS_DIR = os.path.join(DATA_DIR, "scans")
 os.makedirs(PLNE_MOCE_DIR, exist_ok=True)
-os.makedirs(SCANS_DIR, exist_ok=True)
 
 # ── PDF template sanity check ───────────────────────────────────────────────
 import logging as _logging
@@ -210,8 +209,86 @@ def read_firmy() -> list:
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODELS = {
     "sonnet": "claude-sonnet-4-6",
-    "haiku": "claude-haiku-4-5-20251001",
+    "haiku": "claude-haiku-5-5",
 }
+# Haiku 5.5 (na rozdíl od 4.5) přemýšlí sám od sebe — výchozí effort „medium".
+# Na opsání údajů z dokladu hluboké uvažování netřeba, „low" ho nechá
+# přemýšlení u jednoduchých fotek klidně přeskočit (rychlejší a levnější).
+# Pozor: Haiku 5.5 vrací 400 na temperature/top_p/top_k i na předvyplněnou
+# odpověď asistenta — nic z toho sem nepřidávat.
+_MODEL_EXTRA = {"haiku": {"output_config": {"effort": "low"}}}
+# Přemýšlení se počítá do max_tokens; se starými 800–1500 by u Haiku 5.5
+# mohlo spolknout celý limit dřív, než model napíše JSON.
+VISION_MAX_TOKENS = 4096
+
+
+class ClaudeError(Exception):
+    """Sken se nepovedl z důvodu, který stojí za to ukázat uživateli."""
+
+
+def claude_vision_json(content: list, model: str = "sonnet", timeout: int = 30) -> tuple:
+    """Pošle jeden obrázek(y) + prompt a vrátí (data, meta).
+
+    data = JSON z PRVNÍHO TEXTOVÉHO bloku odpovědi. Dřív se četlo
+    content[0]["text"] — jenže Haiku 5.5 může odpověď začít blokem
+    `thinking` bez textu, a sken by spadl na KeyError.
+    meta = model, čas, tokeny — pro porovnání modelů.
+    """
+    key = model if model in MODELS else "sonnet"
+    body = {
+        "model": MODELS[key],
+        "max_tokens": VISION_MAX_TOKENS,
+        "messages": [{"role": "user", "content": content}],
+        **_MODEL_EXTRA.get(key, {}),
+    }
+    t0 = time.time()
+    response = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json=body,
+        timeout=timeout,
+    )
+    try:
+        result = response.json()
+    except ValueError:
+        raise ClaudeError(f"API HTTP {response.status_code}: {response.text[:200]}")
+    if response.status_code != 200 or "error" in result:
+        raise ClaudeError((result.get("error") or {}).get("message")
+                          or f"API HTTP {response.status_code}")
+    stop = result.get("stop_reason")
+    if stop == "refusal":
+        raise ClaudeError("Model odmítl doklad zpracovat.")
+    if stop == "max_tokens":
+        raise ClaudeError("Odpověď modelu se nevešla do limitu.")
+    text = next((b.get("text", "") for b in result.get("content", [])
+                 if b.get("type") == "text"), "").strip()
+    if not text:
+        raise ClaudeError("Model nevrátil žádný text.")
+    usage = result.get("usage") or {}
+    meta = {"model": MODELS[key], "ms": int((time.time() - t0) * 1000),
+            "input_tokens": usage.get("input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0)}
+    return _vytahni_json(text), meta
+
+
+def _vytahni_json(text: str):
+    """JSON z odpovědi, ať je kdekoli.
+
+    Sonnet 4.6 občas před JSON napíše větu („The document is upside down. Let me
+    read it…") a teprve pak ```json blok. Starý kód bral jen odpověď, která
+    JSONem ZAČÍNÁ — změřeno 2026-10-08 na 203 reálných ORV: 11 skenů (5,4 %)
+    spadlo, i když data v odpovědi byla."""
+    m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S)
+    if m:
+        return json.loads(m.group(1))
+    zacatek, konec = text.find("{"), text.rfind("}")
+    if zacatek != -1 and konec > zacatek:
+        return json.loads(text[zacatek:konec + 1])
+    return json.loads(text)   # ať chyba řekne, co přišlo
 
 # ── Claude Vision scan ────────────────────────────────────────────────────────
 SCAN_PROMPT = """Analyze this Czech vehicle document image and extract all data.
@@ -331,36 +408,11 @@ def _has_data(result: dict) -> bool:
 
 def scan_document(image_b64: str, mime_type: str, model: str = "sonnet") -> dict:
     try:
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": MODELS.get(model, MODELS["sonnet"]),
-                "max_tokens": 800,
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}},
-                        {"type": "text", "text": SCAN_PROMPT}
-                    ]
-                }]
-            },
-            timeout=30
-        )
-        if response.status_code != 200:
-            return {"success": False, "error": f"API HTTP {response.status_code}: {response.text[:200]}"}
-        result = response.json()
-        if "error" in result:
-            return {"success": False, "error": result["error"].get("message", "API error")}
-        text = result["content"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"): text = text[4:]
-        return {"success": True, "data": json.loads(text.strip())}
+        data, _ = claude_vision_json([
+            {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}},
+            {"type": "text", "text": SCAN_PROMPT},
+        ], model)
+        return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": f"{type(e).__name__}: {e}"}
 
@@ -1977,73 +2029,6 @@ def api_scan():
         result = scan_document(rotate_180(image_b64, mime_type), mime_type, model)
     return jsonify(result)
 
-@app.route("/api/save-scan", methods=["POST"])
-def api_save_scan():
-    data = request.get_json()
-    if not data or 'image' not in data:
-        return jsonify({"success": False, "error": "No image data"})
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"scan_{ts}.jpg"
-    filepath = os.path.join(SCANS_DIR, filename)
-    img_data = data['image']
-    if ',' in img_data:
-        img_data = img_data.split(',', 1)[1]
-    with open(filepath, 'wb') as f:
-        f.write(base64.b64decode(img_data))
-    return jsonify({"success": True, "filename": filename})
-
-@app.route("/api/scan-all", methods=["POST"])
-def api_scan_all():
-    # Accept either saved filenames (JSON) or uploaded files (multipart)
-    model = request.form.get('model', 'sonnet')
-    filenames = request.form.getlist('filenames')
-    content = []
-    if filenames:
-        for fname in filenames:
-            safe = os.path.basename(fname)
-            filepath = os.path.join(SCANS_DIR, safe)
-            if not os.path.exists(filepath):
-                continue
-            with open(filepath, 'rb') as f:
-                image_b64 = base64.b64encode(f.read()).decode('utf-8')
-            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_b64}})
-    else:
-        images = request.files.getlist('images')
-        if not images:
-            return jsonify({"success": False, "error": "No images provided"})
-        for img in images:
-            mime_type = img.mimetype or "image/jpeg"
-            image_b64 = base64.b64encode(img.read()).decode('utf-8')
-            content.append({"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}})
-    if not content:
-        return jsonify({"success": False, "error": "No valid images found"})
-    content.append({"type": "text", "text": ORV_SCAN_PROMPT})
-    try:
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": MODELS.get(model, MODELS["sonnet"]),
-                "max_tokens": 1500,
-                "messages": [{"role": "user", "content": content}]
-            },
-            timeout=45
-        )
-        result = response.json()
-        if "error" in result:
-            return jsonify({"success": False, "error": result["error"].get("message", "API error")})
-        text = result["content"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"): text = text[4:]
-        return jsonify({"success": True, "data": _fix_orv_serie(json.loads(text.strip()))})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
 @app.route("/api/scan-orv", methods=["POST"])
 def api_scan_orv():
     if 'image' not in request.files:
@@ -2054,39 +2039,48 @@ def api_scan_orv():
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
     for candidate in [image_b64, rotate_180(image_b64, mime_type)]:
         try:
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": MODELS.get(model, MODELS["sonnet"]),
-                    "max_tokens": 1200,
-                    "messages": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": candidate}},
-                            {"type": "text", "text": ORV_SCAN_PROMPT}
-                        ]
-                    }]
-                },
-                timeout=30
-            )
-            result = response.json()
-            if "error" in result:
-                return jsonify({"success": False, "error": result["error"].get("message", "API error")})
-            text = result["content"][0]["text"].strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"): text = text[4:]
-            data = _fix_orv_serie(json.loads(text.strip()))
+            data, _ = claude_vision_json([
+                {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": candidate}},
+                {"type": "text", "text": ORV_SCAN_PROMPT},
+            ], model)
+            data = _fix_orv_serie(data)
             if data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka") or (data.get("vlastnik") or {}).get("jmeno"):
                 return jsonify({"success": True, "data": data})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
     return jsonify({"success": True, "data": data})
+
+# ── „Přidat do evidence" ze skenu ORV (evidence_orv.py) ──────────────────────
+# Prohlížeč volá jen tyhle tři trasy (za přihlášením); klíč k evidenci zůstává
+# na serveru v evidence_orv / tracker_push.
+def _evidence_odpoved(fn):
+    try:
+        return jsonify({"success": True, **fn()})
+    except evidence_orv.EvidenceError as e:
+        return jsonify({"success": False, "error": e.zprava, **e.data}), e.status
+
+
+@app.route("/api/evidence/hledat")
+def api_evidence_hledat():
+    a = request.args
+    return _evidence_odpoved(lambda: evidence_orv.hledat(a.get("vin"), a.get("rz")))
+
+
+@app.route("/api/evidence/doplnit", methods=["POST"])
+def api_evidence_doplnit():
+    d = request.get_json(silent=True) or {}
+    return _evidence_odpoved(lambda: evidence_orv.doplnit(d.get("id"), d.get("rz"), d.get("orv")))
+
+
+@app.route("/api/evidence/zalozit", methods=["POST"])
+def api_evidence_zalozit():
+    d = request.get_json(silent=True) or {}
+    return _evidence_odpoved(lambda: evidence_orv.zalozit(
+        vin=d.get("vin"), rz=d.get("rz"), orv=d.get("orv"),
+        firma_id=d.get("firma_id"), typ_kod=d.get("typ_kod"), celkem=d.get("celkem"),
+        poznamka=d.get("poznamka"), zaplaceno=d.get("zaplaceno"),
+        profil=d.get("profil"), zadost_id=d.get("zadost_id")))
+
 
 @app.route("/download/<filename>")
 def download(filename):
