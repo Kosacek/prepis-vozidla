@@ -3,3 +3,4 @@ openpyxl
 requests
 gunicorn
 python-dotenv
+anthropic>=1.0,<2
