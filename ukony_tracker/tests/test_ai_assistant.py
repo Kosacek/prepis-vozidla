@@ -311,6 +311,16 @@ def test_sentence_may_use_numbers_from_the_question():
     assert not assistant.verify_sentence(sentence, [result])
 
 
+def test_sentence_may_use_today_date_parts():
+    result = {"radky": [{"hodnota": 1300, "pocet": 1}],
+              "obdobi": {"od": "2026-10-01", "do": "2026-10-31"}}
+    sentence = "Tento měsíc (od 1. 10. do 8. 10.) je 1 300 Kč."
+    assert assistant.verify_sentence(sentence, [result], today=date(2026, 10, 8))
+    assert not assistant.verify_sentence(sentence, [result])
+    assert not assistant.verify_sentence(sentence.replace("8. 10.", "9. 10."),
+                                         [result], today=date(2026, 10, 8))
+
+
 def test_sentence_may_use_row_dates_and_row_counts():
     result = {"radky": [{"datum": "2026-10-07", "celkem": 1800}] * 3,
               "obdobi": {"od": "2026-05-04", "do": "2026-10-08"}}
