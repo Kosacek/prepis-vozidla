@@ -67,6 +67,7 @@ def _system_prompt(db_path: str, today: date) -> str:
         "Věta je prostá čeština bez odrážek. Zvýrazni **dvojitými hvězdičkami** "
         "1–3 nejdůležitější údaje (hlavní číslo s jednotkou, jméno vítěze nebo období) "
         "a nic jiného; nikdy nezvýrazňuj celou větu."
+        " Období ve větě uváděj podle pole obdobi z výsledku nástroje; dnešní datum jako konec období nepřidávej."
     )
 
 
@@ -154,12 +155,15 @@ def _derived_numbers(rows: list[dict]) -> set[Decimal]:
     return out
 
 
-def verify_sentence(sentence: str, results: list[dict], *, question: str = "") -> bool:
+def verify_sentence(sentence: str, results: list[dict], *, question: str = "",
+                    today: date | None = None) -> bool:
     """Every number in the sentence must come from the DB results (values, period
     and row dates, row counts, two-row differences) or from the question itself
-    ("za poslední 3 měsíce"). Anything else means the model computed or
-    invented it, and the sentence is dropped."""
+    ("za poslední 3 měsíce") or today's date when supplied. Anything else means
+    the model computed or invented it, and the sentence is dropped."""
     allowed = _allowed_numbers(results)
+    if today is not None:
+        allowed.update(Decimal(value) for value in (today.day, today.month, today.year))
     for match in _NUMBER.finditer(question or ""):
         number = _number(match.group())
         if number is not None:
@@ -238,7 +242,7 @@ def ask(question: str, *, db_path, today: date, client=None) -> dict:
                 marked = _clean_sentence(data.get("veta", "")) if not clarifies else ""
                 sentence = plain_sentence(marked)
                 return {"typ": final.name, "veta": sentence, "veta_znaceno": marked,
-                        "veta_overena": (verify_sentence(sentence, results, question=question)
+                        "veta_overena": (verify_sentence(sentence, results, question=question, today=today)
                                          if sentence else False),
                         "graf": data.get("graf", "zadny") if not clarifies else "zadny",
                         "predpoklady": data.get("predpoklady", "") if not clarifies else "",
