@@ -17,7 +17,10 @@ import requests
 import ppd
 import ppd_push
 
-BATCH_SIZE = 200
+# Evidence runs one worker on a slow ARM NAS and matches each receipt to an úkon,
+# so big batches blow past the normal push timeout. Small batches, patient timeout.
+BATCH_SIZE = 25
+IMPORT_TIMEOUT = 120
 
 
 def main(argv=None) -> int:
@@ -65,7 +68,7 @@ def main(argv=None) -> int:
         batch = records[offset:offset + BATCH_SIZE]
         try:
             response = requests.post(f"{api_url}/api/ppd/import", json={"doklady": batch},
-                                     headers={"X-Api-Key": api_key}, timeout=ppd_push.TIMEOUT)
+                                     headers={"X-Api-Key": api_key}, timeout=IMPORT_TIMEOUT)
             if not 200 <= response.status_code < 300:
                 raise RuntimeError(f"HTTP {response.status_code}: {response.text[:200]}")
             result = response.json()

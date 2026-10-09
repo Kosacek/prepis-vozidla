@@ -287,13 +287,13 @@ def test_backfill_dry_run_prints_counts_and_first_three_without_http(tmp_path, m
     assert all(type(body["castka"]) is int for body in bodies)
 
 
-def test_backfill_batches_200_and_reports_totals_and_errors(tmp_path, monkeypatch, capsys):
+def test_backfill_batches_25_and_reports_totals_and_errors(tmp_path, monkeypatch, capsys):
     mock_history(monkeypatch, tmp_path, 401)
     sent = []
     def post(url, **kwargs):
         assert url == "http://evidence.test/api/ppd/import"
         assert kwargs["headers"] == {"X-Api-Key": "test-import-key"}
-        assert kwargs["timeout"] == ppd_push.TIMEOUT
+        assert kwargs["timeout"] == backfill.IMPORT_TIMEOUT
         sent.append(kwargs["json"]["doklady"])
         if len(sent) == 1:
             return Response(body={"vytvoreno": 199, "aktualizovano": 0,
@@ -301,14 +301,14 @@ def test_backfill_batches_200_and_reports_totals_and_errors(tmp_path, monkeypatc
         return Response(body={"vytvoreno": 0, "aktualizovano": len(sent[-1]), "chyby": []})
     monkeypatch.setattr(backfill.requests, "post", post)
     assert backfill.main([]) == 1
-    assert [len(batch) for batch in sent] == [200, 200, 1]
+    assert [len(batch) for batch in sent] == [25] * 16 + [1]
     assert [body["cislo"] for batch in sent for body in batch] == list(range(1, 402))
     assert sent[0][0]["smazano"] is False
     assert sent[-1][0]["smazano"] is True
     output = capsys.readouterr().out
-    assert "Davka 1/3: vytvoreno=199 / aktualizovano=0 / chyby=1" in output
-    assert "Davka 3/3: vytvoreno=0 / aktualizovano=1 / chyby=0" in output
-    assert "Celkem: vytvoreno=199 / aktualizovano=201 / chyby=1" in output
+    assert "Davka 1/17: vytvoreno=199 / aktualizovano=0 / chyby=1" in output
+    assert "Davka 17/17: vytvoreno=0 / aktualizovano=1 / chyby=0" in output
+    assert "Celkem: vytvoreno=199 / aktualizovano=376 / chyby=1" in output
     assert '"cislo": 2, "error": "bad record"' in output
     assert "test-import-key" not in output
 
