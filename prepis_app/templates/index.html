@@ -172,6 +172,7 @@
   .firm-option { padding: 9px 13px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border); }
   .firm-option:last-child { border-bottom: none; }
   .firm-option:hover { background: var(--accent); }
+  .firm-option.active { background: var(--accent); box-shadow: inset 3px 0 0 var(--primary); }
   .firm-name { font-weight: 600; }
   .firm-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
   .firm-option.add-new { color: var(--primary); font-weight: 600; }
@@ -1376,6 +1377,13 @@ function _jeVyplnitelne(e) {
      (e.tagName === 'INPUT' && ['text', 'number', ''].includes(e.type)));
 }
 
+function _chybiPovinne(e) {
+  if (e.hasAttribute('data-volitelne') || String(e.value || '').trim()) return false;
+  // Firma se identifikuje IČO; prázdné rodné číslo jí nebrání pokračovat.
+  const ico = /_rc_[12]$/.test(e.id) && document.getElementById(e.id.replace(/_rc_[12]$/, '_ico'));
+  return !(ico && ico.value.trim());
+}
+
 /** První prázdné pole za `od` v tomtéž kroku (nebo null). */
 function dalsiPrazdne(od) {
   const panel = od.closest('.step-panel');
@@ -1384,7 +1392,7 @@ function dalsiPrazdne(od) {
   // Volitelná pole (data-volitelne: jiný doklad, poznámky, ID pro úřad) se
   // vyplňují zřídka — skok na ně by kurzor posadil někam, kam nikdo nepíše.
   return pole.slice(pole.indexOf(od) + 1)
-    .find(e => !e.hasAttribute('data-volitelne') && !String(e.value || '').trim()) || null;
+    .find(_chybiPovinne) || null;
 }
 
 function _skoc(cil) {
@@ -1416,7 +1424,7 @@ function autoDal(ev) {
     sken, se přeskočí. Když je vše vyplněné, první pole jako dřív. */
 function prvniPrazdne(panelEl) {
   const pole = [...panelEl.querySelectorAll('input, select, textarea')].filter(_jeVyplnitelne);
-  return pole.find(e => e.tagName !== 'SELECT' && !e.hasAttribute('data-volitelne') && !String(e.value || '').trim())
+  return pole.find(e => e.tagName !== 'SELECT' && _chybiPovinne(e))
     || pole[0] || null;
 }
 
@@ -1714,6 +1722,62 @@ function _hideDropdowns(party) {
     if (d) d.classList.remove('open');
   });
 }
+function najdiFirmy(firms, query) {
+  const normalize = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+  const q = normalize(query);
+  if (!q) return [];
+  return firms.map((firm, index) => {
+    const name = normalize(firm.nazev);
+    const words = normalize(String(firm.nazev || '').replace(/[\p{P}\p{S}]/gu, ' ')).split(' ');
+    const rank = name.startsWith(q) ? 0
+      : name.split(' ').concat(words).some(word => word.startsWith(q)) ? 1
+      : name.includes(q) ? 2
+      : normalize(firm.ico).startsWith(q) ? 3 : 4;
+    return { firm, index, rank };
+  }).filter(match => match.rank < 4)
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(match => match.firm);
+}
+
+// onPick fills synchronously from the rendered firm, so Tab can keep its native
+// default when no required field remains. Rebinding replaces previous handlers.
+function _dropdownKlavesy(input, dropdown, onPick, dalsiKrok = false) {
+  const options = () => [...dropdown.querySelectorAll('.firm-option:not(.add-new)')];
+  const highlight = (option, scroll = false) => {
+    options().forEach(o => o.classList.toggle('active', o === option));
+    if (scroll && option) option.scrollIntoView({ block: 'nearest' });
+  };
+  dropdown.scrollTop = 0;
+  highlight(options()[0]);
+  dropdown.onmouseover = e => {
+    const option = e.target.closest('.firm-option:not(.add-new)');
+    if (option && dropdown.contains(option)) highlight(option);
+  };
+  input.onkeydown = e => {
+    if (!dropdown.classList.contains('open') || e.isComposing || (e.key === 'Enter' && e.ctrlKey)) return;
+    if (!['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key) || (e.key === 'Tab' && e.shiftKey)) return;
+    const rows = options();
+    if (!rows.length) return;
+    e.stopPropagation();
+    if (e.key !== 'Tab') e.preventDefault();
+    const index = rows.findIndex(o => o.classList.contains('active'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      highlight(rows[(index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length], true);
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('open');
+    } else {
+      onPick(rows[index < 0 ? 0 : index]);
+      dropdown.classList.remove('open');
+      const panel = input.closest('.step-panel');
+      const first = panel && prvniPrazdne(panel);
+      const empty = first && _chybiPovinne(first) ? dalsiPrazdne(input) || first : null;
+      if (empty) { e.preventDefault(); _skoc(empty); }
+      else if (e.key === 'Enter' && dalsiKrok) navNext();
+    }
+  };
+}
+
 // source: 'ico' or 'name' — only the matching dropdown opens
 async function openFirmDropdown(party, source) {
   const activeDropdownId = source === 'ico' ? `${party}-firms` : `${party}-name-firms`;
@@ -1730,11 +1794,9 @@ async function openFirmDropdown(party, source) {
 
   if (!query) { dropdown.classList.remove('open'); return; }
 
-  const filtered = firms.filter(f =>
-    f.nazev.toLowerCase().includes(query.toLowerCase()) || f.ico.includes(query)
-  );
+  const filtered = najdiFirmy(firms, query);
   let html = filtered.map(f => `
-    <div class="firm-option" onclick="selectFirm('${esc(party)}','${esc(f.ico)}')">
+    <div class="firm-option" data-ico="${esc(f.ico)}" onclick="selectFirm('${esc(party)}','${esc(f.ico)}')">
       <div class="firm-name">${esc(f.nazev)}</div>
       <div class="firm-sub">IČO: ${esc(f.ico)} · ${esc(f.adresa)}</div>
     </div>`).join('');
@@ -1746,6 +1808,9 @@ async function openFirmDropdown(party, source) {
   if (!html) { dropdown.classList.remove('open'); return; }
   dropdown.innerHTML = html;
   dropdown.classList.add('open');
+  const input = document.getElementById(`${party}_${source === 'ico' ? 'ico' : 'jmeno'}`);
+  _dropdownKlavesy(input, dropdown, option => selectFirm(party, option.dataset.ico,
+    firms.find(f => f.ico === option.dataset.ico)), true);
 }
 async function matchFirmByIco(party, ico) {
   if (!ico) return false;
@@ -1785,9 +1850,8 @@ async function matchFirmByName(party, name) {
   const idEl = document.getElementById(`${party}_id`); if (idEl) idEl.value = match.id || '';
   return true;
 }
-async function selectFirm(party, ico) {
-  const firms = await getSavedFirms();
-  const firm = firms.find(f => f.ico === ico);
+async function selectFirm(party, ico, firm = null) {
+  if (!firm) firm = (await getSavedFirms()).find(f => f.ico === ico);
   if (!firm) return;
   document.getElementById(`${party}_ico`).value    = firm.ico;
   document.getElementById(`${party}_jmeno`).value  = firm.nazev;
@@ -1826,15 +1890,17 @@ async function ppdPayerSuggest() {
   document.getElementById('ppd_prijato_adresa').value = '';
   if (!q) { dd.classList.remove('open'); return; }
   const firms = await getSavedFirms();
-  const filtered = firms
-    .filter(f => f.nazev.toLowerCase().includes(q.toLowerCase()) || f.ico.includes(q))
-    .slice(0, 8);
+  const filtered = najdiFirmy(firms, q).slice(0, 8);
   dd.innerHTML = filtered.map(f => `
-    <div class="firm-option" onclick="ppdPayerPick('${esc(f.nazev)}','${esc(f.ico)}','${esc(f.adresa||'')}')">
+    <div class="firm-option" data-ico="${esc(f.ico)}" onclick="ppdPayerPick('${esc(f.nazev)}','${esc(f.ico)}','${esc(f.adresa||'')}')">
       <div class="firm-name">${esc(f.nazev)}</div>
       <div class="firm-sub">IČO: ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}</div>
     </div>`).join('');
   dd.classList.toggle('open', filtered.length > 0);
+  _dropdownKlavesy(inp, dd, option => {
+    const firm = firms.find(f => f.ico === option.dataset.ico);
+    ppdPayerPick(firm.nazev, firm.ico, firm.adresa);
+  });
   // 8-digit IČO not among saved firms → ARES lookup (debounced)
   if (/^\d{8}$/.test(q) && !firms.find(f => f.ico === q)) {
     clearTimeout(_ppdAresTimer);
@@ -1858,6 +1924,8 @@ async function ppdPayerAres(ico) {
         <div class="firm-name">${esc(d.nazev)}</div>
         <div class="firm-sub">ARES · IČO ${esc(ico)}${d.adresa ? ' · ' + esc(d.adresa) : ''}</div></div>`;
       dd.classList.add('open');
+      _dropdownKlavesy(document.getElementById('ppd_prijato_od'), dd,
+        () => ppdPayerPick(d.nazev, ico, d.adresa));
     }
   } catch (e) { /* ignore — ARES optional */ }
 }
@@ -2808,6 +2876,8 @@ function icoMistoJmena(party) {
   const icoEl = document.getElementById(party + '_ico');
   if (!icoEl) return false;
   icoEl.value = ico;
+  _hideDropdowns(party);
+  icoEl.focus();
   lookupIco(party);
   return true;
 }
