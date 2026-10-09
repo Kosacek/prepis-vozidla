@@ -257,6 +257,13 @@ def start_sweep(data_dir: str, interval_s: int = 300) -> None:
                     _log.warning("tracker sweep: %d push(es) still failing", n)
             except Exception as e:  # pragma: no cover - the sweep must never die
                 _log.warning("tracker sweep error: %s", e)
+            try:
+                import ppd_push
+                n = ppd_push.retry_failed(data_dir)
+                if n:
+                    _log.warning("PPD sweep: %d push(es) still failing", n)
+            except Exception as e:  # pragma: no cover - independent of tracker retry
+                _log.warning("PPD sweep error: %s", e)
             time.sleep(interval_s)
 
     threading.Thread(target=_loop, daemon=True).start()
