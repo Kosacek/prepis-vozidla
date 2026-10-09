@@ -49,6 +49,8 @@ def test_new_modal_fragment_uses_first_active_firma_and_selected_prices(client_f
     body = selected.get_data(as_text=True)
     assert f'action="/ukony/{fid}"' in body and 'data-cena="1500"' in body
     assert 'value="1AB2345"' in body and 'value="VIN123"' in body
+    assert 'class="ukon-new-actions"' in body
+    assert body.count('inputmode="text" autocapitalize="characters" enterkeyhint="next"') == 3
 
 
 def test_add_ajax_returns_full_list_item_and_saves(client_fid):
