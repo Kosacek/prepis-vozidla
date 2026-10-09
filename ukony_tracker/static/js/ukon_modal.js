@@ -5,6 +5,7 @@
   var modal = document.getElementById("ukon-modal");
   var modalBody = document.getElementById("ukon-modal-body");
   if (!modal || !modalBody) return;
+  var modalCard = modal.querySelector(".modal-card");
   var lastFocused = null;
 
   function openModal(url, isNew) {
@@ -17,6 +18,7 @@
       })
       .then(function (html) {
         modalBody.innerHTML = html;
+        modalCard.classList.toggle("modal-card--new", !!isNew);
         if (isNew) document.dispatchEvent(new CustomEvent('ukon:new-form-shown', { detail: { form: modalBody.querySelector('#ukon-form') } }));
         lastFocused = document.activeElement;
         modal.hidden = false;

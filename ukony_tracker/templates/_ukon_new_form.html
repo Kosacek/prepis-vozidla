@@ -17,7 +17,7 @@
     </div>
     <div class="form-row">
       <div class="field"><label>Datum</label><input type="date" name="datum" value="{{ dnes }}" required></div>
-      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper" value="{{ sel_rz }}"></div>
+      <div class="field"><label>RZ / SPZ</label><input name="rz" id="rz" autocomplete="off" class="input-upper" value="{{ sel_rz }}" inputmode="text" autocapitalize="characters" enterkeyhint="next"></div>
     </div>
     <div class="field">
       <label>Typ úkonu</label>
@@ -31,11 +31,11 @@
     {% set init_typ = sel_typ if sel_typ else (typy[0].kod if typy else none) %}
     <div class="form-row">
       <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else (ceny.get(init_typ)|int if ceny.get(init_typ) is not none else '') }}"></div>
-      <div class="field"><label>VIN</label><input name="vin" id="vin" class="input-upper" value="{{ sel_vin }}"></div>
+      <div class="field"><label>VIN</label><input name="vin" id="vin" class="input-upper" value="{{ sel_vin }}" inputmode="text" autocapitalize="characters" enterkeyhint="next"></div>
     </div>
     <div class="field">
       <label>ORV <span class="muted small">(číslo OTP)</span></label>
-      <input name="orv" id="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}"
+      <input name="orv" id="orv" class="input-upper" autocomplete="off" value="{{ sel_orv|default('', true) }}" inputmode="text" autocapitalize="characters" enterkeyhint="next"
              oninput="if(this.value.replace(/\s/g,'').length>=9)orvLookupFrom(this)" onblur="orvLookupFrom(this)">
       <div class="orv-status muted small" style="display:none;margin-top:4px"></div>
     </div>
@@ -53,5 +53,7 @@
       {{ m.person_select(sel_zpracoval) }}
     </div>
     <div class="ukon-new-message" role="status" aria-live="polite" hidden></div>
-    <button type="submit" class="btn btn-primary">Přidat úkon</button>
+    <div class="ukon-new-actions">
+      <button type="submit" class="btn btn-primary">Přidat úkon</button>
+    </div>
   </form>

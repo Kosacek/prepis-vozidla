@@ -1499,6 +1499,7 @@ a.kpi-link:hover {
   width: 100%;
   max-width: 560px;
   max-height: 88vh;
+  overflow-x: hidden;
   overflow-y: auto;
   /* a little more lift than a normal card so it reads as floating */
   box-shadow: 0 18px 50px rgba(0, 0, 0, .22), 0 6px 18px rgba(0, 0, 0, .10);
@@ -1507,6 +1508,47 @@ a.kpi-link:hover {
   transition: transform .26s cubic-bezier(.2, .8, .25, 1), opacity .26s ease;
 }
 .modal-backdrop.is-open .modal-card { opacity: 1; transform: none; }
+
+.modal-card--new { max-width: 720px; }
+.modal-card .modal-body,
+.modal-card form,
+.modal-card .form-row,
+.modal-card .field { min-width: 0; }
+.modal-card .field input,
+.modal-card .field select,
+.modal-card .field textarea {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+.modal-card--new .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* The shared new form wraps its types in both the overlay and the entry card. */
+#ukon-form .seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  max-width: 100%;
+  overflow: visible;
+}
+#ukon-form .seg span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 88px;
+  min-width: 0;
+  min-height: 40px;
+  padding: var(--sp-2);
+}
+
+.modal-card .firma-pick,
+.modal-card .firma-pick__btn,
+.modal-card .firma-pick__list,
+.modal-card .firma-pick__item { min-width: 0; max-width: 100%; }
+.modal-card .firma-pick__list { overflow-x: hidden; }
+.modal-card .firma-pick__item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 
 .modal-close {
   position: absolute;
@@ -1534,6 +1576,45 @@ a.kpi-link:hover {
 @media (max-width: 560px) {
   .modal-backdrop { padding: var(--sp-2); }
   .modal-card { max-height: calc(100dvh - 2 * var(--sp-2)); }
+  #ukon-modal .modal-card--new {
+    flex-shrink: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: var(--sp-4) var(--sp-4) 0;
+  }
+  #ukon-modal .modal-close {
+    top: var(--sp-2);
+    right: var(--sp-2);
+    width: 44px;
+    height: 44px;
+  }
+  #ukon-modal .modal-card--new #ukon-modal-title { padding-right: var(--sp-7); }
+  #ukon-modal #ukon-form .field input,
+  #ukon-modal #ukon-form .field select,
+  #ukon-modal #ukon-form .firma-pick__btn,
+  #ukon-modal #ukon-form .firma-pick__item {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  #ukon-modal #ukon-form .seg span { flex-basis: calc((100% - 3 * var(--sp-1)) / 4); }
+  #ukon-modal #ukon-form .chip { min-height: 36px; padding: var(--sp-2) var(--sp-3); }
+  #ukon-modal #ukon-form .ukon-new-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin: 0 calc(-1 * var(--sp-4));
+    padding: var(--sp-3) var(--sp-4) max(var(--sp-3), env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--card);
+  }
+  #ukon-modal #ukon-form .ukon-new-actions .btn { width: 100%; min-height: 44px; font-size: 16px; }
+}
+
+@media (max-width: 480px) {
+  #ukon-modal #ukon-form .form-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 
 body.modal-open { overflow: hidden; }

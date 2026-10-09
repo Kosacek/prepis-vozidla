@@ -78,7 +78,7 @@
   <div class="chips">{% for p in priklady %}<a class="chip" href="/zeptej?q={{ p|urlencode }}">{{ p }}</a>{% endfor %}</div>
 </div>
 {% include '_ukon_modal.html' %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=7"></script>
 <script>
 document.getElementById('ask-form').addEventListener('submit', function () {
   document.getElementById('ask-loading').hidden = false;
