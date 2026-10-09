@@ -57,7 +57,14 @@ def _system_prompt(db_path: str, today: date) -> str:
         "společné období a upozornění z nástroje. Větu piš jen z jeho výsledků. "
         "Součet přes skupiny najdeš v poli celkem — sám nesčítej, nepočítej podíly "
         "ani procenta; u srovnání dvou hodnot smíš uvést jejich rozdíl. "
-        "prumer_na='zadny' znamená bez průměru. Jedno volání nástroje obvykle stačí."
+        "prumer_na='zadny' znamená bez průměru. Jedno volání nástroje obvykle stačí. "
+        "Styl věty v odpoved: čtenář má vedle věty graf a tabulku se všemi řádky, "
+        "proto věta říká jen hlavní závěr, ne výčet. Nejvýš 2 krátké věty a nejvýš "
+        "3 čísla: nejdůležitější hodnota (kdo/co vede, kolik) a případně srovnání "
+        "s dalším nebo celkem. Nikdy nevypisuj všechny řádky, nedávej čísla do "
+        "závorek jedno za druhým a neuváděj počty úkonů ke každé hodnotě. "
+        "Období řekni jednou a stručně (např. 'od 27. 7.'). Částky piš '4 773 Kč'. "
+        "Věta je prostá čeština bez odrážek a bez zvýraznění."
     )
 
 

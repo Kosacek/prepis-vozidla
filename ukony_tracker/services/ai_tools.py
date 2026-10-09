@@ -103,7 +103,9 @@ TOOLS: list[dict] = [
     },
     {
         "name": "odpoved",
-        "description": "Ukončí odpověď 1–2 větami česky. Použij jen čísla z výsledků nástrojů.",
+        "description": ("Ukončí odpověď: veta = 1–2 krátké české věty jen s hlavním závěrem "
+                        "(nejvýš 3 čísla, žádný výčet všech řádků – ty jsou v grafu a tabulce). "
+                        "Použij jen čísla z výsledků nástrojů."),
         "input_schema": _object_schema({
             "veta": {"type": "string"},
             "graf": {"type": "string", "enum": ["sloupcovy", "skupinovy_sloupcovy",
