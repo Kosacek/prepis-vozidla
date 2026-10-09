@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from services.ask_service import _cz_month, _filters, fold
+from repositories import ppd_repo
 
 METRIKY = ("pocet", "soucet_kc", "prumer_kc", "nezaplaceno_kc", "zaplaceno_kc")
 SKUPINY = ("den_v_tydnu", "den", "tyden", "mesic", "firma", "typ",
@@ -87,6 +88,20 @@ TOOLS: list[dict] = [
         "strict": True,
     },
     {
+        "name": "doklady_ppd",
+        "description": (
+            "PPD = příjmové pokladní doklady (hotovost přijatá), NE tržby z úkonů — "
+            "nikdy je nesčítej s úkony. Vrátí počet a součet dokladů za období; "
+            "seznam=true přidá nejvýše 20 položek. Smazané doklady se nepočítají."
+        ),
+        "input_schema": _object_schema({
+            "obdobi": _OBDOBI_SCHEMA,
+            "hledat": {"type": ["string", "null"]},
+            "seznam": {"type": "boolean"},
+        }),
+        "strict": True,
+    },
+    {
         "name": "odpoved",
         "description": "Ukončí odpověď 1–2 větami česky. Použij jen čísla z výsledků nástrojů.",
         "input_schema": _object_schema({
@@ -108,6 +123,79 @@ TOOLS: list[dict] = [
         "strict": True,
     },
 ]
+
+
+_STRICT_UNSUPPORTED = ("minimum", "maximum", "minItems", "maxItems",
+                       "minLength", "maxLength", "pattern")
+
+
+def _strict_safe(node):
+    """Copy of a schema without keywords strict tool use rejects (400).
+
+    TOOLS keeps them as documentation; the validators below enforce each one
+    server-side, so dropping them from what the API sees loses no safety. The
+    YYYY-MM-DD pattern becomes the supported `format: date`.
+    """
+    if isinstance(node, list):
+        return [_strict_safe(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out = {key: _strict_safe(value) for key, value in node.items()
+           if key not in _STRICT_UNSUPPORTED}
+    if node.get("pattern") == r"^\d{4}-\d{2}-\d{2}$":
+        out["format"] = "date"
+    # A nullable enum (`type: [string, null]` + None in enum) is rejected too;
+    # the accepted spelling is anyOf(string enum, null).
+    if isinstance(out.get("type"), list) and None in out.get("enum", ()):
+        values = [v for v in out.pop("enum") if v is not None]
+        kinds = [t for t in out.pop("type") if t != "null"]
+        out["anyOf"] = [{"type": kinds[0], "enum": values}, {"type": "null"}]
+    return out
+
+
+def _optional_filters(schema: dict) -> dict:
+    """Filters as OPTIONAL non-null fields instead of required nullable ones.
+
+    Strict schemas allow at most 16 union-typed parameters across all tools and
+    the 7 nullable filters, used by two tools, alone are 14. "Missing" and
+    "null" mean the same to _validated_filters, so nothing changes semantically.
+    """
+    props = {}
+    for key, prop in schema["properties"].items():
+        prop = dict(prop)
+        if isinstance(prop.get("type"), list):
+            prop["type"] = next(t for t in prop["type"] if t != "null")
+        props[key] = prop
+    return {**schema, "properties": props, "required": []}
+
+
+PRUMER_ZADNY = "zadny"
+
+
+def _api_tool(tool: dict) -> dict:
+    safe = _strict_safe(tool)
+    props = safe["input_schema"]["properties"]
+    if "filtry" in props:
+        props["filtry"] = _optional_filters(props["filtry"])
+    if "prumer_na" in props:
+        # Haiku sent the nullable anyOf as a quoted string ("\"den_v_tydnu\"");
+        # a plain enum with an explicit "zadny" is unambiguous. The assistant
+        # maps "zadny" back to None (see from_api_input).
+        props["prumer_na"] = {"type": "string", "enum": [PRUMER_ZADNY, *PRUMER_NA]}
+    return safe
+
+
+def from_api_input(params: dict) -> dict:
+    """Undo the API-only schema spellings before the validators see the input."""
+    if not isinstance(params, dict):
+        return params
+    out = dict(params)
+    if out.get("prumer_na") == PRUMER_ZADNY:
+        out["prumer_na"] = None
+    return out
+
+
+API_TOOLS: list[dict] = [_api_tool(tool) for tool in TOOLS]
 
 
 def connect_ro(db_path) -> sqlite3.Connection:
@@ -341,7 +429,13 @@ def agregace(conn: sqlite3.Connection, params: dict, today: date) -> dict:
                 label = "částečně zaplaceno"
             labels.append(label)
         rows.append({"skupina": labels, "hodnota": row["hodnota"], "pocet": row["pocet"]})
-    return {"radky": rows, "metrika": metric, **_metadata(conn, start, end, warning, filters)}
+    result = {"radky": rows, "metrika": metric, "pocet_radku": len(rows)}
+    # Totals across the shown rows, so the model quotes a DB number instead of
+    # adding up the rows itself (averages don't add up, so none for those).
+    if groups and unit is None and metric != "prumer_kc":
+        result["celkem"] = {"hodnota": sum(r["hodnota"] for r in rows),
+                            "pocet": sum(r["pocet"] for r in rows)}
+    return {**result, **_metadata(conn, start, end, warning, filters)}
 
 
 def seznam_ukonu(conn: sqlite3.Connection, params: dict, today: date) -> dict:
@@ -366,6 +460,27 @@ def seznam_ukonu(conn: sqlite3.Connection, params: dict, today: date) -> dict:
             + " ORDER BY u.datum DESC, u.id DESC LIMIT ?")
     rows = [dict(row) for row in conn.execute(sql, [*args, limit])]
     return {"radky": rows, **_metadata(conn, start, end, warning, filters)}
+
+
+def doklady_ppd(conn: sqlite3.Connection, params: dict, today: date) -> dict:
+    params = _object(params, "Parametry", TOOLS[2]["input_schema"]["properties"])
+    start, end = _period(params)
+    search = params.get("hledat")
+    if search is not None and not isinstance(search, str):
+        raise ValueError("Hledat musí být text nebo prázdné.")
+    show_list = params.get("seznam", False)
+    if not isinstance(show_list, bool):
+        raise ValueError("Seznam musí být pravda nebo nepravda.")
+    period = {"od": start.isoformat(), "do": end.isoformat()}
+    totals = ppd_repo.totals(conn, period["od"], period["do"], q=search,
+                             include_deleted=False)
+    result = {"pocet": totals["pocet"], "soucet_kc": totals["castka"], "obdobi": period}
+    if show_list:
+        fields = ("cislo", "datum", "prijato_od", "castka", "ucel", "vozidlo")
+        result["polozky"] = [{key: row[key] for key in fields} for row in ppd_repo.list(
+            conn, period["od"], period["do"], q=search,
+            include_deleted=False, limit=20)]
+    return result
 
 
 def ciselniky(conn: sqlite3.Connection, today: date) -> dict:

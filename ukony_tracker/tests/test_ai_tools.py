@@ -68,7 +68,8 @@ def test_each_metric_and_return_contract(data, metric, expected):
     conn, _, _ = data
     result = aggregate(conn, metrika=metric)
     assert result == {"radky": [{"skupina": [], "hodnota": expected, "pocet": 10}],
-                      "metrika": metric, "obdobi": PERIOD, "upozorneni": None,
+                      "metrika": metric, "pocet_radku": 1,
+                      "obdobi": PERIOD, "upozorneni": None,
                       "bez_zpracovatele": 2, "pouzite_filtry": {}}
     assert type(result["radky"][0]["hodnota"]) is (float if metric == "prumer_kc" else int)
 
@@ -396,7 +397,7 @@ def test_tools_schemas_are_strict_recursively():
         elif isinstance(value, list):
             for child in value:
                 walk(child)
-    assert [tool["name"] for tool in ai.TOOLS] == ["agregace", "seznam_ukonu", "odpoved", "doptat_se"]
+    assert [tool["name"] for tool in ai.TOOLS] == ["agregace", "seznam_ukonu", "doklady_ppd", "odpoved", "doptat_se"]
     for tool in ai.TOOLS:
         assert tool["strict"] is True
         assert set(tool) == {"name", "description", "input_schema", "strict"}
@@ -405,6 +406,9 @@ def test_tools_schemas_are_strict_recursively():
     assert schema["prumer_na"]["type"] == ["string", "null"]
     assert set(schema["filtry"]["properties"]) == {
         "firma_ids", "typy", "zpracoval", "stav_platby", "dny_v_tydnu", "poznamka_obsahuje", "bez_rz"}
+    ppd = ai.TOOLS[2]
+    assert set(ppd["input_schema"]["properties"]) == {"obdobi", "hledat", "seznam"}
+    assert "nikdy je nesčítej s úkony" in ppd["description"]
 
 
 @pytest.mark.parametrize("bad", [

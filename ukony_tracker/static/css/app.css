@@ -1640,7 +1640,7 @@ body.modal-open { overflow: hidden; }
   .recent-pozn { white-space: normal; overflow: visible; text-overflow: clip; }
 }
 
-/* ── Zeptej se — deterministický dotazovací box (žádná AI) ──────────────────── */
+/* ── Zeptej se ──────────────────────────────────────────────────────────────── */
 .ask-form { display: flex; gap: var(--sp-3); align-items: stretch; }
 .ask-input {
   flex: 1 1 auto;
@@ -1681,10 +1681,25 @@ body.modal-open { overflow: hidden; }
 
 /* the example chips are links here, not toggles */
 .chips a.chip { text-decoration: none; }
+.ask-mode { margin: var(--sp-2) 0; }
+.ask-choices, .ask-examples .chips { margin-top: var(--sp-3); }
+.ask-chart { position: relative; width: 100%; height: 320px; margin-top: var(--sp-4); }
+.ask-table-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: var(--sp-4); }
+.ask-table { width: 100%; min-width: 420px; border-collapse: collapse; }
+.ask-table th, .ask-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.ask-table th { color: var(--muted); font-weight: 600; }
+.ask-warning { margin: var(--sp-3) 0; padding: var(--sp-3); border-radius: var(--radius); background: #fff4d9; color: #684a07; }
+.ask-method { margin-top: var(--sp-4); border-top: 1px solid var(--line); padding-top: var(--sp-3); }
+.ask-method summary { cursor: pointer; font-weight: 600; }
+.ask-method p { margin: var(--sp-2) 0; overflow-wrap: anywhere; }
+.ask-ppd-summary { margin: var(--sp-3) 0 0; font-weight: 600; }
+#ask-loading { margin-top: var(--sp-3); }
 
 @media (max-width: 560px) {
   .ask-form { flex-wrap: wrap; }
   .ask-form .btn { width: 100%; }
+  .ask-answer { min-width: 0; overflow: hidden; }
+  .ask-chart { height: 260px; }
 }
 
 /* ── Mobil: čitelnost a iOS ────────────────────────────────────────────────

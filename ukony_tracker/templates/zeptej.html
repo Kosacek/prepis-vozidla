@@ -1,73 +1,115 @@
 {% extends "base.html" %}
 {% block title %}Zeptej se{% endblock %}
 {% block content %}
-
-<div class="page-header">
-  <h1>Zeptej se</h1>
-</div>
-
+<div class="page-header"><h1>Zeptej se</h1></div>
 <div class="card">
-  <form method="get" action="/zeptej" class="ask-form">
+  <form method="get" action="/zeptej" class="ask-form" id="ask-form">
     <input type="search" name="q" class="ask-input" value="{{ q }}" autocomplete="off"
-           autofocus placeholder="Např. kolik peněz za červenec?">
+           autofocus placeholder="Zeptej se na úkony nebo PPD">
     <button type="submit" class="btn btn-primary">Zeptat se</button>
   </form>
+  <div id="ask-loading" class="muted small" role="status" hidden>Přemýšlím…</div>
 </div>
 
-{% if res %}
-<div class="card ask-answer {{ '' if res.understood else 'ask-answer--unknown' }}">
-  <div class="ask-headline">{{ res.headline }}</div>
-  {% if res.detail %}<div class="muted small ask-detail">{{ res.detail }}</div>{% endif %}
+{% if fallback_reason %}<p class="muted small ask-mode">Jednodušší režim{% if 'limit' in fallback_reason %} — limit dotazů{% endif %}</p>{% endif %}
 
-  {% if res.rows %}
-  <div class="ask-rows">
-    {% for r in res.rows %}
-    <div class="ask-row">
-      <span class="ask-row__label">{{ r.label }}</span>
-      <span class="ask-row__n muted">{{ r.n }}×</span>
-      <span class="ask-row__kc"><b>{{ r.kc | round | int }} Kč</b></span>
+{% if ai %}
+  {% if ai.typ == 'doptat_se' %}
+  <div class="card ask-answer">
+    <div class="ask-headline">{{ ai.otazka }}</div>
+    <div class="chips ask-choices">
+      {% for option in ai.moznosti %}<a class="chip" href="/zeptej?q={{ option|urlencode }}">{{ option }}</a>{% endfor %}
     </div>
-    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card ask-answer">
+    {% if ai.veta_overena and ai.veta %}<div class="ask-headline">{{ ai.veta }}</div>{% endif %}
+    {% set result = ai.vysledek or {} %}
+    {% if ai.graf != 'zadny' and result.radky and ai.nastroj == 'agregace' %}
+      <div class="ask-chart"><canvas id="ask-chart" role="img" aria-label="Graf výsledků"></canvas></div>
+    {% endif %}
+    {% if result.upozorneni %}<p class="ask-warning">{{ result.upozorneni }}{% if result.bez_zpracovatele %} Bez zpracovatele: {{ result.bez_zpracovatele }} úkonů.{% endif %}</p>{% endif %}
+    {% if ai.nastroj == 'agregace' %}
+      <div class="ask-table-scroll"><table class="ask-table">
+        <thead><tr><th>Skupina</th><th>Hodnota</th><th>Úkonů</th></tr></thead>
+        <tbody>{% for row in result.radky %}<tr>
+          <td>{{ row.skupina|join(' / ') if row.skupina else 'Celkem' }}</td>
+          <td>{{ row.hodnota }}{% if result.metrika != 'pocet' %} Kč{% endif %}</td>
+          <td>{{ row.pocet }}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+    {% elif ai.nastroj == 'doklady_ppd' %}
+      <p class="ask-ppd-summary">{{ result.pocet }} dokladů · {{ result.soucet_kc|kc }} Kč přijaté hotovosti</p>
+      {% if result.polozky %}<div class="ask-table-scroll"><table class="ask-table">
+        <thead><tr><th>Číslo</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th>Účel</th><th>Vozidlo</th></tr></thead>
+        <tbody>{% for row in result.polozky %}<tr><td>{{ row.cislo }}</td><td>{{ row.datum }}</td>
+          <td>{{ row.prijato_od }}</td><td>{{ row.castka|kc }} Kč</td><td>{{ row.ucel }}</td><td>{{ row.vozidlo }}</td></tr>{% endfor %}</tbody>
+      </table></div>{% endif %}
+    {% elif ai.nastroj == 'seznam_ukonu' %}
+      <div class="recent-list">
+        {% set rows = ai_rows %}{% set back = '/zeptej?q=' ~ (q|urlencode) %}
+        {% include '_recent_rows.html' %}
+      </div>
+    {% endif %}
+    {% if explanation %}<details class="ask-method"><summary>Jak jsem to spočítal</summary>
+      <p><b>Období:</b> {{ explanation.obdobi }}</p>
+      <p><b>Filtry:</b> {{ explanation.filtry }}</p>
+      <p><b>Metrika:</b> {{ explanation.metrika }}</p>
+      <p><b>Skupiny:</b> {{ explanation.skupiny }}</p>
+      {% if explanation.predpoklady %}<p><b>Předpoklady:</b> {{ explanation.predpoklady }}</p>{% endif %}
+    </details>{% endif %}
   </div>
   {% endif %}
-</div>
-
-{# Konkrétní úkony, o kterých odpověď mluví — stejný řádek jako v přehledu
-   úkonů, takže se dá kliknout a rovnou upravit. #}
-{% if res.ukony %}
-<div class="card recent-card">
-  <div class="card-head">
-    <h2>Úkony <span class="muted small">{{ res.ukony|length }}</span></h2>
-    {% if res.ukony|length >= limit %}
-      <span class="muted small">zobrazeno prvních {{ limit }}</span>
-    {% endif %}
+{% elif res %}
+  <div class="card ask-answer {{ '' if res.understood else 'ask-answer--unknown' }}">
+    <div class="ask-headline">{{ res.headline }}</div>
+    {% if res.detail %}<div class="muted small ask-detail">{{ res.detail }}</div>{% endif %}
+    {% if res.rows %}<div class="ask-rows">{% for r in res.rows %}<div class="ask-row">
+      <span class="ask-row__label">{{ r.label }}</span><span class="ask-row__n muted">{{ r.n }}×</span>
+      <span class="ask-row__kc"><b>{{ r.kc|round|int }} Kč</b></span>
+    </div>{% endfor %}</div>{% endif %}
   </div>
-  <div class="recent-list">
-    {% set rows = res.ukony %}
-    {% set back = '/zeptej?q=' ~ (q | urlencode) %}
-    {% include "_recent_rows.html" %}
-  </div>
-</div>
-{% endif %}
+  {% if res.ukony %}<div class="card recent-card"><div class="card-head"><h2>Úkony <span class="muted small">{{ res.ukony|length }}</span></h2></div>
+    <div class="recent-list">{% set rows = res.ukony %}{% set back = '/zeptej?q=' ~ (q|urlencode) %}{% include '_recent_rows.html' %}</div>
+  </div>{% endif %}
 {% endif %}
 
-<div class="card">
-  <div class="muted small" style="margin-bottom: var(--sp-3);">Příklady — klikni:</div>
-  <div class="chips">
-    {% for p in priklady %}
-      <a class="chip" href="/zeptej?q={{ p | urlencode }}">{{ p }}</a>
-    {% endfor %}
-  </div>
-  <div class="muted small" style="margin-top: var(--sp-4); line-height:1.5;">
-    Počítá se přímo z databáze úkonů — žádná AI, takže čísla vždycky sedí.
-    Období: dnes, včera, tento/minulý týden, tento/minulý měsíc, název měsíce,
-    letos, loni, posledních N dní.
-  </div>
+<div class="card ask-examples"><div class="muted small">Příklady — klikni:</div>
+  <div class="chips">{% for p in priklady %}<a class="chip" href="/zeptej?q={{ p|urlencode }}">{{ p }}</a>{% endfor %}</div>
 </div>
-
-{# Stejné inline otevírání úkonu jako v přehledu — bez něj by proklik odešel
-   na samostatnou stránku místo overlaye. #}
-{% include "_ukon_modal.html" %}
+{% include '_ukon_modal.html' %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=6"></script>
-
+<script>
+document.getElementById('ask-form').addEventListener('submit', function () {
+  document.getElementById('ask-loading').hidden = false;
+});
+{% if ai and ai.typ == 'odpoved' and ai.graf != 'zadny' and ai.vysledek and ai.vysledek.radky and ai.nastroj == 'agregace' %}
+(function () {
+  const rows = {{ ai.vysledek.radky|tojson }};
+  const kind = {{ ai.graf|tojson }};
+  const two = rows.some(r => r.skupina.length > 1);
+  let labels, datasets;
+  if (two) {
+    labels = [...new Set(rows.map(r => r.skupina[0]))];
+    const groups = [...new Set(rows.map(r => r.skupina[1]))];
+    datasets = groups.map((group, i) => ({label: group, data: labels.map(label => {
+      const row = rows.find(r => r.skupina[0] === label && r.skupina[1] === group);
+      return row ? row.hodnota : 0;
+    }), backgroundColor: `hsl(${(i * 67 + 205) % 360} 65% 55%)`, borderColor: `hsl(${(i * 67 + 205) % 360} 65% 45%)`}));
+  } else {
+    labels = rows.map(r => r.skupina.join(' / ') || 'Celkem');
+    datasets = [{label: 'Hodnota', data: rows.map(r => r.hodnota),
+      backgroundColor: rows.map((_, i) => `hsl(${(i * 37 + 205) % 360} 65% 55%)`),
+      borderColor: '#2875af'}];
+  }
+  new Chart(document.getElementById('ask-chart'), {
+    type: kind === 'cara' ? 'line' : kind === 'kolac' && !two ? 'pie' : 'bar',
+    data: {labels, datasets},
+    options: {responsive: true, maintainAspectRatio: false,
+      scales: kind === 'kolac' && !two ? {} : {y: {beginAtZero: true}},
+      plugins: {legend: {display: two || kind === 'kolac'}}}
+  });
+})();
+{% endif %}
+</script>
 {% endblock %}
