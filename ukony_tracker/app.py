@@ -9,6 +9,8 @@ import db
 
 def create_app():
     app = Flask(__name__)
+    from services.orv_images import ScanRequest
+    app.request_class = ScanRequest
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     # In production (login gate on) refuse to boot with a fallback SECRET_KEY —
     # a known constant would let anyone forge a signed 'authed' session cookie.
@@ -87,6 +89,8 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     from routes.ukony import bp as ukony_bp
     app.register_blueprint(ukony_bp)
+    from routes.orv_scan import bp as orv_scan_bp
+    app.register_blueprint(orv_scan_bp)
     from routes.firmy import bp as firmy_bp
     app.register_blueprint(firmy_bp)
     from routes.nastaveni import bp as nastaveni_bp

@@ -91,45 +91,24 @@
   <div class="chips">{% for p in priklady %}<a class="chip" href="/zeptej?q={{ p|urlencode }}">{{ p }}</a>{% endfor %}</div>
 </div>
 {% include '_ukon_modal.html' %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
 <script>
 (function () {
   const results = document.getElementById('ask-results');
   const thinking = document.getElementById('ask-thinking');
   const form = document.getElementById('ask-form');
   const verbEl = document.getElementById('ask-verb');
-  const VERBS = ['Louskám čísla', 'Šmejdím v evidenci', 'Hrabu se v úkonech', 'Budím databázi',
-    'Žmoulám sloupečky', 'Cvakám na kalkulačce', 'Šťourám se v tabulkách', 'Mudruju nad grafem',
-    'Vařím statistiku', 'Honím čísla po sloupcích', 'Cuchám řádky', 'Probírám fascikl',
-    'Počítám na prstech', 'Cinkám korunama', 'Lustruju razítka', 'Šoupám sloupce',
-    'Drbu data', 'Šlehám graf', 'Brouzdám v registru', 'Hledám ztracené kačky',
-    'Hladím tabulku', 'Louhuju z dat zlato', 'Ladím kalkulačku', 'Šrotuju'];
-  let verbTimer = null;
-  function cycleVerbs() {
-    let last = 'Přemýšlím';
-    verbEl.textContent = last;
-    clearInterval(verbTimer);
-    verbTimer = setInterval(function () {
-      let next;
-      do { next = VERBS[Math.floor(Math.random() * VERBS.length)]; } while (next === last);
-      last = next;
-      verbEl.classList.add('is-swap');
-      setTimeout(function () { verbEl.textContent = next; verbEl.classList.remove('is-swap'); }, 160);
-    }, 1700);
-  }
+  const cycle = window.Thinking(thinking, verbEl);
   function showThinking() {
-    cycleVerbs();
+    cycle.start();
     results.classList.add('is-leaving');
-    thinking.hidden = false;
-    thinking.classList.remove('is-in');
-    void thinking.offsetWidth;            // restart the entrance animation
-    thinking.classList.add('is-in');
     form.querySelector('button').disabled = true;
   }
   function reset() {
     results.classList.remove('is-leaving');
     thinking.hidden = true;
-    clearInterval(verbTimer);
+    cycle.stop();
     form.querySelector('button').disabled = false;
   }
   form.addEventListener('submit', function () { if (form.q.value.trim()) showThinking(); });

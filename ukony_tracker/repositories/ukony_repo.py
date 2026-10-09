@@ -38,11 +38,12 @@ def create(
     return cur.lastrowid
 
 
-def update(conn: sqlite3.Connection, uid: int, **fields) -> None:
+def update(conn: sqlite3.Connection, uid: int, *, commit: bool = True, **fields) -> None:
     fields["updated_at"] = db.now_iso()
     cols = ", ".join(f"{k}=?" for k in fields)
     conn.execute(f"UPDATE ukony SET {cols} WHERE id=?", (*fields.values(), uid))
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def get(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:

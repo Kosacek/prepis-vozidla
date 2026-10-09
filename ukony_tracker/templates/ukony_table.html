@@ -4,9 +4,15 @@
 {% block main_class %}container-wide{% endblock %}
 {% block content %}
 
-<div class="page-header">
+<div class="page-header ukony-header">
   <h1>Úkony</h1>
-  <div class="header-actions"><a href="/ukony" class="btn btn-primary" data-new-ukon>+ Nový úkon</a></div>
+  <div class="header-actions">
+    <a href="/ukony" class="btn btn-primary" data-new-ukon>+ Nový úkon</a>
+    <button type="button" class="btn" data-orv-sken aria-label="Doplnit RZ a ORV z techničáku" title="Doplnit RZ a ORV z techničáku">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 5l1.5-2h5L16 5h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Techničák
+    </button>
+  </div>
 </div>
 
 {# ── Filter bar ── #}
@@ -60,8 +66,12 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=8"></script>
 <script src="{{ url_for('static', filename='js/ukon_new_form.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/orv_helpers.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/orv_camera.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/orv_sken.js') }}?v=1"></script>
 
 <script>
 (function () {

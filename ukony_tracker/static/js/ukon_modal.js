@@ -7,8 +7,12 @@
   if (!modal || !modalBody) return;
   var modalCard = modal.querySelector(".modal-card");
   var lastFocused = null;
+  var openSerial = 0;
+  var closeTimer;
 
-  function openModal(url, isNew) {
+  function openModal(url, isNew, isScan) {
+    var serial = ++openSerial;
+    clearTimeout(closeTimer);
     fetch(url, { headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
         // Non-OK (e.g. the úkon was deleted meanwhile) → fall back to plain
@@ -17,11 +21,14 @@
         return r.text();
       })
       .then(function (html) {
+        if (serial !== openSerial) return;
         modalBody.innerHTML = html;
         modalCard.classList.toggle("modal-card--new", !!isNew);
+        modalCard.classList.toggle("modal-card--scan", !!isScan);
         if (isNew) document.dispatchEvent(new CustomEvent('ukon:new-form-shown', { detail: { form: modalBody.querySelector('#ukon-form') } }));
         lastFocused = document.activeElement;
         modal.hidden = false;
+        if (isScan) document.dispatchEvent(new CustomEvent('ukon:scan-shown'));
         // Reserve the width the scrollbar occupied before overflow:hidden hides
         // it, so locking background scroll doesn't shift the page sideways.
         var sbw = window.innerWidth - document.documentElement.clientWidth;
@@ -31,19 +38,26 @@
           modal.classList.add("is-open");
           // Skip the hidden `back` input — focusing it silently does nothing,
           // so the intended "cursor in first field" never happened.
-          var first = isNew ? modalBody.querySelector('#rz') :
+          var first = isScan ? modal.querySelector('[data-modal-close]') : isNew ? modalBody.querySelector('#rz') :
             modalBody.querySelector("input:not([type=hidden]), select, button");
           if (first) first.focus();
         });
       })
-      .catch(function () { window.location.href = isNew ? '/ukony' : url.replace(/[?&]modal=1/, ""); });
+      .catch(function () {
+        if (serial !== openSerial) return;
+        if (isScan) { window.alert('Skenování se nepodařilo otevřít. Obnovte stránku a zkuste to znovu.'); return; }
+        window.location.href = isNew ? '/ukony' : url.replace(/[?&]modal=1/, "");
+      });
   }
 
   function closeModal() {
+    var event = new CustomEvent('ukon:modal-closing', {cancelable: true});
+    if (!document.dispatchEvent(event)) return;
+    ++openSerial;
     modal.classList.remove("is-open");
     document.body.classList.remove("modal-open");
     document.body.style.paddingRight = "";
-    setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
+    closeTimer = setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
     if (lastFocused && lastFocused.focus) lastFocused.focus();
     var url = new URL(window.location.href);
     if (url.searchParams.has('novy')) {
@@ -51,6 +65,18 @@
       history.replaceState({}, '', url.pathname + url.search + url.hash);
     }
   }
+  window.UkonModal = {close: closeModal};
+  window.addEventListener('pagehide', function () {
+    ++openSerial; // A fragment arriving after navigation must not open a camera.
+    clearTimeout(closeTimer);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-orv-sken]')) return;
+    e.preventDefault();
+    if (!modal.hidden) return;
+    openModal('/ukony/orv-sken', false, true);
+  });
 
   // Open — delegated on document so it covers the dashboard recent list, the
   // /ukony list, and any rows swapped in later by a live search.
@@ -218,5 +244,12 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && !modal.hidden) closeModal();
+    if (e.key === 'Tab' && !modal.hidden && modalCard.classList.contains('modal-card--scan')) {
+      var focusable = Array.from(modal.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href]'))
+        .filter(function (el) { return el.getClientRects().length; });
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   });
 })();

@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS ppd (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ppd_datum ON ppd(datum);
+CREATE TABLE IF NOT EXISTS orv_scan_rate (sid TEXT NOT NULL, stamp REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_orv_scan_rate ON orv_scan_rate(sid, stamp);
 """
 
 
