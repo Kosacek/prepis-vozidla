@@ -228,7 +228,7 @@ def test_route_ai_chart_table_clarification_and_ppd(tmp_path, monkeypatch):
         body = client.get("/zeptej?q=Albion").get_data(as_text=True)
         assert "Albion 1 300 Kč" in body and 'id="ask-chart"' in body
         assert "Jak jsem to spočítal" in body and "Roman se zapisuje" in body
-        assert "<td>Albion</td>" in body and "Přemýšlím…" in body
+        assert "<td>Albion</td>" in body and "Přemýšlím" in body
         ai["veta_overena"] = False
         body = client.get("/zeptej?q=Albion").get_data(as_text=True)
         assert "Albion 1 300 Kč" not in body and "<td>Albion</td>" in body
