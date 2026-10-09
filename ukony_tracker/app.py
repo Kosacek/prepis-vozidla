@@ -33,6 +33,11 @@ def create_app():
             return value
         return f"{n:,}".replace(",", " ")
 
+    @app.template_filter("ask_em")
+    def _ask_em(value):
+        from services.ai_assistant import emphasize
+        return emphasize(value)
+
     app.teardown_appcontext(db.close_db)
 
     @app.before_request

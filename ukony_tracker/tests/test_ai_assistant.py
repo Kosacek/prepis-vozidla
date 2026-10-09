@@ -334,3 +334,14 @@ def test_group_total_comes_from_the_tool(conn):
 def test_leaked_tool_markup_is_cut_from_the_sentence():
     raw = 'Nejvíc bylo 93 úkonů.</veta>\n<parameter name="graf">cara'
     assert assistant._clean_sentence(raw) == "Nejvíc bylo 93 úkonů."
+
+def test_emphasis_markers_render_safely_and_do_not_affect_number_check():
+    from services.ai_assistant import emphasize, plain_sentence, verify_sentence
+    html = str(emphasize("David má **523 úkonů** a <b>Roman</b> 138."))
+    assert '<strong class="ask-em">523 úkonů</strong>' in html
+    assert "&lt;b&gt;Roman&lt;/b&gt;" in html and "<b>" not in html
+    assert "**" not in str(emphasize("špatně **otevřené"))
+    assert plain_sentence("a **b** c") == "a b c"
+    results = [{"radky": [{"skupina": [], "hodnota": 523, "pocet": 523}]}]
+    assert verify_sentence(plain_sentence("**523** úkonů"), results)
+    assert not verify_sentence(plain_sentence("**524** úkonů"), results)

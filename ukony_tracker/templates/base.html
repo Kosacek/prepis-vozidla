@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=61">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=62">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
@@ -15,10 +15,10 @@
       <nav>
         <a href="/">Přehled</a>
         <a href="/ukony/vse">Úkony</a>
-        <a href="/doklady">Doklady</a>
+        <a href="/zeptej" class="nav-ai">Zeptej se<svg class="nav-ai__spark" viewBox="0 0 24 24" width="9" height="9" aria-hidden="true"><path d="M12 1.5l2.4 7.7 7.7 2.4-7.7 2.4-2.4 7.7-2.4-7.7-7.7-2.4 7.7-2.4z" fill="currentColor"/></svg></a>
         <a href="/prichozi">Příchozí{% if nav_prichozi_count %} <span class="nav-badge">{{ nav_prichozi_count }}</span>{% endif %}</a>
+        <a href="/doklady">Doklady</a>
         <a href="/firmy">Firmy</a>
-        <a href="/zeptej">Zeptej se</a>
         <a href="/export">Export</a>
       </nav>
       <form method="post" action="/logout" class="logout-form">

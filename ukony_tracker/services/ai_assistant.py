@@ -64,7 +64,9 @@ def _system_prompt(db_path: str, today: date) -> str:
         "s dalším nebo celkem. Nikdy nevypisuj všechny řádky, nedávej čísla do "
         "závorek jedno za druhým a neuváděj počty úkonů ke každé hodnotě. "
         "Období řekni jednou a stručně (např. 'od 27. 7.'). Částky piš '4 773 Kč'. "
-        "Věta je prostá čeština bez odrážek a bez zvýraznění."
+        "Věta je prostá čeština bez odrážek. Zvýrazni **dvojitými hvězdičkami** "
+        "1–3 nejdůležitější údaje (hlavní číslo s jednotkou, jméno vítěze nebo období) "
+        "a nic jiného; nikdy nezvýrazňuj celou větu."
     )
 
 
@@ -108,6 +110,21 @@ def _allowed_numbers(results: list[dict]) -> set[Decimal]:
             if number is not None:
                 allowed.add(number)
     return allowed
+
+
+_EM = re.compile(r"\*\*(.+?)\*\*")
+
+
+def plain_sentence(text: str) -> str:
+    """The sentence without **emphasis** markers (what the number check reads)."""
+    return (text or "").replace("**", "")
+
+
+def emphasize(text: str):
+    """Escape the sentence, then turn **x** into <strong class="ask-em">x</strong>."""
+    from markupsafe import Markup, escape
+    safe = str(escape(plain_sentence(text) if (text or "").count("**") % 2 else text))
+    return Markup(_EM.sub(lambda m: '<strong class="ask-em">' + m.group(1) + "</strong>", safe).replace("**", ""))
 
 
 def _clean_sentence(text: str) -> str:
@@ -218,8 +235,9 @@ def ask(question: str, *, db_path, today: date, client=None) -> dict:
                 clarifies = final.name == "doptat_se"
                 if not clarifies and last_result is None:
                     raise AssistantUnavailable("Model odpověděl bez datového výsledku.")
-                sentence = _clean_sentence(data.get("veta", "")) if not clarifies else ""
-                return {"typ": final.name, "veta": sentence,
+                marked = _clean_sentence(data.get("veta", "")) if not clarifies else ""
+                sentence = plain_sentence(marked)
+                return {"typ": final.name, "veta": sentence, "veta_znaceno": marked,
                         "veta_overena": (verify_sentence(sentence, results, question=question)
                                          if sentence else False),
                         "graf": data.get("graf", "zadny") if not clarifies else "zadny",

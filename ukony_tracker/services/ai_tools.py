@@ -104,7 +104,8 @@ TOOLS: list[dict] = [
     {
         "name": "odpoved",
         "description": ("Ukončí odpověď: veta = 1–2 krátké české věty jen s hlavním závěrem "
-                        "(nejvýš 3 čísla, žádný výčet všech řádků – ty jsou v grafu a tabulce). "
+                        "(nejvýš 3 čísla, žádný výčet všech řádků – ty jsou v grafu a tabulce; "
+                        "1–3 nejdůležitější údaje obal do **dvojitých hvězdiček**). "
                         "Použij jen čísla z výsledků nástrojů."),
         "input_schema": _object_schema({
             "veta": {"type": "string"},

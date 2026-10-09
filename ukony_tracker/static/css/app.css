@@ -1932,3 +1932,11 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .ask-reveal, .ask-table tbody tr, .ask-thinking.is-in, .ask-thinking__icon, .ask-dots i, .ask-skeleton span { animation: none; }
   #ask-results { transition: none; }
 }
+.ask-examples { margin-top: var(--sp-5); }
+.ask-em { font-weight: 700; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent, #0a6cd6); text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+#ask-verb { display: inline-block; transition: opacity .16s ease, transform .16s ease; }
+#ask-verb.is-swap { opacity: 0; transform: translateY(4px); }
+.topnav nav a.nav-ai { position: relative; padding-right: calc(var(--sp-3) + 6px); }
+.nav-ai__spark { position: absolute; right: 5px; bottom: 5px; color: var(--accent, #0a6cd6); opacity: .8; }
+.topnav nav a.nav-ai.active .nav-ai__spark { color: currentColor; }
+@media (prefers-reduced-motion: reduce) { #ask-verb { transition: none; } }

@@ -16,7 +16,7 @@
     <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" opacity=".55"/>
   </svg>
   <div class="ask-thinking__body">
-    <div class="ask-thinking__label">Přemýšlím<span class="ask-dots"><i></i><i></i><i></i></span></div>
+    <div class="ask-thinking__label"><span id="ask-verb">Přemýšlím</span><span class="ask-dots"><i></i><i></i><i></i></span></div>
     <div class="ask-skeleton"><span></span><span></span><span></span></div>
   </div>
 </div>
@@ -35,7 +35,7 @@
   </div>
   {% else %}
   <div class="card ask-answer">
-    {% if ai.veta_overena and ai.veta %}<div class="ask-headline ask-headline--ai ask-reveal" style="--i:0">{{ ai.veta }}</div>{% endif %}
+    {% if ai.veta_overena and ai.veta %}<div class="ask-headline ask-headline--ai ask-reveal" style="--i:0">{{ (ai.veta_znaceno or ai.veta)|ask_em }}</div>{% endif %}
     {% set result = ai.vysledek or {} %}
     {% if ai.graf != 'zadny' and result.radky and ai.nastroj == 'agregace' %}
       <div class="ask-chart ask-reveal" style="--i:1"><canvas id="ask-chart" role="img" aria-label="Graf výsledků"></canvas></div>
@@ -97,7 +97,28 @@
   const results = document.getElementById('ask-results');
   const thinking = document.getElementById('ask-thinking');
   const form = document.getElementById('ask-form');
+  const verbEl = document.getElementById('ask-verb');
+  const VERBS = ['Louskám čísla', 'Šmejdím v evidenci', 'Hrabu se v úkonech', 'Budím databázi',
+    'Žmoulám sloupečky', 'Cvakám na kalkulačce', 'Šťourám se v tabulkách', 'Mudruju nad grafem',
+    'Vařím statistiku', 'Honím čísla po sloupcích', 'Cuchám řádky', 'Probírám fascikl',
+    'Počítám na prstech', 'Cinkám korunama', 'Lustruju razítka', 'Šoupám sloupce',
+    'Drbu data', 'Šlehám graf', 'Brouzdám v registru', 'Hledám ztracené kačky',
+    'Hladím tabulku', 'Louhuju z dat zlato', 'Ladím kalkulačku', 'Šrotuju'];
+  let verbTimer = null;
+  function cycleVerbs() {
+    let last = 'Přemýšlím';
+    verbEl.textContent = last;
+    clearInterval(verbTimer);
+    verbTimer = setInterval(function () {
+      let next;
+      do { next = VERBS[Math.floor(Math.random() * VERBS.length)]; } while (next === last);
+      last = next;
+      verbEl.classList.add('is-swap');
+      setTimeout(function () { verbEl.textContent = next; verbEl.classList.remove('is-swap'); }, 160);
+    }, 1700);
+  }
   function showThinking() {
+    cycleVerbs();
     results.classList.add('is-leaving');
     thinking.hidden = false;
     thinking.classList.remove('is-in');
@@ -108,6 +129,7 @@
   function reset() {
     results.classList.remove('is-leaving');
     thinking.hidden = true;
+    clearInterval(verbTimer);
     form.querySelector('button').disabled = false;
   }
   form.addEventListener('submit', function () { if (form.q.value.trim()) showThinking(); });
