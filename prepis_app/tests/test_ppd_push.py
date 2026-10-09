@@ -335,3 +335,17 @@ def test_backfill_success(tmp_path, monkeypatch, capsys):
     }))
     assert backfill.main([]) == 0
     assert "Celkem: vytvoreno=1 / aktualizovano=0 / chyby=0" in capsys.readouterr().out
+
+
+def test_backfill_includes_ledger_only_receipts_older_than_the_backup(tmp_path, monkeypatch, capsys):
+    mock_history(monkeypatch, tmp_path, 2)   # backup: 1 (live) and 2 (deleted)
+    monkeypatch.delenv("UKONY_API_KEY")
+    monkeypatch.setattr(backfill.ppd, "read_ppd_log", lambda dd: [
+        {"cislo": 1}, {"cislo": 7, "datum": "01.06.2026", "prijato_od": "STARY",
+                       "castka": 1300, "ucel": "Zastupování na MMB", "vozidlo": "1AB2345"}])
+    assert backfill.main(["--dry-run"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "Doklady: 3 / zive: 2 / smazane: 1 / chyby: 0"
+    old = [json.loads(line) for line in lines[1:] if json.loads(line)["cislo"] == 7]
+    assert old and old[0]["smazano"] is False and old[0]["vozidlo"] == "1AB2345"
+

@@ -33,10 +33,16 @@ def main(argv=None) -> int:
         message = str(message)
         print(message.replace(api_key, "[redacted]") if api_key else message)
 
-    live = {int(row["cislo"]) for row in ppd.read_ppd_log(data_dir)}
+    ledger = ppd.read_ppd_log(data_dir)
+    live = {int(row["cislo"]) for row in ledger}
+    backup = ppd.read_backup(data_dir)
+    in_backup = {int(row["cislo"]) for row in backup if isinstance(row.get("cislo"), int)}
+    # The oldest receipts (before the append-only backup existed) live only in
+    # the ledger; send them too or evidence would be missing them forever.
+    rows = [*backup, *(row for row in ledger if int(row["cislo"]) not in in_backup)]
     records = []
     errors = []
-    for row in ppd.read_backup(data_dir):
+    for row in rows:
         try:
             records.append(ppd_push.build_record(row, smazano=int(row["cislo"]) not in live))
         except (TypeError, ValueError, OverflowError) as e:
