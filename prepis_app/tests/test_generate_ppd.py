@@ -4,8 +4,26 @@ DATA_DIR is monkeypatched to a tmp dir so the test never touches the real
 NAS evidence ledger / counter.
 """
 import os
+import json
+import threading
+
+import pytest
 
 import app as appmod
+import ppd_push
+import tracker_push
+
+_real_ppd_push_async = ppd_push.push_async
+
+
+@pytest.fixture(autouse=True)
+def evidence_pushes(monkeypatch):
+    """Capture both request hooks; ordinary PDF tests never start HTTP threads."""
+    calls = {"ppd": [], "tracker": []}
+    monkeypatch.setattr(ppd_push, "push_async", lambda body, dd: calls["ppd"].append((body, dd)))
+    monkeypatch.setattr(tracker_push, "push_async", lambda data, dd: calls["tracker"].append(
+        (tracker_push.build_payload(data), dd)))
+    return calls
 
 
 def _payload(**over):
@@ -41,20 +59,127 @@ def test_generate_pushes_to_evidence_by_default(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     import tracker_push
     calls = []
-    monkeypatch.setattr(tracker_push, "push", lambda data, dd: calls.append(data))
+    monkeypatch.setattr(tracker_push, "push_async", lambda data, dd: calls.append(data))
     r = client.post("/api/generate", json=_payload())     # no evidence_log → default true
     assert r.get_json()["success"] is True
     assert len(calls) == 1
 
 
-def test_generate_skips_evidence_when_unchecked(client, tmp_path, monkeypatch):
+def test_generate_skips_evidence_when_unchecked(client, tmp_path, monkeypatch, evidence_pushes):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     import tracker_push
     calls = []
-    monkeypatch.setattr(tracker_push, "push", lambda data, dd: calls.append(data))
+    monkeypatch.setattr(tracker_push, "push_async", lambda data, dd: calls.append(data))
     r = client.post("/api/generate", json=_payload(evidence_log=False))
     assert r.get_json()["success"] is True
     assert calls == []                                    # box off → no push
+    assert len(evidence_pushes["ppd"]) == 1                # every receipt still goes
+
+
+@pytest.mark.parametrize("zadost_id", [None, "browser-stable-id"])
+def test_generate_ppd_and_tracker_share_one_id(client, tmp_path, monkeypatch, evidence_pushes, zadost_id):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    generated = []
+    def uuid4():
+        generated.append(True)
+        return type("UUID", (), {"hex": "generated-once"})()
+    monkeypatch.setattr(appmod.uuid, "uuid4", uuid4)
+    response = client.post("/api/generate", json=_payload(
+        zadost_id=zadost_id, ppd_prijato_ico="01234567", ppd_extra_spz="2CD6789"))
+    assert response.status_code == 200
+    assert response.get_json()["ppd"]
+    body, data_dir = evidence_pushes["ppd"][0]
+    payload, tracker_dir = evidence_pushes["tracker"][0]
+    assert body["zadost_id"] == payload["zadost_id"] == (zadost_id or "generated-once")
+    assert len(generated) == (0 if zadost_id else 1)
+    assert data_dir == tracker_dir == str(tmp_path)
+    assert body["prijato_ico"] == "01234567"
+    assert body["vozidlo"] == "1AB2345, 2CD6789"
+    assert body["castka"] == 1300 and type(body["castka"]) is int
+
+
+def test_generate_returns_receipt_when_evidence_http_raises(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(ppd_push, "RETRY_DELAYS", ())
+    finished = threading.Event()
+    sent = []
+    def put(*args, **kwargs):
+        sent.append(kwargs["json"])
+        raise RuntimeError("evidence unavailable")
+    original = ppd_push.push
+    def push(*args):
+        try:
+            return original(*args)
+        finally:
+            finished.set()
+    monkeypatch.setattr(ppd_push.requests, "put", put)
+    monkeypatch.setattr(ppd_push, "push", push)
+    monkeypatch.setattr(ppd_push, "push_async", _real_ppd_push_async)
+    response = client.post("/api/generate", json=_payload(evidence_log=False))
+    assert finished.wait(2)  # keep the mock active until the background thread ends
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    assert response.get_json()["ppd"].startswith("/download/ppd_")
+    queued = json.loads((tmp_path / "failed_ppd_pushes.jsonl").read_text(encoding="utf-8"))
+    assert queued["record"] == sent[0]
+    assert queued["reason"] == "evidence unavailable"
+
+
+def test_generate_returns_receipt_when_push_hook_raises(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    def fail(*args, **kwargs):
+        raise RuntimeError("thread could not start")
+    monkeypatch.setattr(ppd_push, "push_async", fail)
+    response = client.post("/api/generate", json=_payload())
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    assert response.get_json()["ppd"]
+
+
+def test_delete_and_restore_push_status_from_backup(client, tmp_path, monkeypatch, evidence_pushes):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    generated = client.post("/api/generate", json=_payload(ppd_prijato_ico="01234567")).get_json()
+    number = int(generated["ppd_print"].rsplit("/", 1)[1])
+    issued = evidence_pushes["ppd"].pop()[0]
+    deleted = client.delete(f"/api/ppd/{number}")
+    assert deleted.get_json() == {"success": True, "removed": True}
+    restored = client.post(f"/api/ppd/{number}/restore")
+    assert restored.get_json() == {"success": True, "restored": True}
+    bodies = [body for body, dd in evidence_pushes["ppd"]]
+    assert [body["smazano"] for body in bodies] == [True, False]
+    for body in bodies:
+        assert body["cislo"] == number
+        assert body["prijato_ico"] == "01234567"
+        assert body["vozidlo"] == issued["vozidlo"]
+        assert body["castka"] == issued["castka"]
+    # Repeating the restore has no local change and sends no extra push.
+    assert client.post(f"/api/ppd/{number}/restore").get_json()["restored"] is False
+    assert len(evidence_pushes["ppd"]) == 2
+
+
+def test_delete_skips_push_without_backup(client, tmp_path, monkeypatch, evidence_pushes):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    number = appmod.ppd.reserve_ppd_number_and_log(str(tmp_path), {
+        "date": "08.10.2026", "payer": "Firma", "amount": 1300, "vehicle": "RZ",
+    })
+    assert client.delete(f"/api/ppd/{number}").get_json()["removed"] is True
+    assert evidence_pushes["ppd"] == []
+    assert client.delete(f"/api/ppd/{number}").get_json()["removed"] is False
+    assert client.post(f"/api/ppd/{number}/restore").status_code == 404
+    assert evidence_pushes["ppd"] == []
+
+
+def test_delete_and_restore_complete_when_push_raises(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
+    generated = client.post("/api/generate", json=_payload()).get_json()
+    number = int(generated["ppd_print"].rsplit("/", 1)[1])
+    def fail(*args, **kwargs):
+        raise RuntimeError("push failed")
+    monkeypatch.setattr(ppd_push, "push_async", fail)
+    response = client.delete(f"/api/ppd/{number}")
+    assert response.status_code == 200 and response.get_json()["removed"] is True
+    response = client.post(f"/api/ppd/{number}/restore")
+    assert response.status_code == 200 and response.get_json()["restored"] is True
 
 
 def test_ppd_payer_is_uppercased(client, tmp_path, monkeypatch):

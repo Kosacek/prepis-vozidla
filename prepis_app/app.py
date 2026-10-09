@@ -6,6 +6,7 @@ import re
 import hmac
 import threading
 import time
+import uuid
 from dotenv import load_dotenv
 import sys as _sys
 _base = getattr(_sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -58,7 +59,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.20.1"
+__version__ = "1.21.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1588,6 +1589,8 @@ def api_generate():
     raw = request.json or {}
     # Sanitize: strip all string values
     data = {k: v.strip() if isinstance(v, str) else v for k, v in raw.items()}
+    # Both evidence pushes must use one ID, even when the browser omitted it.
+    data["zadost_id"] = data.get("zadost_id") or uuid.uuid4().hex
     mode = data.get("mode", "prevod")
 
     if mode not in {"prevod", "zapis", "zmena", "3rz", "vyvoz"}:
@@ -1743,6 +1746,16 @@ def api_generate():
                 # hlavní SPZ zmizela auta z „+ Přidat vozidlo" (doklad č. 174).
                 "spz": rz_full, "vin": vin,
             })
+            # Every receipt goes to evidence, independently of evidence_log.
+            try:
+                import ppd_push
+                ppd_push.push_async(ppd_push.build_record({
+                    "cislo": number, "date": today, "payer": payer,
+                    "payer_ico": payer_ico, "amount": amount, "purpose": purpose,
+                    "vehicle": rz_full or vin,
+                }, zadost_id=data["zadost_id"]), DATA_DIR)
+            except Exception as e:
+                _log.warning("PPD push skipped: %s", e)
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 
@@ -1990,6 +2003,14 @@ def api_ppd_delete(number):
     """Remove a receipt from the LIVE ledger. The append-only backup keeps its
     copy and the PDF file is left on disk, so the receipt can be restored."""
     removed = ppd.delete_ppd(DATA_DIR, number)
+    if removed:
+        try:
+            rec = next((r for r in ppd.read_backup(DATA_DIR) if r.get("cislo") == number), None)
+            if rec is not None:
+                import ppd_push
+                ppd_push.push_async(ppd_push.build_record(rec, smazano=True), DATA_DIR)
+        except Exception as e:
+            _log.warning("PPD delete push skipped: %s", e)
     return jsonify({"success": True, "removed": removed})
 
 
@@ -2042,6 +2063,12 @@ def api_ppd_restore(number):
         "prijato_od": rec.get("prijato_od", ""), "castka": rec.get("castka", ""),
         "ucel": rec.get("ucel", ""), "vozidlo": rec.get("spz") or rec.get("vin") or "",
     })
+    if restored:
+        try:
+            import ppd_push
+            ppd_push.push_async(ppd_push.build_record(rec, smazano=False), DATA_DIR)
+        except Exception as e:
+            _log.warning("PPD restore push skipped: %s", e)
     return jsonify({"success": True, "restored": restored})
 
 @app.route("/api/scan", methods=["POST"])

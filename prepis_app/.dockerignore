@@ -18,6 +18,7 @@ output
 plne_moce
 firmy.xlsx
 firmy.bak.xlsx
+failed_ppd_pushes.jsonl*
 *.bak
 deploy_output.txt
 *.bat
