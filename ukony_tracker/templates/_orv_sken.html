@@ -1,0 +1,50 @@
+<section id="orv-sken" class="orv-sken">
+  <header class="orv-heading">
+    <p class="orv-step" id="orv-step">1 · Foť</p>
+    <h2 id="ukon-modal-title">Doplnit z techničáku</h2>
+    <p class="muted">Přední strana ORV, celý doklad na šířku. Až 30 fotek najednou.</p>
+  </header>
+  <p id="orv-note" class="orv-note" role="status" hidden></p>
+  <div id="orv-capture">
+    <div class="orv-viewfinder" id="orv-viewfinder" hidden>
+      <video id="orv-video" autoplay muted playsinline aria-label="Živý náhled zadní kamery"></video>
+      <span class="orv-guide" aria-hidden="true"></span>
+    </div>
+    <div class="orv-sources">
+      <button class="btn" id="orv-camera" type="button">Zapnout kameru</button>
+      <label class="btn btn-primary orv-file" id="orv-fallback" hidden>
+        Vyfotit techničák
+        <input id="orv-file-camera" type="file" accept="image/*" capture="environment" aria-label="Vyfotit techničák">
+      </label>
+      <label class="btn orv-file">Z galerie
+        <input id="orv-gallery" type="file" accept="image/*" multiple aria-label="Vybrat fotky z galerie">
+      </label>
+    </div>
+    <div class="orv-counter" id="orv-counter" role="status">0 fotek</div>
+    <div class="orv-thumbnails" id="orv-thumbnails" aria-label="Vyfocené techničáky"></div>
+  </div>
+  <div id="orv-thinking" class="card ask-thinking" role="status" hidden>
+    <svg class="ask-thinking__icon" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" fill="currentColor"/>
+      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" opacity=".55"/>
+    </svg>
+    <div class="ask-thinking__body">
+      <div class="ask-thinking__label"><span class="ask-verb" id="orv-verb">Přemýšlím</span><span class="ask-dots"><i></i><i></i><i></i></span></div>
+      <div class="ask-skeleton"><span></span><span></span><span></span></div>
+      <p id="orv-progress"></p>
+    </div>
+  </div>
+  <div id="orv-summary" class="card orv-summary ask-reveal" role="status" hidden>
+    <h3 id="orv-summary-title"></h3>
+    <p id="orv-summary-other" class="muted"></p>
+  </div>
+  <div id="orv-results" class="orv-results" aria-label="Výsledky jednotlivých fotek" hidden></div>
+  <footer class="orv-actions">
+    <button id="orv-shutter" class="orv-shutter" type="button" aria-label="Vyfotit techničák" disabled hidden><span></span></button>
+    <button id="orv-process" class="btn btn-primary" type="button" disabled>Zpracovat 0 fotek</button>
+    <div id="orv-done" class="orv-done" hidden>
+      <button id="orv-again" class="btn btn-primary" type="button">Vyfotit další</button>
+      <button class="btn" type="button" data-modal-close>Zavřít</button>
+    </div>
+  </footer>
+</section>
