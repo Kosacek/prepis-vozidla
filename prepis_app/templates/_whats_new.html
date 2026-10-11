@@ -64,8 +64,12 @@
     font-size: 11px; font-weight: 700;
   }
 
-  .wn-pages { overflow: hidden; }
-  .wn-page[hidden] { display: none; }
+  /* Every release sits in the same grid cell, so the card is always as
+     tall as the tallest one: stepping through versions never resizes it,
+     and "Starší ›" / "Rozumím" stay exactly under the finger. */
+  .wn-pages { display: grid; overflow: hidden; }
+  .wn-page { grid-area: 1 / 1; }
+  .wn-page.is-off { visibility: hidden; pointer-events: none; }
   .wn-page.in-older { animation: wn-in-older .26s cubic-bezier(.2, .8, .25, 1); }
   .wn-page.in-newer { animation: wn-in-newer .26s cubic-bezier(.2, .8, .25, 1); }
   @keyframes wn-in-older { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
@@ -140,7 +144,7 @@
   <div class="wn-card">
     <div class="wn-pages">
       {% for r in RELEASES %}
-      <section class="wn-page" data-version="{{ r.version }}" {{ 'hidden' if not loop.first }}>
+      <section class="wn-page{{ ' is-off' if not loop.first }}" data-version="{{ r.version }}">
         <div class="wn-head">
           <span>Verze {{ r.version }}</span><span class="sep">·</span>
           <span>{{ r.date.day }}. {{ r.date.month }}. {{ r.date.year }}</span>
@@ -175,7 +179,6 @@
   // -- Version history ------------------------------------------------------
   var overlay = document.getElementById('wn');
   var card = overlay.querySelector('.wn-card');
-  var wrap = overlay.querySelector('.wn-pages');
   var pages = Array.prototype.slice.call(overlay.querySelectorAll('.wn-page'));
   var count = overlay.querySelector('.wn-count');
   var newerBtn = overlay.querySelector('[data-dir="newer"]');
@@ -191,19 +194,14 @@
 
   function show(i, dir) {
     if (i < 0 || i >= pages.length) return;
-    var from = wrap.offsetHeight;
     pages.forEach(function (p, j) {
-      p.hidden = j !== i;
+      p.classList.toggle('is-off', j !== i);
+      p.setAttribute('aria-hidden', j !== i ? 'true' : 'false');
       p.classList.remove('in-older', 'in-newer');
     });
     if (dir && !reduce) {
       void pages[i].offsetWidth;
       pages[i].classList.add(dir === 'older' ? 'in-older' : 'in-newer');
-      var to = wrap.offsetHeight;
-      if (from && to && from !== to) {
-        wrap.animate([{ height: from + 'px' }, { height: to + 'px' }],
-                     { duration: 260, easing: 'cubic-bezier(.2,.8,.25,1)' });
-      }
     }
     current = i;
     overlay.setAttribute('aria-labelledby', 'wn-title-' + i);
