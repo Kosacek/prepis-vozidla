@@ -239,9 +239,14 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   margin-bottom: var(--sp-5);
 }
 
-/* 2×2 on narrow screens — never the ugly 3+1 orphan wrap */
+/* Always four in one row (a 2×2 grid wasted the Samsung Fold's inner screen);
+   below 900px the cards just get tighter instead of wrapping. */
 @media (max-width: 900px) {
-  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .kpis .kpi { padding: 10px 10px; gap: 3px; border-radius: var(--radius-sm); }
+  .kpis .kpi-v { font-size: 1.5rem; }
+  .kpis .kpi-l { font-size: 0.65rem; letter-spacing: 0.02em; line-height: 1.2; }
+  .kpis .kpi-sub { font-size: 0.75rem; }
 }
 
 .kpi {
@@ -1527,7 +1532,7 @@ a.kpi-link:hover {
 /* The shared new form wraps its types in both the overlay and the entry card. */
 #ukon-form .seg {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--sp-1);
   padding: var(--sp-1);
   max-width: 100%;
@@ -1537,10 +1542,16 @@ a.kpi-link:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 1 88px;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 40px;
-  padding: var(--sp-2);
+  padding: var(--sp-2) 6px;
+  white-space: nowrap;
+}
+/* One row while it fits; only a phone-width form wraps the types. */
+@media (max-width: 640px) {
+  #ukon-form .seg { flex-wrap: wrap; }
+  #ukon-form .seg span { flex: 0 1 88px; padding: var(--sp-2); }
 }
 
 .modal-card .firma-pick,
@@ -1599,7 +1610,7 @@ a.kpi-link:hover {
     min-height: 44px;
     font-size: 16px;
   }
-  #ukon-modal #ukon-form .seg span { flex-basis: calc((100% - 3 * var(--sp-1)) / 4); }
+  #ukon-modal #ukon-form .seg span { flex: 0 1 calc((100% - 4 * var(--sp-1)) / 5); padding: var(--sp-2) 2px; font-size: 13px; }
   #ukon-modal #ukon-form .chip { min-height: 36px; padding: var(--sp-2) var(--sp-3); }
   #ukon-modal #ukon-form .ukon-new-actions {
     position: sticky;
@@ -1827,7 +1838,7 @@ body.modal-open { overflow: hidden; }
   .mesic-recent .recent-row .tag { order: 2; }
   .recent-list .recent-rz,
   .ukony-list .recent-rz,
-  .mesic-recent .recent-rz { order: 5; }
+  .mesic-recent .recent-rz { order: 5; white-space: normal; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
   .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 6; }
   .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 7; }
   .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 8; }
@@ -1835,7 +1846,8 @@ body.modal-open { overflow: hidden; }
 
   /* Filtry: po zvětšení písma na 16px se rozsypaly do pěti řádků.
      Dva sloupce = pravidelná mřížka místo náhodného zalamování. */
-  .filter-bar__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+  .filter-bar__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+  .filter-bar__fields > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
   .filter-bar__fields > .btn { grid-column: 1 / -1; }
 
   /* Akce u každého řádku byly stejně výrazné jako data — zmenšit, ať se na
@@ -2010,4 +2022,23 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 @media (prefers-reduced-motion: reduce) {
   .modal-card--scan, .modal-backdrop:has(.modal-card--scan) { transition: none; }
   .orv-shutter:active { transform: none; }
+}
+
+/* Nav on mid-width screens (Samsung Fold inner display ~ 690px, tablets): links
+   never wrap onto two lines; if the row is still too wide it scrolls instead of
+   pushing "Odhlásit" off-screen. */
+.topnav nav a { white-space: nowrap; }
+@media (max-width: 900px) {
+  .topnav-inner {
+    gap: var(--sp-3);
+    padding: 0 var(--sp-4);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .topnav-inner::-webkit-scrollbar { display: none; }
+  .topnav nav { flex-shrink: 0; }
+  .topnav nav a { padding: var(--sp-2) 7px; font-size: 0.8125rem; }
+  .topnav nav a.nav-ai { padding-right: 12px; }
+  .logout-form { flex-shrink: 0; margin-left: 0; }
 }
