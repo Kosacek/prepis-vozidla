@@ -1,5 +1,6 @@
 """Offline scan contract, atomic fill matrix, upload and session boundaries."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from io import BytesIO
 from types import SimpleNamespace as NS
 
@@ -42,8 +43,10 @@ def test_extract_normalizes_and_uses_strict_tool():
     assert scan.extract(b"photo", "image/jpeg", client=fake) == DATA
     call = fake.calls[0]
     assert call["model"] == "claude-haiku-5-5"
+    assert call["max_tokens"] == 1024
     assert call["output_config"] == {"effort": "low"}
-    assert not {"temperature", "top_p", "top_k", "thinking", "tool_choice"} & call.keys()
+    assert call["thinking"] == {"type": "disabled"}
+    assert not {"temperature", "top_p", "top_k", "tool_choice"} & call.keys()
     assert len(call["tools"]) == 1 and call["tools"][0]["strict"] is True
     schema = call["tools"][0]["input_schema"]
     assert set(schema["required"]) == set(DATA)
@@ -52,6 +55,11 @@ def test_extract_normalizes_and_uses_strict_tool():
     assert call["messages"][0]["content"][0]["source"] == {
         "type": "base64", "media_type": "image/jpeg", "data": "cGhvdG8="}
     assert scan.tokens.get() == 125
+
+
+@pytest.fixture(autouse=True)
+def no_registry_network(monkeypatch):
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", lambda _orv: {"success": False, "error": "offline"})
 
 
 @pytest.mark.parametrize("field,value", [
@@ -113,6 +121,75 @@ def test_no_match_no_creation_and_vin_preference(conn, make):
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}))
     assert result["stav"] == "doplneno" and result["doplneno"] == ["orv"]
+
+
+def test_front_photo_looks_up_vin_before_transaction_and_fills(conn, make, monkeypatch):
+    uid = make()
+    photo_data = {**DATA, "vin": None}
+    events = []
+    original_transaction = scan.transaction
+
+    @contextmanager
+    def transaction_spy(connection):
+        events.append("transaction")
+        with original_transaction(connection):
+            yield
+
+    def lookup(orv):
+        events.append("lookup")
+        assert orv == DATA["orv_cislo"]
+        return {"success": True, "vin": " tmb-ek6nw7m3158470 "}
+
+    monkeypatch.setattr(scan, "transaction", transaction_spy)
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data), lookup=lookup)
+    assert events == ["lookup", "transaction"]
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert result["vin"] == VIN and result["vin_zdroj"] == "registr"
+    assert result["doplneno"] == ["rz", "orv"]
+    assert ukony_repo.get(conn, uid)["rz"] == DATA["rz"]
+    assert ukony_repo.get(conn, uid)["orv"] == DATA["orv_cislo"]
+
+
+def test_lookup_failure_falls_back_to_rz(conn, make):
+    uid = make(vin="OTHER", rz=DATA["rz"])
+    photo_data = {**DATA, "vin": None}
+    calls = []
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
+                          lookup=lambda orv: calls.append(orv) or {"success": False, "error": "offline"})
+    assert calls == [DATA["orv_cislo"]]
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert result["vin"] is None and result["vin_zdroj"] is None
+    assert result["doplneno"] == ["orv"]
+
+
+def test_invalid_registry_vin_is_ignored_and_explained(conn):
+    photo_data = {**DATA, "vin": None}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
+                          lookup=lambda _orv: {"success": True, "vin": "not a vin!"})
+    assert result["stav"] == "nenalezeno" and result["vin"] is None
+    assert result["vin_zdroj"] is None
+    assert "RZ " + DATA["rz"] in result["zprava"]
+    assert "VIN z registru se nepodařilo zjistit" in result["zprava"]
+
+
+def test_registry_no_match_names_vin_source(conn):
+    photo_data = {**DATA, "vin": None}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
+                          lookup=lambda _orv: {"success": True, "vin": VIN})
+    assert result["stav"] == "nenalezeno" and result["vin"] == VIN
+    assert result["vin_zdroj"] == "registr"
+    assert result["zprava"] == f"Nenalezeno — VIN {VIN} (z registru podle ORV)"
+
+
+def test_lookup_skipped_when_photo_has_vin_or_no_orv(conn, make):
+    make()
+    calls = []
+    lookup = lambda orv: calls.append(orv) or {"success": False}
+    photo_with_vin = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(), lookup=lookup)
+    assert photo_with_vin["vin_zdroj"] == "foto" and calls == []
+    no_orv = {**DATA, "vin": None, "orv_cislo": None}
+    scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(no_orv), lookup=lookup)
+    assert calls == []
 
 
 @pytest.mark.parametrize("other_fields,expected", [({}, "vice_shod"),
