@@ -14,6 +14,21 @@ update that changes something people **see or do** ships with a one-time
 Copy its structure, spacing, motion and behaviour, then adapt the content and
 the colour tokens to the app you're in.
 
+### How: add a release to the app's version history
+Each app has a browsable version history behind a "Verze X ⓘ" control:
+Hunter at the bottom of Settings, žádosti bottom-left in the nav bar,
+evidence in the top bar next to "Odhlásit". The newest release opens by
+itself once per device; "‹ Novější / Starší ›" or a swipe steps back.
+To announce an update, add a `Release` at the TOP of the app's releases file
+(version, date, title, 1–2 points, optional `demo` partial). Never build a
+one-off popup.
+- Žádosti: `prepis_app/releases.py` (real VERSION numbers), browser
+  `prepis_app/templates/_whats_new.html`.
+- Evidence: `ukony_tracker/releases.py`, demos in `ukony_tracker/templates/demos/`,
+  browser `ukony_tracker/templates/_whats_new.html`.
+- Hunter: `app/releases.py`, demos in `app/templates/partials/demos/`,
+  browser `app/templates/partials/_releases.html`.
+
 ### When
 - Yes: new features, changed gestures/flows/screens, anything a user would
   otherwise have to discover or be told about.
@@ -32,11 +47,11 @@ the colour tokens to the app you're in.
 - `prefers-reduced-motion`: no animation, show the demo's end state.
 
 ### Behaviour
-- Once per device per release: `localStorage` key `<app>_whatsnew_<slug>`,
+- Once per device per release: `localStorage` key `<app>_whatsnew_<version>`,
   set when shown. No storage → don't show (never on every load).
 - Only on a logged-in, settled page; never on login, never over another
   dialog or mid-gesture (defer and retry).
-- A new release replaces the previous popup.
+- A new release simply goes on top; older ones stay browsable.
 
 ### Czech copy
 Natural Czech, full diacritics, informal "ty". Short — if it needs a third
