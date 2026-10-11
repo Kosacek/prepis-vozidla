@@ -146,7 +146,7 @@
         <ul class="wn-points">
           {% for point in r.points %}
             {% set head, sep, rest = point.partition(' – ') %}
-            <li><span>{% if rest %}<b>{{ head }}</b> – {{ rest }}{% else %}{{ point }}{% endif %}</span></li>
+            <li><span>{% if rest and head.split()|length <= 3 %}<b>{{ head }}</b> – {{ rest }}{% else %}{{ point }}{% endif %}</span></li>
           {% endfor %}
         </ul>
       </section>

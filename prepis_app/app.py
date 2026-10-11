@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import requests
+import functools
 import json
 import os
 import re
@@ -59,7 +60,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.21.0"
+__version__ = "1.22.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2201,6 +2202,43 @@ def sdilena_zadost_polozka(kod, index):
 def sdilena_zadost(token):
     """Původní dlouhý tvar odkazu — drží při životě, co už je rozeslané."""
     return _posli_sdilenou(token)
+
+# ── Version history + "Nová verze" bar (templates/_whats_new.html) ──────────
+from releases import CURRENT_RELEASE as _CURRENT_RELEASE, RELEASES as _RELEASES
+
+
+@functools.lru_cache(maxsize=1)
+def _build_id() -> str:
+    """Hash of the app's own code, taken once per process. Every page is
+    stamped with it; when /verze reports a different one, the server was
+    updated underneath an open page and it offers a reload."""
+    import hashlib
+    from pathlib import Path
+    root = Path(__file__).resolve().parent
+    digest = hashlib.blake2b(digest_size=6)
+    files = sorted(list(root.glob("*.py")) + list((root / "templates").rglob("*.html"))
+                   + [root / "VERSION"])
+    for path in files:
+        if path.is_file():
+            digest.update(path.relative_to(root).as_posix().encode())
+            # Line endings depend on how the tree was copied, not on the code.
+            digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
+    return digest.hexdigest()
+
+
+app.jinja_env.globals.update(
+    RELEASES=_RELEASES, CURRENT_RELEASE=_CURRENT_RELEASE,
+    APP_VERSION=__version__, APP_BUILD=_build_id(),
+)
+
+
+@app.route("/verze")
+def verze():
+    resp = jsonify(build=_build_id())
+    # Every poll must reach the server, or a page would never see an update.
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
 
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")

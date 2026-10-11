@@ -1310,7 +1310,8 @@
 <!-- Fixed nav bar -->
 <div class="nav-bar">
   <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">← Zpět</button>
-  <span id="app-version-bar" style="position:absolute;left:32px;font-size:16px;color:#bbb;font-weight:400;pointer-events:none;"></span>
+  {# Version + its history (templates/_whats_new.html). #}
+  <button type="button" id="app-version-bar" class="app-ver" data-releases-open aria-label="Verze {{ APP_VERSION }} – co je nového">v{{ APP_VERSION }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.4" r=".6" fill="currentColor"/></svg></button>
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
 </div>
 <div class="kb-hints">
@@ -3989,9 +3990,6 @@ setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (
 tryAutoOpenCamera();
 </script>
 <script>
-  fetch('/api/version').then(r=>r.json()).then(d=>{ document.getElementById('app-version-bar').textContent = 'v' + d.version; });
-</script>
-<script>
 // ── Kdo vyplňuje (profil) ─────────────────────────────────────────────────────
 // A per-device label of who's filling it out, sent with each žádost so the Úkony
 // Tracker can show who added the car. Not authentication — just a name.
@@ -4021,5 +4019,6 @@ tryAutoOpenCamera();
   if (!window.getProfil()) window.openProfilModal();  // prompt on first open
 })();
 </script>
+{% include "_whats_new.html" %}
 </body>
 </html>

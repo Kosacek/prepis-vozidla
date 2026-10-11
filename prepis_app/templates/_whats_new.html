@@ -1,0 +1,307 @@
+{# Version history ("Co je nového") + the "Nová verze aplikace" bar.
+
+   History (releases.py): one card per release, newest first — optional demo
+   (templates/demos/<name>.html), title, a point or two; "‹ Novější" /
+   "Starší ›", a swipe or the arrow keys step through them. Opens from the
+   "v1.21.0 ⓘ" label in the bottom bar (index.html), and the newest release
+   opens by itself once per device. House rule for every user-visible
+   update — see ../AGENTS.md; when you bump VERSION, add a Release at the
+   top of releases.py (and a demo if it helps).
+
+   Bar: the page polls /verze (app.py); when the server runs a different
+   build than the one that drew this page, a small inverted pill offers a
+   reload, so an update reaches pages that were left open.
+
+   Same layout and behaviour as Hunter and Evidence, in this app's own
+   tokens (--card, --primary, --text, --muted, --border, --bg) and its
+   modal scrim. Light only, like the rest of the app. #}
+<style>
+  .wn-overlay, .wn-update {
+    --wn-card: var(--card, #fff); --wn-ink: var(--text, #1a1d23);
+    --wn-muted: var(--muted, #6b7280); --wn-line: var(--border, #dde1e7);
+    --wn-accent: var(--primary, #1a56db); --wn-accent-dark: var(--primary-dark, #1341b0);
+    --wn-soft: var(--accent, #e8f0fe); --wn-bg: var(--bg, #f0f2f5);
+  }
+
+  /* "v1.21.0 ⓘ" in the bottom bar. */
+  .app-ver {
+    position: absolute; left: 24px; display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 8px; border: 0; border-radius: 8px; background: none; cursor: pointer;
+    font: 400 16px inherit; font-family: inherit; color: #bbb;
+    font-variant-numeric: tabular-nums;
+  }
+  .app-ver:hover { color: var(--muted, #6b7280); background: var(--bg, #f0f2f5); }
+  .app-ver svg { display: block; }
+  @media (max-width: 600px) { .app-ver { left: 8px; font-size: 14px; } }
+
+  .wn-overlay {
+    position: fixed; inset: 0; z-index: 600;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0, 0, 0, .45);
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .wn-overlay[hidden] { display: none; }
+  .wn-overlay.is-open { opacity: 1; }
+  .wn-card {
+    width: 100%; max-width: 380px; border-radius: 14px;
+    padding: 18px 22px 22px; background: var(--wn-card); color: var(--wn-ink);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .18), 0 2px 10px rgba(0, 0, 0, .06);
+    touch-action: pan-y;
+    opacity: 0; transform: translateY(10px) scale(.97);
+    transition: transform .26s cubic-bezier(.2, .8, .25, 1), opacity .26s ease;
+  }
+  .wn-overlay.is-open .wn-card { opacity: 1; transform: none; }
+
+  .wn-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    font-size: 12px; font-weight: 600; color: var(--wn-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .wn-head .sep { opacity: .6; }
+  .wn-new {
+    margin-left: auto; padding: 2px 9px; border-radius: 999px;
+    background: var(--wn-soft); color: var(--wn-accent);
+    font-size: 11px; font-weight: 700;
+  }
+
+  .wn-pages { overflow: hidden; }
+  .wn-page[hidden] { display: none; }
+  .wn-page.in-older { animation: wn-in-older .26s cubic-bezier(.2, .8, .25, 1); }
+  .wn-page.in-newer { animation: wn-in-newer .26s cubic-bezier(.2, .8, .25, 1); }
+  @keyframes wn-in-older { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @keyframes wn-in-newer { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+  /* Releases without a demo get a version tile to keep the rhythm. */
+  .wn-tile {
+    min-width: 52px; height: 52px; padding: 0 10px; border-radius: 14px; margin-bottom: 16px;
+    display: inline-grid; place-items: center; background: var(--wn-bg);
+    font-size: 17px; font-weight: 800; color: var(--wn-accent);
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+
+  .wn-page h3 { margin: 0 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .wn-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .wn-points li { display: flex; gap: 10px; font-size: 15px; line-height: 1.4; color: var(--wn-muted); }
+  .wn-points li::before {
+    content: ''; flex: none; width: 6px; height: 6px; margin-top: 8px;
+    border-radius: 50%; background: var(--wn-accent);
+  }
+  .wn-points b { color: var(--wn-ink); font-weight: 600; }
+
+  .wn-steps {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    margin: 16px 0 12px;
+  }
+  .wn-step {
+    border: 0; background: none; padding: 6px 2px; cursor: pointer;
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--wn-accent);
+  }
+  .wn-step[data-dir="newer"] { justify-self: start; }
+  .wn-step[data-dir="older"] { justify-self: end; }
+  .wn-step:disabled { visibility: hidden; }
+  .wn-count { font-size: 12px; font-weight: 600; color: var(--wn-muted); font-variant-numeric: tabular-nums; }
+  .wn-ok {
+    width: 100%; padding: 12px 20px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--wn-accent); color: #fff; font: inherit; font-size: 16px; font-weight: 600;
+  }
+  .wn-ok:hover { background: var(--wn-accent-dark); }
+
+  /* -- "Nová verze" bar ----------------------------------------------- */
+  .wn-update {
+    position: fixed; left: 50%; z-index: 700;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    transform: translate(-50%, calc(-100% - 40px));
+    transition: transform .42s cubic-bezier(.2, .7, .3, 1);
+    display: flex; align-items: center; gap: 12px; white-space: nowrap;
+    padding: 6px 6px 6px 16px; border-radius: 999px;
+    background: var(--wn-ink); color: #fff;
+    font-size: 14px; font-weight: 600; line-height: 1.2;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+  .wn-update[hidden] { display: none; }
+  .wn-update.show { transform: translate(-50%, 0); }
+  .wn-update button {
+    border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    background: var(--wn-accent); color: #fff; font: inherit; font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wn-overlay, .wn-card, .wn-update { transition: none; }
+    .wn-page.in-older, .wn-page.in-newer { animation: none; }
+  }
+</style>
+
+<div class="wn-update" id="wnUpdate" role="status" aria-live="polite" hidden>
+  Nová verze aplikace
+  <button type="button" onclick="location.reload()">Obnovit</button>
+</div>
+
+<div class="wn-overlay" id="wn" role="dialog" aria-modal="true" aria-labelledby="wn-title-0" hidden>
+  <div class="wn-card">
+    <div class="wn-pages">
+      {% for r in RELEASES %}
+      <section class="wn-page" data-version="{{ r.version }}" {{ 'hidden' if not loop.first }}>
+        <div class="wn-head">
+          <span>Verze {{ r.version }}</span><span class="sep">·</span>
+          <span>{{ r.date.day }}. {{ r.date.month }}. {{ r.date.year }}</span>
+          {% if loop.first %}<span class="wn-new">Nejnovější</span>{% endif %}
+        </div>
+        {% if r.demo %}
+          {% include "demos/" ~ r.demo ~ ".html" %}
+        {% else %}
+          <div class="wn-tile" aria-hidden="true">{{ r.version }}</div>
+        {% endif %}
+        <h3 id="wn-title-{{ loop.index0 }}">{{ r.title }}</h3>
+        <ul class="wn-points">
+          {% for point in r.points %}
+            {% set head, sep, rest = point.partition(' – ') %}
+            <li><span>{% if rest and head.split()|length <= 3 %}<b>{{ head }}</b> – {{ rest }}{% else %}{{ point }}{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endfor %}
+    </div>
+    <div class="wn-steps">
+      <button type="button" class="wn-step" data-dir="newer" aria-label="Novější verze">‹ Novější</button>
+      <span class="wn-count" aria-live="polite"></span>
+      <button type="button" class="wn-step" data-dir="older" aria-label="Starší verze">Starší ›</button>
+    </div>
+    <button type="button" class="wn-ok">Rozumím</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // -- Version history ------------------------------------------------------
+  var overlay = document.getElementById('wn');
+  var card = overlay.querySelector('.wn-card');
+  var wrap = overlay.querySelector('.wn-pages');
+  var pages = Array.prototype.slice.call(overlay.querySelectorAll('.wn-page'));
+  var count = overlay.querySelector('.wn-count');
+  var newerBtn = overlay.querySelector('[data-dir="newer"]');
+  var olderBtn = overlay.querySelector('[data-dir="older"]');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var KEY = {{ ('zadosti_whatsnew_' ~ CURRENT_RELEASE) | tojson }};
+  var current = 0;
+
+  // Without storage we couldn't remember having shown it, and a popup on
+  // every load is worse than none -- so then it never opens by itself.
+  function seen() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return true; } }
+  function markSeen() { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+
+  function show(i, dir) {
+    if (i < 0 || i >= pages.length) return;
+    var from = wrap.offsetHeight;
+    pages.forEach(function (p, j) {
+      p.hidden = j !== i;
+      p.classList.remove('in-older', 'in-newer');
+    });
+    if (dir && !reduce) {
+      void pages[i].offsetWidth;
+      pages[i].classList.add(dir === 'older' ? 'in-older' : 'in-newer');
+      var to = wrap.offsetHeight;
+      if (from && to && from !== to) {
+        wrap.animate([{ height: from + 'px' }, { height: to + 'px' }],
+                     { duration: 260, easing: 'cubic-bezier(.2,.8,.25,1)' });
+      }
+    }
+    current = i;
+    overlay.setAttribute('aria-labelledby', 'wn-title-' + i);
+    count.textContent = (i + 1) + ' / ' + pages.length;
+    newerBtn.disabled = i === 0;
+    olderBtn.disabled = i === pages.length - 1;
+  }
+
+  // The page's own keyboard shortcuts (Enter / Esc / arrows step the form)
+  // must not fire while the history is open -- capture and stop them here.
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight') show(current + 1, 'older');
+    else if (e.key === 'ArrowLeft') show(current - 1, 'newer');
+    else if (e.key === 'Enter') {
+      // Enter on a focused button in here presses that button -- but the
+      // form behind must still not take it as "next step".
+      e.stopPropagation();
+      if (document.activeElement && document.activeElement.closest('#wn')) return;
+    } else return;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  function open() {
+    show(0);
+    overlay.hidden = false;
+    void overlay.offsetWidth;
+    overlay.classList.add('is-open');
+    overlay.querySelector('.wn-ok').focus({ preventScroll: true });
+    document.addEventListener('keydown', onKey, true);
+  }
+  function close() {
+    overlay.classList.remove('is-open');
+    setTimeout(function () { overlay.hidden = true; }, 260);
+    document.removeEventListener('keydown', onKey, true);
+  }
+
+  newerBtn.addEventListener('click', function () { show(current - 1, 'newer'); });
+  olderBtn.addEventListener('click', function () { show(current + 1, 'older'); });
+  overlay.querySelector('.wn-ok').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+  // Swipe through versions: left = older, right = newer.
+  var sx = null, sy = 0;
+  card.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; });
+  card.addEventListener('pointerup', function (e) {
+    if (sx === null) return;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    sx = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) show(current + 1, 'older'); else show(current - 1, 'newer');
+  });
+
+  // The "v1.21.0 ⓘ" label (and anything else marked for it).
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-releases-open]')) { e.preventDefault(); open(); }
+  });
+
+  // The newest release introduces itself once per device.
+  function autoOpen() {
+    if (seen()) return;
+    // Never on top of another dialog (Správa firem, hledání, ...).
+    if (document.querySelector('.modal-overlay.open')) { setTimeout(autoOpen, 2000); return; }
+    markSeen();  // shown once means once, even if the tab is just closed
+    open();
+  }
+  if (!seen()) setTimeout(autoOpen, 900);  // let the page settle first
+
+  // -- "Nová verze aplikace" bar ---------------------------------------------
+  var pageBuild = {{ APP_BUILD | tojson }};
+  var POLL_MS = 60000;
+  var timer = null, polling = false;
+
+  function showBar() {
+    var bar = document.getElementById('wnUpdate');
+    if (!bar || !bar.hidden) return;
+    bar.hidden = false;
+    void bar.offsetWidth;  // render off-screen first, then slide in
+    bar.classList.add('show');
+  }
+  function schedule() {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(poll, POLL_MS);
+  }
+  function poll() {
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    if (polling) return;
+    // Hidden (locked phone, background tab): keep the clock, spend nothing.
+    if (document.hidden) { schedule(); return; }
+    polling = true;
+    fetch('/verze', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })  // logged out -> HTML, ignored
+      .then(function (d) { if (d && d.build && d.build !== pageBuild) showBar(); })
+      .catch(function () {})
+      .then(function () { polling = false; schedule(); });
+  }
+  // Back from the lock screen or another app: check at once.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  schedule();
+})();
+</script>
