@@ -1,8 +1,7 @@
 <section id="orv-sken" class="orv-sken">
   <header class="orv-heading">
     <p class="orv-step" id="orv-step">1 · Foť</p>
-    <h2 id="ukon-modal-title">Doplnit z techničáku</h2>
-    <p class="muted">Přední strana ORV, celý doklad na šířku. Až 30 fotek najednou.</p>
+    <h2 id="ukon-modal-title">Techničák</h2>
   </header>
   <p id="orv-note" class="orv-note" role="status" hidden></p>
   <div id="orv-capture">
@@ -18,6 +17,12 @@
       </label>
       <label class="btn orv-file">Z galerie
         <input id="orv-gallery" type="file" accept="image/*" multiple aria-label="Vybrat fotky z galerie">
+      </label>
+      <label class="orv-person">Zpracoval
+        <select id="orv-zpracoval">
+          <option value="">—</option>
+          {% for person in profily %}<option value="{{ person }}">{{ person }}</option>{% endfor %}
+        </select>
       </label>
     </div>
     <div class="orv-counter" id="orv-counter" role="status">0 fotek</div>
@@ -35,10 +40,32 @@
     </div>
   </div>
   <div id="orv-summary" class="card orv-summary ask-reveal" role="status" hidden>
-    <h3 id="orv-summary-title"></h3>
-    <p id="orv-summary-other" class="muted"></p>
+    <h3 id="orv-summary-title" class="orv-banner"></h3>
+    <div id="orv-counts" class="orv-counts" aria-label="Souhrn výsledků"></div>
   </div>
+  <form id="orv-assign" class="card orv-assign ask-reveal" hidden>
+    <h3>K jaké firmě přiřadit?</h3>
+    <div class="orv-assign-defaults">
+      <label>Firma
+        <select id="orv-batch-firma">
+          <option value="">—</option>
+          {% for firma in firmy %}<option value="{{ firma.id }}">{{ firma.nazev }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Typ
+        <select id="orv-batch-typ">
+          {% for typ in typy %}<option value="{{ typ.kod }}" {{ 'selected' if typ.kod == default_typ }}>{{ typ.kod }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div id="orv-unassigned" class="orv-unassigned"></div>
+    <button id="orv-create-unmatched" class="btn btn-primary orv-create-unmatched" type="submit" disabled>Založit 0 úkonů</button>
+  </form>
   <div id="orv-results" class="orv-results" aria-label="Výsledky jednotlivých fotek" hidden></div>
+  <dialog id="orv-preview" class="orv-preview">
+    <button type="button" class="orv-preview-close" aria-label="Zavřít">×</button>
+    <img alt="Zvětšená fotografie techničáku">
+  </dialog>
   <footer class="orv-actions">
     <button id="orv-shutter" class="orv-shutter" type="button" aria-label="Vyfotit techničák" disabled hidden><span></span></button>
     <button id="orv-process" class="btn btn-primary" type="button" disabled>Zpracovat 0 fotek</button>

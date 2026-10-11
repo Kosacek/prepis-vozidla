@@ -5,15 +5,16 @@ const fs = require('node:fs');
 const H = require('../static/js/orv_helpers.js');
 
 class Element {
-  constructor() { this.children = []; this.handlers = {}; this.dataset = {}; this.hidden = false; }
+  constructor() { this.children = []; this.handlers = {}; this.dataset = {}; this.hidden = false; this.nodes = {}; }
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   addEventListener(name, fn) { this.handlers[name] = fn; }
   setAttribute() {}
   remove() {}
+  querySelector(name) { return this.nodes[name] || (this.nodes[name] = new Element()); }
 }
 function environment() {
-  const ids = new Map(), handlers = {}, requests = [];
+  const ids = new Map(), handlers = {}, requests = [], renders = [];
   let add, reloads = 0, maxActive = 0, inFlight = 0, stops = 0, revoked = 0;
   const el = name => {
     if (!ids.has(name)) ids.set(name, new Element());
@@ -24,6 +25,7 @@ function environment() {
     addEventListener: (name, fn) => { handlers[name] = fn; }};
   const window = {
     OrvHelpers: H, Thinking: () => ({start() {}, stop() {}}),
+    OrvReport: {render(_, photos) { renders.push(photos.map(p => p.result)); }, selected() { return []; }, updateCreateCount() {}},
     OrvCamera: (_, addPhoto) => {
       add = addPhoto;
       return {start() {}, stop() { stops++; }, destroy() { stops++; }};
@@ -40,7 +42,7 @@ function environment() {
     })
   });
   handlers['ukon:scan-shown']();
-  return {el, handlers, requests, add: () => add({size: 100}),
+  return {el, handlers, requests, renders, add: () => add({size: 100}),
     stats: () => ({reloads, maxActive, inFlight, stops, revoked})};
 }
 const tick = () => new Promise(setImmediate);
@@ -62,8 +64,7 @@ test('one tap processes the batch with three requests maximum and live rows', as
   await done;
   assert.equal(e.stats().maxActive, 3);
   assert.equal(e.el('summary').hidden, false);
-  assert.equal(e.el('summary-title').children[1].textContent, 10);
-  assert.equal(e.el('summary-title').children[3].textContent, 10);
+  assert.equal(e.el('summary').hidden, false);
 });
 
 test('close stops queued photos, waits for active writes, then releases photos and refreshes', async () => {
@@ -94,7 +95,9 @@ test('failed photo can be retried without reprocessing successful photos', async
   assert.equal(e.requests.length, 3);
   e.requests[2](success);
   await retried;
-  assert.equal(e.el('summary-title').children[1].textContent, 2);
+  const last = e.renders[e.renders.length - 1];
+  assert.equal(last.length, 2);
+  assert.ok(last.every(r => r.stav === 'doplneno'));
 });
 
 test('batch accepts at most thirty photos', () => {

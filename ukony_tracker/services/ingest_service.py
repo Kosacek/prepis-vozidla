@@ -85,6 +85,7 @@ def pridat_ukon(
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
     zpracoval: str | None = None,
+    commit: bool = True,
 ) -> int:
     """Validate, resolve firma, derive payment state and persist a new úkon.
 
@@ -141,4 +142,5 @@ def pridat_ukon(
         zaplaceno_kc=zaplaceno_kc,
         zdroj=zdroj,
         zpracoval=normalize_profil(zpracoval),
+        commit=commit,
     )
