@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 ARG CACHEBUST=2026-10-11-dash-period
-COPY app.py config.py db.py ./
+COPY app.py config.py db.py releases.py ./
 COPY repositories ./repositories
 COPY services ./services
 COPY routes ./routes
