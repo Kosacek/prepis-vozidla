@@ -8,8 +8,9 @@ import pytest
 
 import app as appmod
 import config
+from releases import CURRENT_VERSION, RELEASES
 
-RELEASE_KEY = "evidence_whatsnew_ai-hledani-technicak"
+RELEASE_KEY = "evidence_whatsnew_"
 
 
 @pytest.fixture
@@ -62,3 +63,22 @@ def test_build_endpoint_needs_login(gated_client):
     r = gated_client.get("/verze")
     assert r.status_code in (301, 302)
     assert "/login" in r.headers["Location"]
+
+
+def test_releases_are_newest_first_and_well_formed():
+    versions = [r.version for r in RELEASES]
+    assert len(set(versions)) == len(versions)
+    dates = [r.date for r in RELEASES]
+    assert dates == sorted(dates, reverse=True)
+    for r in RELEASES:
+        assert r.title and 1 <= len(r.points) <= 2
+    assert CURRENT_VERSION == RELEASES[0].version
+
+
+def test_version_button_opens_the_whole_history(gated_client):
+    _login(gated_client)
+    html = gated_client.get("/").get_data(as_text=True)
+    assert f"v{CURRENT_VERSION}" in html and "data-releases-open" in html
+    for r in RELEASES:
+        assert r.title in html
+    assert "Starší" in html and "Novější" in html

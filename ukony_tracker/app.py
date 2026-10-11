@@ -112,6 +112,9 @@ def create_app():
     # Stamped into every page (templates/_whats_new.html) so an open page
     # can tell when the server has been updated underneath it.
     app.jinja_env.globals["APP_BUILD"] = build_id()
+    from releases import CURRENT_VERSION, RELEASES
+    app.jinja_env.globals["RELEASES"] = RELEASES
+    app.jinja_env.globals["CURRENT_VERSION"] = CURRENT_VERSION
 
     @app.get("/health")
     def health():
