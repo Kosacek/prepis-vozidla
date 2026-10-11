@@ -1,0 +1,294 @@
+{# "Co je nového" popup + "Nová verze aplikace" bar.
+
+   Popup: once per device per release (localStorage key below), only for a
+   logged-in page (base.html includes this inside {% if authed %}). A small
+   looping demo shows the change instead of describing it; the copy is one
+   title and at most two one-line points. House rule for every user-visible
+   update — see ../AGENTS.md. To announce the next release: change
+   RELEASE_KEY, the demo and the copy; the old key is already marked seen.
+
+   Bar: the page polls /verze (routes/verze.py); when the server runs a
+   different build than the one that drew this page, a small inverted pill
+   offers a reload, so an update reaches pages that were left open.
+
+   Visual language is the app's own: the .modal-backdrop scrim and card
+   lift, --radius, --accent, --bg, the "Zeptej se" sparkle. Light only,
+   like the rest of the app. #}
+<style>
+  .wn-overlay {
+    position: fixed; inset: 0; z-index: 1050;
+    display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
+    background: rgba(0, 0, 0, .42);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .wn-overlay[hidden] { display: none; }
+  .wn-overlay.is-open { opacity: 1; }
+  .wn-card {
+    width: 100%; max-width: 380px; border-radius: var(--radius);
+    padding: var(--sp-5); background: var(--card); color: var(--ink);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .22), 0 6px 18px rgba(0, 0, 0, .10);
+    font-family: var(--font);
+    opacity: 0; transform: translateY(10px) scale(.97);
+    transition: transform .26s cubic-bezier(.2, .8, .25, 1), opacity .26s ease;
+  }
+  .wn-overlay.is-open .wn-card { opacity: 1; transform: none; }
+
+  /* -- Demo ----------------------------------------------------------- */
+  .wn-demo {
+    display: grid; gap: 10px; padding: 12px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg);
+  }
+  .wn-mini {
+    padding: 10px 12px 11px; border-radius: var(--radius-sm);
+    background: var(--card); box-shadow: var(--shadow-sm);
+  }
+  .wn-cap {
+    display: flex; align-items: center; gap: 5px; margin-bottom: 8px;
+    font-size: 11.5px; font-weight: 700; color: var(--muted);
+  }
+  .wn-cap svg { color: var(--accent); flex: none; }
+
+  /* Zeptej se: a question types itself, the sparkle thinks, the answer appears. */
+  .wn-ask {
+    height: 30px; display: flex; align-items: center; padding: 0 10px;
+    border: 1.5px solid var(--line); border-radius: 8px;
+    font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden;
+  }
+  .wn-type { clip-path: inset(0 100% 0 0); animation: wn-type 6.4s infinite; }
+  .wn-reply { display: flex; align-items: center; gap: 7px; height: 22px; margin-top: 7px; font-size: 12.5px; }
+  .wn-think { color: var(--accent); flex: none; opacity: 0; animation: wn-think 6.4s infinite; }
+  .wn-ans { opacity: 0; transform: translateY(3px); animation: wn-ans 6.4s infinite; }
+  .wn-ans b { color: var(--accent); font-weight: 700; }
+
+  /* Techničák: a scan beam passes the card, then RZ and ORV fill themselves. */
+  .wn-scan { display: flex; align-items: center; gap: 10px; }
+  .wn-doc {
+    position: relative; overflow: hidden; flex: none;
+    width: 58px; height: 40px; padding: 6px 7px; border-radius: 5px;
+    background: #e9eef3; border: 1px solid #d5dde6;
+    display: grid; align-content: start; gap: 4px;
+  }
+  .wn-doc i { display: block; height: 3px; border-radius: 2px; background: #b9c4d0; }
+  .wn-doc i:nth-child(1) { width: 70%; }
+  .wn-doc i:nth-child(2) { width: 90%; }
+  .wn-doc i:nth-child(3) { width: 55%; }
+  .wn-doc i:nth-child(4) { width: 80%; }
+  .wn-beam {
+    position: absolute; left: 0; right: 0; top: 0; height: 10px;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 45%, transparent), transparent);
+    opacity: 0; animation: wn-beam 6.4s infinite;
+  }
+  .wn-arrow { color: var(--muted); flex: none; opacity: .7; }
+  .wn-fields { flex: 1; min-width: 0; display: grid; gap: 5px; }
+  .wn-field {
+    position: relative; display: flex; align-items: center; gap: 8px; height: 18px;
+    font-size: 12.5px;
+  }
+  .wn-field .k { width: 28px; flex: none; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+  .wn-field .dash { position: absolute; left: 36px; color: var(--muted); animation: wn-dash 6.4s infinite; }
+  .wn-field .v {
+    font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .01em;
+    opacity: 0; transform: scale(.9); transform-origin: left center;
+    animation: wn-fill 6.4s infinite;
+  }
+  .wn-field .ok { color: #2a7; flex: none; opacity: 0; animation: wn-fill 6.4s infinite; }
+  .wn-field + .wn-field .dash { animation-name: wn-dash2; }
+  .wn-field + .wn-field .v, .wn-field + .wn-field .ok { animation-name: wn-fill2; }
+
+  @keyframes wn-type {
+    0%, 6%   { clip-path: inset(0 100% 0 0); animation-timing-function: steps(24, end); }
+    30%, 94% { clip-path: inset(0 0 0 0); }
+    100%     { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes wn-think {
+    0%, 31%  { opacity: 0; transform: rotate(0deg) scale(.8); }
+    34%      { opacity: 1; transform: rotate(60deg) scale(1); }
+    42%      { opacity: 1; transform: rotate(240deg) scale(1); }
+    46%, 94% { opacity: 1; transform: rotate(300deg) scale(.85); }
+    100%     { opacity: 0; transform: rotate(300deg) scale(.8); }
+  }
+  @keyframes wn-ans {
+    0%, 43%  { opacity: 0; transform: translateY(3px); }
+    49%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes wn-beam {
+    0%, 52%  { opacity: 0; top: -10px; }
+    54%      { opacity: 1; top: -10px; }
+    66%      { opacity: 1; top: 40px; }
+    68%, 100% { opacity: 0; top: 40px; }
+  }
+  @keyframes wn-dash  { 0%, 68% { opacity: 1; } 70%, 96% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes wn-dash2 { 0%, 73% { opacity: 1; } 75%, 96% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes wn-fill  {
+    0%, 69%  { opacity: 0; transform: scale(.9); }
+    73%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes wn-fill2 {
+    0%, 74%  { opacity: 0; transform: scale(.9); }
+    78%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+
+  /* -- Copy ----------------------------------------------------------- */
+  .wn-card h3 { margin: 0 0 var(--sp-3); font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
+  .wn-points { list-style: none; margin: 0 0 var(--sp-5); padding: 0; display: grid; gap: 10px; }
+  .wn-points li { display: flex; gap: 10px; font-size: .9375rem; line-height: 1.4; color: var(--muted); }
+  .wn-points li svg { flex: none; margin-top: 2px; color: var(--accent); }
+  .wn-points b { color: var(--ink); font-weight: 600; }
+  .wn-ok { width: 100%; padding: 12px 20px; font-size: 1rem; }
+
+  /* -- "Nová verze" bar ----------------------------------------------- */
+  .wn-update {
+    position: fixed; left: 50%; z-index: 1100;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    transform: translate(-50%, calc(-100% - 40px));
+    transition: transform .42s cubic-bezier(.2, .7, .3, 1);
+    display: flex; align-items: center; gap: 12px; white-space: nowrap;
+    padding: 6px 6px 6px 16px; border-radius: var(--radius-pill);
+    background: var(--ink); color: #fff;
+    font: 600 .875rem/1.2 var(--font);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+  .wn-update[hidden] { display: none; }
+  .wn-update.show { transform: translate(-50%, 0); }
+  .wn-update button {
+    border: 0; border-radius: var(--radius-pill); padding: 7px 14px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the demo's end state — question asked, answer shown, fields filled. */
+    .wn-overlay, .wn-card, .wn-update { transition: none; }
+    .wn-type, .wn-think, .wn-ans, .wn-beam, .wn-field .dash, .wn-field .v, .wn-field .ok { animation: none; }
+    .wn-type { clip-path: none; }
+    .wn-think, .wn-ans, .wn-field .v, .wn-field .ok { opacity: 1; transform: none; }
+    .wn-field .dash { opacity: 0; }
+  }
+</style>
+
+<div class="wn-update" id="wnUpdate" role="status" aria-live="polite" hidden>
+  Nová verze aplikace
+  <button type="button" onclick="location.reload()">Obnovit</button>
+</div>
+
+<div class="wn-overlay" id="wn" role="dialog" aria-modal="true" aria-labelledby="wn-title" hidden>
+  <div class="wn-card">
+    <div class="wn-demo" aria-hidden="true">
+      <div class="wn-mini">
+        <div class="wn-cap">
+          <svg viewBox="0 0 24 24" width="11" height="11"><path d="M12 1.5l2.4 7.7 7.7 2.4-7.7 2.4-2.4 7.7-2.4-7.7-7.7-2.4 7.7-2.4z" fill="currentColor"/></svg>
+          Zeptej se
+        </div>
+        <div class="wn-ask"><span class="wn-type">Kolik úkonů bylo v září?</span></div>
+        <div class="wn-reply">
+          <svg class="wn-think" viewBox="0 0 24 24" width="15" height="15"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" fill="currentColor"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" opacity=".55"/></svg>
+          <span class="wn-ans">V září bylo <b>42 úkonů</b>.</span>
+        </div>
+      </div>
+      <div class="wn-mini">
+        <div class="wn-cap">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          Techničák
+        </div>
+        <div class="wn-scan">
+          <div class="wn-doc"><i></i><i></i><i></i><i></i><span class="wn-beam"></span></div>
+          <svg class="wn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <div class="wn-fields">
+            <div class="wn-field"><span class="k">RZ</span><span class="dash">—</span><span class="v">2AB 1234</span><span class="ok">✓</span></div>
+            <div class="wn-field"><span class="k">ORV</span><span class="dash">—</span><span class="v">UAA 123456</span><span class="ok">✓</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 id="wn-title">Nově ti pomáhá AI</h3>
+    <ul class="wn-points">
+      <li>
+        <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 1.5l2.4 7.7 7.7 2.4-7.7 2.4-2.4 7.7-2.4-7.7-7.7-2.4 7.7-2.4z" fill="currentColor"/></svg>
+        <span><b>Zeptej se</b> – napiš otázku vlastními slovy a AI ti ji najde v úkonech.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span><b>Techničák</b> v Úkonech – vyfoť techničáky a AI sama doplní značky a ORV.</span>
+      </li>
+    </ul>
+    <button type="button" class="btn btn-primary wn-ok">Rozumím</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // -- "Co je nového" popup ------------------------------------------------
+  var RELEASE_KEY = 'evidence_whatsnew_ai-hledani-technicak';
+  var overlay = document.getElementById('wn');
+
+  // Without storage we couldn't remember having shown it, and a popup on
+  // every page load is worse than none -- so then it never shows.
+  function seen() {
+    try { return localStorage.getItem(RELEASE_KEY) === '1'; } catch (e) { return true; }
+  }
+  function markSeen() { try { localStorage.setItem(RELEASE_KEY, '1'); } catch (e) {} }
+
+  function close() {
+    overlay.classList.remove('is-open');
+    setTimeout(function () { overlay.hidden = true; }, 260);
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+
+  function open() {
+    if (seen()) return;
+    // Never on top of another dialog (e.g. the úkon modal or the scanner).
+    var other = document.querySelector('.modal-backdrop:not([hidden]), dialog[open]');
+    if (other) { setTimeout(open, 2000); return; }
+    markSeen();  // shown once means once, even if the tab is just closed
+    overlay.hidden = false;
+    void overlay.offsetWidth;
+    overlay.classList.add('is-open');
+    overlay.querySelector('.wn-ok').focus({ preventScroll: true });
+    document.addEventListener('keydown', onKey);
+  }
+
+  overlay.querySelector('.wn-ok').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  if (!seen()) setTimeout(open, 900);  // let the page settle first
+
+  // -- "Nová verze aplikace" bar ---------------------------------------------
+  var pageBuild = {{ APP_BUILD | tojson }};
+  var POLL_MS = 60000;
+  var timer = null, polling = false;
+
+  function showBar() {
+    var bar = document.getElementById('wnUpdate');
+    if (!bar || !bar.hidden) return;
+    bar.hidden = false;
+    void bar.offsetWidth;  // render off-screen first, then slide in
+    bar.classList.add('show');
+  }
+
+  function schedule() {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(poll, POLL_MS);
+  }
+
+  function poll() {
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    if (polling) return;
+    // Hidden (locked phone, background tab): keep the clock, spend nothing.
+    if (document.hidden) { schedule(); return; }
+    polling = true;
+    fetch('/verze', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })  // logged out -> HTML, ignored
+      .then(function (d) { if (d && d.build && d.build !== pageBuild) showBar(); })
+      .catch(function () {})
+      .then(function () { polling = false; schedule(); });
+  }
+
+  // Back from the lock screen or another app: check at once.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  schedule();
+})();
+</script>

@@ -34,6 +34,7 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  {% if authed %}{% include "_whats_new.html" %}{% endif %}
   <script>
   // Shared ORV → VIN autofill (dataovozidlech.cz via /orv-lookup). Form-relative
   // (uses `this` + name="vin"/.orv-status in the same form) so it works on the

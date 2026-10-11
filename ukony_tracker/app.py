@@ -107,6 +107,11 @@ def create_app():
     app.register_blueprint(auth_bp)
     from routes.ask import bp as ask_bp
     app.register_blueprint(ask_bp)
+    from routes.verze import bp as verze_bp, build_id
+    app.register_blueprint(verze_bp)
+    # Stamped into every page (templates/_whats_new.html) so an open page
+    # can tell when the server has been updated underneath it.
+    app.jinja_env.globals["APP_BUILD"] = build_id()
 
     @app.get("/health")
     def health():
