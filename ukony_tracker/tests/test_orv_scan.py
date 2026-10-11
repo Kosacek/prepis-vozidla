@@ -14,7 +14,8 @@ from services import orv_images, orv_scan_service as scan
 from services.ingest_service import pridat_ukon
 
 VIN = "TMBEK6NW7M3158470"
-DATA = {"typ": "orv", "rz": "5AB1234", "vin": VIN, "orv_cislo": "UBE037263"}
+DATA = {"typ": "orv", "rz": "5AB1234", "vin": VIN, "orv_cislo": "UBE037263",
+        "provozovatel": "BSAuto s.r.o."}
 
 
 class FakeClient:
@@ -39,7 +40,7 @@ class FakeClient:
 
 def test_extract_normalizes_and_uses_strict_tool():
     fake = FakeClient({"typ": "orv", "rz": " 5ab-12 34 ", "vin": "tmb-ek6nw7m3158470",
-                       "orv_cislo": " ube\t037-263 "})
+                       "orv_cislo": " ube\t037-263 ", "provozovatel": " BSAuto   s.r.o. "})
     assert scan.extract(b"photo", "image/jpeg", client=fake) == DATA
     call = fake.calls[0]
     assert call["model"] == "claude-haiku-5-5"
@@ -52,6 +53,7 @@ def test_extract_normalizes_and_uses_strict_tool():
     assert set(schema["required"]) == set(DATA)
     assert schema["additionalProperties"] is False
     assert schema["properties"]["orv_cislo"]["type"] == ["string", "null"]
+    assert schema["properties"]["provozovatel"]["type"] == ["string", "null"]
     assert call["messages"][0]["content"][0]["source"] == {
         "type": "base64", "media_type": "image/jpeg", "data": "cGhvdG8="}
     assert scan.tokens.get() == 125
@@ -74,7 +76,8 @@ def test_invalid_fields_are_null_never_repaired(field, value):
 
 def test_no_legible_fields_and_missing_tool():
     result = scan.extract(b"p", "image/jpeg", client=FakeClient(dict.fromkeys(DATA, None) | {"typ": "orv"}))
-    assert result == {"typ": "necitelne", "rz": None, "vin": None, "orv_cislo": None}
+    assert result == {"typ": "necitelne", "rz": None, "vin": None, "orv_cislo": None,
+                      "provozovatel": None}
     fake = FakeClient()
     fake.create = lambda **kw: NS(content=[NS(type="thinking")])
     with pytest.raises(scan.ScanUnavailable):
@@ -104,7 +107,8 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     after = dict(ukony_repo.get(conn, uid))
     assert result["stav"] == expected and result["doplneno"] == changes
-    assert result["ukon"] == {"id": uid, "datum": "2026-10-08", "firma": "BSAuto"}
+    assert result["ukon"] == {"id": uid, "datum": "2026-10-08", "firma": "BSAuto",
+                              "typ": "ZÁPIS", "celkem": 1300.0}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
     if expected == "konflikt":
         assert after == before
@@ -114,11 +118,11 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     assert not conn.in_transaction
 
 
-def test_no_match_no_creation_and_vin_preference(conn, make):
+def test_vin_preference_creates_even_if_rz_belongs_to_another_vin(conn, make):
     make(vin="OTHER", rz=DATA["rz"])
     before = conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0]
-    assert scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())["stav"] == "nenalezeno"
-    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before
+    assert scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())["stav"] == "zalozeno"
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before + 1
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}))
     assert result["stav"] == "doplneno" and result["doplneno"] == ["orv"]
 
@@ -166,19 +170,19 @@ def test_invalid_registry_vin_is_ignored_and_explained(conn):
     photo_data = {**DATA, "vin": None}
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
                           lookup=lambda _orv: {"success": True, "vin": "not a vin!"})
-    assert result["stav"] == "nenalezeno" and result["vin"] is None
+    assert result["stav"] == "bez_firmy" and result["vin"] is None
     assert result["vin_zdroj"] is None
-    assert "RZ " + DATA["rz"] in result["zprava"]
-    assert "VIN z registru se nepodařilo zjistit" in result["zprava"]
+    assert result["rz"] == DATA["rz"] and result["orv_cislo"] == DATA["orv_cislo"]
 
 
 def test_registry_no_match_names_vin_source(conn):
     photo_data = {**DATA, "vin": None}
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
                           lookup=lambda _orv: {"success": True, "vin": VIN})
-    assert result["stav"] == "nenalezeno" and result["vin"] == VIN
+    assert result["stav"] == "bez_firmy" and result["vin"] == VIN
     assert result["vin_zdroj"] == "registr"
-    assert result["zprava"] == f"Nenalezeno — VIN {VIN} (z registru podle ORV)"
+    assert result["vin"] == VIN and result["vin_zdroj"] == "registr"
+    assert result["rz"] == DATA["rz"] and result["orv_cislo"] == DATA["orv_cislo"]
 
 
 def test_lookup_skipped_when_photo_has_vin_or_no_orv(conn, make):

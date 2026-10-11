@@ -59,13 +59,21 @@
     document.body.style.paddingRight = "";
     closeTimer = setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
     if (lastFocused && lastFocused.focus) lastFocused.focus();
+    if (modal.dataset.scanRefresh === "1") {
+      delete modal.dataset.scanRefresh;
+      window.location.reload();
+    }
     var url = new URL(window.location.href);
     if (url.searchParams.has('novy')) {
       url.searchParams.delete('novy');
       history.replaceState({}, '', url.pathname + url.search + url.hash);
     }
   }
-  window.UkonModal = {close: closeModal};
+  window.UkonModal = {close: closeModal, openEdit: function (uid) {
+    document.dispatchEvent(new CustomEvent('ukon:scan-navigate'));
+    modal.dataset.scanRefresh = "1";
+    openModal('/ukony/' + encodeURIComponent(uid) + '/upravit?modal=1', false, false);
+  }};
   window.addEventListener('pagehide', function () {
     ++openSerial; // A fragment arriving after navigation must not open a camera.
     clearTimeout(closeTimer);

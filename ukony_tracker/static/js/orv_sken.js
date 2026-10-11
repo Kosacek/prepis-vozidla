@@ -1,7 +1,7 @@
 (function () {
   let active;
   const H = window.OrvHelpers;
-  const ok = r => r && ['doplneno', 'uz_doplneno'].includes(r.stav);
+  const ok = r => r && ['zalozeno', 'doplneno', 'uz_doplneno'].includes(r.stav);
   function mount(root) {
     const el = id => root.querySelector('#orv-' + id);
     let photos = [], running = false, dead = false, closing = false, imported = false;
@@ -82,15 +82,8 @@
       photo.retry.disabled = running;
     }
     function summary() {
-      const t = H.totals(photos);
-      const title = el('summary-title'); title.replaceChildren();
-      const n = document.createElement('strong'); n.textContent = t.rz;
-      const m = document.createElement('strong'); m.textContent = t.orv;
-      title.append('Doplněno ', n, ' ' + H.plural(t.rz, 'značka', 'značky', 'značek') + ' a ',
-        m, ' ' + H.plural(t.orv, 'číslo', 'čísla', 'čísel') + ' ORV');
-      const labels = {uz_doplneno: 'již doplněno', nenalezeno: 'nenalezeno', vice_shod: 'více shod',
-        konflikt: 'konflikt', necitelne: 'nečitelná', chyba: 'chyba'};
-      el('summary-other').textContent = Object.entries(t.other).map(([k, v]) => v + ' ' + (labels[k] || k)).join(' · ');
+      photos.forEach(photo => { photo.row = null; photo.retry = null; });
+      window.OrvReport.render(root, photos, photo => run([photo]));
       el('summary').hidden = false;
       el('done').hidden = false;
       el('step').textContent = '3 · Hotovo';
@@ -99,6 +92,7 @@
       photo.busy = true; row(photo);
       const body = new FormData();
       body.append('foto', photo.blob, 'foto');
+      body.append('zpracoval', el('zpracoval').value);
       const abort = new AbortController();
       photo.abort = abort;
       const timeout = setTimeout(() => abort.abort(), 90000);
@@ -125,6 +119,7 @@
       if (running || dead || imported || !queue.length) return;
       running = true; processed = true; camera.stop(); notice('');
       el('capture').hidden = el('process').hidden = el('done').hidden = el('summary').hidden = true;
+      el('assign').hidden = true;
       el('results').hidden = false; el('step').textContent = '2 · Zpracovávám';
       queue.forEach(p => { p.result = null; });
       photos.forEach(row);
@@ -145,7 +140,7 @@
       if (running) return;
       photos.forEach(p => URL.revokeObjectURL(p.url)); photos = [];
       el('thumbnails').replaceChildren(); el('results').replaceChildren();
-      el('results').hidden = el('summary').hidden = el('done').hidden = true;
+      el('results').hidden = el('summary').hidden = el('done').hidden = el('assign').hidden = true;
       el('capture').hidden = el('process').hidden = false;
       el('step').textContent = '1 · Foť'; controls(); camera.start();
     }
@@ -156,6 +151,48 @@
     }
     el('process').addEventListener('click', () => run(photos.slice()));
     el('again').addEventListener('click', reset);
+    const person = el('zpracoval');
+    try { person.value = localStorage.getItem('ukony_zpracoval') || ''; } catch (_) {}
+    person.addEventListener('change', () => {
+      try { localStorage.setItem('ukony_zpracoval', person.value); } catch (_) {}
+    });
+    el('assign').addEventListener('submit', async event => {
+      event.preventDefault();
+      const selected = window.OrvReport.selected(root, photos);
+      if (!selected.length) return;
+      const button = el('create-unmatched'); button.disabled = true;
+      try {
+        const response = await fetch('/ukony/orv-sken/zalozit', {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+          body: JSON.stringify({zpracoval: person.value, auta: selected.map(x => ({
+            rz: x.photo.result.rz, vin: x.photo.result.vin, orv_cislo: x.photo.result.orv_cislo,
+            provozovatel: x.photo.result.provozovatel, vin_zdroj: x.photo.result.vin_zdroj,
+            firma_id: Number(x.firma_id), typ_kod: x.typ_kod
+          }))})});
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.results)) throw Error(data.error || 'Úkony se nepodařilo založit.');
+        selected.forEach((x, i) => { x.photo.result = data.results[i]; });
+        summary();
+      } catch (error) {
+        notice(error.message || 'Úkony se nepodařilo založit.');
+      } finally { window.OrvReport.updateCreateCount(root, photos); }
+    });
+    el('batch-firma').addEventListener('change', () => window.OrvReport.updateCreateCount(root, photos));
+    el('batch-typ').addEventListener('change', () => window.OrvReport.updateCreateCount(root, photos));
+    el('results').addEventListener('click', event => {
+      const open = event.target.closest('[data-ukon]');
+      if (open && window.UkonModal && window.UkonModal.openEdit) {
+        window.UkonModal.openEdit(open.dataset.ukon);
+        return;
+      }
+      const thumb = event.target.closest('[data-preview]');
+      if (thumb) {
+        const dialog = el('preview');
+        dialog.querySelector('img').src = thumb.dataset.preview;
+        dialog.showModal();
+      }
+    });
+    el('preview').querySelector('.orv-preview-close').addEventListener('click', () => el('preview').close());
     camera.start();
     return {destroy, close: function (event) {
       camera.stop();
@@ -170,6 +207,9 @@
   document.addEventListener('ukon:scan-shown', function () {
     if (active) active.destroy();
     active = mount(document.getElementById('orv-sken'));
+  });
+  document.addEventListener('ukon:scan-navigate', function () {
+    if (active) { active.destroy(); active = null; }
   });
   document.addEventListener('ukon:modal-closing', e => { if (active) active.close(e); });
   window.addEventListener('pagehide', function () { if (active) { active.destroy(); active = null; } });

@@ -25,6 +25,7 @@ def create(
     zaplaceno_kc: float = 0,
     zdroj: str = "rucni",
     zpracoval: str | None = None,
+    commit: bool = True,
 ) -> int:
     ts = db.now_iso()
     cur = conn.execute(
@@ -34,7 +35,8 @@ def create(
         (firma_id, datum, rz, typ_kod, celkem, vin, orv, poznamka, prevod,
          stav_platby, zaplaceno_kc, zdroj, zpracoval, ts, ts),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cur.lastrowid
 
 
