@@ -5,6 +5,7 @@ import re
 from contextvars import ContextVar
 
 from repositories import ukony_repo
+from services import orv_service
 from services.vehicle_fill_service import FillError, doplnit, transaction
 
 MODEL = "claude-haiku-5-5"
@@ -50,8 +51,9 @@ def extract(image_bytes, media_type, *, client=None) -> dict:
             raise ScanUnavailable("Čtení fotky se nezdařilo. Zkuste to znovu.") from exc
     try:
         response = client.with_options(timeout=45, max_retries=0).messages.create(
-            model=MODEL, max_tokens=2048, system=PROMPT, tools=[TOOL],
+            model=MODEL, max_tokens=1024, system=PROMPT, tools=[TOOL],
             output_config={"effort": "low"},
+            thinking={"type": "disabled"},
             messages=[{"role": "user", "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": media_type,
                  "data": base64.b64encode(image_bytes).decode("ascii")}},
@@ -78,24 +80,48 @@ def extract(image_bytes, media_type, *, client=None) -> dict:
         raise ScanUnavailable("Čtení fotky se nezdařilo. Zkuste to znovu.") from exc
 
 
-def zpracuj(conn, image_bytes, media_type, *, client=None) -> dict:
+def zpracuj(conn, image_bytes, media_type, *, client=None, lookup=None) -> dict:
     result = {"stav": "chyba", "rz": None, "vin": None, "orv_cislo": None,
-              "ukon": None, "doplneno": [], "zprava": "Fotku se nepodařilo zpracovat. Zkuste to znovu."}
+              "vin_zdroj": None, "ukon": None, "doplneno": [],
+              "zprava": "Fotku se nepodařilo zpracovat. Zkuste to znovu."}
     try:
         data = extract(image_bytes, media_type, client=client)
         result.update({k: data[k] for k in PATTERNS})
+        result["vin_zdroj"] = "foto" if data["vin"] else None
         if data["typ"] != "orv":
             result.update(stav="necitelne", zprava="Nečitelná fotka nebo jiný doklad. Vyfoťte přední stranu ORV.")
             return result
+        lookup_failed = False
+        if not data["vin"] and data["orv_cislo"]:
+            try:
+                lookup_fn = lookup if lookup is not None else orv_service.lookup_vin
+                looked_up = lookup_fn(data["orv_cislo"])
+                vin = (looked_up.get("vin") if isinstance(looked_up, dict) and looked_up.get("success")
+                       else None)
+                vin = re.sub(r"[\s-]", "", vin).upper() if isinstance(vin, str) else ""
+                if re.fullmatch(PATTERNS["vin"], vin):
+                    data["vin"] = result["vin"] = vin
+                    result["vin_zdroj"] = "registr"
+                else:
+                    lookup_failed = True
+            except Exception:
+                lookup_failed = True
         values = {k: v for k, v in (("rz", data["rz"]), ("orv", data["orv_cislo"])) if v}
         # The API's matching/ordering, without its display limit: an older
         # ambiguous match must never disappear from an automatic decision.
         with transaction(conn):
-            rows = ukony_repo.find_by_vehicle_any_firm(conn, vin=data["vin"], rz=data["rz"], limit=-1)
+            rows = ukony_repo.find_by_vehicle_any_firm(
+                conn, vin=data["vin"], rz=None if result["vin_zdroj"] == "registr" else data["rz"], limit=-1)
             if not rows:
-                result.update(stav="nenalezeno", zprava="Nenalezeno — " + (
-                    "VIN " + data["vin"] if data["vin"] else "RZ " + data["rz"] if data["rz"]
-                    else "chybí čitelná RZ i VIN."))
+                if result["vin_zdroj"] == "registr":
+                    message = f"Nenalezeno — VIN {data['vin']} (z registru podle ORV)"
+                else:
+                    subject = ("VIN " + data["vin"] if data["vin"] else "RZ " + data["rz"] if data["rz"]
+                               else "chybí čitelná RZ i VIN.")
+                    message = "Nenalezeno — " + subject
+                    if lookup_failed:
+                        message += " (VIN z registru se nepodařilo zjistit)"
+                result.update(stav="nenalezeno", zprava=message)
                 return result
             if len(rows) > 1:
                 candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
