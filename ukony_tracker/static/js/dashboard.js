@@ -1,7 +1,8 @@
 (function () {
-  // Current month, day by day (1 → today).
-  var daily = window.DAILY || [];
-  var firmy = window.DAILY_FIRMY || [];
+  // Selected period: daily points for a month, monthly points for a whole year.
+  var TREND = window.TREND || { labels: [], rows: [], firmy: [] };
+  var daily = TREND.rows;
+  var firmy = TREND.firmy;
   // Apple system colors — vivid but soft, in the iOS/macOS palette.
   var COLORS = ["#0a84ff", "#34c759", "#ff9f0a", "#bf5af2", "#ff375f",
                 "#5ac8fa", "#ffd60a", "#ff6482", "#64d2ff", "#30d158"];
@@ -39,18 +40,70 @@
   var MOBILE = window.matchMedia("(max-width: 760px)").matches;
   var TREND_RATIO = MOBILE ? 1.0 : 2.7;
 
-  // Typy úkonů — revenue share per type (doughnut). Independent of the trend
-  // chart, so render it before the trend-chart early-return.
+  // ── Kč | Počet toggle, shared by "Podle firmy" and "Typy úkonů" ───────────
+  var METRIC_KEY = "dash_metric";
+  var metric = "trzby";
+  try {
+    var saved = localStorage.getItem(METRIC_KEY);
+    if (saved === "pocet" || saved === "trzby") metric = saved;
+  } catch (e) { /* private mode / blocked storage — default is fine */ }
+
+  var perFirma = window.PER_FIRMA || [];
+  var per = window.PER_TYP || [];
+  var typChart = null;
+  var typRows = [];
+
+  function byMetric(rows) {
+    return rows.slice().sort(function (a, b) { return (b[metric] || 0) - (a[metric] || 0); });
+  }
+  function fmtValue(v) { return metric === "trzby" ? formatKc(Math.round(v || 0)) : String(v || 0); }
+
+  // Bars are built with DOM calls + textContent (firm names come from the DB).
+  function renderBars() {
+    var box = document.getElementById("firmaBars");
+    if (!box) return;
+    var rows = byMetric(perFirma);
+    var max = rows.length ? (rows[0][metric] || 0) : 0;
+    box.replaceChildren();
+    if (!rows.length) {
+      var empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Žádná data.";
+      box.appendChild(empty);
+      return;
+    }
+    rows.forEach(function (r) {
+      var row = document.createElement("div"); row.className = "bar-row";
+      var label = document.createElement("span"); label.className = "bar-label"; label.textContent = r.zkratka;
+      var track = document.createElement("span"); track.className = "bar-track";
+      var fill = document.createElement("span"); fill.className = "bar-fill";
+      fill.style.width = (max ? Math.floor(100 * (r[metric] || 0) / max) : 0) + "%";
+      track.appendChild(fill);
+      var amt = document.createElement("span"); amt.className = "bar-amt"; amt.textContent = fmtValue(r[metric]);
+      row.append(label, track, amt);
+      box.appendChild(row);
+    });
+  }
+
+  // Typy úkonů — share per type (doughnut), in Kč or úkon count.
   var pctx = document.getElementById("typChart");
+  function updateTyp() {
+    if (!typChart) return;
+    typRows = byMetric(per);
+    typChart.data.labels = typRows.map(function (t) { return t.kod; });
+    typChart.data.datasets[0].data = typRows.map(function (t) { return t[metric] || 0; });
+    typChart.data.datasets[0].backgroundColor = typRows.map(function (t, i) { return COLORS[i % COLORS.length]; });
+    typChart.update();
+  }
   if (pctx) {
-    var per = window.PER_TYP || [];
-    new Chart(pctx, {
+    typRows = byMetric(per);
+    typChart = new Chart(pctx, {
       type: "doughnut",
       data: {
-        labels: per.map(function (t) { return t.kod; }),
+        labels: typRows.map(function (t) { return t.kod; }),
         datasets: [{
-          data: per.map(function (t) { return t.trzby; }),
-          backgroundColor: per.map(function (t, i) { return COLORS[i % COLORS.length]; }),
+          data: typRows.map(function (t) { return t[metric] || 0; }),
+          backgroundColor: typRows.map(function (t, i) { return COLORS[i % COLORS.length]; }),
           borderColor: "#fff",
           borderWidth: 2
         }]
@@ -73,8 +126,8 @@
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                var t = per[ctx.dataIndex] || {};
-                return t.kod + ": " + Math.round(t.trzby || 0) + " Kč (×" + (t.pocet || 0) + ")";
+                var t = typRows[ctx.dataIndex] || {};
+                return t.kod + ": " + formatKc(Math.round(t.trzby || 0)) + " Kč (×" + (t.pocet || 0) + ")";
               }
             }
           }
@@ -83,10 +136,27 @@
     });
   }
 
+  function setMetric(m, persist) {
+    metric = m;
+    if (persist) { try { localStorage.setItem(METRIC_KEY, m); } catch (e) { /* ignore */ } }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-metric-toggle] span[data-metric]"), function (x) {
+      x.classList.toggle("on", x.dataset.metric === m);
+    });
+    renderBars();
+    updateTyp();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-metric-toggle]"), function (grp) {
+    grp.addEventListener("click", function (e) {
+      var s = e.target.closest("span[data-metric]");
+      if (s) setMetric(s.dataset.metric, true);
+    });
+  });
+  if (metric !== "trzby") setMetric(metric, false);  // restore the remembered choice
+
   var tctx = document.getElementById("trendChart");
   if (!tctx) return;
 
-  var labels = daily.map(function (t) { return String(t.d); });
+  var labels = TREND.labels;
   var chart = null;
 
   // Running total: [a, b, c] -> [a, a+b, a+b+c]. Used only by the Firmy lines

@@ -2042,3 +2042,15 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .topnav nav a.nav-ai { padding-right: 12px; }
   .logout-form { flex-shrink: 0; margin-left: 0; }
 }
+
+/* ── Dashboard: period picker, Kč | Počet toggle, empty state ─────────────── */
+.period-select { max-width: 12rem; text-overflow: ellipsis; }
+.seg--sm { padding: 2px; flex-shrink: 0; }
+.seg--sm span { padding: 3px 10px; font-size: 0.75rem; min-height: 0; }
+.dash-total { margin: -2px 0 var(--sp-3); }
+.dash-empty { text-align: center; padding: var(--sp-5) 0 var(--sp-2); }
+.dash-breakdowns .card-head { gap: var(--sp-2); flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .dash-breakdowns .card-head h2 { font-size: 0.95rem; }
+  .period-select { max-width: 9.5rem; }
+}
