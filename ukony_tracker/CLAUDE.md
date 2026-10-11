@@ -125,3 +125,7 @@ Běží jako kontejner `ukony-app` (port 8090) na QNAP NASu, `/share/Container/u
 
 - **Specifikace:** `docs/superpowers/specs/2026-06-09-ukony-tracker-design.md`
 - **Implementační plán:** `docs/superpowers/plans/2026-06-09-ukony-tracker.md`
+
+## Co je nového popup (každá viditelná změna)
+
+Každá aktualizace, kterou uživatelé uvidí, dostane jednorázový český popup „Co je nového" + lištu „Nová verze aplikace · Obnovit". Pravidla a schválený vzor: [../AGENTS.md](../AGENTS.md), `docs/whats-new/reference_hunter_intro.html`.

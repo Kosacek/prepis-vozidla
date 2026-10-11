@@ -1,0 +1,204 @@
+{# One-time introduction to live sync, in Czech — shown once per device.
+
+   Opens the first time a page here gets a live answer from the server
+   (the 'hunter:live-ok' event from _live.html, so never on a logged-out
+   page), and never again on that device. A small looping demo shows the
+   idea instead of describing it: a row swiped to "used" on one phone,
+   then the same row updating by itself on another.
+
+   Visual language is the "Kdo jsi?" sheet's (partials/_claim.html):
+   same scrim, same card, same radius. Colours come from the shared
+   tokens with the desktop names as fallbacks, so it fits both shells
+   and both themes. Included by _live.html. #}
+<style>
+  .lvi-overlay {
+    position: fixed; inset: 0; z-index: 210;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: var(--m-modalScrim, rgba(20, 20, 40, 0.35));
+    opacity: 0; transition: opacity 240ms ease;
+  }
+  .lvi-overlay[hidden] { display: none; }
+  .lvi-overlay.open { opacity: 1; }
+
+  .lvi-box {
+    --lv-surface:  var(--m-surface, var(--surface, #fff));
+    --lv-surface2: var(--m-surface2, var(--surface2, #f7f7f9));
+    --lv-border:   var(--m-border, var(--border, #e4e4ea));
+    --lv-text:     var(--m-text, var(--text, #1c1e21));
+    --lv-muted:    var(--m-muted, var(--muted, #6b6d75));
+    --lv-faint:    var(--m-faint, var(--faint, #9b9da5));
+    --lv-ok:       var(--m-ok, var(--ok, #1c8a45));
+    --lv-accent:   var(--m-accent, var(--accent, #3174ed));
+    width: 100%; max-width: 380px; border-radius: 16px;
+    padding: 20px 22px 22px; background: var(--lv-surface); color: var(--lv-text);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--m-borderSoft, transparent);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 320ms cubic-bezier(.2, .7, .3, 1);
+  }
+  .lvi-overlay.open .lvi-box { transform: none; }
+
+  /* -- Demo: two phones, one row each ------------------------------- */
+  .lvi-demo {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px;
+    padding: 14px; margin-bottom: 18px; border-radius: 12px;
+    background: var(--lv-surface2);
+  }
+  .lvi-cap {
+    display: flex; align-items: center; gap: 5px; margin-bottom: 7px;
+    font-size: 11px; font-weight: 700; color: var(--lv-muted); letter-spacing: 0;
+  }
+  .lvi-row {
+    position: relative; overflow: hidden; border-radius: 10px;
+    border: 1px solid var(--lv-border); background: var(--lv-surface);
+  }
+  /* The green "mark used" panel the swipe uncovers -- only ever behind
+     the moving front, exactly like .m-row-action on a real row. */
+  .lvi-act {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 38px;
+    display: grid; place-items: center; background: var(--lv-ok);
+  }
+  .lvi-front {
+    position: relative; padding: 9px 10px; background: var(--lv-surface);
+  }
+  /* Dimmed separately from .lvi-front so a "used" row fades its text,
+     never its opaque background (which would show the green through). */
+  .lvi-in { display: flex; align-items: center; gap: 6px; }
+  .lvi-pip { width: 6px; height: 6px; border-radius: 50%; background: var(--lv-ok); flex: none; }
+  .lvi-time {
+    position: relative; font-size: 14px; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+  }
+  .lvi-time::after {
+    content: ''; position: absolute; left: -1px; right: -1px; top: 52%;
+    height: 1.5px; background: var(--lv-muted);
+    transform: scaleX(0); transform-origin: left;
+  }
+  .lvi-pin {
+    margin-left: auto; font: 700 12.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--lv-muted);
+  }
+  .lvi-sync { display: block; flex: none; color: var(--lv-faint); margin-bottom: 11px; }
+  .lvi-live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--lv-accent);
+    animation: lvi-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* One 4.4s loop. Your phone: swipe left (0.6–1.2s), spring back as
+     "used". The other phone: lights up and strikes through on its own a
+     beat later (2.5s), both hold, then reset together. */
+  .lvi-row.mine .lvi-front { animation: lvi-swipe 4.4s infinite; }
+  .lvi-row.mine .lvi-in { animation: lvi-dim-a 4.4s infinite; }
+  .lvi-row.mine .lvi-time::after { animation: lvi-strike-a 4.4s infinite; }
+  .lvi-row.theirs .lvi-front { animation: lvi-flash 4.4s infinite; }
+  .lvi-row.theirs .lvi-in { animation: lvi-dim-b 4.4s infinite; }
+  .lvi-row.theirs .lvi-time::after { animation: lvi-strike-b 4.4s infinite; }
+
+  @keyframes lvi-swipe {
+    0%, 14%  { transform: translateX(0); }
+    24%, 30% { transform: translateX(-38px); }
+    40%, 100% { transform: translateX(0); }
+  }
+  @keyframes lvi-dim-a    { 0%, 34% { opacity: 1; } 40%, 92% { opacity: 0.45; } 100% { opacity: 1; } }
+  @keyframes lvi-strike-a { 0%, 34% { transform: scaleX(0); } 42%, 92% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+  @keyframes lvi-flash {
+    0%, 56% { background: var(--lv-surface); }
+    59%     { background: var(--lv-surface2); }
+    82%, 100% { background: var(--lv-surface); }
+  }
+  @keyframes lvi-dim-b    { 0%, 57% { opacity: 1; } 63%, 92% { opacity: 0.45; } 100% { opacity: 1; } }
+  @keyframes lvi-strike-b { 0%, 58% { transform: scaleX(0); } 66%, 92% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+  @keyframes lvi-pulse {
+    0%, 100% { opacity: 0.4; transform: scale(0.92); }
+    50%      { opacity: 1;   transform: scale(1.15); }
+  }
+
+  /* -- Copy ---------------------------------------------------------- */
+  .lvi-box h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .lvi-box p { margin: 6px 0 20px; font-size: 14px; line-height: 1.45; color: var(--lv-muted); }
+  .lvi-ok {
+    width: 100%; padding: 13px 16px; border: 0; border-radius: 12px; cursor: pointer;
+    background: var(--lv-accent); color: #fff; font: inherit; font-size: 16px; font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: show the end state — both phones already up to date. */
+    .lvi-overlay, .lvi-box { transition: none; }
+    .lvi-row .lvi-front { animation: none; }
+    .lvi-row .lvi-in { animation: none; opacity: 0.45; }
+    .lvi-row .lvi-time::after { animation: none; transform: scaleX(1); }
+    .lvi-live-dot { animation: none; opacity: 1; }
+  }
+</style>
+
+<div class="lvi-overlay" id="lvi" role="dialog" aria-modal="true" aria-labelledby="lvi-title" hidden>
+  <div class="lvi-box">
+    <div class="lvi-demo" aria-hidden="true">
+      <div>
+        <div class="lvi-cap">Tvůj telefon</div>
+        <div class="lvi-row mine">
+          <div class="lvi-act">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="lvi-front"><div class="lvi-in"><span class="lvi-pip"></span><span class="lvi-time">09:20</span><span class="lvi-pin">1010</span></div></div>
+        </div>
+      </div>
+      <svg class="lvi-sync" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      <div>
+        <div class="lvi-cap"><span class="lvi-live-dot"></span>Ostatní</div>
+        <div class="lvi-row theirs">
+          <div class="lvi-front"><div class="lvi-in"><span class="lvi-pip"></span><span class="lvi-time">09:20</span><span class="lvi-pin">1010</span></div></div>
+        </div>
+      </div>
+    </div>
+    <h3 id="lvi-title">Všechno se teď aktualizuje samo</h3>
+    <p>Když někdo přejede termín jako použitý nebo si ho zabere, ostatní to uvidí během pár vteřin. Stránku už není potřeba obnovovat.</p>
+    <button type="button" class="lvi-ok">Rozumím</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = 'hunter_live_intro_v1';
+  var overlay = document.getElementById('lvi');
+  if (!overlay) return;
+
+  // Without storage we couldn't remember having shown it, and a popup on
+  // every page load is worse than none -- so then it simply never shows.
+  function seen() {
+    try { return localStorage.getItem(KEY) === '1'; } catch (e) { return true; }
+  }
+  function markSeen() {
+    try { localStorage.setItem(KEY, '1'); } catch (e) {}
+  }
+
+  function close() {
+    overlay.classList.remove('open');
+    setTimeout(function () { overlay.hidden = true; }, 260);
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+
+  function open() {
+    if (seen()) return;
+    // Never on top of the "Kdo jsi?" sheet or under a finger mid-swipe.
+    if (document.querySelector('.clm-overlay.open, .clm-holding, .m-row.swiping')) {
+      setTimeout(open, 2000);
+      return;
+    }
+    markSeen();  // shown once means once, even if the tab is just closed
+    overlay.hidden = false;
+    void overlay.offsetWidth;
+    overlay.classList.add('open');
+    overlay.querySelector('.lvi-ok').focus({ preventScroll: true });
+    document.addEventListener('keydown', onKey);
+  }
+
+  overlay.querySelector('.lvi-ok').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+  document.addEventListener('hunter:live-ok', function () {
+    if (!seen()) setTimeout(open, 900);  // let the page settle first
+  });
+})();
+</script>
