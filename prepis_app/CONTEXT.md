@@ -185,7 +185,7 @@ These are intentional and should NOT be changed without user confirmation:
 - Used for: auto-filling company name/address when IČO is entered
 
 ### Anthropic Claude API (Vision/OCR)
-- Model: `claude-haiku-4-5-20251001` (cheapest, fast, sufficient for OCR)
+- Model: `claude-haiku-5-5` only (Sonnet 4.6 toggle removed 2026-10-12)
 - Used for: scanning physical documents (COC list, Osvědčení, OP, Plná moc)
 - Returns: structured JSON with person/vehicle data
 - Cost: ~$0.01–0.03 per scan

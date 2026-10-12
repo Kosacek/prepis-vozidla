@@ -42,7 +42,7 @@ def test_odpoved_zacinajici_premyslenim_se_precte(monkeypatch):
         {"type": "thinking", "thinking": "", "signature": "x"},
         {"type": "text", "text": '{"vin": "TMBEK6NW7M3158470"}'},
     ], "usage": {"input_tokens": 1500, "output_tokens": 120}})
-    data, meta = A.claude_vision_json(OBRAZEK, "haiku")
+    data, meta = A.claude_vision_json(OBRAZEK)
     assert data == {"vin": "TMBEK6NW7M3158470"}
     assert meta["model"] == "claude-haiku-5-5"
     assert meta["input_tokens"] == 1500
@@ -51,7 +51,7 @@ def test_odpoved_zacinajici_premyslenim_se_precte(monkeypatch):
 def test_json_v_markdown_plotu_se_rozbali(monkeypatch):
     _zachyt(monkeypatch, {"stop_reason": "end_turn", "content": [
         {"type": "text", "text": '```json\n{"registracni_znacka": "1AB2345"}\n```'}]})
-    data, _ = A.claude_vision_json(OBRAZEK, "sonnet")
+    data, _ = A.claude_vision_json(OBRAZEK)
     assert data["registracni_znacka"] == "1AB2345"
 
 
@@ -63,33 +63,33 @@ def test_json_v_markdown_plotu_se_rozbali(monkeypatch):
 ])
 def test_json_se_najde_i_za_uvodni_vetou(monkeypatch, text):
     _zachyt(monkeypatch, {"stop_reason": "end_turn", "content": [{"type": "text", "text": text}]})
-    data, _ = A.claude_vision_json(OBRAZEK, "sonnet")
+    data, _ = A.claude_vision_json(OBRAZEK)
     assert data == {"osvedceni_cislo": "619676"}
 
 
 def test_odpoved_uplne_bez_json_je_porad_chyba(monkeypatch):
     _zachyt(monkeypatch, {"stop_reason": "end_turn", "content": [{"type": "text", "text": "Nevidím doklad."}]})
     with pytest.raises(ValueError):
-        A.claude_vision_json(OBRAZEK, "sonnet")
+        A.claude_vision_json(OBRAZEK)
 
 
 @pytest.mark.parametrize("stop, hlaska", [("refusal", "odmítl"), ("max_tokens", "limitu")])
 def test_odmitnuti_a_useknuta_odpoved_daji_srozumitelnou_chybu(monkeypatch, stop, hlaska):
     _zachyt(monkeypatch, {"stop_reason": stop, "content": [{"type": "thinking", "thinking": ""}]})
     with pytest.raises(A.ClaudeError, match=hlaska):
-        A.claude_vision_json(OBRAZEK, "haiku")
+        A.claude_vision_json(OBRAZEK)
 
 
 def test_chyba_api_se_propise(monkeypatch):
     _zachyt(monkeypatch, {"type": "error", "error": {"message": "invalid model"}}, status=400)
     with pytest.raises(A.ClaudeError, match="invalid model"):
-        A.claude_vision_json(OBRAZEK, "haiku")
+        A.claude_vision_json(OBRAZEK)
 
 
 def test_pozadavek_na_haiku_neobsahuje_nic_co_haiku_5_5_odmita(monkeypatch):
     odeslane = _zachyt(monkeypatch, {"stop_reason": "end_turn",
                                      "content": [{"type": "text", "text": "{}"}]})
-    A.claude_vision_json(OBRAZEK, "haiku")
+    A.claude_vision_json(OBRAZEK)
     body = odeslane[0]
     assert body["model"] == "claude-haiku-5-5"
     for zakazane in ("temperature", "top_p", "top_k"):
@@ -99,20 +99,20 @@ def test_pozadavek_na_haiku_neobsahuje_nic_co_haiku_5_5_odmita(monkeypatch):
     assert body["max_tokens"] >= 4096, "přemýšlení se počítá do max_tokens"
 
 
-def test_sonnet_se_posila_beze_zmeny_chovani(monkeypatch):
-    """Sonnet 4.6 bez `thinking` nepřemýšlí — nic se mu nemá měnit."""
-    odeslane = _zachyt(monkeypatch, {"stop_reason": "end_turn",
-                                     "content": [{"type": "text", "text": "{}"}]})
-    A.claude_vision_json(OBRAZEK, "sonnet")
-    assert odeslane[0]["model"] == "claude-sonnet-4-6"
-    assert "output_config" not in odeslane[0] and "thinking" not in odeslane[0]
-
-
-def test_neznamy_model_spadne_na_sonnet(monkeypatch):
-    odeslane = _zachyt(monkeypatch, {"stop_reason": "end_turn",
-                                     "content": [{"type": "text", "text": "{}"}]})
-    A.claude_vision_json(OBRAZEK, "gpt-cokoliv")
-    assert odeslane[0]["model"] == "claude-sonnet-4-6"
+@pytest.mark.parametrize("trasa", ["/api/scan-orv", "/api/scan"])
+def test_sken_jde_vzdy_na_haiku_i_se_starym_polem_model(client, monkeypatch, trasa):
+    """2026-10-12: Sonnet 4.6 odebrán — stará stránka v cache může pořád
+    posílat model=sonnet, ale číst má vždy Haiku 5.5."""
+    odeslane = _zachyt(monkeypatch, {"stop_reason": "end_turn", "content": [
+        {"type": "text", "text": '{"vin": "TMBEK6NW7M3158470"}'}]})
+    import io
+    from PIL import Image
+    jpeg = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(jpeg, "JPEG")
+    jpeg.seek(0)
+    client.post(trasa, data={"model": "sonnet", "image": (jpeg, "orv.jpg", "image/jpeg")},
+                content_type="multipart/form-data")
+    assert odeslane and all(b["model"] == "claude-haiku-5-5" for b in odeslane)
 
 
 def test_scan_orv_s_haiku_5_5_vyplni_data(client, monkeypatch):
@@ -125,7 +125,7 @@ def test_scan_orv_s_haiku_5_5_vyplni_data(client, monkeypatch):
     jpeg = io.BytesIO()
     Image.new("RGB", (8, 8), "white").save(jpeg, "JPEG")   # trasa fotku otáčí přes Pillow
     jpeg.seek(0)
-    r = client.post("/api/scan-orv", data={"model": "haiku", "image": (jpeg, "orv.jpg", "image/jpeg")},
+    r = client.post("/api/scan-orv", data={"image": (jpeg, "orv.jpg", "image/jpeg")},
                     content_type="multipart/form-data")
     body = r.get_json()
     assert body["success"] is True

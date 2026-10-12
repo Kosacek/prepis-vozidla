@@ -501,7 +501,6 @@
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></symbol>
   <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></symbol>
   <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16"/><path d="M12 10h7a1 1 0 0 1 1 1v10"/><path d="M3 21h18"/><path d="M7 8h.01M7 12h.01M7 16h.01M16 14h.01M16 18h.01"/></symbol>
-  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
   <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 8h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="3.2"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></symbol>
@@ -701,7 +700,6 @@
         <div class="scan-actions">
           <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
           <button id="evidence-scan-btn" onclick="pridatDoEvidence()" title="Najde auto v evidenci a doplní RZ, nebo založí nový úkon" style="padding:10px 14px;background:#fff;border:1.5px solid var(--primary);color:var(--primary);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Přidat do evidence</button>
-          <button id="model-toggle-btn" onclick="toggleModel()" title="Přepnout AI model" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;"><svg class="ico"><use href="#i-spark"></use></svg> <span id="model-name">Haiku 5.5</span></button>
         </div>
       </div>
       <!-- Jen když kamera neběží (zamítnuté povolení, zaseknuté zařízení). -->
@@ -3496,7 +3494,6 @@ async function _naskenujOrv() {
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
   const fd = new FormData();
   fd.append('image', blob, 'capture.jpg');
-  fd.append('model', getModel());
   const resp = await fetch('/api/scan-orv', { method: 'POST', body: fd });
   return resp.json();
 }
@@ -3860,7 +3857,6 @@ async function scanDoc(input, target) {
 
   const formData = new FormData();
   formData.append('image', file);
-  formData.append('model', getModel());
   try {
     const res    = await fetch('/api/scan', { method:'POST', body: formData });
     const result = await res.json();
@@ -3915,32 +3911,6 @@ function resetForm() {
   closeCamera();       // pustit kameru dřív, než ji nová stránka bude chtít
   location.reload();
 }
-
-// ── Model toggle ──────────────────────────────────────────────────────────────
-// Výchozí Haiku 5.5: benchmark 2026-10-08 na 203 reálných ORV proti podaným
-// žádostem — čte stejně dobře jako Sonnet 4.6 (RZ 180 vs 178, č. ORV 189 vs
-// 188), je ~40 % rychlejší (3,5 vs 5,9 s) a ~20× levnější.
-//
-// Nový klíč `scan_model_v2`: ve starém `scan_model` měl skoro každý z dřívějška
-// uložené „sonnet" (stačilo jednou přepnout), takže by nový výchozí Haiku
-// nikdo neviděl — David to tak hned po nasazení dostal. Staré volby se proto
-// jednou zahodí; každé další přepnutí se pamatuje dál.
-const MODEL_KLIC = 'scan_model_v2';
-try { localStorage.removeItem('scan_model'); } catch (_) {}
-function getModel() {
-  try { return localStorage.getItem(MODEL_KLIC) || 'haiku'; } catch (_) { return 'haiku'; }
-}
-// Popisky musí sedět s MODELS v app.py (sonnet → claude-sonnet-4-6,
-// haiku → claude-haiku-5-5), ať je jasné, který model zrovna čte.
-const MODEL_POPISEK = { sonnet: 'Sonnet 4.6', haiku: 'Haiku 5.5' };
-function toggleModel() {
-  const next = getModel() === 'sonnet' ? 'haiku' : 'sonnet';
-  try { localStorage.setItem(MODEL_KLIC, next); } catch (_) {}
-  document.getElementById('model-name').textContent = MODEL_POPISEK[next];
-}
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('model-name').textContent = MODEL_POPISEK[getModel()] || MODEL_POPISEK.haiku;
-});
 
 // ── Auto-update check ─────────────────────────────────────────────────────────
 let _updateMode = null;

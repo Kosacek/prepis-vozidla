@@ -60,7 +60,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.22.2"
+__version__ = "1.22.3"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -209,16 +209,15 @@ def read_firmy() -> list:
     return firms
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODELS = {
-    "sonnet": "claude-sonnet-4-6",
-    "haiku": "claude-haiku-5-5",
-}
+# Doklady čte jen Haiku 5.5 (Sonnet 4.6 odebrán 2026-10-12): benchmark
+# 2026-10-08 na 203 reálných ORV — čte stejně dobře, ~40 % rychleji, ~20× levněji.
+VISION_MODEL = "claude-haiku-5-5"
 # Haiku 5.5 (na rozdíl od 4.5) přemýšlí sám od sebe — výchozí effort „medium".
 # Na opsání údajů z dokladu hluboké uvažování netřeba, „low" ho nechá
 # přemýšlení u jednoduchých fotek klidně přeskočit (rychlejší a levnější).
 # Pozor: Haiku 5.5 vrací 400 na temperature/top_p/top_k i na předvyplněnou
 # odpověď asistenta — nic z toho sem nepřidávat.
-_MODEL_EXTRA = {"haiku": {"output_config": {"effort": "low"}}}
+VISION_EFFORT = "low"
 # Přemýšlení se počítá do max_tokens; se starými 800–1500 by u Haiku 5.5
 # mohlo spolknout celý limit dřív, než model napíše JSON.
 VISION_MAX_TOKENS = 4096
@@ -228,20 +227,19 @@ class ClaudeError(Exception):
     """Sken se nepovedl z důvodu, který stojí za to ukázat uživateli."""
 
 
-def claude_vision_json(content: list, model: str = "sonnet", timeout: int = 30) -> tuple:
+def claude_vision_json(content: list, timeout: int = 30) -> tuple:
     """Pošle jeden obrázek(y) + prompt a vrátí (data, meta).
 
     data = JSON z PRVNÍHO TEXTOVÉHO bloku odpovědi. Dřív se četlo
     content[0]["text"] — jenže Haiku 5.5 může odpověď začít blokem
     `thinking` bez textu, a sken by spadl na KeyError.
-    meta = model, čas, tokeny — pro porovnání modelů.
+    meta = model, čas, tokeny.
     """
-    key = model if model in MODELS else "sonnet"
     body = {
-        "model": MODELS[key],
+        "model": VISION_MODEL,
         "max_tokens": VISION_MAX_TOKENS,
         "messages": [{"role": "user", "content": content}],
-        **_MODEL_EXTRA.get(key, {}),
+        "output_config": {"effort": VISION_EFFORT},
     }
     t0 = time.time()
     response = requests.post(
@@ -271,7 +269,7 @@ def claude_vision_json(content: list, model: str = "sonnet", timeout: int = 30) 
     if not text:
         raise ClaudeError("Model nevrátil žádný text.")
     usage = result.get("usage") or {}
-    meta = {"model": MODELS[key], "ms": int((time.time() - t0) * 1000),
+    meta = {"model": VISION_MODEL, "ms": int((time.time() - t0) * 1000),
             "input_tokens": usage.get("input_tokens", 0),
             "output_tokens": usage.get("output_tokens", 0)}
     return _vytahni_json(text), meta
@@ -408,12 +406,12 @@ def _has_data(result: dict) -> bool:
     data = result.get("data", {})
     return bool(data.get("spz") or data.get("vin") or data.get("znacka"))
 
-def scan_document(image_b64: str, mime_type: str, model: str = "sonnet") -> dict:
+def scan_document(image_b64: str, mime_type: str) -> dict:
     try:
         data, _ = claude_vision_json([
             {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_b64}},
             {"type": "text", "text": SCAN_PROMPT},
-        ], model)
+        ])
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": f"{type(e).__name__}: {e}"}
@@ -2078,11 +2076,10 @@ def api_scan():
         return jsonify({"success": False, "error": "No image provided"})
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
-    model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
-    result = scan_document(image_b64, mime_type, model)
+    result = scan_document(image_b64, mime_type)
     if not _has_data(result):
-        result = scan_document(rotate_180(image_b64, mime_type), mime_type, model)
+        result = scan_document(rotate_180(image_b64, mime_type), mime_type)
     return jsonify(result)
 
 @app.route("/api/scan-orv", methods=["POST"])
@@ -2091,14 +2088,13 @@ def api_scan_orv():
         return jsonify({"success": False, "error": "No image provided"})
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
-    model = request.form.get('model', 'sonnet')
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
     for candidate in [image_b64, rotate_180(image_b64, mime_type)]:
         try:
             data, _ = claude_vision_json([
                 {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": candidate}},
                 {"type": "text", "text": ORV_SCAN_PROMPT},
-            ], model)
+            ])
             data = _fix_orv_serie(data)
             if data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka") or (data.get("vlastnik") or {}).get("jmeno"):
                 return jsonify({"success": True, "data": data})

@@ -195,14 +195,12 @@ def test_primarni_zadost_ma_jen_jednu_definici():
     assert html.count("prevod: 'zmeny', zapis: 'zapis'") == 1
 
 
-def test_vychozi_model_skenu_je_haiku_i_se_starou_volbou():
-    """2026-10-08: po přepnutí výchozího modelu na Haiku 5.5 David pořád viděl
-    Sonnet 4.6 — v prohlížeči měl ze staré verze uložené „sonnet". Stará
-    volba se proto jednou zahodí a ukládá se pod novým klíčem."""
+def test_sken_nema_prepinac_modelu():
+    """2026-10-12: Sonnet 4.6 odebrán, doklady čte jen Haiku 5.5 — přepínač
+    modelu ani posílání `model` na server už nemá být."""
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
-    assert "localStorage.removeItem('scan_model')" in html
-    assert "localStorage.getItem(MODEL_KLIC) || 'haiku'" in html
-    assert "localStorage.setItem('scan_model'," not in html, "zápis pod starým klíčem by vracel Sonnet"
+    for pozustatek in ("model-toggle-btn", "toggleModel", "getModel", "Sonnet"):
+        assert pozustatek not in html, pozustatek
 
 
 def test_okno_sdileni_je_nad_ostatnimi_okny():
