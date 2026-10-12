@@ -2,6 +2,20 @@
 {% block title %}Příchozí{% endblock %}
 {% block content %}
 {% import "_macros.html" as m with context %}
+{# One úkon in the same row layout as the Úkony list. `link` = the existing úkon
+   (clickable, opens the edit overlay); otherwise the incoming one (preview). #}
+{% macro urow(u, link=false, keys=[]) %}
+<{{ 'a' if link else 'div' }} class="recent-row{{ '' if link else ' recent-row--incoming' }}"{% if link %} href="/ukony/{{ u.id }}/upravit?back={{ request.full_path | urlencode }}"{% endif %}>
+  <span class="recent-date muted{{ ' is-diff' if 'datum' in keys }}">{% if u.datum %}{{ u.datum[8:10] }}.{{ u.datum[5:7] }}.{{ u.datum[0:4] }}{% else %}—{% endif %}</span>
+  <b class="recent-rz">{{ u.rz or '—' }}</b>
+  <span class="tag{{ ' is-diff' if 'typ' in keys }}">{{ u.typ_kod or '—' }}</span>
+  <span class="recent-firma{{ ' is-diff' if 'firma' in keys }}">{% if u.firma_zkratka %}<span class="firma-dot" style="background: {{ firma_colors.get(u.firma_zkratka, 'var(--muted)') }};"></span>{{ u.firma_zkratka }}{% else %}<span class="muted">firma?</span>{% endif %}</span>
+  <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
+  <span class="recent-pay">{% if u.stav_platby == 'zaplaceno' %}<span class="badge ok">zapl.</span>{% elif u.stav_platby == 'castecne' %}<span class="badge warn">část. {{ u.zaplaceno_kc|kc }}</span>{% endif %}</span>
+  <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
+  <span class="recent-kc{{ ' is-diff' if 'cena' in keys }}"><b>{% if u.celkem is not none %}{{ u.celkem|kc }} Kč{% else %}—{% endif %}</b></span>
+</{{ 'a' if link else 'div' }}>
+{% endmacro %}
 <div class="page-header">
   <h1>Příchozí žádosti</h1>
   <div class="muted">{{ items|length }} čeká na přiřazení</div>
@@ -43,14 +57,20 @@
   </div>
 
   {# Held back by the same-vehicle guard: this car already has an úkon at this
-     firm, so it wasn't auto-created. Name the existing one (číslo + datum) and
-     link to it, so the user can confirm this really is a second job. #}
+     firm, so it wasn't auto-created. Show the existing úkon and the incoming one
+     as the same row the Úkony list uses, so the difference is visible at a glance
+     (click the existing row to open it). #}
   {% if p.dup %}
   <div class="prichozi-dup">
-    <b>Možný duplikát</b> — tohle vozidlo už má úkon
-    <a href="/ukony/{{ p.dup.id }}/upravit?back={{ request.full_path | urlencode }}">#{{ p.dup.id }}</a>
-    z {{ p.dup.datum[8:10] }}.{{ p.dup.datum[5:7] }}.{{ p.dup.datum[0:4] }}{% if p.dup.typ_kod %} ({{ p.dup.typ_kod }}){% endif %}.
-    Přidej jen pokud jde opravdu o další úkon.
+    <div class="dup-title"><b>Možný duplikát</b> <span class="dup-sub">– tohle vozidlo už má úkon u této firmy</span></div>
+    <div class="dup-label">Už v evidenci <span class="muted">#{{ p.dup.id }}</span></div>
+    <div class="recent-list dup-list">{{ urow(p.dup, true) }}</div>
+    <div class="dup-label">Přichází z Přepisu</div>
+    <div class="recent-list dup-list">{{ urow(p.incoming.row, false, p.incoming.diff_keys) }}</div>
+    <div class="dup-diffs">
+      {% if p.incoming.same %}<span class="dup-chip dup-chip--same">stejné datum, typ i cena</span>
+      {% else %}{% for d in p.incoming.diffs %}<span class="dup-chip">{{ d }}</span>{% endfor %}{% endif %}
+    </div>
   </div>
   {% endif %}
 
@@ -103,6 +123,8 @@
 </div>
 {% endfor %}
 
+{% include "_ukon_modal.html" %}
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=9"></script>
 <script>
 (function () {
   var FIRM_PRICES = {{ firm_prices_json|safe }};

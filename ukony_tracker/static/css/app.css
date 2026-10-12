@@ -2054,3 +2054,30 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .dash-breakdowns .card-head h2 { font-size: 0.95rem; }
   .period-select { max-width: 9.5rem; }
 }
+
+/* ── Příchozí: the possible duplicate shown as real úkon rows ─────────────── */
+.prichozi-dup .dup-title { margin-bottom: var(--sp-2); }
+.prichozi-dup .dup-sub { font-weight: 400; }
+.prichozi-dup .dup-label {
+  margin: var(--sp-2) 0 4px; font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8;
+}
+.dup-list {
+  border-radius: var(--radius-sm); background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); overflow: hidden;
+}
+.dup-list .recent-row { grid-template-columns: 84px 88px 72px 104px minmax(0, 1fr) auto auto auto; border-bottom: none; }
+.recent-row--incoming { cursor: default; background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
+.recent-row--incoming:hover { background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
+.recent-row--incoming .is-diff { color: var(--flash-warning-ink); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.dup-diffs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-2); }
+.dup-diffs:empty { display: none; }
+.dup-chip {
+  padding: 2px 9px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line);
+}
+.dup-chip--same { background: var(--flash-warning-ink); color: var(--flash-warning-bg); border-color: transparent; }
+@media (max-width: 640px) {
+  .dup-list .recent-row { grid-template-columns: auto 78px 100px minmax(0, 1fr) auto auto auto; }
+  .dup-list .recent-row .tag { display: none; }
+}

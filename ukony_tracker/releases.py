@@ -27,6 +27,14 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.1", date(2026, 10, 12),
+        "V Příchozích vidíš, co je duplikát",
+        ("U možného duplikátu uvidíš stávající i příchozí úkon jako běžné řádky "
+         "a hned poznáš, co se liší.",
+         "Klepnutím na stávající úkon ho otevřeš, aniž bys odešel z Příchozích."),
+        demo="v2_1",
+    ),
+    Release(
         "2.0", date(2026, 10, 11),
         "Nově ti pomáhá AI",
         ("Zeptej se – napiš otázku vlastními slovy a AI ti ji najde v úkonech.",

@@ -8,7 +8,7 @@ import db
 from repositories import firmy_repo, typy_repo, prichozi_repo, ukony_repo
 from services import ingest_service as ing
 from services import prichozi_service
-from services import pricing_service
+from services import colors_service, pricing_service
 
 bp = Blueprint("prichozi", __name__)
 
@@ -27,6 +27,50 @@ def _cena(v) -> str:
         return str(v).strip()
 
 
+def _dup_row(conn, uid):
+    """The existing úkon as the list row shows it (with firma_zkratka)."""
+    return conn.execute(
+        "SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u "
+        "JOIN firmy f ON f.id=u.firma_id WHERE u.id=?", (uid,)).fetchone()
+
+
+def _cena_cislo(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def incoming_preview(item: dict, dup, firma_by_id: dict) -> dict:
+    """What approving this inbox item would create, shaped like an úkon row, plus
+    the fields that differ from the already-existing duplicate."""
+    typ = item["typ_kod"] or MODE_TYP.get(item.get("mode"), "")
+    firma = firma_by_id.get(item.get("suggested_firma_id"))
+    row = {
+        "datum": item.get("datum") or "",
+        "rz": item.get("rz") or "",
+        "vin": item.get("vin") or "",
+        "typ_kod": typ,
+        "firma_zkratka": firma["zkratka"] if firma else "",
+        "firma_id": firma["id"] if firma else None,
+        "celkem": _cena_cislo(item["celkem"]),
+        "poznamka": item["note"],
+        "prevod": prichozi_service.context_note(item) or "",
+        "zpracoval": item["profil"],
+    }
+    diffs, keys = [], []
+    if dup is not None:
+        if row["datum"] and row["datum"] != dup["datum"]:
+            diffs.append("jiné datum"); keys.append("datum")
+        if row["typ_kod"] and row["typ_kod"] != dup["typ_kod"]:
+            diffs.append("jiný typ"); keys.append("typ")
+        if row["firma_id"] and row["firma_id"] != dup["firma_id"]:
+            diffs.append("jiná firma"); keys.append("firma")
+        if row["celkem"] is not None and abs(row["celkem"] - (dup["celkem"] or 0)) > 0.5:
+            diffs.append("jiná cena"); keys.append("cena")
+    return {"row": row, "diffs": diffs, "diff_keys": keys, "same": dup is not None and not diffs}
+
+
 @bp.get("/prichozi")
 def inbox():
     conn = db.get_db()
@@ -34,6 +78,7 @@ def inbox():
     # Surface the vehicle make (znacka) from the stored payload — it helps
     # identify the firm at a glance (e.g. Volvo → Cardion). Convert each Row to
     # a dict so the template can read the extra `znacka` key alongside columns.
+    firma_by_id = {f["id"]: f for f in firmy_repo.list_all(conn)}
     items = []
     for r in rows:
         d = dict(r)
@@ -52,7 +97,8 @@ def inbox():
         # Held back as a possible duplicate → load the existing úkon so the card
         # can name it (číslo + datum) for the user's confirmation.
         dup_id = d.get("duplicate_ukon_id")
-        d["dup"] = ukony_repo.get(conn, dup_id) if dup_id else None
+        d["dup"] = _dup_row(conn, dup_id) if dup_id else None
+        d["incoming"] = incoming_preview(d, d["dup"], firma_by_id) if d["dup"] else None
         items.append(d)
     firmy = firmy_repo.list_all(conn, only_active=True)
     # Per-firm price maps so the inbox price field follows the chosen firm+type.
@@ -64,6 +110,7 @@ def inbox():
         typy=typy_repo.list_active(conn),
         mode_typ=MODE_TYP,
         firm_prices_json=json.dumps(firm_prices),
+        firma_colors=colors_service.firma_color_map(conn),
     )
 
 

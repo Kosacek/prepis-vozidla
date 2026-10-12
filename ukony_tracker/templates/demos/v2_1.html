@@ -1,0 +1,92 @@
+{# Demo for release 2.1 (Příchozí ukáže, co je duplikát): inside a "Možný duplikát"
+   box the already-existing úkon and the incoming one appear as the same rows the
+   Úkony list uses; the incoming price/date get underlined and a "jiná cena" chip
+   pops in. CSS-only, 5.6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de21-demo {
+    display: grid; align-content: center; box-sizing: border-box; height: 134px;
+    padding: 8px 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de21-box {
+    min-width: 0; padding: 5px 9px 7px; border-radius: var(--radius-sm);
+    background: var(--flash-warning-bg); color: var(--flash-warning-ink);
+  }
+  .de21-title { margin: 0 0 5px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .de21-label--first { margin-top: 0; font-weight: 700; }
+  .de21-label {
+    margin: 3px 0 2px; font-size: 8.5px; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; opacity: .8; white-space: nowrap;
+  }
+  .de21-row {
+    display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; min-width: 0;
+    border-radius: 7px; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); font-size: 11px; white-space: nowrap;
+  }
+  .de21-row--new {
+    background: color-mix(in srgb, var(--accent) 7%, var(--card));
+    opacity: 0; transform: translateY(5px); animation: de21-new 5.6s infinite;
+  }
+  .de21-row--old { animation: de21-old 5.6s infinite; }
+  .de21-date { color: var(--muted); font-size: 10px; }
+  .de21-rz { font-weight: 700; letter-spacing: .02em; }
+  .de21-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--accent); }
+  .de21-vin { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .de21-kc { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .de21-diff { animation: de21-diff 5.6s infinite; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+  .de21-chips { display: flex; gap: 5px; height: 16px; margin-top: 4px; }
+  .de21-chip {
+    padding: 0 8px; border-radius: var(--radius-pill); background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); font-size: 9.5px; font-weight: 600; line-height: 14px;
+    opacity: 0; transform: scale(.85);
+  }
+  .de21-chip--a { animation: de21-chip-a 5.6s infinite; }
+  .de21-chip--b { animation: de21-chip-b 5.6s infinite; }
+
+  @keyframes de21-old {
+    0%, 4%    { opacity: 0; transform: translateY(5px); }
+    12%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de21-new {
+    0%, 22%   { opacity: 0; transform: translateY(5px); }
+    32%, 92%  { opacity: 1; transform: none; }
+    98%, 100% { opacity: 0; transform: translateY(5px); }
+  }
+  @keyframes de21-diff {
+    0%, 44%   { text-decoration: none; color: inherit; }
+    52%, 92%  { text-decoration: underline; color: var(--flash-warning-ink); }
+    98%, 100% { text-decoration: none; color: inherit; }
+  }
+  @keyframes de21-chip-a {
+    0%, 50%   { opacity: 0; transform: scale(.85); }
+    58%, 92%  { opacity: 1; transform: none; }
+    98%, 100% { opacity: 0; transform: scale(.85); }
+  }
+  @keyframes de21-chip-b {
+    0%, 56%   { opacity: 0; transform: scale(.85); }
+    64%, 92%  { opacity: 1; transform: none; }
+    98%, 100% { opacity: 0; transform: scale(.85); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .de21-row--old, .de21-row--new, .de21-chip { animation: none; opacity: 1; transform: none; }
+    .de21-diff { animation: none; text-decoration: underline; color: var(--flash-warning-ink); }
+  }
+</style>
+<div class="de21-demo" aria-hidden="true">
+  <div class="de21-box">
+    <div class="de21-label de21-label--first">Možný duplikát · už v evidenci</div>
+    <div class="de21-row de21-row--old">
+      <span class="de21-date">08.10.</span><b class="de21-rz">8AP0073</b>
+      <span class="de21-dot"></span><span class="de21-vin">YV1XZA6V…</span>
+      <span class="de21-kc">1 500 Kč</span>
+    </div>
+    <div class="de21-label">Přichází z Přepisu</div>
+    <div class="de21-row de21-row--new">
+      <span class="de21-date de21-diff">12.10.</span><b class="de21-rz">8AP0073</b>
+      <span class="de21-dot"></span><span class="de21-vin">YV1XZA6V…</span>
+      <span class="de21-kc de21-diff">2 000 Kč</span>
+    </div>
+    <div class="de21-chips"><span class="de21-chip de21-chip--a">jiné datum</span><span class="de21-chip de21-chip--b">jiná cena</span></div>
+  </div>
+</div>

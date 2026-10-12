@@ -131,6 +131,12 @@ def test_discard_marks_discarded(client):
 
 # ── same-vehicle duplicate flag ───────────────────────────────────────────────
 
+def _cards(body: str) -> str:
+    """Just the inbox cards — the page also carries the "co je nového" history,
+    whose demos reuse the duplicate wording."""
+    return body.split("</h1>", 1)[-1].split('id="ukon-modal"', 1)[0]
+
+
 def _flagged_row(client):
     """Seed an existing úkon + a pending žádost for the SAME car, flagged."""
     c, fid, _ = client
@@ -164,7 +170,7 @@ def test_inbox_shows_duplicate_warning_with_ukon_number_and_date(client):
 def test_unflagged_rows_show_no_duplicate_warning(client):
     """The plain seeded row (no duplicate) must not carry the warning."""
     c, _, _ = client
-    assert "Možný duplikát" not in c.get("/prichozi").get_data(as_text=True)
+    assert "Možný duplikát" not in _cards(c.get("/prichozi").get_data(as_text=True))
 
 
 def test_flagged_duplicate_can_still_be_approved(client):
@@ -243,3 +249,64 @@ def test_inbox_survives_row_without_raw_json(client):
             " VALUES('bezraw','2026-08-03','2026-08-03','prevod','pending','x','x')")
         conn.commit()
     assert c.get("/prichozi").status_code == 200
+
+
+def test_duplicate_shows_both_as_real_rows_with_differences(client):
+    """The existing úkon and the incoming one appear in the Úkony row layout,
+    with chips naming what differs (here: datum)."""
+    c, _, _ = client
+    uid, _pid = _flagged_row(client)
+    body = c.get("/prichozi").get_data(as_text=True)
+    assert "Už v evidenci" in body and "Přichází z Přepisu" in body
+    assert body.count('class="recent-row') >= 2
+    assert f'href="/ukony/{uid}/upravit' in body        # existing row opens the úkon
+    assert "recent-row--incoming" in body               # incoming row is a preview, not a link
+    assert "9XX9999" in body and "DUPVIN00000000001" in body
+    assert "20.06.2026" in body and "14.06.2026" in body
+    assert 'class="dup-chip">jiné datum' in body
+    assert "dup-chip--same" not in body
+
+
+def test_identical_duplicate_gets_the_same_chip(client):
+    c, fid, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        uid = ukony_repo.create(conn, firma_id=fid, datum="2026-06-20", typ_kod="PŘEVOD",
+                                celkem=1300, rz="8YY8888", vin="SAMEVIN0000000001")
+        pid = prichozi_repo.create(
+            conn, zadost_id="dup-same", datum="2026-06-20", mode="prevod",
+            rz="8YY8888", vin="SAMEVIN0000000001", novy_jmeno="Cardion",
+            suggested_firma_id=fid, status="pending",
+            raw={"typ_kod": "PŘEVOD", "celkem": 1300},
+        )
+        prichozi_repo.update(conn, pid, duplicate_ukon_id=uid)
+    body = c.get("/prichozi").get_data(as_text=True)
+    assert "dup-chip--same" in body and "stejné datum, typ i cena" in body
+
+
+def test_duplicate_chips_for_price_and_type(client):
+    c, fid, _ = client
+    with c.application.app_context():
+        conn = db.get_db()
+        typy_repo.upsert(conn, "NOVÉ", 1500, 2)
+        uid = ukony_repo.create(conn, firma_id=fid, datum="2026-06-20", typ_kod="PŘEVOD",
+                                celkem=1300, rz="7ZZ7777", vin="PRICEVIN000000001")
+        pid = prichozi_repo.create(
+            conn, zadost_id="dup-diff", datum="2026-06-20", mode="prevod",
+            rz="7ZZ7777", vin="PRICEVIN000000001", novy_jmeno="Cardion",
+            suggested_firma_id=fid, status="pending",
+            raw={"typ_kod": "NOVÉ", "celkem": 2000},
+        )
+        prichozi_repo.update(conn, pid, duplicate_ukon_id=uid)
+    body = c.get("/prichozi").get_data(as_text=True)
+    cards = _cards(body)
+    assert ">jiný typ<" in cards and ">jiná cena<" in cards and ">jiné datum<" not in cards
+
+
+def test_incoming_preview_helper_handles_missing_data():
+    from routes.prichozi import incoming_preview
+    item = {"datum": "", "rz": None, "vin": None, "typ_kod": "", "mode": "zmena",
+            "celkem": "", "note": "", "profil": "", "suggested_firma_id": None}
+    out = incoming_preview(item, None, {})
+    assert out["row"]["celkem"] is None and out["diffs"] == [] and out["same"] is False
+
