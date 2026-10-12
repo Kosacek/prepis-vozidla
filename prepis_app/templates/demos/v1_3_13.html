@@ -1,0 +1,106 @@
+{# Demo for release 1.3.13 (Tisk jedním klepnutím): one tap on "Vytisknout žádost"
+   and the A4 sheet comes out of the printer; one tap on "Vytisknout PPD" and
+   the smaller A5 receipt follows. CSS-only, 6.6s loop; app tokens only.
+   Included by _whats_new.html. #}
+<style>
+  .dz1313-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11px; color: var(--wn-ink, #1a1d23);
+  }
+  .dz1313-btns { flex: 1; min-width: 0; display: grid; gap: 9px; }
+  .dz1313-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    height: 30px; padding: 0 8px; border-radius: 8px; color: #fff;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden;
+  }
+  .dz1313-btn svg { flex: none; }
+  .dz1313-btn span { overflow: hidden; text-overflow: ellipsis; }
+  .dz1313-b1 { background: var(--success, #059669); animation: dz1313-b1 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1313-b2 { background: var(--wn-accent, #1a56db); animation: dz1313-b2 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+
+  /* The printer: sheets rise from behind its body. */
+  .dz1313-printer { position: relative; flex: none; width: 84px; height: 108px; overflow: hidden; }
+  .dz1313-body {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; box-sizing: border-box; height: 38px;
+    border-radius: 9px 9px 7px 7px; border: 1.5px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+  }
+  .dz1313-body::before {
+    content: ''; position: absolute; left: 10px; right: 10px; bottom: 8px; height: 3px; border-radius: 2px;
+    background: var(--wn-line, #dde1e7);
+  }
+  .dz1313-led {
+    position: absolute; right: 9px; top: 8px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--wn-line, #dde1e7); animation: dz1313-led 6.6s infinite;
+  }
+  .dz1313-paper {
+    position: absolute; left: 50%; bottom: 18px; z-index: 1; box-sizing: border-box;
+    border-radius: 3px 3px 0 0; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--wn-ink, #1a1d23) 10%, transparent);
+    display: grid; align-content: start; gap: 4px; padding: 7px 6px;
+  }
+  .dz1313-paper i { display: block; height: 3px; border-radius: 2px; background: var(--wn-line, #dde1e7); }
+  .dz1313-pa { width: 46px; height: 64px; margin-left: -23px; transform: translateY(50px); animation: dz1313-pa 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1313-pa i:nth-child(1) { width: 55%; height: 5px; background: var(--wn-soft, #e8f0fe); margin-bottom: 2px; }
+  .dz1313-pa i:nth-child(2) { width: 92%; }
+  .dz1313-pa i:nth-child(3) { width: 75%; }
+  .dz1313-pa i:nth-child(4) { width: 88%; }
+  .dz1313-pa i:nth-child(5) { width: 60%; }
+  .dz1313-pb { width: 33px; height: 46px; margin-left: -16.5px; padding: 6px 5px; gap: 3px; transform: translateY(30px); animation: dz1313-pb 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1313-pb i:nth-child(1) { width: 70%; height: 2px; justify-self: center; background: var(--wn-ink, #1a1d23); opacity: .5; }
+  .dz1313-pb i:nth-child(2) { width: 90%; }
+  .dz1313-pb i:nth-child(3) { width: 65%; }
+  .dz1313-a5 {
+    justify-self: start; margin-top: 2px; padding: 1px 4px; border-radius: 3px;
+    background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db);
+    font-size: 8px; font-weight: 800; line-height: 1.3;
+  }
+
+  @keyframes dz1313-b1 {
+    0%, 14%   { transform: none; }
+    17%       { transform: scale(.94); }
+    21%, 100% { transform: none; }
+  }
+  @keyframes dz1313-b2 {
+    0%, 54%   { transform: none; }
+    57%       { transform: scale(.94); }
+    61%, 100% { transform: none; }
+  }
+  @keyframes dz1313-pa {
+    0%, 19%   { transform: translateY(50px); opacity: 1; }
+    36%, 46%  { transform: translateY(-14px); opacity: 1; }
+    53%, 100% { transform: translateY(-42px); opacity: 0; }
+  }
+  @keyframes dz1313-pb {
+    0%, 59%   { transform: translateY(30px); opacity: 1; }
+    76%, 93%  { transform: translateY(-14px); opacity: 1; }
+    99%       { transform: translateY(-14px); opacity: 0; }
+    100%      { transform: translateY(30px); opacity: 0; }
+  }
+  @keyframes dz1313-led {
+    0%, 19%   { background: var(--wn-line, #dde1e7); }
+    22%, 36%  { background: var(--success, #059669); }
+    40%, 59%  { background: var(--wn-line, #dde1e7); }
+    62%, 76%  { background: var(--success, #059669); }
+    80%, 100% { background: var(--wn-line, #dde1e7); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, the A5 receipt out of the printer. */
+    .dz1313-b1, .dz1313-b2, .dz1313-pa, .dz1313-pb, .dz1313-led { animation: none; }
+    .dz1313-pa { opacity: 0; }
+    .dz1313-pb { transform: translateY(-14px); }
+  }
+</style>
+<div class="dz1313-demo" aria-hidden="true">
+  <div class="dz1313-btns">
+    <div class="dz1313-btn dz1313-b1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="15" width="10" height="6" rx="1"/></svg><span>Vytisknout žádost</span></div>
+    <div class="dz1313-btn dz1313-b2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></svg><span>Vytisknout PPD</span></div>
+  </div>
+  <div class="dz1313-printer">
+    <div class="dz1313-paper dz1313-pa"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="dz1313-paper dz1313-pb"><i></i><i></i><i></i><span class="dz1313-a5">A5</span></div>
+    <div class="dz1313-body"><span class="dz1313-led"></span></div>
+  </div>
+</div>

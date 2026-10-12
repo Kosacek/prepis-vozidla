@@ -1,0 +1,122 @@
+{# Demo for release 1.5.0 (Plná moc): a žádost is picked from the list, one tap
+   on "Vystavit plnou moc" and the power-of-attorney sheet appears and gets
+   signed. CSS-only, 6.8s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz150-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10.5px; color: var(--wn-ink, #1a1d23);
+  }
+
+  /* Left: "Ze které žádosti" + the button. */
+  .dz150-pick { flex: 1; min-width: 0; display: grid; gap: 3px; }
+  .dz150-lbl { margin-bottom: 1px; font-size: 8.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--wn-muted, #6b7280); white-space: nowrap; }
+  .dz150-row {
+    display: flex; align-items: center; gap: 6px; min-width: 0; height: 18px; padding: 0 7px;
+    border-radius: 7px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    white-space: nowrap;
+  }
+  .dz150-tag {
+    flex: none; padding: 0 4px; border-radius: 4px; font-size: 8.5px; font-weight: 700; line-height: 13px;
+    background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db);
+  }
+  .dz150-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .dz150-r1 { animation: dz150-r1 6.8s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz150-r2 { animation: dz150-rx 6.8s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz150-r3 { animation: dz150-rx 6.8s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz150-btn {
+    margin-top: 4px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280);
+    font-size: 10.5px; font-weight: 700; white-space: nowrap;
+    animation: dz150-btn 6.8s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+
+  /* Right: the power of attorney. */
+  .dz150-stage { position: relative; flex: none; width: 78px; height: 96px; }
+  .dz150-ghost {
+    position: absolute; inset: 0; border-radius: 6px; border: 1.5px dashed var(--wn-muted, #6b7280);
+    opacity: .4; animation: dz150-ghost 6.8s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz150-sheet {
+    position: absolute; inset: 0; box-sizing: border-box; padding: 9px 8px;
+    border-radius: 6px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--wn-ink, #1a1d23) 10%, transparent);
+    display: grid; align-content: start; gap: 5px; opacity: 0;
+    animation: dz150-sheet 6.8s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz150-sheet b { justify-self: center; margin-bottom: 3px; font-size: 7.5px; font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
+  .dz150-sheet i { display: block; height: 3px; border-radius: 2px; background: var(--wn-line, #dde1e7); }
+  .dz150-sheet i:nth-child(2) { width: 95%; }
+  .dz150-sheet i:nth-child(3) { width: 80%; }
+  .dz150-sheet i:nth-child(4) { width: 90%; }
+  .dz150-sheet i:nth-child(5) { width: 55%; }
+  .dz150-sig { position: absolute; left: 8px; right: 8px; bottom: 8px; width: auto; height: 22px; overflow: visible; }
+  .dz150-sig path {
+    fill: none; stroke: var(--wn-accent, #1a56db); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 100; stroke-dashoffset: 100; animation: dz150-sig 6.8s infinite cubic-bezier(.4, 0, .6, 1);
+  }
+  .dz150-line { position: absolute; left: 8px; right: 8px; bottom: 6px; height: 1px; background: var(--wn-line, #dde1e7); }
+
+  @keyframes dz150-r1 {
+    0%, 14%   { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    21%, 93%  { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz150-rx {
+    0%, 14%   { opacity: 1; }
+    21%, 93%  { opacity: .5; }
+    99%, 100% { opacity: 1; }
+  }
+  @keyframes dz150-btn {
+    0%, 20%   { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+    27%       { background: var(--wn-accent, #1a56db); color: #fff; transform: none; }
+    38%       { transform: none; }
+    41%       { transform: scale(.95); }
+    45%, 93%  { background: var(--wn-accent, #1a56db); color: #fff; transform: none; }
+    99%, 100% { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+  }
+  @keyframes dz150-ghost {
+    0%, 42%   { opacity: .4; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes dz150-sheet {
+    0%, 42%   { opacity: 0; transform: translateY(8px) scale(.96); }
+    52%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz150-sig {
+    0%, 56%   { stroke-dashoffset: 100; }
+    76%, 93%  { stroke-dashoffset: 0; }
+    99%       { stroke-dashoffset: 0; }
+    100%      { stroke-dashoffset: 100; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, žádost picked and the power of attorney signed. */
+    .dz150-r1, .dz150-r2, .dz150-r3, .dz150-btn, .dz150-ghost, .dz150-sheet, .dz150-sig path { animation: none; }
+    .dz150-r1 { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    .dz150-r2, .dz150-r3 { opacity: .5; }
+    .dz150-btn { background: var(--wn-accent, #1a56db); color: #fff; }
+    .dz150-ghost { opacity: 0; }
+    .dz150-sheet { opacity: 1; }
+    .dz150-sig path { stroke-dashoffset: 0; }
+  }
+</style>
+<div class="dz150-demo" aria-hidden="true">
+  <div class="dz150-pick">
+    <div class="dz150-lbl">Ze které žádosti</div>
+    <div class="dz150-row dz150-r1"><span class="dz150-tag">Převod</span><span class="dz150-who">Novák Jan</span></div>
+    <div class="dz150-row dz150-r2"><span class="dz150-tag">Zápis</span><span class="dz150-who">Dvořák s.r.o.</span></div>
+    <div class="dz150-row dz150-r3"><span class="dz150-tag">3RZ</span><span class="dz150-who">Svoboda Petr</span></div>
+    <div class="dz150-btn">Vystavit plnou moc</div>
+  </div>
+  <div class="dz150-stage">
+    <span class="dz150-ghost"></span>
+    <div class="dz150-sheet">
+      <b>PLNÁ MOC</b><i></i><i></i><i></i><i></i>
+      <span class="dz150-line"></span>
+      <svg class="dz150-sig" viewBox="0 0 62 22" preserveAspectRatio="none"><path pathLength="100" d="M2 16 C 6 3, 12 3, 14 12 S 20 20, 25 9 S 31 4, 35 13 S 46 17, 60 6"/></svg>
+    </div>
+  </div>
+</div>

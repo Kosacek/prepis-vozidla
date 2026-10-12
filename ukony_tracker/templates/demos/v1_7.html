@@ -1,0 +1,122 @@
+{# Demo for release 1.7 (Všechno bez čekání): the big Přehled number counts up, and
+   a tap on "✓ zapl." flips that row to a green "zapl." badge in place, with
+   no page load. CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  @property --de17-n { syntax: '<integer>'; inherits: false; initial-value: 128; }
+
+  .de17-demo {
+    display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); align-content: center;
+    gap: 8px; box-sizing: border-box; height: 134px;
+    padding: 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de17-demo > div { align-self: center; }
+  .de17-mini {
+    min-width: 0; padding: 9px 10px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* KPI tile, like the Přehled hero numbers: label, big count-up, blue Kč. */
+  .de17-kpi { display: flex; flex-direction: column; gap: 3px; }
+  .de17-l {
+    font-size: 8.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); white-space: nowrap;
+  }
+  .de17-num {
+    font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: -.025em;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+    animation: de17-n 6.4s infinite, de17-fade 6.4s infinite;
+  }
+  .de17-num::before { counter-reset: de17c var(--de17-n); content: counter(de17c); }
+  .de17-sub { font-size: 11px; color: var(--muted); white-space: nowrap; animation: de17-fade2 6.4s infinite; }
+  .de17-sub b { color: var(--accent); font-weight: 700; }
+
+  /* Rows with the payment slot, like the real úkon rows + payment slot. */
+  .de17-row {
+    position: relative; display: flex; align-items: center; gap: 6px;
+    height: 24px; margin: 0 -4px; padding: 0 4px; border-radius: 7px;
+    font-size: 11px; white-space: nowrap;
+  }
+  .de17-row + .de17-row { box-shadow: 0 -1px 0 var(--line); }
+  .de17-row--tap { animation: de17-flash 6.4s infinite; }
+  .de17-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .de17-rz { font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .de17-slot { position: relative; display: grid; place-items: center; width: 54px; height: 20px; margin-left: auto; flex: none; }
+  .de17-slot > * { grid-area: 1 / 1; }
+  .de17-badge {
+    padding: 1px 8px; border-radius: var(--radius-pill);
+    background: var(--flash-success-bg, #d1f5d3); color: var(--flash-success-ink, #1a6b2a);
+    font-size: 10px; font-weight: 600; line-height: 15px;
+  }
+  .de17-pay {
+    padding: 0 6px; border: 1.5px solid var(--line); border-radius: 7px;
+    background: var(--card); color: var(--ink); font-size: 10px; font-weight: 600; line-height: 16px;
+  }
+  .de17-row--tap .de17-pay { animation: de17-pay 6.4s infinite; }
+  .de17-row--tap .de17-badge { opacity: 0; animation: de17-badge 6.4s infinite; }
+  .de17-ring {
+    position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+    border-radius: 50%; background: color-mix(in srgb, var(--ink) 13%, transparent);
+    opacity: 0; animation: de17-ring 6.4s infinite; pointer-events: none;
+  }
+
+  @keyframes de17-n {
+    0%, 3%    { --de17-n: 0; animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+    24%, 96%  { --de17-n: 128; }
+    97%, 100% { --de17-n: 0; }
+  }
+  @keyframes de17-fade {
+    0%        { opacity: 0; }
+    3%, 92%   { opacity: 1; }
+    96%, 100% { opacity: 0; }
+  }
+  @keyframes de17-fade2 {
+    0%, 22%   { opacity: 0; transform: translateY(2px); }
+    30%, 92%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes de17-ring {
+    0%, 33%   { opacity: 0; transform: scale(1.6); }
+    38%       { opacity: 1; transform: scale(1); }
+    44%       { opacity: .7; transform: scale(.85); }
+    52%, 100% { opacity: 0; transform: scale(.85); }
+  }
+  @keyframes de17-pay {
+    0%, 38%   { opacity: 1; transform: none; }
+    41%       { opacity: 1; transform: scale(.92); }
+    44%, 90%  { opacity: 0; transform: scale(.92); }
+    96%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de17-badge {
+    0%, 41%   { opacity: 0; transform: scale(.85); }
+    46%       { opacity: 1; transform: scale(1.1); }
+    50%, 90%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: scale(.85); }
+  }
+  @keyframes de17-flash {
+    0%, 41%   { background: transparent; }
+    45%       { background: color-mix(in srgb, var(--flash-success-bg, #d1f5d3) 85%, transparent); }
+    66%, 100% { background: transparent; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state - number counted up, the tapped row paid. */
+    .de17-num, .de17-sub, .de17-row--tap, .de17-row--tap .de17-pay, .de17-row--tap .de17-badge, .de17-ring { animation: none !important; }
+    .de17-num { --de17-n: 128; opacity: 1; }
+    .de17-sub { opacity: 1; transform: none; }
+    .de17-row--tap .de17-pay, .de17-ring { opacity: 0; }
+    .de17-row--tap .de17-badge { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de17-demo" aria-hidden="true">
+  <div class="de17-mini de17-kpi">
+    <span class="de17-l">Tento měsíc</span>
+    <span class="de17-num"></span>
+    <span class="de17-sub"><b>142 300</b> Kč</span>
+  </div>
+  <div class="de17-mini">
+    <div class="de17-row"><span class="de17-dot" style="background: var(--accent);"></span><b class="de17-rz">2AB 1234</b><span class="de17-slot"><span class="de17-badge">zapl.</span></span></div>
+    <div class="de17-row de17-row--tap"><span class="de17-dot" style="background: #2a7;"></span><b class="de17-rz">7C2 5678</b><span class="de17-slot"><span class="de17-pay">✓ zapl.</span><span class="de17-badge">zapl.</span><span class="de17-ring"></span></span></div>
+    <div class="de17-row"><span class="de17-dot" style="background: #ff9f0a;"></span><b class="de17-rz">1E5 9012</b><span class="de17-slot"><span class="de17-pay">✓ zapl.</span></span></div>
+  </div>
+</div>

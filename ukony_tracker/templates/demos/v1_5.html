@@ -1,0 +1,108 @@
+{# Demo for release 1.5 (Zeptej se, první verze bez AI): otázka se napíše, tlačítko
+   se zmáčkne a pod ní naskočí spočítaná odpověď i konkrétní úkony. CSS-only,
+   6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de15-demo {
+    display: grid; align-content: center; box-sizing: border-box; height: 134px;
+    padding: 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de15-mini {
+    min-width: 0; padding: 8px 10px 6px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* Question box + button, like the real "Zeptej se" form. */
+  .de15-form { display: flex; gap: 6px; }
+  .de15-field {
+    flex: 1; min-width: 0; height: 26px; display: grid; align-items: center;
+    padding: 0 9px; border: 1.5px solid var(--line); border-radius: 8px;
+    background: var(--bg); font-size: 12px; white-space: nowrap; overflow: hidden;
+  }
+  .de15-ph, .de15-q { grid-area: 1 / 1; }
+  .de15-ph { color: var(--muted); animation: de15-ph 6s infinite; }
+  .de15-q { color: var(--ink); clip-path: inset(0 100% 0 0); animation: de15-q 6s infinite; }
+  .de15-btn {
+    flex: none; display: flex; align-items: center; height: 26px; padding: 0 10px;
+    border-radius: 8px; background: var(--accent); color: var(--accent-ink);
+    font-size: 11.5px; font-weight: 600; white-space: nowrap;
+    animation: de15-press 6s infinite;
+  }
+
+  /* The computed answer, then the úkony it was computed from. */
+  .de15-head {
+    height: 18px; margin-top: 6px; display: flex; align-items: center; gap: 4px;
+    font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap;
+    overflow: hidden; opacity: 0; animation: de15-head 6s infinite;
+  }
+  .de15-head b { color: var(--accent); font-weight: 700; }
+  .de15-head span { color: var(--muted); font-weight: 400; }
+  .de15-row {
+    display: flex; align-items: center; gap: 7px; height: 20px; min-width: 0;
+    border-top: 1px solid var(--line); font-size: 12px; white-space: nowrap;
+    opacity: 0; transform: translateY(4px);
+  }
+  .de15-row--1 { animation: de15-r1 6s infinite; }
+  .de15-row--2 { animation: de15-r2 6s infinite; }
+  .de15-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .de15-rz { font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .de15-tag {
+    padding: 0 7px; border-radius: var(--radius-pill); background: var(--bg);
+    border: 1px solid var(--line); color: var(--muted);
+    font-size: 10px; font-weight: 600; line-height: 15px;
+  }
+  .de15-kc { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  @keyframes de15-ph {
+    0%, 4%    { opacity: 1; }
+    6%, 97%   { opacity: 0; }
+    100%      { opacity: 1; }
+  }
+  @keyframes de15-q {
+    0%, 6%    { clip-path: inset(0 100% 0 0); animation-timing-function: steps(22, end); }
+    30%, 94%  { clip-path: inset(0 0 0 0); animation-timing-function: steps(10, end); }
+    98%, 100% { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes de15-press {
+    0%, 31%   { transform: none; box-shadow: none; }
+    33%       { transform: scale(.93); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+    38%, 100% { transform: none; box-shadow: none; }
+  }
+  @keyframes de15-head {
+    0%, 36%   { opacity: 0; transform: translateY(3px); }
+    43%, 92%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes de15-r1 {
+    0%, 44%   { opacity: 0; transform: translateY(4px); }
+    51%, 92%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes de15-r2 {
+    0%, 50%   { opacity: 0; transform: translateY(4px); }
+    57%, 92%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state — question asked, answer and úkony shown. */
+    .de15-ph, .de15-q, .de15-btn, .de15-head, .de15-row { animation: none !important; }
+    .de15-ph { opacity: 0; }
+    .de15-q { clip-path: none; }
+    .de15-head, .de15-row { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de15-demo" aria-hidden="true">
+  <div class="de15-mini">
+    <div class="de15-form">
+      <div class="de15-field">
+        <span class="de15-ph">Zeptej se na úkony</span>
+        <span class="de15-q">Kolik úkonů ve středu?</span>
+      </div>
+      <div class="de15-btn">Zeptat se</div>
+    </div>
+    <div class="de15-head">Ve středu: <b>7 úkonů</b><span>·</span>8 450 Kč</div>
+    <div class="de15-row de15-row--1"><span class="de15-dot" style="background: var(--accent);"></span><b class="de15-rz">4AB 1234</b><span class="de15-tag">A50</span><b class="de15-kc">1 200 Kč</b></div>
+    <div class="de15-row de15-row--2"><span class="de15-dot" style="background: #2a7;"></span><b class="de15-rz">7C2 5678</b><span class="de15-tag">KOLA</span><b class="de15-kc">950 Kč</b></div>
+  </div>
+</div>

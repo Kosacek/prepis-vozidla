@@ -1,0 +1,133 @@
+{# Demo for release 1.9 (Přehled za měsíc i celý rok): the period picker switches from
+   "Říjen 2026" to "Celý rok 2026" and the chart morphs from daily bars to monthly
+   bars, then back. CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de19-demo {
+    display: grid; align-content: center; box-sizing: border-box; height: 134px;
+    padding: 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de19-mini {
+    min-width: 0; padding: 8px 10px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* Period picker (like the real filter select) on the left, the period's total on the right. */
+  .de19-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 24px; margin-bottom: 6px; }
+  .de19-sel {
+    display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 10px;
+    border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+    font-size: 11.5px; font-weight: 500; color: var(--ink); white-space: nowrap;
+    animation: de19-focus 6.4s infinite;
+  }
+  .de19-stack { display: grid; }
+  .de19-stack > span { grid-area: 1 / 1; }
+  .de19-stack--r { justify-items: end; }
+  .de19-chev {
+    flex: none; width: 6px; height: 6px; margin-bottom: 2px;
+    border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg);
+  }
+  .de19-tot { font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .de19-tot b { color: var(--ink); font-weight: 700; }
+  .de19-m { animation: de19-lab-m 6.4s infinite; }
+  .de19-y { opacity: 0; animation: de19-lab-y 6.4s infinite; }
+
+  /* Bars: 24 thin days in a month, 12 wide months in a year. */
+  .de19-bars {
+    display: flex; align-items: flex-end; height: 48px; border-bottom: 1px solid var(--line);
+  }
+  .de19-b {
+    display: block; flex: 1 1 0; min-width: 0; height: 100%; margin-inline: 1px;
+    border-radius: 2px 2px 0 0; background: var(--accent);
+    transform-origin: 50% 100%; transform: scaleY(var(--m));
+    animation: de19-bar 6.4s infinite; animation-delay: calc(var(--i) * 9ms);
+  }
+  .de19-ax { display: grid; margin-top: 3px; }
+  .de19-ax > div {
+    grid-area: 1 / 1; display: flex; justify-content: space-between;
+    font-size: 9.5px; line-height: 11px; color: var(--muted); white-space: nowrap;
+  }
+
+  @keyframes de19-bar {
+    0%, 18% {
+      flex-grow: 1; margin-inline: 1px; transform: scaleY(var(--m)); opacity: 1;
+      animation-timing-function: cubic-bezier(.2, .7, .3, 1);
+    }
+    31%, 62% {
+      flex-grow: var(--k); margin-inline: calc(var(--k) * 3px); transform: scaleY(var(--y));
+      opacity: calc(var(--k) * var(--yo));
+      animation-timing-function: cubic-bezier(.2, .7, .3, 1);
+    }
+    75%, 100% { flex-grow: 1; margin-inline: 1px; transform: scaleY(var(--m)); opacity: 1; }
+  }
+  @keyframes de19-focus {
+    0%, 12%   { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+    17%, 22%  { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    28%, 58%  { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+    63%, 68%  { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    74%, 100% { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes de19-lab-m {
+    0%, 20%   { opacity: 1; transform: none; }
+    27%, 66%  { opacity: 0; transform: translateY(-3px); }
+    73%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de19-lab-y {
+    0%, 20%   { opacity: 0; transform: translateY(3px); }
+    27%, 66%  { opacity: 1; transform: none; }
+    73%, 100% { opacity: 0; transform: translateY(3px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state - the whole year shown. */
+    .de19-sel, .de19-b, .de19-m, .de19-y { animation: none !important; }
+    .de19-b {
+      flex-grow: var(--k); margin-inline: calc(var(--k) * 3px); transform: scaleY(var(--y));
+      opacity: calc(var(--k) * var(--yo));
+    }
+    .de19-m { opacity: 0; }
+    .de19-y { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de19-demo" aria-hidden="true">
+  <div class="de19-mini">
+    <div class="de19-top">
+      <div class="de19-sel">
+        <span class="de19-stack"><span class="de19-m">Říjen 2026</span><span class="de19-y">Celý rok 2026</span></span>
+        <span class="de19-chev"></span>
+      </div>
+      <span class="de19-stack de19-stack--r"><span class="de19-tot de19-m"><b>42</b> úkonů</span><span class="de19-tot de19-y"><b>512</b> úkonů</span></span>
+    </div>
+    <div class="de19-bars">
+        <i class="de19-b" style="--i:0;--m:0.35;--y:0.46;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:1;--m:0.5;--y:0.52;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:2;--m:0.28;--y:0.6;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:3;--m:0.62;--y:0.55;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:4;--m:0.45;--y:0.68;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:5;--m:0.7;--y:0.74;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:6;--m:0.2;--y:0.62;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:7;--m:0.15;--y:0.8;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:8;--m:0.55;--y:0.86;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:9;--m:0.68;--y:0.7;--k:1;--yo:1"></i>
+        <i class="de19-b" style="--i:10;--m:0.4;--y:0.05;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:11;--m:0.58;--y:0.05;--k:1;--yo:0.55"></i>
+        <i class="de19-b" style="--i:12;--m:0.75;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:13;--m:0.3;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:14;--m:0.22;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:15;--m:0.6;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:16;--m:0.48;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:17;--m:0.66;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:18;--m:0.35;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:19;--m:0.52;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:20;--m:0.72;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:21;--m:0.44;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:22;--m:0.3;--y:0;--k:0;--yo:0.55"></i>
+        <i class="de19-b" style="--i:23;--m:0.58;--y:0;--k:0;--yo:0.55"></i>
+    </div>
+    <div class="de19-ax">
+      <div class="de19-m"><span>1. 10.</span><span>31. 10.</span></div>
+      <div class="de19-y"><span>led</span><span>pro</span></div>
+    </div>
+  </div>
+</div>

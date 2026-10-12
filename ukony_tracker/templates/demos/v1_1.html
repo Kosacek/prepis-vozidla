@@ -1,0 +1,139 @@
+{# Demo for release 1.1 (Propojení se žádostmi): a finished žádost gets its
+   check, an arrow points over, and its card lands in Příchozí while the red
+   nav badge pops to 1. CSS-only, 6.4s loop; app tokens only. #}
+<style>
+  .de11-demo, .de11-demo * { box-sizing: border-box; }
+  .de11-demo {
+    display: grid; gap: 10px; padding: 12px; margin-bottom: var(--sp-4, 16px);
+    border-radius: 14px; background: var(--bg); font-family: var(--font);
+  }
+
+  /* Mini top nav, the badge sits on "Příchozí" like the real one. */
+  .de11-nav {
+    display: flex; align-items: center; gap: 2px; padding: 4px 6px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+  .de11-nav span {
+    display: inline-flex; align-items: center; padding: 5px 9px;
+    border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 500;
+    color: var(--muted); white-space: nowrap;
+  }
+  .de11-badge {
+    display: inline-block; min-width: 16px; margin-left: 5px; padding: 0 4px; border-radius: 8px;
+    background: #ff3b30; color: #fff; font-size: 10px; font-weight: 700;
+    line-height: 16px; text-align: center;
+    transform: scale(0); animation: de11-badge 6.4s infinite;
+  }
+
+  .de11-body {
+    display: grid; grid-template-columns: 44px 16px minmax(0, 1fr);
+    align-items: center; gap: 8px; height: 64px;
+  }
+
+  /* Hotová žádost: a tiny sheet that gets a green check. */
+  .de11-src { display: grid; justify-items: center; gap: 4px; }
+  .de11-doc {
+    position: relative; width: 36px; height: 44px; padding: 7px 6px;
+    border-radius: 6px; background: var(--card); box-shadow: var(--shadow-sm);
+    display: grid; align-content: start; gap: 4px;
+  }
+  .de11-doc i { display: block; height: 3px; border-radius: 2px; background: var(--line); }
+  .de11-doc i:nth-child(1) { width: 70%; }
+  .de11-doc i:nth-child(3) { width: 55%; }
+  .de11-check {
+    position: absolute; right: -6px; top: -6px; width: 16px; height: 16px;
+    display: grid; place-items: center; border-radius: 50%;
+    background: #2a7; color: #fff;
+    transform: scale(0); animation: de11-check 6.4s infinite;
+  }
+  .de11-lbl { font-size: 9.5px; font-weight: 600; color: var(--muted); }
+
+  .de11-arrow { color: var(--muted); animation: de11-arrow 6.4s infinite; }
+
+  /* Příchozí slot: dashed "nothing yet" gives way to the incoming card. */
+  .de11-slot { position: relative; height: 64px; }
+  .de11-empty {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    border: 1.5px dashed var(--line); border-radius: var(--radius-sm);
+    font-size: 10.5px; color: var(--muted); animation: de11-empty 6.4s infinite;
+  }
+  .de11-card {
+    position: absolute; inset: 0; padding: 7px 10px; overflow: hidden;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+    display: grid; align-content: center; gap: 2px; line-height: 1.3;
+    opacity: 0; transform: translateX(-12px);
+    animation: de11-card 6.4s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .de11-head { display: flex; align-items: center; gap: 6px; }
+  .de11-veh { font-size: 13px; font-weight: 700; letter-spacing: -.01em; text-transform: uppercase; white-space: nowrap; }
+  .de11-tag {
+    padding: 0 7px; border-radius: var(--radius-pill, 9999px); background: var(--bg);
+    border: 1px solid var(--line); color: var(--muted);
+    font-size: 10px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+  }
+  .de11-line {
+    font-size: 11px; color: var(--muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .de11-line b { color: var(--ink); font-weight: 600; }
+  .de11-meta { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  @keyframes de11-check {
+    0%, 6%   { transform: scale(0); }
+    11%      { transform: scale(1.18); }
+    13%, 92% { transform: scale(1); }
+    97%, 100% { transform: scale(0); }
+  }
+  @keyframes de11-arrow {
+    0%, 14%  { opacity: .25; transform: translateX(-4px); }
+    22%, 92% { opacity: .8; transform: none; }
+    100%     { opacity: .25; transform: translateX(-4px); }
+  }
+  @keyframes de11-empty {
+    0%, 24%  { opacity: 1; }
+    30%, 92% { opacity: 0; }
+    100%     { opacity: 1; }
+  }
+  @keyframes de11-card {
+    0%, 26%  { opacity: 0; transform: translateX(-12px); }
+    35%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de11-badge {
+    0%, 36%  { transform: scale(0); }
+    41%      { transform: scale(1.25); }
+    44%, 92% { transform: scale(1); }
+    97%, 100% { transform: scale(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, žádost checked, card in Příchozí, badge 1. */
+    .de11-check, .de11-arrow, .de11-empty, .de11-card, .de11-badge { animation: none; }
+    .de11-check, .de11-badge { transform: none; }
+    .de11-arrow { opacity: .8; }
+    .de11-empty { opacity: 0; }
+    .de11-card { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de11-demo" aria-hidden="true">
+  <div class="de11-nav">
+    <span>Přehled</span><span>Úkony</span><span>Příchozí<b class="de11-badge">1</b></span>
+  </div>
+  <div class="de11-body">
+    <div class="de11-src">
+      <div class="de11-doc"><i></i><i></i><i></i>
+        <span class="de11-check"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      </div>
+      <span class="de11-lbl">Žádosti</span>
+    </div>
+    <svg class="de11-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    <div class="de11-slot">
+      <div class="de11-empty">Žádné nové žádosti</div>
+      <div class="de11-card">
+        <div class="de11-head"><span class="de11-veh">2AB 1234</span><span class="de11-tag">přepis</span></div>
+        <div class="de11-line">nový provoz. <b>Novák s.r.o.</b></div>
+        <div class="de11-meta">ORV UAA 123456</div>
+      </div>
+    </div>
+  </div>
+</div>

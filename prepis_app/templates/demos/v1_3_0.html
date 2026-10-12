@@ -1,0 +1,111 @@
+{# Demo for release 1.3.0 (Vystavené doklady): the "Vystavené doklady (PPD)" list
+   fills with receipts, then a search narrows it down to one person.
+   CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz130-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; align-items: center;
+    font-size: 10px; color: var(--wn-ink, #1a1d23);
+  }
+  .dz130-modal {
+    flex: 1; min-width: 0; overflow: hidden;
+    border-radius: 10px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    animation: dz130-m 6.4s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz130-head {
+    display: flex; align-items: center; gap: 6px; height: 25px; padding: 0 9px;
+    border-bottom: 1px solid var(--wn-line, #dde1e7); font-size: 11px; font-weight: 700;
+  }
+  .dz130-head svg { flex: none; }
+  .dz130-x { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--wn-muted, #6b7280); line-height: 1; }
+
+  .dz130-search {
+    position: relative; display: flex; align-items: center; gap: 5px;
+    height: 20px; margin: 5px 8px 3px; padding: 0 6px;
+    border-radius: 6px; border: 1.5px solid var(--wn-line, #dde1e7);
+    font-size: 10.5px; white-space: nowrap; overflow: hidden;
+    animation: dz130-focus 6.4s infinite;
+  }
+  .dz130-search svg { flex: none; color: var(--wn-muted, #6b7280); }
+  .dz130-ph { color: var(--wn-muted, #6b7280); opacity: .7; overflow: hidden; text-overflow: ellipsis; animation: dz130-ph 6.4s infinite; }
+  .dz130-q { position: absolute; left: 22px; clip-path: inset(0 100% 0 0); font-weight: 600; animation: dz130-q 6.4s infinite; }
+
+  .dz130-row {
+    display: grid; grid-template-columns: 22px 32px minmax(0, 1fr) auto; align-items: center; column-gap: 5px;
+    height: 16px; padding: 0 9px; font-size: 10px; font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid color-mix(in srgb, var(--wn-line, #dde1e7) 55%, transparent);
+    opacity: 0;
+  }
+  .dz130-row:last-child { border-bottom: 0; }
+  .dz130-row b { font-weight: 700; }
+  .dz130-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz130-row .dz130-d { color: var(--wn-muted, #6b7280); }
+  .dz130-row .dz130-k { color: var(--wn-ink, #1a1d23); font-weight: 600; }
+  .dz130-r1 { animation: dz130-r1 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz130-r2 { animation: dz130-r2 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz130-r3 { animation: dz130-r3 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+
+  @keyframes dz130-m {
+    0%, 2%    { opacity: 0; transform: translateY(6px); }
+    9%, 93%   { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz130-r1 {
+    0%, 12%   { opacity: 0; transform: translateY(5px); background: transparent; }
+    19%, 52%  { opacity: 1; transform: none; background: transparent; }
+    60%, 93%  { opacity: 1; transform: none; background: var(--wn-soft, #e8f0fe); }
+    99%, 100% { opacity: 0; transform: none; background: transparent; }
+  }
+  @keyframes dz130-r2 {
+    0%, 18%   { opacity: 0; transform: translateY(5px); }
+    25%, 52%  { opacity: 1; transform: none; }
+    60%, 93%  { opacity: .25; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz130-r3 {
+    0%, 24%   { opacity: 0; transform: translateY(5px); background: transparent; }
+    31%, 52%  { opacity: 1; transform: none; background: transparent; }
+    60%, 93%  { opacity: 1; transform: none; background: var(--wn-soft, #e8f0fe); }
+    99%, 100% { opacity: 0; transform: none; background: transparent; }
+  }
+  @keyframes dz130-q {
+    0%, 38%   { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: steps(5, end); }
+    50%, 93%  { clip-path: inset(0 0 0 0); opacity: 1; }
+    99%       { clip-path: inset(0 0 0 0); opacity: 0; }
+    100%      { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  @keyframes dz130-ph { 0%, 37% { opacity: .7; } 40%, 99% { opacity: 0; } 100% { opacity: .7; } }
+  @keyframes dz130-focus {
+    0%, 36%   { border-color: var(--wn-line, #dde1e7); }
+    40%, 93%  { border-color: var(--wn-accent, #1a56db); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, searched for "novák", the other receipt dimmed. */
+    .dz130-modal, .dz130-search, .dz130-ph, .dz130-q, .dz130-row { animation: none; }
+    .dz130-search { border-color: var(--wn-accent, #1a56db); }
+    .dz130-ph { opacity: 0; }
+    .dz130-q { clip-path: none; }
+    .dz130-row { opacity: 1; }
+    .dz130-r1, .dz130-r3 { background: var(--wn-soft, #e8f0fe); }
+    .dz130-r2 { opacity: .25; }
+  }
+</style>
+<div class="dz130-demo" aria-hidden="true">
+  <div class="dz130-modal">
+    <div class="dz130-head">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></svg>
+      Vystavené doklady (PPD)<span class="dz130-x">✕</span>
+    </div>
+    <div class="dz130-search">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <span class="dz130-ph">Hledat (číslo, jméno, IČO…)</span>
+      <span class="dz130-q">novák</span>
+    </div>
+    <div class="dz130-row dz130-r1"><b>142</b><span class="dz130-d">12. 6.</span><span class="dz130-k">Novák Jan</span><span>500 Kč</span></div>
+    <div class="dz130-row dz130-r2"><b>141</b><span class="dz130-d">11. 6.</span><span class="dz130-k">Dvořák s.r.o.</span><span>1 300 Kč</span></div>
+    <div class="dz130-row dz130-r3"><b>140</b><span class="dz130-d">9. 6.</span><span class="dz130-k">Novák Jan</span><span>800 Kč</span></div>
+  </div>
+</div>

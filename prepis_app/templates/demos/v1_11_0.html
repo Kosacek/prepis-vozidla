@@ -1,0 +1,105 @@
+{# Demo for release 1.11.0 (Správné datum na tiskopisu): a week strip with counter
+   closing hours; in the morning the date is today, after closing it jumps to the
+   next open day. CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1110-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1110-mini {
+    display: grid; gap: 9px; padding: 9px 10px; border-radius: 10px;
+    border: 1px solid var(--wn-line); background: var(--wn-card);
+  }
+  .dz1110-days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .dz1110-day {
+    box-sizing: border-box; display: grid; align-content: center; justify-items: center; gap: 3px; height: 36px;
+    border: 1px solid var(--wn-line); border-radius: 7px; background: var(--wn-bg); color: var(--wn-ink);
+  }
+  .dz1110-d { font-size: 10.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dz1110-h { font-size: 9px; color: var(--wn-muted); white-space: nowrap; }
+  .dz1110-ut { animation: dz1110-ut 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1110-ut .dz1110-h { animation: dz1110-uth 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1110-st { animation: dz1110-st 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1110-st .dz1110-h { animation: dz1110-sth 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  .dz1110-line { display: flex; align-items: center; gap: 8px; height: 26px; }
+  .dz1110-stack { display: grid; }
+  .dz1110-stack > span { grid-area: 1 / 1; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .dz1110-clock {
+    flex: none; box-sizing: border-box; height: 26px; padding: 0 9px 0 7px; border-radius: 999px;
+    border: 1.5px solid var(--wn-line); background: var(--wn-card);
+    display: inline-grid; align-items: center; font-size: 10.5px; font-weight: 700; color: var(--wn-muted);
+  }
+  .dz1110-arrow { flex: none; color: var(--wn-muted); }
+  .dz1110-date {
+    box-sizing: border-box; flex: 1; min-width: 0; height: 26px; padding: 0 9px; border-radius: 6px;
+    border: 1.5px solid var(--wn-line); background: var(--wn-bg);
+    display: grid; align-items: center; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .dz1110-tag { font-weight: 600; font-size: 9.5px; color: var(--wn-accent); }
+  .dz1110-a { animation: dz1110-a 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1110-b { opacity: 0; animation: dz1110-b 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1110-ut {
+    0%, 44%  { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+    54%, 92% { background: var(--wn-bg); border-color: var(--wn-line); color: var(--wn-muted); }
+    100%     { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+  }
+  @keyframes dz1110-uth {
+    0%, 44%  { color: #fff; text-decoration: none; }
+    54%, 92% { color: var(--wn-muted); text-decoration: line-through; }
+    100%     { color: #fff; text-decoration: none; }
+  }
+  @keyframes dz1110-st {
+    0%, 46%  { background: var(--wn-bg); border-color: var(--wn-line); color: var(--wn-ink); }
+    56%, 92% { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+    100%     { background: var(--wn-bg); border-color: var(--wn-line); color: var(--wn-ink); }
+  }
+  @keyframes dz1110-sth {
+    0%, 46%  { color: var(--wn-muted); }
+    56%, 92% { color: #fff; }
+    100%     { color: var(--wn-muted); }
+  }
+  @keyframes dz1110-a {
+    0%, 44%  { opacity: 1; transform: none; }
+    52%, 92% { opacity: 0; transform: translateY(-4px); }
+    100%     { opacity: 1; transform: none; }
+  }
+  @keyframes dz1110-b {
+    0%, 46%  { opacity: 0; transform: translateY(4px); }
+    54%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(4px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state of the morning case: the date on the form is today. */
+    .dz1110-ut, .dz1110-ut .dz1110-h, .dz1110-st, .dz1110-st .dz1110-h, .dz1110-a, .dz1110-b { animation: none; }
+    .dz1110-ut { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+    .dz1110-ut .dz1110-h { color: #fff; }
+    .dz1110-b { opacity: 0; }
+  }
+</style>
+<div class="dz1110-demo" aria-hidden="true">
+  <div class="dz1110-mini">
+    <div class="dz1110-days">
+      <div class="dz1110-day"><span class="dz1110-d">Po 14.</span><span class="dz1110-h">do 17</span></div>
+      <div class="dz1110-day dz1110-ut"><span class="dz1110-d">Út 15.</span><span class="dz1110-h">do 12</span></div>
+      <div class="dz1110-day dz1110-st"><span class="dz1110-d">St 16.</span><span class="dz1110-h">do 17</span></div>
+      <div class="dz1110-day"><span class="dz1110-d">Čt 17.</span><span class="dz1110-h">do 12</span></div>
+      <div class="dz1110-day"><span class="dz1110-d">Pá 18.</span><span class="dz1110-h">do 12</span></div>
+    </div>
+    <div class="dz1110-line">
+      <span class="dz1110-clock dz1110-stack">
+        <span class="dz1110-a"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Út 9:40</span>
+        <span class="dz1110-b"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Út 13:30</span>
+      </span>
+      <svg class="dz1110-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      <span class="dz1110-date dz1110-stack">
+        <span class="dz1110-a">15.09.2026 <span class="dz1110-tag">dnes</span></span>
+        <span class="dz1110-b">16.09.2026 <span class="dz1110-tag">zítra</span></span>
+      </span>
+    </div>
+  </div>
+</div>

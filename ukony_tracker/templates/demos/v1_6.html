@@ -1,0 +1,130 @@
+{# Demo for release 1.6 (Rychlejší zadávání): in the "Nový úkon" form the firm picker
+   opens with coloured dots, another firm is chosen and the price switches to
+   its own price - while the RZ typed so far stays put (no page reload).
+   CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de16-demo {
+    display: grid; align-content: center; box-sizing: border-box; height: 134px;
+    padding: 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de16-mini {
+    position: relative; min-width: 0; padding: 8px 10px 9px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+  .de16-lab {
+    display: block; height: 12px; margin-bottom: 2px;
+    font-size: 10.5px; font-weight: 600; line-height: 12px; color: var(--muted);
+  }
+
+  /* Firma picker: button with the chosen firm's dot, like the real firma-pick button. */
+  .de16-pick {
+    display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
+    border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+    font-size: 12px; font-weight: 500; color: var(--ink);
+    animation: de16-focus 6.4s infinite;
+  }
+  .de16-val { flex: 1; min-width: 0; display: grid; }
+  .de16-v { grid-area: 1 / 1; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .de16-v--a { animation: de16-a 6.4s infinite; }
+  .de16-v--b { opacity: 0; animation: de16-b 6.4s infinite; }
+  .de16-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .de16-chev {
+    flex: none; width: 7px; height: 7px; margin-right: 2px;
+    border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg) translate(-2px, -2px);
+  }
+
+  /* The list the picker opens: one firm per row, a coloured dot in front. */
+  .de16-list {
+    position: absolute; left: 10px; right: 10px; top: 52px; z-index: 2;
+    background: var(--bg); border: 1.5px solid var(--line); border-radius: 8px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .14); overflow: hidden;
+    opacity: 0; animation: de16-list 6.4s infinite;
+  }
+  .de16-item {
+    display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 10px;
+    border-bottom: 1px solid var(--line); font-size: 11px; color: var(--ink); white-space: nowrap;
+  }
+  .de16-item:last-child { border-bottom: none; }
+  .de16-item .de16-dot { width: 7px; height: 7px; }
+  .de16-item--1 { font-weight: 700; animation: de16-i1 6.4s infinite; }
+  .de16-item--2 { animation: de16-i2 6.4s infinite; }
+
+  /* Fields below: the RZ stays, the price follows the chosen firm. */
+  .de16-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+  .de16-in {
+    display: grid; align-items: center; height: 26px; padding: 0 10px;
+    border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+    font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    white-space: nowrap; overflow: hidden;
+  }
+  .de16-in > span { grid-area: 1 / 1; }
+  .de16-p--a { animation: de16-a 6.4s infinite; }
+  .de16-p--b { opacity: 0; color: var(--ink); animation: de16-pb 6.4s infinite; }
+
+  @keyframes de16-list {
+    0%, 9%    { opacity: 0; transform: translateY(-3px); }
+    15%, 35%  { opacity: 1; transform: none; }
+    40%, 100% { opacity: 0; transform: translateY(-3px); }
+  }
+  @keyframes de16-focus {
+    0%, 9%    { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+    14%, 36%  { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    42%, 100% { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes de16-i1 {
+    0%, 22%   { background: var(--card); }
+    26%, 100% { background: transparent; }
+  }
+  @keyframes de16-i2 {
+    0%, 22%   { background: transparent; }
+    26%, 37%  { background: var(--card); }
+    40%, 100% { background: transparent; }
+  }
+  @keyframes de16-a {
+    0%, 40%   { opacity: 1; transform: none; }
+    46%, 90%  { opacity: 0; transform: translateY(-3px); }
+    96%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de16-b {
+    0%, 40%   { opacity: 0; transform: translateY(3px); }
+    46%, 90%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: translateY(3px); }
+  }
+  @keyframes de16-pb {
+    0%, 42%   { opacity: 0; transform: translateY(3px); color: var(--accent); }
+    48%       { opacity: 1; transform: none; color: var(--accent); }
+    66%, 90%  { opacity: 1; transform: none; color: var(--ink); }
+    96%, 100% { opacity: 0; transform: translateY(3px); color: var(--ink); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state - the other firm chosen, its price filled in. */
+    .de16-pick, .de16-v, .de16-list, .de16-item, .de16-p--a, .de16-p--b { animation: none !important; }
+    .de16-list { display: none; }
+    .de16-v--a, .de16-p--a { opacity: 0; }
+    .de16-v--b, .de16-p--b { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de16-demo" aria-hidden="true">
+  <div class="de16-mini">
+    <span class="de16-lab">Firma</span>
+    <div class="de16-pick">
+      <div class="de16-val">
+        <span class="de16-v de16-v--a"><span class="de16-dot" style="background: var(--accent);"></span>BSAuto</span>
+        <span class="de16-v de16-v--b"><span class="de16-dot" style="background: #2a7;"></span>Autoservis</span>
+      </div>
+      <span class="de16-chev"></span>
+    </div>
+    <div class="de16-row">
+      <div><span class="de16-lab">RZ / SPZ</span><div class="de16-in"><span>2AB 1234</span></div></div>
+      <div><span class="de16-lab">Cena (Kč)</span><div class="de16-in"><span class="de16-p--a">350</span><span class="de16-p--b">420</span></div></div>
+    </div>
+    <div class="de16-list">
+      <div class="de16-item de16-item--1"><span class="de16-dot" style="background: var(--accent);"></span>BSAuto</div>
+      <div class="de16-item de16-item--2"><span class="de16-dot" style="background: #2a7;"></span>Autoservis</div>
+      <div class="de16-item"><span class="de16-dot" style="background: #ff9f0a;"></span>Moto Kolář</div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,106 @@
+{# Demo for release 1.2 (Hledání a barvy firem): "mor" types itself into the
+   search box and the list narrows live to the one firm, whose colour dot
+   gives a little pulse. CSS-only, 6.2s loop; app tokens + firm palette. #}
+<style>
+  .de12-demo, .de12-demo * { box-sizing: border-box; }
+  .de12-demo {
+    display: grid; gap: 10px; padding: 12px; margin-bottom: var(--sp-4, 16px);
+    border-radius: 14px; background: var(--bg); font-family: var(--font);
+  }
+  .de12-mini {
+    display: grid; gap: 6px; padding: 8px 10px 6px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* Search box, like .ukony-search: it takes the accent ring while typing. */
+  .de12-search {
+    position: relative; display: flex; align-items: center; gap: 7px;
+    height: 28px; padding: 0 9px; border: 1.5px solid var(--line);
+    border-radius: 8px; background: var(--bg); overflow: hidden;
+    animation: de12-focus 6.2s infinite;
+  }
+  .de12-search svg { flex: none; color: var(--muted); }
+  .de12-text { font-size: 12.5px; color: var(--ink); white-space: nowrap; clip-path: inset(0 100% 0 0); animation: de12-type 6.2s infinite; }
+  .de12-ph {
+    position: absolute; left: 30px; font-size: 12.5px; color: var(--muted);
+    white-space: nowrap; animation: de12-ph 6.2s infinite;
+  }
+
+  /* List: rows that don't match fold away, the match stays. */
+  .de12-list { display: grid; }
+  .de12-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    height: 22px; padding: 0 3px; overflow: hidden; font-size: 12px; color: var(--ink);
+  }
+  .de12-firma { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; white-space: nowrap; }
+  .de12-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .de12-hit .de12-dot { animation: de12-dot 6.2s infinite; }
+  .de12-hl { padding: 0 1px; margin: 0 -1px; border-radius: 3px; animation: de12-hl 6.2s infinite; }
+  .de12-rz { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .de12-gone { animation: de12-gone 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes de12-focus {
+    0%, 3%   { border-color: var(--line); box-shadow: none; }
+    6%, 38%  { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    44%, 94% { border-color: var(--line); box-shadow: none; }
+    100%     { border-color: var(--line); box-shadow: none; }
+  }
+  @keyframes de12-ph {
+    0%, 4%   { opacity: 1; }
+    7%, 94%  { opacity: 0; }
+    100%     { opacity: 1; }
+  }
+  @keyframes de12-type {
+    0%, 8%   { clip-path: inset(0 100% 0 0); animation-timing-function: steps(3, end); }
+    24%, 94% { clip-path: inset(0 0 0 0); }
+    100%     { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes de12-gone {
+    0%, 25%  { max-height: 22px; opacity: 1; }
+    30%      { max-height: 22px; opacity: 0; }
+    38%, 94% { max-height: 0; opacity: 0; }
+    100%     { max-height: 22px; opacity: 1; }
+  }
+  @keyframes de12-hl {
+    0%, 26%  { background: transparent; }
+    32%, 94% { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+    100%     { background: transparent; }
+  }
+  @keyframes de12-dot {
+    0%, 40%  { transform: scale(1); }
+    46%      { transform: scale(1.7); }
+    54%, 100% { transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, "mor" typed, only the matching firm left. */
+    .de12-search, .de12-text, .de12-ph, .de12-gone, .de12-hl, .de12-hit .de12-dot { animation: none; }
+    .de12-text { clip-path: none; }
+    .de12-ph { opacity: 0; }
+    .de12-gone { max-height: 0; opacity: 0; }
+    .de12-hl { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  }
+</style>
+<div class="de12-demo" aria-hidden="true">
+  <div class="de12-mini">
+    <div class="de12-search">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      <span class="de12-ph">Hledat…</span>
+      <span class="de12-text">mor</span>
+    </div>
+    <div class="de12-list">
+      <div class="de12-row de12-gone">
+        <span class="de12-firma"><i class="de12-dot" style="background:#0a84ff"></i>BSAuto</span>
+        <b class="de12-rz">1BC 2345</b>
+      </div>
+      <div class="de12-row de12-hit">
+        <span class="de12-firma"><i class="de12-dot" style="background:#34c759"></i><span><span class="de12-hl">Mor</span>avia</span></span>
+        <b class="de12-rz">3AD 6789</b>
+      </div>
+      <div class="de12-row de12-gone">
+        <span class="de12-firma"><i class="de12-dot" style="background:#ff9f0a"></i>Kolář</span>
+        <b class="de12-rz">5E4 1122</b>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,134 @@
+{# Demo for release 1.17.0 (Rychlejší sken a rovnou do evidence): the faster
+   Haiku model sweeps an ORV, RZ + VIN fill in, then "Přidat do evidence" is
+   pressed and turns into a green "V evidenci". CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1170-demo {
+    position: relative; overflow: hidden; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); color: var(--wn-ink, #1a1d23);
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px;
+    line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .dz1170-doc {
+    position: relative; overflow: hidden; width: 58px; height: 92px; padding: 9px 8px;
+    border: 1px solid var(--wn-line, #dde1e7); border-radius: 8px; background: var(--wn-card, #fff);
+    display: grid; align-content: start; gap: 6px;
+  }
+  .dz1170-doc i { display: block; height: 4px; border-radius: 2px; background: var(--wn-line, #dde1e7); }
+  .dz1170-doc i:nth-child(1) { width: 55%; background: var(--wn-muted, #6b7280); opacity: .55; }
+  .dz1170-doc i:nth-child(2) { width: 90%; }
+  .dz1170-doc i:nth-child(3) { width: 72%; }
+  .dz1170-doc i:nth-child(4) { width: 84%; }
+  .dz1170-doc i:nth-child(5) { width: 48%; }
+  .dz1170-beam {
+    position: absolute; left: 0; right: 0; top: 0; height: 18px; opacity: 0;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--wn-accent, #1a56db) 50%, transparent), transparent);
+    animation: dz1170-beam 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  .dz1170-side { display: grid; gap: 5px; min-width: 0; }
+  .dz1170-model {
+    justify-self: start; display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px 3px 7px; border: 1.5px solid var(--wn-line, #dde1e7); border-radius: 999px;
+    background: var(--wn-card, #fff); font-size: 10.5px; font-weight: 700; white-space: nowrap;
+  }
+  .dz1170-model svg { color: var(--wn-accent, #1a56db); flex: none; }
+  .dz1170-row {
+    position: relative; display: flex; align-items: center; gap: 6px; height: 22px; min-width: 0;
+    padding: 0 8px; border: 1.5px solid var(--wn-line, #dde1e7); border-radius: 6px;
+    background: var(--wn-card, #fff); font-size: 12px;
+    animation: dz1170-row 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1170-row + .dz1170-row { animation-name: dz1170-row2; }
+  .dz1170-k { flex: none; width: 22px; font-size: 9.5px; font-weight: 700; letter-spacing: .04em; color: var(--wn-muted, #6b7280); }
+  .dz1170-dash { position: absolute; left: 38px; color: var(--wn-muted, #6b7280); animation: dz1170-dash 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1170-row + .dz1170-row .dz1170-dash { animation-name: dz1170-dash2; }
+  .dz1170-v {
+    min-width: 0; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0; transform: scale(.92); transform-origin: left center;
+    animation: dz1170-v 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1170-row + .dz1170-row .dz1170-v { animation-name: dz1170-v2; }
+
+  .dz1170-btn {
+    position: relative; height: 28px; margin-top: 2px; display: grid; place-items: center;
+    border: 1.5px solid var(--wn-accent, #1a56db); border-radius: 8px; background: var(--wn-card, #fff);
+    color: var(--wn-accent, #1a56db); font-size: 12px; font-weight: 700; white-space: nowrap;
+    animation: dz1170-btn 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1170-btn > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 5px; }
+  .dz1170-add { animation: dz1170-add 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1170-done { opacity: 0; color: var(--success, #059669); animation: dz1170-done 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1170-beam {
+    0%, 7%   { opacity: 0; top: -18px; }
+    9%       { opacity: 1; top: -18px; }
+    20%      { opacity: 1; top: 92px; }
+    22%, 100% { opacity: 0; top: 92px; }
+  }
+  @keyframes dz1170-dash  { 0%, 21% { opacity: 1; } 23%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1170-dash2 { 0%, 25% { opacity: 1; } 27%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1170-v {
+    0%, 21%  { opacity: 0; transform: scale(.92); }
+    26%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes dz1170-v2 {
+    0%, 25%  { opacity: 0; transform: scale(.92); }
+    30%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes dz1170-row {
+    0%, 21%  { border-color: var(--wn-line, #dde1e7); }
+    24%, 94% { border-color: var(--success, #059669); }
+    100%     { border-color: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1170-row2 {
+    0%, 25%  { border-color: var(--wn-line, #dde1e7); }
+    28%, 94% { border-color: var(--success, #059669); }
+    100%     { border-color: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1170-btn {
+    0%, 50% { transform: none; border-color: var(--wn-accent, #1a56db); background: var(--wn-card, #fff); }
+    53%     { transform: scale(.95); border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    58%, 94% { transform: none; border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 12%, var(--wn-card, #fff)); }
+    100%    { transform: none; border-color: var(--wn-accent, #1a56db); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz1170-add  { 0%, 54% { opacity: 1; } 58%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1170-done { 0%, 54% { opacity: 0; } 60%, 94% { opacity: 1; } 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: both fields filled, button turned into "V evidenci". */
+    .dz1170-demo .dz1170-beam,
+    .dz1170-demo .dz1170-row,
+    .dz1170-demo .dz1170-dash,
+    .dz1170-demo .dz1170-v,
+    .dz1170-demo .dz1170-btn,
+    .dz1170-demo .dz1170-add,
+    .dz1170-demo .dz1170-done { animation: none; }
+    .dz1170-demo .dz1170-beam,
+    .dz1170-demo .dz1170-dash,
+    .dz1170-demo .dz1170-add { opacity: 0; }
+    .dz1170-demo .dz1170-row { border-color: var(--success, #059669); }
+    .dz1170-demo .dz1170-v,
+    .dz1170-demo .dz1170-done { opacity: 1; transform: none; }
+    .dz1170-demo .dz1170-btn { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 12%, var(--wn-card, #fff)); }
+  }
+</style>
+<div class="dz1170-demo" aria-hidden="true">
+  <div class="dz1170-doc"><i></i><i></i><i></i><i></i><i></i><span class="dz1170-beam"></span></div>
+  <div class="dz1170-side">
+    <div class="dz1170-model">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>
+      Haiku 5.5
+    </div>
+    <div class="dz1170-row"><span class="dz1170-k">RZ</span><span class="dz1170-dash">—</span><span class="dz1170-v">2AB 1234</span></div>
+    <div class="dz1170-row"><span class="dz1170-k">VIN</span><span class="dz1170-dash">—</span><span class="dz1170-v">TMBJJ7NE5K0123456</span></div>
+    <div class="dz1170-btn">
+      <span class="dz1170-add">Přidat do evidence</span>
+      <span class="dz1170-done">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        V evidenci
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,119 @@
+{# Demo for release 1.3 (Kdo co vyřídil): "Zpracoval" is set to Roman, the new
+   úkon drops into the list and its "kdo" badge pops in next to the firm.
+   CSS-only, 6s loop; app tokens + firm palette. #}
+<style>
+  .de13-demo, .de13-demo * { box-sizing: border-box; }
+  .de13-demo {
+    display: grid; gap: 10px; padding: 12px; margin-bottom: var(--sp-4, 16px);
+    border-radius: 14px; background: var(--bg); font-family: var(--font);
+  }
+  .de13-mini {
+    display: grid; gap: 6px; padding: 8px 10px 6px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* "Zpracoval" select, like .filter-select. */
+  .de13-field { display: flex; align-items: center; gap: 10px; }
+  .de13-label { flex: none; font-size: 12px; font-weight: 600; color: var(--ink); }
+  .de13-select {
+    position: relative; flex: 1; min-width: 0; height: 28px;
+    display: flex; align-items: center; padding: 0 28px 0 10px;
+    border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+    font-size: 12.5px; animation: de13-focus 6s infinite;
+  }
+  .de13-select > svg { position: absolute; right: 9px; top: 50%; margin-top: -5px; color: var(--muted); }
+  .de13-ph { position: absolute; left: 10px; color: var(--muted); animation: de13-ph 6s infinite; }
+  .de13-val { color: var(--ink); font-weight: 500; opacity: 0; transform: translateY(3px); animation: de13-val 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  /* List: the new row sits on top, the others were there already. */
+  .de13-list { display: grid; }
+  .de13-row {
+    display: grid; grid-template-columns: 58px minmax(0, 1fr) auto auto;
+    align-items: center; gap: 6px; height: 22px; padding: 0 4px; margin: 0 -4px;
+    border-radius: 6px; font-size: 12px; color: var(--ink);
+  }
+  .de13-row + .de13-row + .de13-row { box-shadow: 0 -1px 0 var(--line); }
+  .de13-new { box-shadow: 0 1px 0 var(--line); opacity: 0; transform: translateY(-5px); animation: de13-new 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de13-firma {
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+    font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .de13-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .de13-rz { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .de13-kdo {
+    display: inline-block; padding: 0 7px; border-radius: var(--radius-pill, 9999px);
+    background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+    font-size: 10.5px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+  }
+  .de13-pop { opacity: 0; transform: scale(.6); animation: de13-pop 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de13-kc { min-width: 46px; font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  @keyframes de13-focus {
+    0%, 6%   { border-color: var(--line); box-shadow: none; }
+    10%, 24% { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    30%, 94% { border-color: var(--line); box-shadow: none; }
+    100%     { border-color: var(--line); box-shadow: none; }
+  }
+  @keyframes de13-ph {
+    0%, 16%  { opacity: 1; }
+    19%, 94% { opacity: 0; }
+    100%     { opacity: 1; }
+  }
+  @keyframes de13-val {
+    0%, 17%  { opacity: 0; transform: translateY(3px); }
+    22%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de13-new {
+    0%, 28%  { opacity: 0; transform: translateY(-5px); background: transparent; }
+    35%      { opacity: 1; transform: none; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    62%      { opacity: 1; transform: none; background: transparent; }
+    94%      { opacity: 1; transform: none; background: transparent; }
+    100%     { opacity: 0; transform: none; background: transparent; }
+  }
+  @keyframes de13-pop {
+    0%, 38%  { opacity: 0; transform: scale(.6); }
+    45%      { opacity: 1; transform: scale(1.12); }
+    49%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, Roman selected, his úkon listed with his badge. */
+    .de13-select, .de13-ph, .de13-val, .de13-new, .de13-pop { animation: none; }
+    .de13-ph { opacity: 0; }
+    .de13-val, .de13-new, .de13-pop { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de13-demo" aria-hidden="true">
+  <div class="de13-mini">
+    <div class="de13-field">
+      <span class="de13-label">Zpracoval</span>
+      <div class="de13-select">
+        <span class="de13-ph">— kdo —</span>
+        <span class="de13-val">Roman</span>
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+    </div>
+    <div class="de13-list">
+      <div class="de13-row de13-new">
+        <span class="de13-firma"><i class="de13-dot" style="background:#0a84ff"></i>BSAuto</span>
+        <b class="de13-rz">7F2 4455</b>
+        <span class="de13-kdo de13-pop">Roman</span>
+        <span class="de13-kc">900 Kč</span>
+      </div>
+      <div class="de13-row">
+        <span class="de13-firma"><i class="de13-dot" style="background:#34c759"></i>Moravia</span>
+        <b class="de13-rz">3AD 6789</b>
+        <span class="de13-kdo">David</span>
+        <span class="de13-kc">1 500 Kč</span>
+      </div>
+      <div class="de13-row">
+        <span class="de13-firma"><i class="de13-dot" style="background:#ff9f0a"></i>Kolář</span>
+        <b class="de13-rz">5E4 1122</b>
+        <span class="de13-kdo">Petr</span>
+        <span class="de13-kc">1 400 Kč</span>
+      </div>
+    </div>
+  </div>
+</div>

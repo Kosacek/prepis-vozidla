@@ -1,0 +1,145 @@
+{# Demo for release 1.0.0 (Žádosti jsou tady): a techničák is photographed, a
+   scan beam passes over it and the vehicle form fills itself in.
+   CSS-only, 6.2s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz100-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--wn-ink, #1a1d23);
+  }
+
+  /* Techničák in a viewfinder. */
+  .dz100-shot { position: relative; flex: none; width: 56px; height: 84px; display: grid; place-items: center; }
+  .dz100-vf {
+    position: absolute; inset: 0; animation: dz100-vf 6.2s infinite cubic-bezier(.2, .7, .3, 1);
+    background:
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 0 0 / 9px 2px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 0 0 / 2px 9px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 100% 0 / 9px 2px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 100% 0 / 2px 9px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 0 100% / 9px 2px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 0 100% / 2px 9px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 100% 100% / 9px 2px no-repeat,
+      linear-gradient(var(--wn-accent, #1a56db), var(--wn-accent, #1a56db)) 100% 100% / 2px 9px no-repeat;
+  }
+  .dz100-doc {
+    position: relative; overflow: hidden; width: 42px; height: 62px; padding: 7px 6px;
+    border-radius: 4px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    display: grid; align-content: start; gap: 4px;
+  }
+  .dz100-doc i { display: block; height: 3px; border-radius: 2px; background: var(--wn-line, #dde1e7); }
+  .dz100-doc i:nth-child(1) { width: 60%; height: 5px; background: var(--wn-soft, #e8f0fe); }
+  .dz100-doc i:nth-child(2) { width: 90%; }
+  .dz100-doc i:nth-child(3) { width: 70%; }
+  .dz100-doc i:nth-child(4) { width: 85%; }
+  .dz100-doc i:nth-child(5) { width: 55%; }
+  .dz100-flash { position: absolute; inset: 0; background: #fff; opacity: 0; animation: dz100-flash 6.2s infinite; }
+  .dz100-beam {
+    position: absolute; left: 0; right: 0; top: -12px; height: 12px; opacity: 0;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--wn-accent, #1a56db) 50%, transparent), transparent);
+    animation: dz100-beam 6.2s infinite cubic-bezier(.4, 0, .6, 1);
+  }
+  .dz100-arrow { flex: none; color: var(--wn-muted, #6b7280); opacity: .45; animation: dz100-arrow 6.2s infinite; }
+
+  /* Údaje o vozidle: the three fields fill themselves. */
+  .dz100-form {
+    flex: 1; min-width: 0; padding: 7px 8px; display: grid; gap: 4px;
+    border-radius: 10px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+  }
+  .dz100-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; font-weight: 700; }
+  .dz100-done {
+    flex: none; width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--wn-line, #dde1e7); color: #fff; animation: dz100-done 6.2s infinite;
+  }
+  .dz100-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .dz100-k { flex: none; width: 24px; font-size: 9.5px; font-weight: 700; color: var(--wn-muted, #6b7280); }
+  .dz100-in {
+    flex: 1; min-width: 0; height: 20px; padding: 0 6px; display: flex; align-items: center; overflow: hidden;
+    border-radius: 6px; border: 1.5px solid var(--wn-line, #dde1e7);
+    font-size: 10.5px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .dz100-v { display: block; clip-path: inset(0 100% 0 0); }
+  .dz100-v1 { animation: dz100-t1 6.2s infinite; }
+  .dz100-v2 { animation: dz100-t2 6.2s infinite; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 9.5px; }
+  .dz100-v3 { animation: dz100-t3 6.2s infinite; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 9.5px; }
+  .dz100-in3 { animation: dz100-ok 6.2s infinite; }
+
+  @keyframes dz100-vf {
+    0%, 5%    { opacity: 0; transform: scale(1.18); }
+    10%, 90%  { opacity: 1; transform: none; }
+    98%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz100-flash {
+    0%, 13% { opacity: 0; }
+    15%     { opacity: .9; }
+    22%, 100% { opacity: 0; }
+  }
+  @keyframes dz100-beam {
+    0%, 22%   { opacity: 0; top: -12px; }
+    24%       { opacity: 1; top: -12px; }
+    38%       { opacity: 1; top: 62px; }
+    40%, 100% { opacity: 0; top: 62px; }
+  }
+  @keyframes dz100-arrow {
+    0%, 36%   { opacity: .45; transform: none; }
+    42%, 90%  { opacity: 1; color: var(--wn-accent, #1a56db); transform: translateX(1px); }
+    98%, 100% { opacity: .45; transform: none; }
+  }
+  @keyframes dz100-t1 {
+    0%, 42%   { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: steps(8, end); }
+    50%, 93%  { clip-path: inset(0 0 0 0); opacity: 1; }
+    99%       { clip-path: inset(0 0 0 0); opacity: 0; }
+    100%      { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  @keyframes dz100-t2 {
+    0%, 50%   { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: steps(9, end); }
+    58%, 93%  { clip-path: inset(0 0 0 0); opacity: 1; }
+    99%       { clip-path: inset(0 0 0 0); opacity: 0; }
+    100%      { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  @keyframes dz100-t3 {
+    0%, 58%   { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: steps(17, end); }
+    70%, 93%  { clip-path: inset(0 0 0 0); opacity: 1; }
+    99%       { clip-path: inset(0 0 0 0); opacity: 0; }
+    100%      { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  /* VIN goes green once it is complete, like the real field. */
+  @keyframes dz100-ok {
+    0%, 69%   { border-color: var(--wn-line, #dde1e7); background: transparent; }
+    72%, 93%  { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); background: transparent; }
+  }
+  @keyframes dz100-done {
+    0%, 71%   { background: var(--wn-line, #dde1e7); transform: scale(1); }
+    75%       { background: var(--success, #059669); transform: scale(1.25); }
+    79%, 93%  { background: var(--success, #059669); transform: scale(1); }
+    99%, 100% { background: var(--wn-line, #dde1e7); transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, form filled in. */
+    .dz100-vf, .dz100-flash, .dz100-beam, .dz100-arrow, .dz100-v, .dz100-in3, .dz100-done { animation: none; }
+    .dz100-vf { opacity: 1; }
+    .dz100-flash, .dz100-beam { opacity: 0; }
+    .dz100-arrow { opacity: 1; color: var(--wn-accent, #1a56db); }
+    .dz100-v { clip-path: none; opacity: 1; }
+    .dz100-in3 { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); }
+    .dz100-done { background: var(--success, #059669); }
+  }
+</style>
+<div class="dz100-demo" aria-hidden="true">
+  <div class="dz100-shot">
+    <span class="dz100-vf"></span>
+    <div class="dz100-doc"><i></i><i></i><i></i><i></i><i></i><span class="dz100-flash"></span><span class="dz100-beam"></span></div>
+  </div>
+  <svg class="dz100-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  <div class="dz100-form">
+    <div class="dz100-head">Údaje o vozidle
+      <span class="dz100-done"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    </div>
+    <div class="dz100-row"><span class="dz100-k">RZ</span><span class="dz100-in"><span class="dz100-v dz100-v1">1AB 2345</span></span></div>
+    <div class="dz100-row"><span class="dz100-k">ORV</span><span class="dz100-in"><span class="dz100-v dz100-v2">UBE037263</span></span></div>
+    <div class="dz100-row"><span class="dz100-k">VIN</span><span class="dz100-in dz100-in3"><span class="dz100-v dz100-v3">WBA3A5C51DF123456</span></span></div>
+  </div>
+</div>

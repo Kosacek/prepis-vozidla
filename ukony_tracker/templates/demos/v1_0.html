@@ -1,0 +1,120 @@
+{# Demo for release 1.0 (Evidence je tady): úkony of three firms land in one
+   list, one gets paid, then the total is exported to Excel. CSS-only,
+   6s loop; app tokens + the firm palette of colors_service. #}
+<style>
+  .de10-demo, .de10-demo * { box-sizing: border-box; }
+  .de10-demo {
+    display: grid; gap: 10px; padding: 12px; margin-bottom: var(--sp-4, 16px);
+    border-radius: 14px; background: var(--bg); font-family: var(--font);
+  }
+  .de10-mini {
+    padding: 4px 10px 8px; border-radius: var(--radius-sm); overflow: hidden;
+    background: var(--card); box-shadow: var(--shadow-sm);
+  }
+  .de10-row {
+    display: grid; grid-template-columns: 64px minmax(0, 1fr) 34px auto;
+    align-items: center; gap: 6px; height: 24px;
+    border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink);
+    opacity: 0; transform: translateY(5px);
+  }
+  .de10-row.de10-r3 { border-bottom: 0; }
+  .de10-r1 { animation: de10-r1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de10-r2 { animation: de10-r2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de10-r3 { animation: de10-r3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de10-firma {
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+    font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .de10-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .de10-rz { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .de10-pay { display: flex; justify-content: center; }
+  .de10-badge {
+    padding: 1px 6px; border-radius: var(--radius-pill, 9999px);
+    background: var(--flash-success-bg, #d1f5d3); color: var(--flash-success-ink, #1a6b2a);
+    font-size: 10px; font-weight: 600; line-height: 1.4;
+    opacity: 0; transform: scale(.7); animation: de10-badge 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .de10-kc { font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .de10-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    height: 28px; margin-top: 4px; padding-top: 6px; border-top: 1.5px solid var(--line);
+  }
+  .de10-sum { font-size: 12px; font-weight: 700; color: var(--ink); opacity: 0; animation: de10-sum 6s infinite; }
+  .de10-sum span { margin-right: 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .de10-xls {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 10px;
+    border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 600;
+    background: var(--line); color: var(--muted);
+    animation: de10-xls 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .de10-xls svg { flex: none; }
+
+  @keyframes de10-r1 {
+    0%, 4%   { opacity: 0; transform: translateY(5px); }
+    9%, 94%  { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de10-r2 {
+    0%, 11%  { opacity: 0; transform: translateY(5px); }
+    16%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de10-r3 {
+    0%, 18%  { opacity: 0; transform: translateY(5px); }
+    23%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de10-badge {
+    0%, 34%  { opacity: 0; transform: scale(.7); }
+    38%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes de10-sum {
+    0%, 28%  { opacity: 0; }
+    33%, 94% { opacity: 1; }
+    100%     { opacity: 0; }
+  }
+  @keyframes de10-xls {
+    0%, 52%  { background: var(--line); color: var(--muted); transform: none; }
+    55%      { background: var(--accent); color: var(--accent-ink); transform: scale(.94); }
+    59%, 94% { background: var(--accent); color: var(--accent-ink); transform: none; }
+    100%     { background: var(--line); color: var(--muted); transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, everything in one list, one paid, Excel ready. */
+    .de10-r1, .de10-r2, .de10-r3, .de10-badge, .de10-sum, .de10-xls { animation: none; }
+    .de10-row, .de10-badge, .de10-sum { opacity: 1; transform: none; }
+    .de10-xls { background: var(--accent); color: var(--accent-ink); }
+  }
+</style>
+<div class="de10-demo" aria-hidden="true">
+  <div class="de10-mini">
+    <div class="de10-row de10-r1">
+      <span class="de10-firma"><i class="de10-dot" style="background:#0a84ff"></i>BSAuto</span>
+      <b class="de10-rz">1BC 2345</b>
+      <span class="de10-pay"></span>
+      <span class="de10-kc">1 200 Kč</span>
+    </div>
+    <div class="de10-row de10-r2">
+      <span class="de10-firma"><i class="de10-dot" style="background:#34c759"></i>Moravia</span>
+      <b class="de10-rz">3AD 6789</b>
+      <span class="de10-pay"><span class="de10-badge">zapl.</span></span>
+      <span class="de10-kc">1 500 Kč</span>
+    </div>
+    <div class="de10-row de10-r3">
+      <span class="de10-firma"><i class="de10-dot" style="background:#ff9f0a"></i>Kolář</span>
+      <b class="de10-rz">5E4 1122</b>
+      <span class="de10-pay"></span>
+      <span class="de10-kc">1 400 Kč</span>
+    </div>
+    <div class="de10-foot">
+      <div class="de10-sum"><span>Celkem</span>4 100 Kč</div>
+      <div class="de10-xls">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+        Excel
+      </div>
+    </div>
+  </div>
+</div>

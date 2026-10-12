@@ -1,0 +1,148 @@
+{# Demo for release 1.18.0 (Sdílecí kód všude): the share button lights up on
+   Plná moc, Historie and Doklady in turn, and each time its own short code
+   (/4821 …) appears in the share panel. CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1180-demo {
+    position: relative; overflow: hidden; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); color: var(--wn-ink, #1a1d23);
+    display: grid; grid-template-rows: auto 1fr; gap: 8px;
+    line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .dz1180-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .dz1180-tile {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 5px;
+    padding: 7px 7px 7px 9px; border: 1.5px solid var(--wn-line, #dde1e7); border-radius: 8px;
+    background: var(--wn-card, #fff); min-width: 0;
+  }
+  .dz1180-tile > svg { color: var(--wn-muted, #6b7280); }
+  .dz1180-share {
+    width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+    border: 1.5px solid var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280);
+  }
+  .dz1180-lbl {
+    grid-column: 1 / -1; font-size: 11px; font-weight: 700; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .dz1180-t1 { animation: dz1180-t1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-t2 { animation: dz1180-t2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-t3 { animation: dz1180-t3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-t1 .dz1180-share { animation: dz1180-s1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-t2 .dz1180-share { animation: dz1180-s2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-t3 .dz1180-share { animation: dz1180-s3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  .dz1180-panel {
+    display: grid; align-content: center; justify-items: center; gap: 4px; min-height: 0;
+    border: 1px solid var(--wn-line, #dde1e7); border-radius: 10px; background: var(--wn-card, #fff);
+  }
+  .dz1180-codes { display: grid; height: 28px; }
+  .dz1180-code {
+    grid-area: 1 / 1; align-self: center; justify-self: center; opacity: 0;
+    font-size: 24px; font-weight: 800; letter-spacing: .5px; color: var(--wn-ink, #1a1d23);
+  }
+  .dz1180-c1 { animation: dz1180-c1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-c2 { animation: dz1180-c2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-c3 { animation: dz1180-c3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1180-sub {
+    display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--wn-muted, #6b7280);
+    white-space: nowrap; opacity: 0; animation: dz1180-sub 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1180-sub svg { color: var(--success, #059669); flex: none; }
+
+  @keyframes dz1180-t1 {
+    0%, 6%   { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    10%, 27% { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    32%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz1180-t2 {
+    0%, 33%  { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    37%, 54% { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    59%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz1180-t3 {
+    0%, 60%  { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    64%, 86% { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    92%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz1180-s1 {
+    0%, 6%   { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+    9%       { transform: scale(.82); }
+    12%, 27% { background: var(--wn-accent, #1a56db); border-color: var(--wn-accent, #1a56db); color: #fff; transform: none; }
+    32%, 100% { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+  }
+  @keyframes dz1180-s2 {
+    0%, 33%  { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+    36%      { transform: scale(.82); }
+    39%, 54% { background: var(--wn-accent, #1a56db); border-color: var(--wn-accent, #1a56db); color: #fff; transform: none; }
+    59%, 100% { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+  }
+  @keyframes dz1180-s3 {
+    0%, 60%  { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+    63%      { transform: scale(.82); }
+    66%, 86% { background: var(--wn-accent, #1a56db); border-color: var(--wn-accent, #1a56db); color: #fff; transform: none; }
+    92%, 100% { background: transparent; border-color: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: none; }
+  }
+  @keyframes dz1180-sub {
+    0%, 10%  { opacity: 0; }
+    15%, 86% { opacity: 1; }
+    91%, 100% { opacity: 0; }
+  }
+  @keyframes dz1180-c1 {
+    0%, 10%  { opacity: 0; transform: scale(.88); }
+    15%, 27% { opacity: 1; transform: none; }
+    31%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1180-c2 {
+    0%, 37%  { opacity: 0; transform: scale(.88); }
+    42%, 54% { opacity: 1; transform: none; }
+    58%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1180-c3 {
+    0%, 64%  { opacity: 0; transform: scale(.88); }
+    69%, 86% { opacity: 1; transform: none; }
+    91%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: the last place (Doklady) shared, its code shown. */
+    .dz1180-demo .dz1180-t1,
+    .dz1180-demo .dz1180-t2,
+    .dz1180-demo .dz1180-t3,
+    .dz1180-demo .dz1180-share,
+    .dz1180-demo .dz1180-code,
+    .dz1180-demo .dz1180-sub { animation: none; }
+    .dz1180-demo .dz1180-t3 { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    .dz1180-demo .dz1180-t3 .dz1180-share { background: var(--wn-accent, #1a56db); border-color: var(--wn-accent, #1a56db); color: #fff; }
+    .dz1180-demo .dz1180-c3,
+    .dz1180-demo .dz1180-sub { opacity: 1; }
+  }
+</style>
+<div class="dz1180-demo" aria-hidden="true">
+  <div class="dz1180-tiles">
+    <div class="dz1180-tile dz1180-t1">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 8h3M9 11h6"/><path d="M9 16.5c1-1.5 1.8.8 2.8 0s1.4-1.2 2.3 0"/></svg>
+      <span class="dz1180-share"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/></svg></span>
+      <span class="dz1180-lbl">Plná moc</span>
+    </div>
+    <div class="dz1180-tile dz1180-t2">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <span class="dz1180-share"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/></svg></span>
+      <span class="dz1180-lbl">Historie</span>
+    </div>
+    <div class="dz1180-tile dz1180-t3">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></svg>
+      <span class="dz1180-share"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/></svg></span>
+      <span class="dz1180-lbl">Doklady</span>
+    </div>
+  </div>
+  <div class="dz1180-panel">
+    <div class="dz1180-codes">
+      <span class="dz1180-code dz1180-c1">/4821</span>
+      <span class="dz1180-code dz1180-c2">/7305</span>
+      <span class="dz1180-code dz1180-c3">/1964</span>
+    </div>
+    <div class="dz1180-sub">
+      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      Zkopírováno · platí 30 dní
+    </div>
+  </div>
+</div>

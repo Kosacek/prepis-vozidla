@@ -1,0 +1,113 @@
+{# Demo for release 1.9.0 (Chytřejší propojení s evidencí): the seller's IČO picks
+   the firma in the evidence panel, then an electric plate sets price 500 + note EL.
+   CSS-only, 6.2s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz190-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz190-mini {
+    display: grid; gap: 6px; padding: 9px 10px; border-radius: 10px;
+    border: 1px solid var(--wn-line); background: var(--wn-card);
+  }
+  .dz190-row { display: flex; align-items: center; gap: 8px; height: 22px; }
+  .dz190-lbl {
+    flex: none; width: 62px; font-size: 9px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--wn-muted);
+  }
+  .dz190-field {
+    box-sizing: border-box; flex: 1; min-width: 0; height: 22px; padding: 0 8px;
+    display: flex; align-items: center; gap: 6px; position: relative;
+    border: 1.5px solid var(--wn-line); border-radius: 6px; background: var(--wn-bg);
+    font-size: 11px; white-space: nowrap; overflow: hidden;
+  }
+  .dz190-stack { display: grid; flex: 1; min-width: 0; }
+  .dz190-stack > span { grid-area: 1 / 1; display: flex; align-items: center; gap: 5px; }
+
+  .dz190-ico { font-weight: 700; font-variant-numeric: tabular-nums; animation: dz190-ico 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz190-pick { animation: dz190-pick 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz190-ph { color: var(--wn-muted); animation: dz190-ph 6.2s infinite; }
+  .dz190-val { font-weight: 700; opacity: 0; animation: dz190-val 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz190-ok { flex: none; margin-left: auto; color: var(--success, #059669); opacity: 0; animation: dz190-okk 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz190-old { font-variant-numeric: tabular-nums; color: var(--wn-muted); text-decoration: line-through; animation: dz190-old 6.2s infinite; }
+  .dz190-new { font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0; animation: dz190-new 6.2s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz190-el {
+    flex: none; margin-left: auto; padding: 1px 6px; border-radius: 4px;
+    background: var(--success, #059669); color: #fff; font-size: 9.5px; font-weight: 800; letter-spacing: .04em;
+    opacity: 0; transform: scale(.6); animation: dz190-el 6.2s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  @keyframes dz190-ico {
+    0%, 10%  { color: var(--wn-ink); }
+    18%, 40% { color: var(--wn-accent); }
+    50%, 92% { color: var(--wn-ink); }
+    100%     { color: var(--wn-ink); }
+  }
+  @keyframes dz190-pick {
+    0%, 20%  { border-color: var(--wn-line); }
+    26%, 38% { border-color: var(--wn-accent); }
+    48%, 92% { border-color: var(--wn-line); }
+    100%     { border-color: var(--wn-line); }
+  }
+  @keyframes dz190-ph { 0%, 22% { opacity: 1; } 28%, 92% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz190-val {
+    0%, 23%  { opacity: 0; transform: translateY(4px); }
+    30%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(4px); }
+  }
+  @keyframes dz190-okk {
+    0%, 29%  { opacity: 0; transform: scale(.5); }
+    35%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: scale(.5); }
+  }
+  @keyframes dz190-old { 0%, 52% { opacity: 1; } 58%, 92% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz190-new {
+    0%, 53%  { opacity: 0; transform: translateY(4px); }
+    60%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(4px); }
+  }
+  @keyframes dz190-el {
+    0%, 62%  { opacity: 0; transform: scale(.6); }
+    70%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: scale(.6); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: firma picked from the IČO, price 500 Kč, EL note. */
+    .dz190-ico, .dz190-pick, .dz190-ph, .dz190-val, .dz190-ok, .dz190-old, .dz190-new, .dz190-el { animation: none; }
+    .dz190-ph, .dz190-old { opacity: 0; }
+    .dz190-val, .dz190-new { opacity: 1; transform: none; }
+    .dz190-ok { opacity: 1; transform: none; }
+    .dz190-el { opacity: 1; transform: none; }
+  }
+</style>
+<div class="dz190-demo" aria-hidden="true">
+  <div class="dz190-mini">
+    <div class="dz190-row">
+      <span class="dz190-lbl">Prodávající</span>
+      <span class="dz190-field"><span class="dz190-ico">IČO 27084111</span></span>
+    </div>
+    <div class="dz190-row">
+      <span class="dz190-lbl">Firma</span>
+      <span class="dz190-field dz190-pick">
+        <span class="dz190-stack">
+          <span class="dz190-ph">— vyber firmu —</span>
+          <span class="dz190-val">Autobazar Novák</span>
+        </span>
+        <svg class="dz190-ok" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </span>
+    </div>
+    <div class="dz190-row">
+      <span class="dz190-lbl">Cena</span>
+      <span class="dz190-field">
+        <span class="dz190-stack">
+          <span class="dz190-old">1 300 Kč</span>
+          <span class="dz190-new">500 Kč</span>
+        </span>
+        <span class="dz190-el">EL</span>
+      </span>
+    </div>
+  </div>
+</div>

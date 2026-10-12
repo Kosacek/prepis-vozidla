@@ -1,0 +1,133 @@
+{# Demo for release 1.21.0 (Doklady se samy propíšou do evidence): a pokladní
+   doklad gets issued, a dot runs along the link to the evidence list, and a new
+   row slides in at the top with a green check. CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1210-demo {
+    position: relative; overflow: hidden; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); color: var(--wn-ink, #1a1d23);
+    display: grid; grid-template-columns: minmax(0, .9fr) 30px minmax(0, 1.1fr); align-items: center;
+    line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+
+  /* Pokladní doklad (PPD). */
+  .dz1210-ppd {
+    padding: 10px 11px; border: 1px solid var(--wn-line, #dde1e7); border-radius: 10px;
+    background: var(--wn-card, #fff); display: grid; gap: 6px; min-width: 0; overflow: hidden;
+  }
+  .dz1210-ppdh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .dz1210-ppdh svg { flex: none; color: var(--wn-accent, #1a56db); }
+  .dz1210-sum { font-size: 18px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; }
+  .dz1210-lines { display: grid; gap: 4px; }
+  .dz1210-lines i { display: block; height: 3px; border-radius: 2px; background: var(--wn-line, #dde1e7); }
+  .dz1210-lines i:nth-child(1) { width: 88%; }
+  .dz1210-lines i:nth-child(2) { width: 58%; }
+  .dz1210-chip {
+    justify-self: start; display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px 2px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap;
+    background: color-mix(in srgb, var(--success, #059669) 14%, transparent); color: var(--success, #059669);
+    opacity: 0; animation: dz1210-chip 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  /* The link between the two cards. */
+  .dz1210-link { position: relative; height: 14px; }
+  .dz1210-link::before {
+    content: ''; position: absolute; left: 3px; right: 3px; top: 50%; border-top: 2px dashed var(--wn-line, #dde1e7);
+    transform: translateY(-1px);
+  }
+  .dz1210-dot {
+    position: absolute; top: 50%; left: 0; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+    background: var(--wn-accent, #1a56db); opacity: 0; animation: dz1210-dot 6s cubic-bezier(.45, 0, .3, 1) infinite;
+  }
+
+  /* Evidence list. */
+  .dz1210-ev {
+    padding: 9px 9px 8px; border: 1px solid var(--wn-line, #dde1e7); border-radius: 10px;
+    background: var(--wn-card, #fff); min-width: 0;
+  }
+  .dz1210-evh { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; font-size: 12px; font-weight: 700; }
+  .dz1210-evh svg { flex: none; color: var(--wn-muted, #6b7280); }
+  .dz1210-row {
+    display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 6px; margin-top: 4px;
+    border-radius: 6px; font-size: 10.5px; background: var(--wn-bg, #f0f2f5); min-width: 0;
+  }
+  .dz1210-row b { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz1210-row em { margin-left: auto; flex: none; font-style: normal; font-size: 10px; color: var(--wn-muted, #6b7280); }
+  .dz1210-newwrap { overflow: hidden; height: 0; animation: dz1210-wrap 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1210-new {
+    margin-top: 0; margin-bottom: 4px; animation: dz1210-new 6s cubic-bezier(.2, .7, .3, 1) infinite;
+    background: var(--wn-soft, #e8f0fe);
+  }
+  .dz1210-new em { color: var(--wn-ink, #1a1d23); font-weight: 700; }
+  .dz1210-tick {
+    flex: none; width: 13px; height: 13px; display: grid; place-items: center; border-radius: 50%;
+    background: var(--success, #059669); color: #fff; opacity: 0; animation: dz1210-tick 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  @keyframes dz1210-chip {
+    0%, 8%   { opacity: 0; transform: translateY(3px); }
+    14%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes dz1210-dot {
+    0%, 22%  { opacity: 0; left: 0; }
+    25%      { opacity: 1; left: 0; }
+    40%      { opacity: 1; left: calc(100% - 8px); }
+    43%, 100% { opacity: 0; left: calc(100% - 8px); }
+  }
+  @keyframes dz1210-wrap {
+    0%, 40%  { height: 0; }
+    50%, 94% { height: 28px; }
+    100%     { height: 0; }
+  }
+  @keyframes dz1210-new {
+    0%, 41%  { opacity: 0; transform: translateY(-8px); }
+    50%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes dz1210-tick {
+    0%, 52%  { opacity: 0; transform: scale(.4); }
+    58%      { opacity: 1; transform: scale(1.15); }
+    61%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: receipt issued, row already in evidence. */
+    .dz1210-demo .dz1210-chip,
+    .dz1210-demo .dz1210-dot,
+    .dz1210-demo .dz1210-newwrap,
+    .dz1210-demo .dz1210-new,
+    .dz1210-demo .dz1210-tick { animation: none; }
+    .dz1210-demo .dz1210-chip,
+    .dz1210-demo .dz1210-new,
+    .dz1210-demo .dz1210-tick { opacity: 1; transform: none; }
+    .dz1210-demo .dz1210-dot { opacity: 0; }
+    .dz1210-demo .dz1210-newwrap { height: 28px; }
+  }
+</style>
+<div class="dz1210-demo" aria-hidden="true">
+  <div class="dz1210-ppd">
+    <div class="dz1210-ppdh">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V3h12v18l-3-2-3 2-3-2z"/><path d="M9.5 8h5M9.5 12h5"/></svg>
+      PPD 0042
+    </div>
+    <div class="dz1210-sum">1 200 Kč</div>
+    <div class="dz1210-lines"><i></i><i></i></div>
+    <div class="dz1210-chip">
+      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      Vystaven
+    </div>
+  </div>
+  <div class="dz1210-link"><span class="dz1210-dot"></span></div>
+  <div class="dz1210-ev">
+    <div class="dz1210-evh">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      Evidence
+    </div>
+    <div class="dz1210-newwrap">
+      <div class="dz1210-row dz1210-new"><span class="dz1210-tick"><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>0042</b><em>1 200 Kč</em></div>
+    </div>
+    <div class="dz1210-row"><b>0041</b><em>800 Kč</em></div>
+    <div class="dz1210-row"><b>0040</b><em>1 500 Kč</em></div>
+  </div>
+</div>

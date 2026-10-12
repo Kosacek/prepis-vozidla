@@ -1,0 +1,92 @@
+{# Demo for release 1.6.0 (Žádost na vývoz): the step-1 type list sits beside the
+   scan zone, and a new "Vývoz vozidla" card slides in and takes the selection.
+   CSS-only, 5.6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz160-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz160-cols { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 8px; }
+  .dz160-types { display: grid; gap: 5px; }
+  .dz160-card {
+    display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 7px;
+    border: 1.5px solid var(--wn-line); border-radius: 8px; background: var(--wn-card);
+    min-width: 0;
+  }
+  .dz160-ico {
+    flex: none; display: grid; place-items: center; width: 20px; height: 20px;
+    border-radius: 5px; background: var(--wn-soft); color: var(--wn-accent);
+  }
+  .dz160-t { font-size: 10.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz160-scan {
+    display: grid; place-content: center; justify-items: center; gap: 5px;
+    border: 1.5px dashed var(--wn-line); border-radius: 8px; background: var(--wn-card);
+    color: var(--wn-muted); font-size: 10px; font-weight: 600;
+  }
+
+  /* Převod starts selected; the new card slides in and takes the selection. */
+  .dz160-first { animation: dz160-off 5.6s infinite; }
+  .dz160-first .dz160-ico { animation: dz160-ioff 5.6s infinite; }
+  .dz160-new { animation: dz160-in 5.6s cubic-bezier(.2, .7, .3, 1) infinite, dz160-on 5.6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz160-new .dz160-ico { animation: dz160-ion 5.6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz160-in {
+    0%, 4%   { opacity: 0; transform: translateY(8px); }
+    16%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(8px); }
+  }
+  @keyframes dz160-off {
+    0%, 26%  { border-color: var(--wn-accent); background: var(--wn-soft); }
+    36%, 92% { border-color: var(--wn-line); background: var(--wn-card); }
+    100%     { border-color: var(--wn-accent); background: var(--wn-soft); }
+  }
+  @keyframes dz160-ioff {
+    0%, 26%  { background: var(--wn-accent); color: #fff; }
+    36%, 92% { background: var(--wn-soft); color: var(--wn-accent); }
+    100%     { background: var(--wn-accent); color: #fff; }
+  }
+  @keyframes dz160-on {
+    0%, 26%  { border-color: var(--wn-line); background: var(--wn-card); box-shadow: 0 0 0 0 color-mix(in srgb, var(--wn-accent) 0%, transparent); }
+    36%      { border-color: var(--wn-accent); background: var(--wn-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wn-accent) 28%, transparent); }
+    48%, 92% { border-color: var(--wn-accent); background: var(--wn-soft); box-shadow: 0 0 0 0 color-mix(in srgb, var(--wn-accent) 0%, transparent); }
+    100%     { border-color: var(--wn-line); background: var(--wn-card); box-shadow: 0 0 0 0 color-mix(in srgb, var(--wn-accent) 0%, transparent); }
+  }
+  @keyframes dz160-ion {
+    0%, 26%  { background: var(--wn-soft); color: var(--wn-accent); }
+    36%, 92% { background: var(--wn-accent); color: #fff; }
+    100%     { background: var(--wn-soft); color: var(--wn-accent); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: Vývoz vozidla is in the list and selected. */
+    .dz160-first, .dz160-first .dz160-ico, .dz160-new, .dz160-new .dz160-ico { animation: none; }
+    .dz160-first { border-color: var(--wn-line); background: var(--wn-card); }
+    .dz160-first .dz160-ico { background: var(--wn-soft); color: var(--wn-accent); }
+    .dz160-new { opacity: 1; transform: none; border-color: var(--wn-accent); background: var(--wn-soft); }
+    .dz160-new .dz160-ico { background: var(--wn-accent); color: #fff; }
+  }
+</style>
+<div class="dz160-demo" aria-hidden="true">
+  <div class="dz160-cols">
+    <div class="dz160-types">
+      <div class="dz160-card dz160-first">
+        <span class="dz160-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4"/><path d="M20 16H6M10 12l-4 4 4 4"/></svg></span>
+        <span class="dz160-t">Převod</span>
+      </div>
+      <div class="dz160-card">
+        <span class="dz160-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 8h3M9 11h6"/></svg></span>
+        <span class="dz160-t">Plná moc</span>
+      </div>
+      <div class="dz160-card dz160-new">
+        <span class="dz160-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="13" height="8" rx="2"/><path d="M6.5 8v8"/><path d="M17 12h5"/><path d="M19.5 9.5L22 12l-2.5 2.5"/></svg></span>
+        <span class="dz160-t">Vývoz vozidla</span>
+      </div>
+    </div>
+    <div class="dz160-scan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span>Sken</span>
+    </div>
+  </div>
+</div>

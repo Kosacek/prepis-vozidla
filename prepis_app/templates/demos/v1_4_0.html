@@ -1,0 +1,116 @@
+{# Demo for release 1.4.0 (Tabulka s registrační značkou): the "Tabulka s
+   registrační značkou (3RZ)" card is picked and a third plate drops into the
+   empty slot next to the two it already has. CSS-only, 6.4s loop; app tokens
+   only. Included by _whats_new.html. #}
+<style>
+  .dz140-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 9px;
+    font-size: 11px; color: var(--wn-ink, #1a1d23);
+  }
+
+  /* The mode card. */
+  .dz140-mode {
+    display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 9px;
+    border-radius: 10px; border: 1.5px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    animation: dz140-card 6.4s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz140-ico {
+    flex: none; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db);
+    animation: dz140-ico 6.4s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz140-txt { min-width: 0; line-height: 1.25; }
+  .dz140-txt b { display: block; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz140-txt span { display: block; font-size: 9.5px; color: var(--wn-muted, #6b7280); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Three plates; the third one is new. */
+  .dz140-plates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .dz140-cell { position: relative; height: 28px; }
+  .dz140-slot {
+    position: absolute; inset: 0; border-radius: 5px; border: 1.5px dashed var(--wn-muted, #6b7280);
+    opacity: .45; animation: dz140-slot 6.4s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz140-plate {
+    position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden;
+    border-radius: 5px; border: 1.5px solid var(--wn-ink, #1a1d23); background: var(--wn-card, #fff);
+  }
+  .dz140-eu {
+    flex: none; align-self: stretch; width: 10px; display: grid; place-items: end center; padding-bottom: 2px;
+    background: var(--wn-accent, #1a56db); color: #fff; font-size: 5px; font-weight: 800; line-height: 1;
+  }
+  .dz140-no {
+    flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  .dz140-p1 { animation: dz140-p1 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz140-p2 { animation: dz140-p2 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz140-p3 { animation: dz140-p3 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz140-cap {
+    grid-column: 3; justify-self: center; margin-top: -3px; font-size: 9.5px; font-weight: 700;
+    color: var(--wn-accent, #1a56db); white-space: nowrap; opacity: 0;
+    animation: dz140-cap 6.4s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+
+  @keyframes dz140-card {
+    0%, 6%    { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    12%, 93%  { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz140-ico {
+    0%, 6%    { background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); transform: scale(1); }
+    9%        { transform: scale(1.12); }
+    12%, 93%  { background: var(--wn-accent, #1a56db); color: #fff; transform: scale(1); }
+    99%, 100% { background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); transform: scale(1); }
+  }
+  @keyframes dz140-p1 {
+    0%, 16%   { opacity: 0; transform: translateY(5px); }
+    24%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz140-p2 {
+    0%, 22%   { opacity: 0; transform: translateY(5px); }
+    30%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz140-p3 {
+    0%, 40%   { opacity: 0; transform: translateY(-16px); }
+    44%       { opacity: 1; transform: translateY(-8px); }
+    50%       { opacity: 1; transform: translateY(2px); }
+    55%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz140-slot {
+    0%, 16%   { opacity: 0; }
+    26%, 46%  { opacity: .45; }
+    54%, 93%  { opacity: 0; }
+    99%, 100% { opacity: 0; }
+  }
+  @keyframes dz140-cap {
+    0%, 54%   { opacity: 0; transform: translateY(-3px); }
+    62%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, three plates and the card picked. */
+    .dz140-mode, .dz140-ico, .dz140-slot, .dz140-p1, .dz140-p2, .dz140-p3, .dz140-cap { animation: none; }
+    .dz140-mode { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    .dz140-ico { background: var(--wn-accent, #1a56db); color: #fff; }
+    .dz140-slot { opacity: 0; }
+    .dz140-cap { opacity: 1; }
+  }
+</style>
+<div class="dz140-demo" aria-hidden="true">
+  <div class="dz140-mode">
+    <span class="dz140-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10"/><path d="M10.5 11h7M10.5 13.5h4.5"/></svg></span>
+    <div class="dz140-txt"><b>Tabulka s registrační značkou (3RZ)</b><span>Třetí značka na nosič kol</span></div>
+  </div>
+  <div class="dz140-plates">
+    <div class="dz140-cell"><div class="dz140-plate dz140-p1"><span class="dz140-eu">CZ</span><span class="dz140-no">1AB 2345</span></div></div>
+    <div class="dz140-cell"><div class="dz140-plate dz140-p2"><span class="dz140-eu">CZ</span><span class="dz140-no">1AB 2345</span></div></div>
+    <div class="dz140-cell"><span class="dz140-slot"></span><div class="dz140-plate dz140-p3"><span class="dz140-eu">CZ</span><span class="dz140-no">1AB 2345</span></div></div>
+    <span class="dz140-cap">3. značka</span>
+  </div>
+</div>

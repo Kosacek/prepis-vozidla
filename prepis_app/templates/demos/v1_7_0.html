@@ -1,0 +1,69 @@
+{# Demo for release 1.7.0 (Čistší plná moc): the "uvést i RZ a VIN" box is
+   unticked and the RZ/VIN line disappears from the paper without a gap.
+   CSS-only, 5.8s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz170-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center; gap: 7px;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz170-opt { display: flex; align-items: center; justify-content: flex-end; gap: 7px; height: 20px; font-size: 11px; color: var(--wn-ink); }
+  .dz170-box {
+    flex: none; display: grid; place-items: center; width: 15px; height: 15px; box-sizing: border-box;
+    border-radius: 4px; border: 1.5px solid var(--wn-accent); background: var(--wn-accent); color: #fff;
+    animation: dz170-box 5.8s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz170-tick { animation: dz170-tick 5.8s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz170-paper {
+    box-sizing: border-box; height: 80px; padding: 7px 10px; display: flex; flex-direction: column; gap: 5px;
+    border: 1px solid var(--wn-line); border-radius: 6px; background: var(--wn-card);
+  }
+  .dz170-h { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; color: var(--wn-ink); }
+  .dz170-ln { display: block; flex: none; height: 4px; border-radius: 2px; background: var(--wn-line); }
+  .dz170-vehwrap { flex: none; height: 15px; overflow: hidden; animation: dz170-veh 5.8s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz170-veh {
+    display: block; width: fit-content; max-width: 100%; box-sizing: border-box; padding: 2px 6px; border-radius: 4px;
+    background: var(--wn-soft); color: var(--wn-accent);
+    font-size: 9.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .dz170-sign { margin-top: auto; color: var(--wn-muted); }
+
+  @keyframes dz170-box {
+    0%, 26%  { background: var(--wn-accent); border-color: var(--wn-accent); }
+    34%, 92% { background: var(--wn-card); border-color: var(--wn-line); }
+    100%     { background: var(--wn-accent); border-color: var(--wn-accent); }
+  }
+  @keyframes dz170-tick {
+    0%, 26%  { opacity: 1; transform: scale(1); }
+    32%, 92% { opacity: 0; transform: scale(.4); }
+    100%     { opacity: 1; transform: scale(1); }
+  }
+  @keyframes dz170-veh {
+    0%, 32%  { height: 15px; margin-bottom: 0; opacity: 1; }
+    46%, 92% { height: 0; margin-bottom: -5px; opacity: 0; }
+    100%     { height: 15px; margin-bottom: 0; opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: box unticked, no RZ/VIN line on the paper. */
+    .dz170-box, .dz170-tick, .dz170-vehwrap { animation: none; }
+    .dz170-box { background: var(--wn-card); border-color: var(--wn-line); }
+    .dz170-tick { opacity: 0; }
+    .dz170-vehwrap { height: 0; margin-bottom: -5px; opacity: 0; }
+  }
+</style>
+<div class="dz170-demo" aria-hidden="true">
+  <div class="dz170-opt">
+    <span class="dz170-box"><svg class="dz170-tick" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    <span>uvést i <b>RZ a VIN</b></span>
+  </div>
+  <div class="dz170-paper">
+    <div class="dz170-h">PLNÁ MOC</div>
+    <i class="dz170-ln" style="width: 82%"></i>
+    <div class="dz170-vehwrap"><span class="dz170-veh">RZ 2AB 1234 · VIN TMBAG7NE5H0123456</span></div>
+    <i class="dz170-ln" style="width: 58%"></i>
+    <svg class="dz170-sign" width="44" height="14" viewBox="0 0 44 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10c4-9 7-9 6-3s3 5 6-1 5 4 8 0 5-3 8 1 5-3 10-5"/></svg>
+  </div>
+</div>

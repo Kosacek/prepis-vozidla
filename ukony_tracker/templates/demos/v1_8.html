@@ -1,0 +1,135 @@
+{# Demo for release 1.8 (Pokladní doklady a nový seznam úkonů): the Úkony page opens
+   straight on the full list with a "+ Nový úkon" button, then the nav pill slides
+   to the new Doklady tab and the cash receipts appear.
+   CSS-only, 6.6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de18-demo {
+    display: grid; align-content: center; box-sizing: border-box; height: 134px;
+    padding: 12px; margin-bottom: var(--sp-4); overflow: hidden;
+    border-radius: 14px; background: var(--bg);
+  }
+  .de18-mini {
+    min-width: 0; padding: 8px 10px;
+    border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-sm);
+  }
+
+  /* Top navigation: the accent pill moves from Úkony to the new Doklady tab. */
+  .de18-nav {
+    position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: 22px; margin-bottom: 6px;
+  }
+  .de18-pill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 33.3333%;
+    border-radius: 8px; background: var(--accent);
+    transform: translateX(100%); animation: de18-pill 6.6s infinite;
+  }
+  .de18-tab {
+    position: relative; display: grid; place-items: center;
+    font-size: 10.5px; font-weight: 500; color: var(--muted); white-space: nowrap;
+  }
+  .de18-tab--u { animation: de18-tab-u 6.6s infinite; }
+  .de18-tab--d { animation: de18-tab-d 6.6s infinite; }
+
+  /* Two pages share one stage and cross-fade. */
+  .de18-stage { position: relative; height: 63px; }
+  .de18-pg { position: absolute; inset: 0; }
+  .de18-pg--u { animation: de18-pg-u 6.6s infinite; }
+  .de18-pg--d { opacity: 0; animation: de18-pg-d 6.6s infinite; }
+  .de18-hd { display: flex; align-items: center; justify-content: space-between; height: 22px; margin-bottom: 1px; }
+  .de18-hd h4 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+  .de18-hd small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .de18-new {
+    display: flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 7px;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 10.5px; font-weight: 600; white-space: nowrap;
+    animation: de18-new 6.6s infinite;
+  }
+  .de18-row {
+    display: flex; align-items: center; gap: 6px; height: 20px; min-width: 0;
+    border-top: 1px solid var(--line); font-size: 11.5px; white-space: nowrap;
+  }
+  .de18-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .de18-rz { font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .de18-tag {
+    padding: 0 7px; border-radius: var(--radius-pill); background: var(--bg);
+    border: 1px solid var(--line); color: var(--muted);
+    font-size: 9.5px; font-weight: 600; line-height: 14px;
+  }
+  .de18-mut { color: var(--muted); font-size: 11px; }
+  .de18-kc { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .de18-row--d1 { opacity: 0; animation: de18-d1 6.6s infinite; }
+  .de18-row--d2 { opacity: 0; animation: de18-d2 6.6s infinite; }
+
+  @keyframes de18-pill {
+    0%, 38%   { transform: translateX(100%); animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+    47%, 90%  { transform: translateX(200%); animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+    99%, 100% { transform: translateX(100%); }
+  }
+  @keyframes de18-tab-u {
+    0%, 40%   { color: var(--accent-ink); }
+    46%, 92%  { color: var(--muted); }
+    98%, 100% { color: var(--accent-ink); }
+  }
+  @keyframes de18-tab-d {
+    0%, 40%   { color: var(--muted); }
+    46%, 92%  { color: var(--accent-ink); }
+    98%, 100% { color: var(--muted); }
+  }
+  @keyframes de18-pg-u {
+    0%, 38%   { opacity: 1; transform: none; }
+    46%, 90%  { opacity: 0; transform: translateX(-8px); }
+    97%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de18-pg-d {
+    0%, 40%   { opacity: 0; transform: translateX(8px); }
+    48%, 90%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: translateX(8px); }
+  }
+  @keyframes de18-new {
+    0%, 12%   { transform: none; box-shadow: 0 0 0 0 transparent; }
+    17%       { transform: scale(1.07); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+    24%, 100% { transform: none; box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes de18-d1 {
+    0%, 46%   { opacity: 0; transform: translateY(4px); }
+    53%, 90%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes de18-d2 {
+    0%, 51%   { opacity: 0; transform: translateY(4px); }
+    58%, 90%  { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state - the Doklady tab active, receipts listed. */
+    .de18-pill, .de18-tab, .de18-pg, .de18-new, .de18-row--d1, .de18-row--d2 { animation: none !important; }
+    .de18-pill { transform: translateX(200%); }
+    .de18-tab--u { color: var(--muted); }
+    .de18-tab--d { color: var(--accent-ink); }
+    .de18-pg--u { opacity: 0; }
+    .de18-pg--d, .de18-row--d1, .de18-row--d2 { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de18-demo" aria-hidden="true">
+  <div class="de18-mini">
+    <div class="de18-nav">
+      <span class="de18-pill"></span>
+      <span class="de18-tab">Přehled</span>
+      <span class="de18-tab de18-tab--u">Úkony</span>
+      <span class="de18-tab de18-tab--d">Doklady</span>
+    </div>
+    <div class="de18-stage">
+      <div class="de18-pg de18-pg--u">
+        <div class="de18-hd"><h4>Úkony</h4><span class="de18-new">+ Nový úkon</span></div>
+        <div class="de18-row"><span class="de18-dot" style="background: var(--accent);"></span><b class="de18-rz">4AB 1234</b><span class="de18-tag">A50</span><b class="de18-kc">1 200 Kč</b></div>
+        <div class="de18-row"><span class="de18-dot" style="background: #2a7;"></span><b class="de18-rz">7C2 5678</b><span class="de18-tag">KOLA</span><b class="de18-kc">950 Kč</b></div>
+      </div>
+      <div class="de18-pg de18-pg--d">
+        <div class="de18-hd"><h4>Doklady</h4><small>17 dokladů · 21 400 Kč</small></div>
+        <div class="de18-row de18-row--d1"><b class="de18-rz">č. 41</b><span class="de18-mut">12.10.</span><span class="de18-mut">Novák</span><b class="de18-kc">1 200 Kč</b></div>
+        <div class="de18-row de18-row--d2"><b class="de18-rz">č. 40</b><span class="de18-mut">12.10.</span><span class="de18-mut">Svoboda</span><b class="de18-kc">950 Kč</b></div>
+      </div>
+    </div>
+  </div>
+</div>

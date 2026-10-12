@@ -1,0 +1,99 @@
+{# Demo for release 1.16.0 (Plná moc i pro Romana): in "Kdo vyplňuje" the Roman
+   chip is picked, "Zmocněnec: Roman" writes itself into the plná moc and a green
+   "Vystavena" stamp lands. CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1160-demo {
+    position: relative; overflow: hidden; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); color: var(--wn-ink, #1a1d23);
+    display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 10px;
+    line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .dz1160-who { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .dz1160-cap {
+    margin-bottom: 3px; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--wn-muted, #6b7280); white-space: nowrap;
+  }
+  .dz1160-chip {
+    flex: none; height: 26px; display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--wn-line, #dde1e7); border-radius: 8px;
+    background: var(--wn-card, #fff); color: var(--wn-ink, #1a1d23);
+    font-size: 12.5px; font-weight: 700;
+  }
+  .dz1160-roman { animation: dz1160-pick 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  .dz1160-paper {
+    position: relative; min-width: 0; padding: 11px 11px;
+    border: 1px solid var(--wn-line, #dde1e7); border-radius: 10px; background: var(--wn-card, #fff);
+  }
+  .dz1160-head { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; font-size: 12.5px; font-weight: 700; }
+  .dz1160-head svg { flex: none; color: var(--wn-accent, #1a56db); }
+  .dz1160-lbl {
+    margin-bottom: 3px; font-size: 9.5px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--wn-muted, #6b7280);
+  }
+  .dz1160-field {
+    position: relative; height: 24px; display: flex; align-items: center; padding: 0 9px;
+    border: 1.5px solid var(--wn-line, #dde1e7); border-radius: 6px; background: var(--wn-bg, #f0f2f5);
+    font-size: 12.5px; font-weight: 700;
+  }
+  .dz1160-dash { position: absolute; color: var(--wn-muted, #6b7280); animation: dz1160-dash 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1160-val { clip-path: inset(0 100% 0 0); animation: dz1160-type 6s steps(6, end) infinite; }
+  .dz1160-stamp {
+    display: flex; align-items: center; gap: 4px; width: max-content; margin-top: 8px;
+    padding: 4px 9px 4px 7px; border-radius: 999px; transform-origin: left center;
+    background: color-mix(in srgb, var(--success, #059669) 14%, transparent);
+    color: var(--success, #059669); font-size: 10.5px; font-weight: 700; white-space: nowrap;
+    opacity: 0; animation: dz1160-stamp 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  @keyframes dz1160-pick {
+    0%, 14% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); color: var(--wn-ink, #1a1d23); transform: none; }
+    17%     { transform: scale(.95); }
+    21%, 94% { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); transform: none; }
+    100%    { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); color: var(--wn-ink, #1a1d23); transform: none; }
+  }
+  @keyframes dz1160-dash { 0%, 26% { opacity: 1; } 28%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1160-type {
+    0%, 27%  { clip-path: inset(0 100% 0 0); }
+    40%, 94% { clip-path: inset(0 0 0 0); }
+    100%     { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes dz1160-stamp {
+    0%, 46%  { opacity: 0; transform: scale(.6); }
+    53%      { opacity: 1; transform: scale(1.08); }
+    58%, 94% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: Roman picked, name filled in, stamp shown. */
+    .dz1160-demo .dz1160-roman,
+    .dz1160-demo .dz1160-dash,
+    .dz1160-demo .dz1160-val,
+    .dz1160-demo .dz1160-stamp { animation: none; }
+    .dz1160-demo .dz1160-roman { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); }
+    .dz1160-demo .dz1160-dash { opacity: 0; }
+    .dz1160-demo .dz1160-val { clip-path: none; }
+    .dz1160-demo .dz1160-stamp { opacity: 1; transform: none; }
+  }
+</style>
+<div class="dz1160-demo" aria-hidden="true">
+  <div class="dz1160-who">
+    <div class="dz1160-cap">Kdo vyplňuje?</div>
+    <div class="dz1160-chip">David</div>
+    <div class="dz1160-chip dz1160-roman">Roman</div>
+    <div class="dz1160-chip">Petr</div>
+  </div>
+  <div class="dz1160-paper">
+    <div class="dz1160-head">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 8h3M9 11h6"/><path d="M9 16.5c1-1.5 1.8.8 2.8 0s1.4-1.2 2.3 0"/></svg>
+      Plná moc
+    </div>
+    <div class="dz1160-lbl">Zmocněnec</div>
+    <div class="dz1160-field"><span class="dz1160-dash">—</span><span class="dz1160-val">Roman</span></div>
+    <div class="dz1160-stamp">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      Vystavena
+    </div>
+  </div>
+</div>

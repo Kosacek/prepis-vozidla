@@ -46,6 +46,7 @@
     transition: transform .26s cubic-bezier(.2, .8, .25, 1), opacity .26s ease;
   }
   .wn-overlay.is-open .wn-card { opacity: 1; transform: none; }
+  .wn-card:focus { outline: none; }
 
   .wn-head {
     display: flex; align-items: center; gap: 8px; margin-bottom: var(--sp-3);
@@ -132,7 +133,7 @@
 </div>
 
 <div class="wn-overlay" id="wn" role="dialog" aria-modal="true" aria-labelledby="wn-title-0" hidden>
-  <div class="wn-card">
+  <div class="wn-card" tabindex="-1">
     <div class="wn-pages">
       {% for r in RELEASES %}
       <section class="wn-page{{ ' is-off' if not loop.first }}" data-version="{{ r.version }}">
@@ -217,7 +218,9 @@
     overlay.hidden = false;
     void overlay.offsetWidth;
     overlay.classList.add('is-open');
-    overlay.querySelector('.wn-ok').focus({ preventScroll: true });
+    // Focus the card, not the button: a focused button draws the app's
+    // keyboard ring on open, which reads like a pre-selected answer.
+    card.focus({ preventScroll: true });
     document.addEventListener('keydown', onKey);
   }
   function close() {

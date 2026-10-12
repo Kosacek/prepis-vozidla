@@ -1,0 +1,80 @@
+{# Demo for release 1.15.0 (Rychlejší žádosti): two bars start together - the new
+   one fills in a blink and ticks off, the old one is still crawling.
+   CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1150-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1150-mini {
+    display: grid; gap: 9px; padding: 10px 11px; border-radius: 10px;
+    border: 1px solid var(--wn-line); background: var(--wn-card);
+  }
+  .dz1150-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
+  .dz1150-head svg { flex: none; color: var(--wn-accent); }
+  .dz1150-row { display: flex; align-items: center; gap: 8px; height: 22px; }
+  .dz1150-lbl { flex: none; width: 30px; font-size: 10.5px; font-weight: 700; color: var(--wn-muted); }
+  .dz1150-lbl-new { color: var(--wn-accent); }
+  .dz1150-track { position: relative; flex: 1; min-width: 0; height: 8px; border-radius: 4px; background: var(--wn-line); overflow: hidden; }
+  .dz1150-fill { position: absolute; inset: 0; border-radius: 4px; transform-origin: left center; transform: scaleX(0); }
+  .dz1150-fill-old { background: var(--wn-muted); animation: dz1150-old 6.4s linear infinite; }
+  .dz1150-fill-new { background: var(--wn-accent); animation: dz1150-new 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1150-val {
+    flex: none; display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; width: 42px;
+    font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0;
+  }
+  .dz1150-val-old { color: var(--wn-muted); animation: dz1150-vold 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1150-val-new { color: var(--success, #059669); animation: dz1150-vnew 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1150-old {
+    0%, 6%   { transform: scaleX(0); }
+    88%      { transform: scaleX(1); }
+    94%      { transform: scaleX(1); }
+    100%     { transform: scaleX(0); }
+  }
+  @keyframes dz1150-new {
+    0%, 6%   { transform: scaleX(0); }
+    18%, 92% { transform: scaleX(1); }
+    100%     { transform: scaleX(0); }
+  }
+  @keyframes dz1150-vold {
+    0%, 86%  { opacity: 0; transform: translateX(-3px); }
+    92%      { opacity: 1; transform: none; }
+    96%      { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+  @keyframes dz1150-vnew {
+    0%, 17%  { opacity: 0; transform: scale(.7); }
+    24%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: scale(.7); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: both bars full, the new one ticked off first. */
+    .dz1150-fill, .dz1150-val { animation: none; }
+    .dz1150-fill { transform: none; }
+    .dz1150-val { opacity: 1; transform: none; }
+  }
+</style>
+<div class="dz1150-demo" aria-hidden="true">
+  <div class="dz1150-mini">
+    <div class="dz1150-head">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4h4"/><path d="M18 9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6z"/><path d="M9 12h6M9 16h4"/></svg>
+      Sestavení žádosti
+    </div>
+    <div class="dz1150-row">
+      <span class="dz1150-lbl">Dřív</span>
+      <span class="dz1150-track"><span class="dz1150-fill dz1150-fill-old"></span></span>
+      <span class="dz1150-val dz1150-val-old">12 s</span>
+    </div>
+    <div class="dz1150-row">
+      <span class="dz1150-lbl dz1150-lbl-new">Teď</span>
+      <span class="dz1150-track"><span class="dz1150-fill dz1150-fill-new"></span></span>
+      <span class="dz1150-val dz1150-val-new">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>2 s
+      </span>
+    </div>
+  </div>
+</div>

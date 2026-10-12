@@ -1,0 +1,167 @@
+{# Demo for release 1.19.0 (Plynulejší skenování): after a scan the stepper stays
+   on "Vozidlo", RZ + VIN are filled, Enter hops the focus to the next field,
+   it gets typed, and only then does the stepper move on. CSS-only, 6.4s loop;
+   app tokens only. #}
+<style>
+  .dz1190-demo {
+    position: relative; overflow: hidden; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); color: var(--wn-ink, #1a1d23);
+    display: grid; grid-template-rows: auto 1fr; gap: 8px;
+    line-height: 1.2; font-variant-numeric: tabular-nums;
+  }
+  .dz1190-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+
+  /* Stepper: 3 steps, joined by lines (the real one: circle + label per step). */
+  .dz1190-steps { flex: 1; max-width: 190px; display: flex; min-width: 0; }
+  .dz1190-step { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .dz1190-step:not(:last-child)::after {
+    content: ''; position: absolute; top: 8px; left: 50%; width: 100%; height: 2px;
+    background: var(--wn-line, #dde1e7);
+  }
+  .dz1190-step:nth-child(1)::after { background: var(--success, #059669); }
+  .dz1190-step:nth-child(2)::after { animation: dz1190-line 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-c {
+    position: relative; z-index: 1; width: 18px; height: 18px; display: grid; place-items: center;
+    border-radius: 50%; font-size: 9.5px; font-weight: 700;
+    background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280);
+  }
+  .dz1190-c > * { grid-area: 1 / 1; }
+  .dz1190-done { background: var(--success, #059669); color: #fff; }
+  .dz1190-c2 { animation: dz1190-c2 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-c3 { animation: dz1190-c3 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-n2 { animation: dz1190-n2 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-ck2 { opacity: 0; animation: dz1190-ck2 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-l { margin-top: 4px; font-size: 9.5px; font-weight: 600; color: var(--wn-muted, #6b7280); white-space: nowrap; }
+  .dz1190-l2 { animation: dz1190-l2 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  .dz1190-key {
+    flex: none; padding: 2px 7px; border: 1px solid var(--wn-line, #dde1e7); border-bottom-width: 2px;
+    border-radius: 5px; background: var(--wn-card, #fff); color: var(--wn-muted, #6b7280);
+    font: 600 10px ui-monospace, Consolas, monospace; white-space: nowrap;
+    animation: dz1190-key 6.4s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+
+  .dz1190-fields { display: grid; gap: 3px; align-content: end; }
+  .dz1190-f {
+    position: relative; display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 9px;
+    border: 1.5px solid var(--wn-line, #dde1e7); border-radius: 6px; background: var(--wn-card, #fff);
+    font-size: 12px; min-width: 0;
+  }
+  .dz1190-k { flex: none; width: 46px; font-size: 9.5px; font-weight: 700; letter-spacing: .04em; color: var(--wn-muted, #6b7280); text-transform: uppercase; }
+  .dz1190-dash { position: absolute; left: 63px; color: var(--wn-muted, #6b7280); }
+  .dz1190-v { min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; }
+  .dz1190-f1 { animation: dz1190-f1 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f2 { animation: dz1190-f2 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f3 { animation: dz1190-f3 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f1 .dz1190-dash { animation: dz1190-dash1 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f2 .dz1190-dash { animation: dz1190-dash1 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f3 .dz1190-dash { animation: dz1190-dash3 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f1 .dz1190-v, .dz1190-f2 .dz1190-v { animation: dz1190-v1 6.4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1190-f3 .dz1190-v { opacity: 1; clip-path: inset(0 100% 0 0); animation: dz1190-v3 6.4s steps(6, end) infinite; }
+
+  @keyframes dz1190-f1 {
+    0%, 8%   { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+    10%, 16% { border-color: var(--wn-accent, #1a56db); background: var(--wn-card, #fff); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wn-accent, #1a56db) 20%, transparent); }
+    19%, 94% { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); box-shadow: none; }
+    100%     { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+  }
+  @keyframes dz1190-f2 {
+    0%, 16%  { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+    19%, 94% { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); box-shadow: none; }
+    100%     { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+  }
+  @keyframes dz1190-f3 {
+    0%, 33%  { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+    36%, 60% { border-color: var(--wn-accent, #1a56db); background: var(--wn-card, #fff); box-shadow: 0 0 0 3px color-mix(in srgb, var(--wn-accent, #1a56db) 20%, transparent); }
+    64%, 94% { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); box-shadow: none; }
+    100%     { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); box-shadow: none; }
+  }
+  @keyframes dz1190-dash1 { 0%, 17% { opacity: 1; } 19%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1190-dash3 { 0%, 44% { opacity: 1; } 46%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1190-v1 {
+    0%, 17%  { opacity: 0; }
+    22%, 94% { opacity: 1; }
+    100%     { opacity: 0; }
+  }
+  @keyframes dz1190-v3 {
+    0%, 44%  { clip-path: inset(0 100% 0 0); }
+    56%, 94% { clip-path: inset(0 0 0 0); }
+    100%     { clip-path: inset(0 100% 0 0); }
+  }
+  @keyframes dz1190-key {
+    0%, 28%  { transform: none; border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); color: var(--wn-muted, #6b7280); }
+    30%      { transform: translateY(1px); border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); }
+    36%, 64% { transform: none; border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); color: var(--wn-muted, #6b7280); }
+    67%      { transform: translateY(1px); border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); }
+    74%, 100% { transform: none; border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); color: var(--wn-muted, #6b7280); }
+  }
+  @keyframes dz1190-c2 {
+    0%, 70%  { background: var(--wn-accent, #1a56db); color: #fff; }
+    75%, 94% { background: var(--success, #059669); color: #fff; }
+    100%     { background: var(--wn-accent, #1a56db); color: #fff; }
+  }
+  @keyframes dz1190-n2  { 0%, 70% { opacity: 1; } 75%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1190-ck2 { 0%, 70% { opacity: 0; } 75%, 94% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes dz1190-c3 {
+    0%, 72%  { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); }
+    78%, 94% { background: var(--wn-accent, #1a56db); color: #fff; }
+    100%     { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); }
+  }
+  @keyframes dz1190-line {
+    0%, 70%  { background: var(--wn-line, #dde1e7); }
+    75%, 94% { background: var(--success, #059669); }
+    100%     { background: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1190-l2 {
+    0%, 70%  { color: var(--wn-accent, #1a56db); }
+    75%, 94% { color: var(--success, #059669); }
+    100%     { color: var(--wn-accent, #1a56db); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: all three fields filled, step 2 done, step 3 active. */
+    .dz1190-demo .dz1190-step::after,
+    .dz1190-demo .dz1190-c2,
+    .dz1190-demo .dz1190-c3,
+    .dz1190-demo .dz1190-n2,
+    .dz1190-demo .dz1190-ck2,
+    .dz1190-demo .dz1190-l2,
+    .dz1190-demo .dz1190-key,
+    .dz1190-demo .dz1190-f,
+    .dz1190-demo .dz1190-dash,
+    .dz1190-demo .dz1190-v { animation: none; }
+    .dz1190-demo .dz1190-step:nth-child(2)::after { background: var(--success, #059669); }
+    .dz1190-demo .dz1190-c2 { background: var(--success, #059669); color: #fff; }
+    .dz1190-demo .dz1190-c3 { background: var(--wn-accent, #1a56db); color: #fff; }
+    .dz1190-demo .dz1190-n2 { opacity: 0; }
+    .dz1190-demo .dz1190-ck2 { opacity: 1; }
+    .dz1190-demo .dz1190-l2 { color: var(--success, #059669); }
+    .dz1190-demo .dz1190-f { border-color: var(--success, #059669); background: color-mix(in srgb, var(--success, #059669) 8%, var(--wn-card, #fff)); }
+    .dz1190-demo .dz1190-dash { opacity: 0; }
+    .dz1190-demo .dz1190-v { opacity: 1; clip-path: none; }
+  }
+</style>
+<div class="dz1190-demo" aria-hidden="true">
+  <div class="dz1190-top">
+    <div class="dz1190-steps">
+      <div class="dz1190-step">
+        <div class="dz1190-c dz1190-done"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <div class="dz1190-l" style="color: var(--success, #059669);">Typ</div>
+      </div>
+      <div class="dz1190-step">
+        <div class="dz1190-c dz1190-c2"><span class="dz1190-n2">2</span><svg class="dz1190-ck2" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <div class="dz1190-l dz1190-l2">Vozidlo</div>
+      </div>
+      <div class="dz1190-step">
+        <div class="dz1190-c dz1190-c3">3</div>
+        <div class="dz1190-l">Vlastník</div>
+      </div>
+    </div>
+    <span class="dz1190-key">Enter ↵</span>
+  </div>
+  <div class="dz1190-fields">
+    <div class="dz1190-f dz1190-f1"><span class="dz1190-k">RZ</span><span class="dz1190-dash">—</span><span class="dz1190-v">2AB 1234</span></div>
+    <div class="dz1190-f dz1190-f2"><span class="dz1190-k">VIN</span><span class="dz1190-dash">—</span><span class="dz1190-v">TMBJJ7NE5K0123456</span></div>
+    <div class="dz1190-f dz1190-f3"><span class="dz1190-k">Značka</span><span class="dz1190-dash">—</span><span class="dz1190-v">Škoda</span></div>
+  </div>
+</div>

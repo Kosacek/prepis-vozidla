@@ -1,0 +1,95 @@
+{# Demo for release 1.8.0 (Filtry v hledání): two filter chips get tapped, the
+   search sentence assembles itself and a matching result drops in.
+   CSS-only, 6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz180-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz180-mini {
+    display: grid; gap: 4px; padding: 8px 10px; border-radius: 10px;
+    border: 1px solid var(--wn-line); background: var(--wn-card);
+  }
+  .dz180-search {
+    display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 7px;
+    border: 1.5px solid var(--wn-line); border-radius: 6px; background: var(--wn-bg);
+    color: var(--wn-muted);
+  }
+  .dz180-query { display: grid; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; }
+  .dz180-ph, .dz180-typed { grid-area: 1 / 1; }
+  .dz180-ph { animation: dz180-ph 6s infinite; }
+  .dz180-typed { color: var(--wn-ink); font-weight: 600; }
+  .dz180-q1, .dz180-q2 { display: inline-block; opacity: 0; }
+  .dz180-q1 { animation: dz180-q1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz180-q2 { animation: dz180-q2 6s cubic-bezier(.2, .7, .3, 1) infinite; white-space: pre; }
+  .dz180-row { display: flex; align-items: center; gap: 4px; height: 18px; }
+  .dz180-lbl { flex: none; width: 24px; font-size: 10px; font-weight: 700; color: var(--wn-muted); }
+  .dz180-chip {
+    box-sizing: border-box; display: inline-flex; align-items: center; height: 18px; padding: 0 7px;
+    border: 1.5px solid var(--wn-line); border-radius: 999px; background: var(--wn-card);
+    font-style: normal; font-size: 10px; font-weight: 600; white-space: nowrap; color: var(--wn-ink);
+  }
+  .dz180-c1 { animation: dz180-c1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz180-c2 { animation: dz180-c2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz180-hit {
+    display: flex; align-items: center; gap: 7px; height: 20px; padding: 0 7px;
+    border: 1px solid var(--wn-line); border-radius: 6px; font-size: 10.5px; white-space: nowrap;
+    opacity: 0; animation: dz180-hit 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz180-badge { flex: none; padding: 1px 6px; border-radius: 4px; background: var(--wn-soft); color: var(--wn-accent); font-size: 9.5px; font-weight: 700; }
+  .dz180-kc { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dz180-sub { color: var(--wn-muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+  @keyframes dz180-ph { 0%, 16% { opacity: 1; } 20%, 92% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz180-q1 {
+    0%, 17%  { opacity: 0; transform: translateX(-3px); }
+    22%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateX(-3px); }
+  }
+  @keyframes dz180-q2 {
+    0%, 41%  { opacity: 0; transform: translateX(-3px); }
+    46%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateX(-3px); }
+  }
+  @keyframes dz180-c1 {
+    0%, 14%  { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); transform: scale(1); }
+    17%      { transform: scale(.93); }
+    22%, 92% { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; transform: scale(1); }
+    100%     { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); transform: scale(1); }
+  }
+  @keyframes dz180-c2 {
+    0%, 38%  { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); transform: scale(1); }
+    41%      { transform: scale(.93); }
+    46%, 92% { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; transform: scale(1); }
+    100%     { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); transform: scale(1); }
+  }
+  @keyframes dz180-hit {
+    0%, 56%  { opacity: 0; transform: translateY(5px); }
+    64%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(5px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: both chips on, sentence complete, result shown. */
+    .dz180-ph, .dz180-q1, .dz180-q2, .dz180-c1, .dz180-c2, .dz180-hit { animation: none; }
+    .dz180-ph { opacity: 0; }
+    .dz180-q1, .dz180-q2, .dz180-hit { opacity: 1; transform: none; }
+    .dz180-c1, .dz180-c2 { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+  }
+</style>
+<div class="dz180-demo" aria-hidden="true">
+  <div class="dz180-mini">
+    <div class="dz180-search">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <span class="dz180-query">
+        <span class="dz180-ph">Hledat v historii…</span>
+        <span class="dz180-typed"><span class="dz180-q1">doklady</span><span class="dz180-q2"> tento měsíc</span></span>
+      </span>
+    </div>
+    <div class="dz180-row"><span class="dz180-lbl">Co</span><i class="dz180-chip">Žádosti</i><i class="dz180-chip dz180-c1">Doklady</i><i class="dz180-chip">Firmy</i></div>
+    <div class="dz180-row"><span class="dz180-lbl">Kdy</span><i class="dz180-chip">Dnes</i><i class="dz180-chip">Tento týden</i><i class="dz180-chip dz180-c2">Tento měsíc</i></div>
+    <div class="dz180-hit"><span class="dz180-badge">Doklad</span><span class="dz180-sub">č. 42 · 2AB 1234</span><span class="dz180-kc">500 Kč</span></div>
+  </div>
+</div>

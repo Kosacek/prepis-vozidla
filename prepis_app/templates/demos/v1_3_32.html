@@ -1,0 +1,86 @@
+{# Demo for release 1.3.32 (Hledání): "novák" is typed into the search and one
+   žádost, one doklad and one firma turn up in the same list.
+   CSS-only, 6.4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1332-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 6px;
+    font-size: 10.5px; color: var(--wn-ink, #1a1d23);
+  }
+  .dz1332-search {
+    position: relative; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; overflow: hidden;
+    border-radius: 8px; border: 1.5px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    font-size: 11.5px; white-space: nowrap; animation: dz1332-focus 6.4s infinite;
+  }
+  .dz1332-search svg { flex: none; color: var(--wn-muted, #6b7280); }
+  .dz1332-ph { color: var(--wn-muted, #6b7280); opacity: .7; overflow: hidden; text-overflow: ellipsis; animation: dz1332-ph 6.4s infinite; }
+  .dz1332-q { position: absolute; left: 26px; font-weight: 600; clip-path: inset(0 100% 0 0); animation: dz1332-q 6.4s infinite; }
+
+  .dz1332-list { display: grid; gap: 4px; }
+  .dz1332-row {
+    display: flex; align-items: center; gap: 7px; min-width: 0; height: 22px; padding: 0 8px;
+    border-radius: 8px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    white-space: nowrap; opacity: 0;
+  }
+  .dz1332-badge {
+    flex: none; width: 46px; padding: 1px 0; border-radius: 5px; text-align: center;
+    background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); font-size: 9px; font-weight: 700;
+  }
+  .dz1332-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .dz1332-txt em { font-style: normal; font-weight: 600; color: var(--wn-muted, #6b7280); }
+  .dz1332-m { padding: 0 2px; border-radius: 3px; background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); }
+  .dz1332-end { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dz1332-r1 { animation: dz1332-r1 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1332-r2 { animation: dz1332-r2 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1332-r3 { animation: dz1332-r3 6.4s infinite cubic-bezier(.2, .7, .3, 1); }
+
+  @keyframes dz1332-focus {
+    0%, 5%    { border-color: var(--wn-line, #dde1e7); }
+    9%, 93%   { border-color: var(--wn-accent, #1a56db); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1332-ph { 0%, 14% { opacity: .7; } 17%, 99% { opacity: 0; } 100% { opacity: .7; } }
+  @keyframes dz1332-q {
+    0%, 16%   { clip-path: inset(0 100% 0 0); opacity: 1; animation-timing-function: steps(5, end); }
+    30%, 93%  { clip-path: inset(0 0 0 0); opacity: 1; }
+    99%       { clip-path: inset(0 0 0 0); opacity: 0; }
+    100%      { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+  @keyframes dz1332-r1 {
+    0%, 36%   { opacity: 0; transform: translateY(6px); }
+    44%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1332-r2 {
+    0%, 44%   { opacity: 0; transform: translateY(6px); }
+    52%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1332-r3 {
+    0%, 52%   { opacity: 0; transform: translateY(6px); }
+    60%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, three kinds of result for "novák". */
+    .dz1332-search, .dz1332-ph, .dz1332-q, .dz1332-row { animation: none; }
+    .dz1332-search { border-color: var(--wn-accent, #1a56db); }
+    .dz1332-ph { opacity: 0; }
+    .dz1332-q { clip-path: none; }
+    .dz1332-row { opacity: 1; }
+  }
+</style>
+<div class="dz1332-demo" aria-hidden="true">
+  <div class="dz1332-search">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+    <span class="dz1332-ph">Např. co jsem dělal 15.7.</span>
+    <span class="dz1332-q">novák</span>
+  </div>
+  <div class="dz1332-list">
+    <div class="dz1332-row dz1332-r1"><span class="dz1332-badge">Žádost</span><span class="dz1332-txt"><span class="dz1332-m">Novák</span> Jan <em>· 1AB 2345</em></span><span class="dz1332-end">12. 6.</span></div>
+    <div class="dz1332-row dz1332-r2"><span class="dz1332-badge">Doklad</span><span class="dz1332-txt"><span class="dz1332-m">Novák</span> Jan <em>· č. 142</em></span><span class="dz1332-end">500 Kč</span></div>
+    <div class="dz1332-row dz1332-r3"><span class="dz1332-badge">Firma</span><span class="dz1332-txt"><span class="dz1332-m">Novák</span> s.r.o. <em>· IČO 12345678</em></span></div>
+  </div>
+</div>

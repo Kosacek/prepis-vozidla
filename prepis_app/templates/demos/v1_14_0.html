@@ -1,0 +1,89 @@
+{# Demo for release 1.14.0 (Krátký sdílecí odkaz): a message with the short link
+   /1234 is tapped and the whole document package opens next to it.
+   CSS-only, 6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1140-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1140-row { display: flex; align-items: center; gap: 8px; }
+  .dz1140-sms {
+    flex: none; box-sizing: border-box; width: 82px; padding: 8px 9px; display: grid; gap: 4px;
+    border: 1px solid var(--wn-line); border-radius: 12px 12px 12px 3px; background: var(--wn-card);
+    transform-origin: left bottom; opacity: 0;
+    animation: dz1140-sms 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1140-msg { font-size: 9.5px; line-height: 1.25; color: var(--wn-muted); }
+  .dz1140-link {
+    justify-self: start; padding: 1px 4px; margin: 0 -4px; border-radius: 4px;
+    font-size: 13px; font-weight: 800; letter-spacing: -.01em; color: var(--wn-accent);
+    text-decoration: underline; text-underline-offset: 2px; font-variant-numeric: tabular-nums;
+    animation: dz1140-tap 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1140-arrow { flex: none; color: var(--wn-muted); opacity: .35; animation: dz1140-arrow 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1140-page {
+    flex: 1; min-width: 0; box-sizing: border-box; display: grid; gap: 4px; padding: 8px;
+    border: 1px solid var(--wn-line); border-radius: 10px; background: var(--wn-card);
+    opacity: 0; transform-origin: left center;
+    animation: dz1140-page 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1140-ph { font-size: 10px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 1px; }
+  .dz1140-doc {
+    display: flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; box-sizing: border-box;
+    border: 1px solid var(--wn-line); border-radius: 6px; background: var(--wn-bg);
+    font-size: 10px; font-weight: 700; white-space: nowrap; opacity: 0;
+  }
+  .dz1140-go { margin-left: auto; color: var(--wn-accent); }
+  .dz1140-d1 { animation: dz1140-d1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1140-d2 { animation: dz1140-d2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1140-d3 { animation: dz1140-d3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1140-sms {
+    0%, 4%   { opacity: 0; transform: scale(.85) translateY(6px); }
+    14%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: scale(.85) translateY(6px); }
+  }
+  @keyframes dz1140-tap {
+    0%, 24%  { background: transparent; transform: scale(1); }
+    28%      { background: var(--wn-soft); transform: scale(.94); }
+    36%, 92% { background: transparent; transform: scale(1); }
+    100%     { background: transparent; transform: scale(1); }
+  }
+  @keyframes dz1140-arrow {
+    0%, 26%  { opacity: .35; transform: none; }
+    32%, 92% { opacity: 1; color: var(--wn-accent); transform: translateX(2px); }
+    100%     { opacity: .35; transform: none; }
+  }
+  @keyframes dz1140-page {
+    0%, 28%  { opacity: 0; transform: translateX(10px) scale(.96); }
+    40%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateX(10px) scale(.96); }
+  }
+  @keyframes dz1140-d1 { 0%, 40% { opacity: 0; transform: translateY(4px); } 48%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(4px); } }
+  @keyframes dz1140-d2 { 0%, 46% { opacity: 0; transform: translateY(4px); } 54%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(4px); } }
+  @keyframes dz1140-d3 { 0%, 52% { opacity: 0; transform: translateY(4px); } 60%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(4px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: the link was opened and the whole package is listed. */
+    .dz1140-sms, .dz1140-link, .dz1140-arrow, .dz1140-page, .dz1140-d1, .dz1140-d2, .dz1140-d3 { animation: none; }
+    .dz1140-sms, .dz1140-page, .dz1140-doc { opacity: 1; transform: none; }
+    .dz1140-arrow { opacity: 1; color: var(--wn-accent); }
+  }
+</style>
+<div class="dz1140-demo" aria-hidden="true">
+  <div class="dz1140-row">
+    <div class="dz1140-sms">
+      <span class="dz1140-msg">Tady je celý balík:</span>
+      <span class="dz1140-link">…/1234</span>
+    </div>
+    <svg class="dz1140-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    <div class="dz1140-page">
+      <div class="dz1140-ph">Dokumenty k vytištění</div>
+      <div class="dz1140-doc dz1140-d1">Žádost<span class="dz1140-go">→</span></div>
+      <div class="dz1140-doc dz1140-d2">Plná moc<span class="dz1140-go">→</span></div>
+      <div class="dz1140-doc dz1140-d3">Pokladní doklad<span class="dz1140-go">→</span></div>
+    </div>
+  </div>
+</div>

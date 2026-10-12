@@ -1,0 +1,109 @@
+{# Demo for release 1.3.22 (Úkon do evidence rovnou ze žádosti): on the last page
+   the "Evidence úkonu" card gets Firma, Typ úkonu and the price, and a green
+   line confirms what goes into the evidence. CSS-only, 6.6s loop; app tokens
+   only. Included by _whats_new.html. #}
+<style>
+  .dz1322-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; align-items: center;
+    font-size: 11px; color: var(--wn-ink, #1a1d23);
+  }
+  .dz1322-card {
+    flex: 1; min-width: 0; padding: 7px 9px 8px; display: grid; gap: 4px;
+    border-radius: 10px; border: 1px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+  }
+  .dz1322-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+  .dz1322-title { font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .dz1322-toggle {
+    display: flex; align-items: center; gap: 4px; min-width: 0;
+    font-size: 8px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  }
+  .dz1322-tick {
+    flex: none; width: 11px; height: 11px; border-radius: 3px; display: grid; place-items: center;
+    background: var(--wn-accent, #1a56db); color: #fff;
+  }
+  .dz1322-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 5px; }
+
+  .dz1322-f {
+    position: relative; display: flex; align-items: center; gap: 5px; min-width: 0; height: 22px; padding: 0 6px;
+    border-radius: 6px; border: 1.5px solid var(--wn-line, #dde1e7); overflow: hidden;
+  }
+  .dz1322-k { flex: none; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--wn-muted, #6b7280); }
+  .dz1322-v {
+    flex: 1; min-width: 0; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums; opacity: 0;
+  }
+  .dz1322-chev { flex: none; color: var(--wn-muted, #6b7280); }
+  .dz1322-f1 { animation: dz1322-f1 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1322-f2 { animation: dz1322-f2 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1322-f3 { animation: dz1322-f3 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1322-v1 { animation: dz1322-v1 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1322-v2 { animation: dz1322-v2 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz1322-v3 { animation: dz1322-v3 6.6s infinite cubic-bezier(.2, .7, .3, 1); }
+
+  .dz1322-status {
+    display: flex; align-items: center; gap: 5px; height: 14px; min-width: 0;
+    font-size: 10px; font-weight: 600; color: var(--success, #059669); white-space: nowrap;
+    opacity: 0; animation: dz1322-st 6.6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz1322-status svg { flex: none; }
+  .dz1322-status span { overflow: hidden; text-overflow: ellipsis; }
+
+  @keyframes dz1322-f1 {
+    0%, 8%    { border-color: var(--wn-line, #dde1e7); }
+    11%, 19%  { border-color: var(--wn-accent, #1a56db); }
+    26%, 100% { border-color: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1322-f2 {
+    0%, 28%   { border-color: var(--wn-line, #dde1e7); }
+    31%, 38%  { border-color: var(--wn-accent, #1a56db); }
+    45%, 100% { border-color: var(--wn-line, #dde1e7); }
+  }
+  @keyframes dz1322-f3 {
+    0%, 42%   { border-color: var(--wn-line, #dde1e7); background: transparent; }
+    46%, 52%  { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    60%, 93%  { border-color: var(--wn-line, #dde1e7); background: transparent; }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); background: transparent; }
+  }
+  @keyframes dz1322-v1 {
+    0%, 12%   { opacity: 0; transform: translateY(4px); }
+    19%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1322-v2 {
+    0%, 31%   { opacity: 0; transform: translateY(4px); }
+    38%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1322-v3 {
+    0%, 45%   { opacity: 0; transform: scale(.85); }
+    52%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1322-st {
+    0%, 62%   { opacity: 0; transform: translateY(3px); }
+    69%, 93%  { opacity: 1; transform: none; }
+    99%, 100% { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, everything filled in and confirmed. */
+    .dz1322-f1, .dz1322-f2, .dz1322-f3, .dz1322-v1, .dz1322-v2, .dz1322-v3, .dz1322-status { animation: none; }
+    .dz1322-v, .dz1322-status { opacity: 1; }
+  }
+</style>
+<div class="dz1322-demo" aria-hidden="true">
+  <div class="dz1322-card">
+    <div class="dz1322-head">
+      <span class="dz1322-title">Evidence úkonu</span>
+      <span class="dz1322-toggle"><span class="dz1322-tick"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>ZAPSAT ÚKON DO EVIDENCE</span>
+    </div>
+    <div class="dz1322-f dz1322-f1"><span class="dz1322-k">Firma</span><span class="dz1322-v dz1322-v1">Autosalon Novák s.r.o.</span><svg class="dz1322-chev" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+    <div class="dz1322-pair">
+      <div class="dz1322-f dz1322-f2"><span class="dz1322-k">Typ</span><span class="dz1322-v dz1322-v2">Převod</span><svg class="dz1322-chev" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="dz1322-f dz1322-f3"><span class="dz1322-k">Cena</span><span class="dz1322-v dz1322-v3">1 300 Kč</span></div>
+    </div>
+    <div class="dz1322-status"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Zapíše se do evidence</span></div>
+  </div>
+</div>

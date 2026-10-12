@@ -1,0 +1,131 @@
+{# Demo for release 1.1.0 (Změna technických údajů): the new "Změna technických
+   údajů" card is picked, one tap on "Skenovat ORV" fills the form and the
+   stepper moves on to Vozidlo. CSS-only, 6s loop; app tokens only.
+   Included by _whats_new.html. #}
+<style>
+  .dz110-demo {
+    box-sizing: border-box; height: 132px; margin-bottom: 16px; padding: 12px;
+    border-radius: 12px; background: var(--wn-bg, #f0f2f5); overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    font-size: 11px; color: var(--wn-ink, #1a1d23);
+  }
+
+  /* Stepper: Typ → Vozidlo → Vlastník → Generovat. */
+  .dz110-steps { display: flex; align-items: center; padding: 0 4px; }
+  .dz110-c {
+    flex: none; width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 9.5px; font-weight: 700; background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280);
+  }
+  .dz110-c1 { background: var(--wn-accent, #1a56db); color: #fff; animation: dz110-c1 6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz110-c2 { animation: dz110-c2 6s infinite cubic-bezier(.2, .7, .3, 1); }
+  .dz110-l { position: relative; flex: 1; height: 2px; margin: 0 -1px; background: var(--wn-line, #dde1e7); overflow: hidden; }
+  .dz110-l1::after {
+    content: ''; position: absolute; inset: 0; background: var(--success, #059669);
+    transform: scaleX(0); transform-origin: left center; animation: dz110-fill 6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+
+  /* The mode card. */
+  .dz110-mode {
+    display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 9px;
+    border-radius: 10px; border: 1.5px solid var(--wn-line, #dde1e7); background: var(--wn-card, #fff);
+    animation: dz110-card 6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz110-ico {
+    flex: none; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db);
+    animation: dz110-ico 6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz110-txt { min-width: 0; line-height: 1.25; }
+  .dz110-txt b { display: block; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz110-txt span { display: block; font-size: 9.5px; color: var(--wn-muted, #6b7280); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* One tap on "Skenovat ORV". */
+  .dz110-btn {
+    position: relative; overflow: hidden; height: 28px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--wn-accent, #1a56db); color: #fff; font-size: 11.5px; font-weight: 700;
+    animation: dz110-btn 6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+  .dz110-lbl { grid-area: 1 / 1; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .dz110-lbl1 { animation: dz110-lbl1 6s infinite; }
+  .dz110-lbl2 { opacity: 0; animation: dz110-lbl2 6s infinite; }
+  .dz110-ripple {
+    position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    border-radius: 50%; background: #fff; opacity: 0; animation: dz110-ripple 6s infinite cubic-bezier(.2, .7, .3, 1);
+  }
+
+  @keyframes dz110-card {
+    0%, 12%   { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+    18%, 93%  { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    99%, 100% { border-color: var(--wn-line, #dde1e7); background: var(--wn-card, #fff); }
+  }
+  @keyframes dz110-ico {
+    0%, 12%   { background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); transform: scale(1); }
+    15%       { transform: scale(1.12); }
+    18%, 93%  { background: var(--wn-accent, #1a56db); color: #fff; transform: scale(1); }
+    99%, 100% { background: var(--wn-soft, #e8f0fe); color: var(--wn-accent, #1a56db); transform: scale(1); }
+  }
+  @keyframes dz110-btn {
+    0%, 22%   { opacity: 0; transform: translateY(5px); background: var(--wn-accent, #1a56db); }
+    30%       { opacity: 1; transform: none; background: var(--wn-accent, #1a56db); }
+    44%       { transform: none; }
+    47%       { transform: scale(.95); }
+    51%       { transform: none; background: var(--wn-accent, #1a56db); }
+    58%, 93%  { opacity: 1; transform: none; background: var(--success, #059669); }
+    99%, 100% { opacity: 0; transform: none; background: var(--wn-accent, #1a56db); }
+  }
+  @keyframes dz110-lbl1 { 0%, 52% { opacity: 1; } 56%, 99% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz110-lbl2 { 0%, 54% { opacity: 0; } 60%, 93% { opacity: 1; } 99%, 100% { opacity: 0; } }
+  @keyframes dz110-ripple {
+    0%, 44%   { opacity: 0; transform: scale(.2); }
+    46%       { opacity: .4; transform: scale(.2); }
+    60%, 100% { opacity: 0; transform: scale(6); }
+  }
+  @keyframes dz110-c1 {
+    0%, 54%   { background: var(--wn-accent, #1a56db); }
+    58%, 93%  { background: var(--success, #059669); }
+    99%, 100% { background: var(--wn-accent, #1a56db); }
+  }
+  @keyframes dz110-c2 {
+    0%, 60%   { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: scale(1); }
+    64%       { transform: scale(1.18); }
+    68%, 93%  { background: var(--wn-accent, #1a56db); color: #fff; transform: scale(1); }
+    99%, 100% { background: var(--wn-line, #dde1e7); color: var(--wn-muted, #6b7280); transform: scale(1); }
+  }
+  @keyframes dz110-fill {
+    0%, 54%   { transform: scaleX(0); }
+    64%, 93%  { transform: scaleX(1); }
+    99%, 100% { transform: scaleX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state, scanned and moved on to Vozidlo. */
+    .dz110-c1, .dz110-c2, .dz110-l1::after, .dz110-mode, .dz110-ico, .dz110-btn,
+    .dz110-lbl1, .dz110-lbl2, .dz110-ripple { animation: none; }
+    .dz110-c1 { background: var(--success, #059669); }
+    .dz110-c2 { background: var(--wn-accent, #1a56db); color: #fff; }
+    .dz110-l1::after { transform: none; }
+    .dz110-mode { border-color: var(--wn-accent, #1a56db); background: var(--wn-soft, #e8f0fe); }
+    .dz110-ico { background: var(--wn-accent, #1a56db); color: #fff; }
+    .dz110-btn { background: var(--success, #059669); }
+    .dz110-lbl1, .dz110-ripple { opacity: 0; }
+    .dz110-lbl2 { opacity: 1; }
+  }
+</style>
+<div class="dz110-demo" aria-hidden="true">
+  <div class="dz110-steps">
+    <span class="dz110-c dz110-c1">1</span><span class="dz110-l dz110-l1"></span>
+    <span class="dz110-c dz110-c2">2</span><span class="dz110-l"></span>
+    <span class="dz110-c">3</span><span class="dz110-l"></span>
+    <span class="dz110-c">4</span>
+  </div>
+  <div class="dz110-mode">
+    <span class="dz110-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-5M5 11V4M12 20v-8M12 8V4M19 20v-4M19 12V4"/><path d="M2.5 15h5M9.5 8h5M16.5 16h5"/></svg></span>
+    <div class="dz110-txt"><b>Změna technických údajů</b><span>Změny v registru (zápis A50-X, …)</span></div>
+  </div>
+  <div class="dz110-btn">
+    <span class="dz110-lbl dz110-lbl1"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M4 12h16"/></svg>Skenovat ORV</span>
+    <span class="dz110-lbl dz110-lbl2"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Vyplněno</span>
+    <span class="dz110-ripple"></span>
+  </div>
+</div>
