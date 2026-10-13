@@ -23,6 +23,7 @@ import ppd  # PPD (cash-receipt) generation — see ppd.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
 import hledani  # deterministic history search (no AI) — see hledani.py
+import hledani_ai  # AI hledání (Haiku vybere filtry, Python počítá) — see hledani_ai.py
 import prefill  # read a past žádost back into form data — see prefill.py
 import pm  # plná moc k zastupování na registru vozidel — see pm.py
 
@@ -60,7 +61,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.22.3"
+__version__ = "1.23.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1963,20 +1964,69 @@ def api_outputs():
     return jsonify(hledani.nacti_vystupy(DATA_DIR))
 
 
+_HLEDANI_LIMIT = 30          # AI dotazů na jedno přihlášení za 10 minut
+_HLEDANI_OKNO_S = 600
+_hledani_lock = threading.Lock()
+_hledani_casy: dict[str, list[float]] = {}
+
+
+def _hledani_ai_povoleno() -> bool:
+    from flask import session
+    sid = session.get("hledani_sid")
+    if not sid:
+        sid = uuid.uuid4().hex
+        session["hledani_sid"] = sid
+    now = time.monotonic()
+    with _hledani_lock:
+        recent = [t for t in _hledani_casy.get(sid, []) if now - t < _HLEDANI_OKNO_S]
+        if len(recent) >= _HLEDANI_LIMIT:
+            _hledani_casy[sid] = recent
+            return False
+        _hledani_casy[sid] = recent + [now]
+        return True
+
+
 @app.route("/api/hledat", methods=["GET"])
 def api_hledat():
-    """Deterministic history search over výstupy + doklady + firmy.
+    """History search over výstupy + doklady + firmy.
 
-    No AI: the question is parsed into a structured query and every record comes
-    from the files themselves, so amounts and receipt numbers are always real.
+    AI first (hledani_ai: Haiku only picks the filters and writes one sentence;
+    every record and number comes from the files, and a number check drops a
+    sentence with any figure not in the result). Falls back to the deterministic
+    parser (hledani.hledej) on no key, API error, rate limit or ?rezim=jednoduchy.
     """
     q = (request.args.get("q") or "").strip()
-    return jsonify(hledani.hledej(
-        q,
-        hledani.nacti_vystupy(DATA_DIR),
-        ppd.read_ppd_log(DATA_DIR),
-        read_firmy(),
-    ))
+    vystupy = hledani.nacti_vystupy(DATA_DIR)
+    doklady = ppd.read_ppd_log(DATA_DIR)
+    firmy = read_firmy()
+    duvod = None
+    if not q:
+        duvod = "prázdný dotaz"
+    elif request.args.get("rezim") == "jednoduchy":
+        duvod = "vyžádaný jednoduchý režim"
+    elif not ANTHROPIC_API_KEY:
+        duvod = "chybí klíč"
+    elif not _hledani_ai_povoleno():
+        duvod = "limit"
+    else:
+        try:
+            res = hledani_ai.zeptej(q, vystupy, doklady, firmy,
+                                    api_key=ANTHROPIC_API_KEY, post=requests.post)
+            _log.info("hledani_ai %s", json.dumps({"q": q, "ms": res.get("ms"),
+                      "tokeny": res.get("tokeny"), "veta": bool(res.get("veta"))},
+                      ensure_ascii=False))
+            res.pop("tokeny", None)
+            return jsonify(res)
+        except Exception as exc:  # AI je pohodlí — hledání nesmí spadnout
+            duvod = f"{type(exc).__name__}: {exc}"
+            _log.warning("hledani_ai fallback: %s", duvod)
+    res = hledani.hledej(q, vystupy, doklady, firmy)
+    if ANTHROPIC_API_KEY:
+        res["priklady"] = hledani_ai.PRIKLADY   # s AI jde ptát normální větou
+    res["ai"] = False
+    res["jednoduchy"] = bool(q) and duvod != "vyžádaný jednoduchý režim"
+    res["limit_dotazu"] = duvod == "limit"
+    return jsonify(res)
 
 
 @app.route("/api/ppd-slovy", methods=["GET"])

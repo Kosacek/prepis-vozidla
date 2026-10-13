@@ -1,0 +1,106 @@
+{# Demo for release 1.23.0 (Zeptej se): a question types itself into the search,
+   the sparkle thinks for a moment ("Listuju šanonem…") and the answer drops in
+   with the key figure bold + underlined, then a matching row. CSS-only, 6s
+   loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1230-demo {
+    box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; align-content: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1230-mini {
+    display: grid; gap: 7px; padding: 9px 10px; border-radius: 10px;
+    border: 1px solid var(--wn-line); background: var(--wn-card);
+  }
+  .dz1230-bar { display: flex; gap: 5px; }
+  .dz1230-search {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 21px; padding: 0 7px;
+    border: 1.5px solid var(--wn-line); border-radius: 6px; color: var(--wn-muted);
+  }
+  .dz1230-q { position: relative; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .dz1230-typed {
+    display: inline-block; overflow: hidden; vertical-align: bottom; color: var(--wn-ink); font-weight: 600;
+    max-width: 0; animation: dz1230-type 6s steps(28, end) infinite;
+  }
+  .dz1230-go {
+    flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 21px;
+    border-radius: 6px; background: var(--wn-accent); color: #fff;
+    animation: dz1230-go 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1230-stage { display: grid; min-height: 46px; }
+  .dz1230-think, .dz1230-answer { grid-area: 1 / 1; }
+  .dz1230-think {
+    display: flex; align-items: center; gap: 8px; color: var(--wn-accent); font-weight: 600;
+    opacity: 0; animation: dz1230-think 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1230-think svg { flex: none; animation: dz1230-spin 1.6s linear infinite; }
+  .dz1230-think span { color: var(--wn-ink); }
+  .dz1230-answer { display: grid; gap: 6px; align-content: start; }
+  .dz1230-veta {
+    font-size: 12px; line-height: 1.35; opacity: 0;
+    animation: dz1230-in 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1230-em {
+    font-weight: 700; background-image: linear-gradient(var(--wn-accent), var(--wn-accent));
+    background-repeat: no-repeat; background-position: 0 100%; background-size: 0 2px; padding-bottom: 2px;
+    animation: dz1230-em 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1230-row {
+    display: flex; align-items: center; gap: 7px; height: 19px; padding: 0 7px;
+    border: 1px solid var(--wn-line); border-radius: 6px; font-size: 10.5px; white-space: nowrap;
+    opacity: 0; animation: dz1230-row 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1230-badge { flex: none; padding: 1px 6px; border-radius: 4px; background: var(--wn-soft); color: var(--wn-accent); font-size: 9.5px; font-weight: 700; }
+  .dz1230-sub { color: var(--wn-muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+  @keyframes dz1230-type { 0%, 4% { max-width: 0; } 30%, 92% { max-width: 190px; } 100% { max-width: 0; } }
+  @keyframes dz1230-go { 0%, 31% { transform: none; } 34% { transform: scale(.88); } 38%, 100% { transform: none; } }
+  @keyframes dz1230-think {
+    0%, 35% { opacity: 0; transform: translateY(-4px); }
+    39%, 55% { opacity: 1; transform: none; }
+    59%, 100% { opacity: 0; transform: translateY(-4px); }
+  }
+  @keyframes dz1230-in {
+    0%, 58% { opacity: 0; transform: translateY(-6px); }
+    64%, 92% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-6px); }
+  }
+  @keyframes dz1230-em { 0%, 64% { background-size: 0 2px; } 72%, 92% { background-size: 100% 2px; } 100% { background-size: 0 2px; } }
+  @keyframes dz1230-row {
+    0%, 66% { opacity: 0; transform: translateY(-5px); }
+    72%, 92% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-5px); }
+  }
+  @keyframes dz1230-spin { to { transform: rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: question typed, answer with underline and the row shown. */
+    .dz1230-typed, .dz1230-go, .dz1230-think, .dz1230-think svg, .dz1230-veta, .dz1230-em, .dz1230-row { animation: none; }
+    .dz1230-typed { max-width: 190px; }
+    .dz1230-think { opacity: 0; }
+    .dz1230-veta, .dz1230-row { opacity: 1; transform: none; }
+    .dz1230-em { background-size: 100% 2px; }
+  }
+</style>
+<div class="dz1230-demo" aria-hidden="true">
+  <div class="dz1230-mini">
+    <div class="dz1230-bar">
+      <div class="dz1230-search">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+        <span class="dz1230-q"><span class="dz1230-typed">Kolik převodů udělal Roman?</span></span>
+      </div>
+      <span class="dz1230-go"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/></svg></span>
+    </div>
+    <div class="dz1230-stage">
+      <div class="dz1230-think">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/></svg>
+        <span>Listuju šanonem…</span>
+      </div>
+      <div class="dz1230-answer">
+        <div class="dz1230-veta">Roman tento měsíc udělal <span class="dz1230-em">12 převodů</span>.</div>
+        <div class="dz1230-row"><span class="dz1230-badge">Převod</span><span class="dz1230-sub">13.10. · 3BR 4008 · Roman</span></div>
+      </div>
+    </div>
+  </div>
+</div>

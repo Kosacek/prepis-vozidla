@@ -196,11 +196,30 @@
   .sdilet-telo { padding: 8px 24px 34px; text-align: center; }
   .sdilet-url { font-size: clamp(22px, 6vw, 40px); font-weight: 800; word-break: break-all; line-height: 1.25; }
   .sdilet-pod { margin-top: 14px; font-size: 13px; color: var(--muted); }
-  /* Doklady (PPD) table */
-  .doklady-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .doklady-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: #fff; }
-  .doklady-table td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-  .doklady-table tr:hover td { background: #f9fafb; }
+  /* Doklady — stejný jazyk jako Firmy: karty, chipy, koš jen ikonou. */
+  #doklady-modal { padding: 16px; }
+  #doklady-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
+  #doklady-search { padding: 10px 12px 10px 38px; font-family: inherit; font-size: 14px; }
+  #doklady-modal-body { display: flex; flex-direction: column; gap: 8px; padding-top: 0; flex: 1 1 auto; min-height: 0; overflow-x: hidden; }
+  .dok-mesic { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 8px 2px 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .dok-mesic:first-child { margin-top: 0; }
+  .dok-mesic span { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dok-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 32px; align-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; flex-shrink: 0; transition: border-color .15s, background .15s; }
+  .dok-card:hover, .dok-card:focus-within { border-color: #b5caf5; background: #f7faff; }
+  .dok-num { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 40px; border-radius: 10px; background: var(--accent); color: var(--primary); font-size: 13px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .dok-num small { font-size: 9px; font-weight: 700; letter-spacing: .04em; opacity: .7; }
+  .dok-castka { padding-top: 1px; font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  a.firm-chip { text-decoration: none; }
+  .dok-card.smazany .dok-num { background: #f1f2f4; color: var(--muted); }
+  .dok-card.smazany .firm-card-name, .dok-card.smazany .dok-castka { color: var(--muted); }
+  .firm-chip.dok-obnovit { border-color: #b9e5d1; background: #ecfdf5; color: var(--success); }
+  .firm-chip.dok-obnovit:hover, .firm-chip.dok-obnovit:focus-visible { border-color: var(--success); background: #d1fae5; color: var(--success); }
+  .dok-deleted { margin-top: 8px; flex-shrink: 0; }
+  .dok-deleted summary { display: flex; align-items: center; gap: 8px; padding: 8px 2px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; list-style: none; }
+  .dok-deleted summary::-webkit-details-marker { display: none; }
+  .dok-deleted summary::after { content: ""; width: 7px; height: 7px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+  .dok-deleted[open] summary::after { transform: rotate(45deg); }
+  .dok-deleted .dok-list { display: flex; flex-direction: column; gap: 8px; }
   #firmy-modal { padding: 16px; }
   #firmy-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
   .firm-count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--accent); color: var(--primary); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -235,7 +254,8 @@
   .firm-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 12px; color: var(--muted); text-align: center; font-size: 14px; }
   @media (hover: hover) and (pointer: fine) {
     .firm-delete { opacity: 0; }
-    .firm-card:hover .firm-delete, .firm-card:focus-within .firm-delete { opacity: 1; }
+    .firm-card:hover .firm-delete, .firm-card:focus-within .firm-delete,
+    .dok-card:hover .firm-delete, .dok-card:focus-within .firm-delete { opacity: 1; }
   }
   @media (hover: none) {
     .firm-delete { opacity: 1; }
@@ -401,6 +421,57 @@
   .ico-xl { width: 44px; height: 44px; stroke-width: 1.4; }
   .ico-muted { color: var(--muted); }
 
+  /* ── Zeptej se (AI hledání) — stejný styl jako „Zeptej se" v evidenci ──── */
+  #hledani-modal { padding: 16px; }
+  #hledani-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
+  #hledani-modal .modal-box { max-width: 720px; }
+  .ask-bar { display: flex; gap: 8px; margin: 0 22px 14px; flex-shrink: 0; }
+  .ask-bar .firm-search { flex: 1; margin: 0; }
+  #hledani-q { padding: 10px 12px 10px 38px; font-family: inherit; font-size: 14px; }
+  .ask-go { display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font: 600 14px 'Segoe UI', system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background .15s; }
+  .ask-go:hover { background: var(--primary-dark); }
+  .ask-go:disabled { opacity: .6; cursor: default; }
+  #hledani-body { padding-top: 0; flex: 1 1 auto; min-height: 0; }
+  .ask-spark { color: var(--primary); }
+  .ask-headline { font-size: 17px; font-weight: 700; line-height: 1.4; letter-spacing: -.01em; }
+  .ask-headline--ai { font-size: 16px; font-weight: 500; line-height: 1.55; letter-spacing: 0; }
+  .ask-headline.unknown { color: var(--muted); font-weight: 600; }
+  .ask-em { font-weight: 700; color: var(--text); text-decoration: underline; text-decoration-color: var(--primary); text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+  .ask-mode { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .ask-choices { margin-top: 12px; }
+  .ask-examples { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .ask-examples:first-child { margin-top: 4px; padding-top: 0; border-top: none; }
+  .ask-examples .hl-sec { margin-top: 0; }
+  .ask-thinking { display: flex; align-items: center; gap: 16px; padding: 14px 4px; color: var(--primary); }
+  .ask-thinking svg.ask-orb { flex: none; width: 28px; height: 28px; animation: ask-spin 2.4s linear infinite, ask-pulse 1.2s ease-in-out infinite; }
+  .ask-thinking-body { flex: 1; min-width: 0; }
+  .ask-thinking-label { font-weight: 600; color: var(--text); font-size: 14px; }
+  .ask-verb { display: inline-block; transition: opacity .16s ease, transform .16s ease; }
+  .ask-verb.is-swap { opacity: 0; transform: translateY(4px); }
+  .ask-dots i { display: inline-block; width: 4px; height: 4px; margin-left: 3px; border-radius: 50%; background: currentColor; animation: ask-dot 1.2s infinite; }
+  .ask-dots i:nth-child(2) { animation-delay: .15s; } .ask-dots i:nth-child(3) { animation-delay: .3s; }
+  .ask-skeleton { display: grid; gap: 8px; margin-top: 10px; }
+  .ask-skeleton span { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: ask-shimmer 1.4s linear infinite; }
+  .ask-skeleton span:nth-child(1) { width: 92%; } .ask-skeleton span:nth-child(2) { width: 68%; } .ask-skeleton span:nth-child(3) { width: 40%; }
+  .ask-reveal { animation: ask-in .5s cubic-bezier(.22, .8, .25, 1) both; animation-delay: calc(var(--i, 0) * 60ms + 40ms); }
+  @keyframes ask-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  @keyframes ask-spin { to { transform: rotate(360deg); } }
+  @keyframes ask-pulse { 0%, 100% { scale: .88; opacity: .7; } 50% { scale: 1.12; opacity: 1; } }
+  @keyframes ask-dot { 0%, 80%, 100% { opacity: .2; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  @keyframes ask-shimmer { to { background-position: -200% 0; } }
+
+  /* Přechod mezi kroky („Jemný"): starý krok vybledne doleva, nový přijede
+     zprava. Odcházející krok je kopie bez id (.panel-ghost), aby se dal
+     dovykreslit, zatímco skutečný panel už je schovaný. */
+  .container { position: relative; transition: max-width .34s cubic-bezier(.22, 1, .36, 1); }
+  .panel-ghost { position: absolute; margin: 0 !important; pointer-events: none; }
+  .step-item:not(:last-child)::after { transform-origin: left center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ask-reveal, .ask-thinking svg.ask-orb, .ask-dots i, .ask-skeleton span { animation: none; }
+    .ask-verb, .container { transition: none; }
+  }
+
   /* ── Hledání v historii ──────────────────────────────────────────────────
      Vše je flex + wrap, ŽÁDNÉ pevné pixelové sloupce: přesně na tom se
      v sesterské evidenci rozbil mobil (vodorovný posuvník na 375 px). */
@@ -466,8 +537,16 @@
                             color: var(--text); font-weight: 700; }
 
   @media (max-width: 600px) {
-    #firmy-modal { padding: 12px; }
-    #firmy-modal .modal-header { padding: 16px 16px 12px; }
+    #firmy-modal, #doklady-modal, #hledani-modal { padding: 12px; }
+    #firmy-modal .modal-header, #doklady-modal .modal-header, #hledani-modal .modal-header { padding: 16px 16px 12px; }
+    #doklady-modal-body, #hledani-body { padding: 0 16px 16px; }
+    .dok-card { position: relative; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 8px; }
+    .dok-card .firm-chips { padding-right: 36px; }
+    .dok-card .firm-delete { position: absolute; right: 8px; bottom: 8px; }
+    .dok-num { width: 40px; }
+    .ask-bar { margin: 0 16px 12px; }
+    .ask-go { padding: 0 13px; }
+    .ask-go span { display: none; }
     .firm-search { margin: 0 16px 12px; }
     #firmy-modal-body { padding: 0 16px 16px; }
     .firm-card { column-gap: 8px; }
@@ -507,6 +586,8 @@
   <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="15" width="10" height="6" rx="1"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/><path d="M9 13h6M9 17h4"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 4h4"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/></symbol>
   <symbol id="i-transfer" viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M13.5 5.5L17 9l-3.5 3.5"/><path d="M20 15H7"/><path d="M10.5 11.5L7 15l3.5 3.5"/></symbol>
@@ -525,7 +606,7 @@
   </div>
   <div class="app-actions">
     <button onclick="openProfilModal()" id="profil-chip" class="hbtn" title="Kdo vyplňuje — kliknutím změníš"><svg class="ico"><use href="#i-user"></use></svg> <span id="profil-name">—</span></button>
-    <button onclick="openHledaniModal()" class="hbtn hbtn-icon" title="Hledat v historii — žádosti, doklady, firmy" aria-label="Hledat v historii"><svg class="ico"><use href="#i-search"></use></svg></button>
+    <button onclick="openHledaniModal()" class="hbtn hbtn-icon" title="Zeptej se — žádosti, doklady, firmy" aria-label="Zeptej se"><svg class="ico"><use href="#i-search"></use></svg></button>
     <button onclick="openDokladyModal()" class="hbtn" title="Vystavené doklady"><svg class="ico"><use href="#i-receipt"></use></svg><span class="hbtn-lbl">Doklady</span></button>
     <button onclick="openFirmyModal()" class="hbtn" title="Firmy" aria-label="Firmy"><svg class="ico"><use href="#i-building"></use></svg><span class="hbtn-lbl">Správa firem</span></button>
   </div>
@@ -591,36 +672,35 @@
 </div>
 
 <!-- Doklady (vystavené PPD) modal -->
-<div class="modal-overlay" id="doklady-modal">
+<div class="modal-overlay" id="doklady-modal" onkeydown="event.stopPropagation();if(event.key==='Escape')closeDokladyModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <h3><svg class="ico"><use href="#i-receipt"></use></svg> Vystavené doklady (PPD)</h3>
-      <button class="modal-close" onclick="closeDokladyModal()">✕</button>
+      <h3><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg> Doklady <span class="firm-count" id="doklady-count" title="Počet dokladů">0</span></h3>
+      <button type="button" class="modal-close" onclick="closeDokladyModal()" title="Zavřít" aria-label="Zavřít">×</button>
     </div>
-    <div style="padding:12px 16px 0;">
-      <input type="text" id="doklady-search" class="no-uc" placeholder="Hledat (číslo, jméno, IČO, datum…)" oninput="renderDoklady()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="firm-search">
+      <svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>
+      <input type="text" id="doklady-search" class="no-uc" placeholder="Hledat" aria-label="Hledat doklady" autocomplete="off" oninput="renderDoklady()">
     </div>
     <div class="modal-body" id="doklady-modal-body">Načítám…</div>
   </div>
 </div>
 
-<!-- Hledání v historii (žádosti / doklady / firmy) -->
-<div class="modal-overlay" id="hledani-modal">
+<!-- Zeptej se — AI hledání v historii (žádosti / doklady / firmy) -->
+<div class="modal-overlay" id="hledani-modal" onkeydown="event.stopPropagation();if(event.key==='Escape')closeHledaniModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <h3><svg class="ico"><use href="#i-search"></use></svg> Hledat v historii</h3>
-      <button class="modal-close" onclick="closeHledaniModal()">✕</button>
+      <h3><svg class="ico ask-spark" aria-hidden="true"><use href="#i-spark"></use></svg> Zeptej se</h3>
+      <button type="button" class="modal-close" onclick="closeHledaniModal()" title="Zavřít" aria-label="Zavřít">×</button>
     </div>
-    <div style="padding:12px 16px 0;">
-      <input type="text" id="hledani-q" class="no-uc" placeholder="Např. co jsem dělal 15.7."
-             autocomplete="off" oninput="hledaniInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();spustHledani();}"
-             style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
-      <!-- Naklikat jde totéž, co jde napsat: chipy jen složí českou větu a pošlou
-           ji stejným parserem. Jedna pravda o tom, co která věta znamená —
-           a kdo netrefí formulaci, doklikne se ke stejnému výsledku. -->
-      <div id="hledani-filtry" style="margin-top:10px;"></div>
-    </div>
-    <div class="modal-body" id="hledani-body"></div>
+    <form class="ask-bar" onsubmit="event.preventDefault();spustHledani();">
+      <div class="firm-search">
+        <svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>
+        <input type="text" id="hledani-q" class="no-uc" placeholder="Zeptej se na žádosti, doklady nebo firmy" aria-label="Dotaz" autocomplete="off">
+      </div>
+      <button type="submit" class="ask-go" id="hledani-go" aria-label="Zeptat se"><svg class="ico" aria-hidden="true"><use href="#i-spark"></use></svg><span>Zeptat se</span></button>
+    </form>
+    <div class="modal-body" id="hledani-body" aria-live="polite"></div>
   </div>
 </div>
 
@@ -1571,7 +1651,88 @@ function navBack() {
   activatePanel(currentPanel());
 }
 
+// ── Přechod mezi kroky („Jemný", David vybral 2026-10-13) ─────────────────
+// Starý krok vybledne a posune se o kousek doleva, nový přijede zprava
+// (zpátky obráceně), čára ve stepperu doběhne k dalšímu kroku a jeho kroužek
+// naskočí. Animace je jen kosmetika: rychlé Entery ji zkrátí, chyba v ní ani
+// zastavená časová osa (tab na pozadí) navigaci nikdy neshodí.
+const _KROK_EASE = 'cubic-bezier(.22,1,.36,1)';
+let _krokPredIdx = 0;
+let _krokAnimace = [];
+let _krokPojistka = 0;
+
+function _krokStop() {
+  clearTimeout(_krokPojistka);
+  _krokAnimace.forEach(a => { try { a.finish(); } catch (_) { /* už doběhla */ } });
+  _krokAnimace = [];
+  document.querySelectorAll('.panel-ghost').forEach(g => g.remove());
+}
+
+function _krokAnim(el, frames, opts) {
+  const a = el.animate(frames, { fill: 'backwards', ...opts });
+  _krokAnimace.push(a);
+  return a;
+}
+
+// Kopie odcházejícího kroku bez id a name — žádná duplicitní id, do kopie
+// nejde kliknout ani se z ní nic neodešle.
+function _krokDuch(from, rect) {
+  const box = document.querySelector('.container').getBoundingClientRect();
+  const g = from.cloneNode(true);
+  g.removeAttribute('id');
+  g.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+  g.querySelectorAll('[name]').forEach(e => e.removeAttribute('name'));
+  g.classList.add('active', 'panel-ghost');
+  g.setAttribute('aria-hidden', 'true');
+  g.inert = true;
+  g.style.top = `${rect.top - box.top}px`;
+  g.style.left = `${rect.left - box.left}px`;
+  g.style.width = `${rect.width}px`;
+  from.parentNode.insertBefore(g, from);
+  return g;
+}
+
+// Stepper se překresluje přes innerHTML, takže CSS transition nemá z čeho jet.
+function _krokStepper(dir) {
+  const items = document.querySelectorAll('#stepper .step-item');
+  const hotovy = items[flowIdx - 1];
+  if (dir > 0 && hotovy) {
+    _krokAnim(hotovy, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }],
+              { duration: 320, easing: _KROK_EASE, pseudoElement: '::after' });
+  }
+  const kruh = items[flowIdx] && items[flowIdx].querySelector('.step-circle');
+  if (kruh) {
+    _krokAnim(kruh, [{ transform: 'scale(.6)', opacity: .4 }, { transform: 'scale(1.12)', offset: .6 },
+                     { transform: 'scale(1)', opacity: 1 }],
+              { duration: 380, delay: dir > 0 ? 160 : 0, easing: _KROK_EASE });
+  }
+}
+
 function activatePanel(n) {
+  _krokStop();
+  const from = document.querySelector('.step-panel.active:not(.panel-ghost)');
+  const rect = from && from.getBoundingClientRect();
+  const dir = Math.sign(flowIdx - _krokPredIdx);
+  _krokPredIdx = flowIdx;
+  _aktivujPanel(n);
+  const to = document.getElementById(`panel-${n}`);
+  if (!from || from === to || !dir || !to.animate
+      || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  try {
+    const duch = _krokDuch(from, rect);
+    _krokAnim(duch, [{ opacity: 1, transform: 'none' },
+                     { opacity: 0, transform: `translateX(${-20 * dir}px)` }],
+              { duration: 140, easing: 'ease-in' })
+      .finished.then(() => duch.remove(), () => duch.remove());
+    _krokAnim(to, [{ opacity: 0, transform: `translateX(${28 * dir}px)` },
+                   { opacity: 1, transform: 'none' }],
+              { duration: 300, delay: 70, easing: _KROK_EASE });
+    _krokStepper(dir);
+  } catch (_) { _krokStop(); return; }
+  _krokPojistka = setTimeout(_krokStop, 900);
+}
+
+function _aktivujPanel(n) {
   // Close camera when leaving panel-1 so the device is fully released
   // (i když se zrovna otevírá — jinak by dorazila až po odchodu a běžela skrytá)
   if (n !== 1 && (cameraStream || _camOpening)) closeCamera();
@@ -2383,90 +2544,42 @@ async function prefillFrom(file) {
   }
 }
 
-// ── Hledání v historii ────────────────────────────────────────────────────────
-// Dotaz parsuje server deterministicky (hledani.py) — tady se jen vykresluje.
-// Žádná AI: každý řádek níž je skutečný soubor / doklad / firma.
-let _hlTimer = null;
+// ── Zeptej se (AI hledání v historii) ────────────────────────────────────────
+// Stejný princip jako „Zeptej se" v evidenci: AI na serveru (hledani_ai.py)
+// jen vybere filtry a napíše větu, každý řádek níž je skutečný soubor / doklad
+// / firma a čísla ve větě prošla kontrolou. Bez AI odpoví deterministický
+// parser (hledani.py) — pak se ukáže „Jednodušší režim".
 let _hlPriklady = [];
+let _hlSeq = 0;
+const HL_SLOVESA = ['Listuju šanonem', 'Hrabu se v žádostech', 'Šmejdím v dokladech',
+  'Lustruju razítka', 'Probírám fascikl', 'Budím archiv', 'Čtu techničáky',
+  'Šťourám se v tabulkách', 'Cinkám korunama', 'Hledám ztracené kačky',
+  'Počítám na prstech', 'Brouzdám v registru', 'Rovnám papíry', 'Foukám prach ze šuplíku'];
+let _hlSlovesoTimer = null;
 
 async function openHledaniModal() {
   document.getElementById('hledani-modal').style.display = 'flex';
   const q = document.getElementById('hledani-q');
   q.value = '';
-  _hlVyber = { co: null, kdy: null, kdo: null };
-  renderHledaniFiltry();
-  document.getElementById('hledani-body').innerHTML = '';
+  _hlSeq++;
+  _hlZastavSlovesa();
+  document.getElementById('hledani-go').disabled = false;
+  renderHledaniUvod();
+  setTimeout(() => q.focus(), 50);
   if (!_hlPriklady.length) {
     try {
       const res = await fetch('/api/hledat?q=').then(r => r.json());
       _hlPriklady = res.priklady || [];
+      if (!q.value.trim()) renderHledaniUvod();
     } catch (e) { /* příklady jsou nice-to-have */ }
   }
-  renderHledaniUvod();
-  setTimeout(() => q.focus(), 50);
 }
 
 function closeHledaniModal() {
   const m = document.getElementById('hledani-modal');
   if (m) m.style.display = 'none';
-  if (_hlTimer) { clearTimeout(_hlTimer); _hlTimer = null; }
-}
-
-function hledaniInput() {
-  // Ruční psaní přebíjí naklikané — jinak by chipy svítily u dotazu, který
-  // s nimi nemá nic společného.
-  if (document.getElementById('hledani-q').value !== hlSlozDotaz()) {
-    _hlVyber = { co: null, kdy: null, kdo: null };
-    renderHledaniFiltry();
-  }
-  if (_hlTimer) clearTimeout(_hlTimer);
-  _hlTimer = setTimeout(spustHledani, 250);   // ať se nestřílí dotaz na každé písmeno
-}
-
-// ── Naklikávací filtry ───────────────────────────────────────────────────────
-// Hodnota chipu JE kus české věty; dotaz se z nich složí a jde na server stejnou
-// cestou jako ručně psaný. Vzniklo z toho, že „doklady 8. měsíc" nikdo netrefil
-// napoprvé — a co netrefí David, netrefí ani Petr s Romanem.
-const HL_FILTRY = [
-  { klic: 'co',  popis: 'Co',  volby: [['Žádosti', 'žádosti'], ['Doklady', 'doklady'], ['Firmy', 'firmy']] },
-  { klic: 'kdy', popis: 'Kdy', volby: [['Dnes', 'dnes'], ['Tento týden', 'tento týden'],
-                                       ['Minulý týden', 'minulý týden'], ['Tento měsíc', 'tento měsíc'],
-                                       ['Minulý měsíc', 'minulý měsíc']] },
-  { klic: 'kdo', popis: 'Kdo', volby: [['David', 'David'], ['Petr', 'Petr'], ['Roman', 'Roman']] },
-];
-let _hlVyber = { co: null, kdy: null, kdo: null };
-
-// Doklady si nepamatují, kdo je vystavil (v evidenci je plátce, ne my), takže
-// „kdo" by u nich tiše nic neudělalo a odpověď by vypadala jako platná.
-function hlKdoJdeSCim() { return _hlVyber.co !== 'doklady' && _hlVyber.co !== 'firmy'; }
-
-function hlSlozDotaz() {
-  const kdo = hlKdoJdeSCim() ? _hlVyber.kdo : null;
-  return [kdo, _hlVyber.co, _hlVyber.kdy].filter(Boolean).join(' ');
-}
-
-function renderHledaniFiltry() {
-  const box = document.getElementById('hledani-filtry');
-  if (!box) return;
-  const vypnuto = !hlKdoJdeSCim();
-  box.innerHTML = HL_FILTRY.map(r => `<div class="hl-radek">
-      <b>${esc(r.popis)}</b>
-      <div class="hl-chips">${r.volby.map(([popis, hodnota]) => {
-        const on = _hlVyber[r.klic] === hodnota;
-        const off = r.klic === 'kdo' && vypnuto;
-        return `<button type="button" class="hl-chip${on ? ' on' : ''}${off ? ' off' : ''}"
-          ${off ? 'disabled title="Doklady si nepamatují, kdo je vystavil"' : ''}
-          onclick="hlFiltr('${r.klic}','${esc(hodnota)}')">${esc(popis)}</button>`;
-      }).join('')}</div></div>`).join('');
-}
-
-function hlFiltr(klic, hodnota) {
-  _hlVyber[klic] = _hlVyber[klic] === hodnota ? null : hodnota;   // druhé kliknutí ruší
-  renderHledaniFiltry();
-  const q = hlSlozDotaz();
-  document.getElementById('hledani-q').value = q;
-  if (_hlTimer) { clearTimeout(_hlTimer); _hlTimer = null; }
-  if (q) spustHledani(); else renderHledaniUvod();
+  _hlSeq++;               // pozdě doběhnutá odpověď se už nevykreslí
+  _hlZastavSlovesa();
 }
 
 function hledejPriklad(p) {
@@ -2474,29 +2587,70 @@ function hledejPriklad(p) {
   spustHledani();
 }
 
-function _hlChips() {
+function _hlChips(nadpis) {
   if (!_hlPriklady.length) return '';
-  return '<div class="hl-sec">Příklady — klikni</div><div class="hl-chips">' +
-    _hlPriklady.map(p => `<button class="hl-chip" onclick="hledejPriklad('${esc(p).replace(/'/g, "\\'")}')">${esc(p)}</button>`).join('') +
-    '</div>';
+  return `<div class="ask-examples ask-reveal" style="--i:3"><div class="hl-sec">${esc(nadpis)}</div><div class="hl-chips">` +
+    _hlPriklady.map(p => `<button type="button" class="hl-chip" data-q="${esc(p)}" onclick="hledejPriklad(this.dataset.q)">${esc(p)}</button>`).join('') +
+    '</div></div>';
 }
 
 function renderHledaniUvod() {
-  document.getElementById('hledani-body').innerHTML =
-    '<div class="hl-answer"><div class="hl-detail">Žádosti, doklady i firmy — počítá se přímo z dat, ' +
-    'takže čísla vždycky sedí.</div>' + _hlChips() + '</div>';
+  document.getElementById('hledani-body').innerHTML = _hlChips('Zkus třeba');
+}
+
+function _hlZastavSlovesa() {
+  if (_hlSlovesoTimer) { clearInterval(_hlSlovesoTimer); _hlSlovesoTimer = null; }
+}
+
+function _hlPremyslim() {
+  document.getElementById('hledani-body').innerHTML = `<div class="ask-thinking ask-reveal" role="status">
+      <svg class="ask-orb" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" fill="currentColor"/>
+        <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" opacity=".55"/>
+      </svg>
+      <div class="ask-thinking-body">
+        <div class="ask-thinking-label"><span class="ask-verb" id="hl-verb">Přemýšlím</span><span class="ask-dots"><i></i><i></i><i></i></span></div>
+        <div class="ask-skeleton"><span></span><span></span><span></span></div>
+      </div></div>`;
+  _hlZastavSlovesa();
+  let posledni = 'Přemýšlím';
+  _hlSlovesoTimer = setInterval(() => {
+    const el = document.getElementById('hl-verb');
+    if (!el) { _hlZastavSlovesa(); return; }
+    let dalsi;
+    do { dalsi = HL_SLOVESA[Math.floor(Math.random() * HL_SLOVESA.length)]; } while (dalsi === posledni);
+    posledni = dalsi;
+    const klid = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!klid) el.classList.add('is-swap');
+    setTimeout(() => { el.textContent = dalsi; el.classList.remove('is-swap'); }, klid ? 0 : 160);
+  }, 1700);
 }
 
 async function spustHledani() {
   const q = (document.getElementById('hledani-q').value || '').trim();
-  const body = document.getElementById('hledani-body');
   if (!q) { renderHledaniUvod(); return; }
-  body.innerHTML = '<div class="hl-answer"><div class="hl-detail">Hledám…</div></div>';
+  const seq = ++_hlSeq;
+  const tlacitko = document.getElementById('hledani-go');
+  tlacitko.disabled = true;
+  _hlPremyslim();
   try {
-    renderHledani(await fetch('/api/hledat?q=' + encodeURIComponent(q)).then(r => r.json()));
+    const res = await fetch('/api/hledat?q=' + encodeURIComponent(q)).then(r => r.json());
+    if (seq !== _hlSeq) return;
+    renderHledani(res);
   } catch (e) {
-    body.innerHTML = '<div class="hl-answer"><div class="hl-headline unknown">Hledání se nepovedlo.</div></div>';
+    if (seq !== _hlSeq) return;
+    document.getElementById('hledani-body').innerHTML =
+      '<div class="ask-headline unknown ask-reveal">Hledání se nepovedlo.</div>';
+  } finally {
+    if (seq === _hlSeq) { _hlZastavSlovesa(); tlacitko.disabled = false; }
   }
+}
+
+// **x** z AI věty → tučně + modré podtržení. Nejdřív se escapuje, pak značí.
+function _hlZvyrazni(veta) {
+  const safe = esc(veta);
+  if ((safe.match(/\*\*/g) || []).length % 2) return safe.replace(/\*\*/g, '');
+  return safe.replace(/\*\*(.+?)\*\*/g, '<strong class="ask-em">$1</strong>');
 }
 
 function _kcFmt(v) {
@@ -2517,28 +2671,39 @@ function _hlSdilet(url) {
 }
 
 function renderHledani(res) {
-  let h = '<div class="hl-answer">';
-  h += `<div class="hl-headline${res.understood ? '' : ' unknown'}">${esc(res.headline || '')}</div>`;
-  if (res.detail) h += `<div class="hl-detail">${esc(res.detail)}</div>`;
+  let i = 0;
+  const r = () => ` ask-reveal" style="--i:${Math.min(i++, 12)}`;
+  let h = '';
+  if (res.jednoduchy) h += `<div class="ask-mode${r()}">Jednodušší režim${res.limit_dotazu ? ' — limit dotazů' : ''}</div>`;
+  if (res.ai && res.veta) {
+    h += `<div class="ask-headline ask-headline--ai${r()}">${_hlZvyrazni(res.veta)}</div>`;
+  } else {
+    h += `<div class="ask-headline${res.understood ? '' : ' unknown'}${r()}">${esc(res.headline || '')}</div>`;
+  }
+  if (res.detail) h += `<div class="hl-detail${r()}">${esc(res.detail)}</div>`;
+  if ((res.moznosti || []).length) {
+    h += `<div class="hl-chips ask-choices${r()}">` + res.moznosti.map(m =>
+      `<button type="button" class="hl-chip" data-q="${esc(m)}" onclick="hledejPriklad(this.dataset.q)">${esc(m)}</button>`).join('') + '</div>';
+  }
 
   if ((res.vystupy || []).length) {
     // Když se výpis ořízl, musí to být vidět — headline mluví o víc záznamech,
     // než kolik jich je v seznamu.
     const orez = res.limit && res.vystupy.length >= res.limit
       ? ` <span style="font-weight:400;text-transform:none;">— zobrazeno prvních ${res.limit}</span>` : '';
-    h += `<div class="hl-sec">Žádosti (${res.vystupy.length})${orez}</div>`;
+    h += `<div class="hl-sec${r()}">Žádosti (${res.vystupy.length})${orez}</div>`;
     h += res.vystupy.map(v => {
       const kdo = [v.rz || v.vin, v.na].filter(Boolean).join(' · ');
-      return `<div class="hl-radek"><a class="hl-row" href="${esc(v.url)}" target="_blank">
+      return `<div class="hl-radek${r()}"><a class="hl-row" href="${esc(v.url)}" target="_blank">
         <span class="hl-badge">${esc(v.typ)}</span>
         <span class="hl-when">${_czDate(v.datum)}</span>
-        <span class="hl-sub">${esc(v.cas)}${kdo ? ' · ' + esc(kdo) : ''}</span></a>${_hlSdilet(v.url)}</div>`;
+        <span class="hl-sub">${esc(v.cas)}${kdo ? ' · ' + esc(kdo) : ''}${v.profil ? ' · ' + esc(v.profil) : ''}</span></a>${_hlSdilet(v.url)}</div>`;
     }).join('');
   }
 
   if ((res.doklady || []).length) {
-    h += `<div class="hl-sec">Doklady (${res.doklady.length})</div>`;
-    h += res.doklady.map(d => `<div class="hl-radek"><a class="hl-row" href="${esc(d.url)}" target="_blank">
+    h += `<div class="hl-sec${r()}">Doklady (${res.doklady.length})</div>`;
+    h += res.doklady.map(d => `<div class="hl-radek${r()}"><a class="hl-row" href="${esc(d.url)}" target="_blank">
         <span class="hl-badge">č. ${esc(d.cislo)}</span>
         <span class="hl-when">${_czDate(d.datum)}</span>
         <span class="hl-sub">${esc(d.prijato_od || '')}${d.vozidlo ? ' · ' + esc(d.vozidlo) : ''}</span>
@@ -2546,24 +2711,24 @@ function renderHledani(res) {
   }
 
   if ((res.firmy || []).length) {
-    h += `<div class="hl-sec">Firmy (${res.firmy.length})</div>`;
-    h += res.firmy.map(f => `<div class="hl-row">
+    h += `<div class="hl-sec${r()}">Firmy (${res.firmy.length})</div>`;
+    h += res.firmy.map(f => `<div class="hl-row${r()}">
         <span class="hl-when">${esc(f.nazev || '')}</span>
         <span class="hl-sub">IČO ${esc(f.ico || '—')}${f.id ? ' · ID ' + esc(f.id) : ''}</span>
         ${f.has_plna_moc ? `<a class="hl-kc" style="font-weight:600;font-size:12px;" href="/plna-moc/${esc(f.ico)}" target="_blank"><svg class="ico"><use href="#i-file"></use></svg> plná moc</a>` : ''}
       </div>`).join('');
   }
 
-  if (!res.understood) h += _hlChips();
-  h += '</div>';
+  if (!res.understood) h += _hlChips('Zkus třeba');
   document.getElementById('hledani-body').innerHTML = h;
 }
 
 async function openDokladyModal() {
   document.getElementById('doklady-modal').style.display = 'flex';
-  document.getElementById('doklady-modal-body').innerHTML = 'Načítám…';
+  document.getElementById('doklady-modal-body').innerHTML = '';
   document.getElementById('doklady-search').value = '';
   await reloadDoklady();
+  setTimeout(() => document.getElementById('doklady-search').focus(), 50);
 }
 async function reloadDoklady() {
   // Live ledger + the deleted (backup-only) rows, fetched from the server so
@@ -2582,60 +2747,89 @@ function closeDokladyModal() {
   const m = document.getElementById('doklady-modal');
   if (m) m.style.display = 'none';
 }
+
+const _DOK_MESICE = ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen', 'Červenec',
+  'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
+
+// Datum z ledgeru bývá „15.07.2026" i „2026-07-15" — na klíč měsíce „2026-07".
+function _dokMesicKlic(datum) {
+  const s = String(datum || '').trim();
+  let m = s.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}`;
+  m = s.match(/^\d{1,2}\.\s*(\d{1,2})\.\s*(\d{4})/);
+  return m ? `${m[2]}-${m[1].padStart(2, '0')}` : '';
+}
+
+function _dokMesicNazev(klic) {
+  if (!klic) return 'Bez data';
+  const [rok, mesic] = klic.split('-');
+  return `${_DOK_MESICE[parseInt(mesic, 10) - 1] || mesic} ${rok}`;
+}
+
+function _dokCastka(v) {
+  const n = parseFloat(String(v ?? '').replace(/\s/g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function _dokladKarta(d, smazany) {
+  const c = esc(String(d.cislo));
+  const sub = [d.datum, d.ucel, d.vozidlo].filter(Boolean).map(x => esc(String(x))).join(' · ');
+  const akce = smazany
+    ? `<a class="firm-chip" href="/download/ppd_${c}.pdf" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
+       <button type="button" class="firm-chip dok-obnovit" onclick="restoreDoklad('${c}')" title="Obnovit doklad"><svg class="ico" aria-hidden="true"><use href="#i-undo"></use></svg>Obnovit</button>`
+    : `<a class="firm-chip" href="/ppd-print/${c}" target="_blank" rel="noopener" title="Vytisknout na A5"><svg class="ico" aria-hidden="true"><use href="#i-printer"></use></svg>Tisk</a>
+       <a class="firm-chip" href="/download/ppd_${c}.pdf" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
+       <button type="button" class="firm-chip" data-soubor="ppd_${c}.pdf" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico" aria-hidden="true"><use href="#i-share"></use></svg>Sdílet</button>`;
+  return `<div class="dok-card${smazany ? ' smazany' : ''}">
+      <div class="dok-num" aria-label="Doklad číslo ${c}"><small>Č.</small>${c}</div>
+      <div class="firm-info">
+        <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${esc(String(d.prijato_od || '—'))}</div>
+        <div class="firm-card-sub" title="${sub}">${sub}</div>
+        <div class="firm-chips">${akce}</div>
+      </div>
+      <div class="dok-castka">${_kcFmt(d.castka)}</div>
+      ${smazany ? '<span></span>' : `<button type="button" class="firm-delete" onclick="deleteDoklad('${c}')" title="Smazat doklad" aria-label="Smazat doklad"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
+    </div>`;
+}
+
+function _dokladySedi(d, q) {
+  if (!q) return true;
+  return [d.cislo, d.prijato_od, d.datum, d.ucel, d.vozidlo, d.castka]
+    .some(v => _firmSearchText(v).includes(q));
+}
+
 function renderDoklady() {
-  const q = (document.getElementById('doklady-search').value || '').toLowerCase().trim();
+  const q = _firmSearchText(document.getElementById('doklady-search').value.trim());
   const body = document.getElementById('doklady-modal-body');
-  let rows = _dokladyCache;
-  if (q) rows = rows.filter(d =>
-    String(d.cislo).includes(q) ||
-    String(d.prijato_od || '').toLowerCase().includes(q) ||
-    String(d.datum || '').toLowerCase().includes(q) ||
-    String(d.ucel || '').toLowerCase().includes(q) ||
-    String(d.vozidlo || '').toLowerCase().includes(q));
+  document.getElementById('doklady-count').textContent = _dokladyCache.length;
+  const rows = _dokladyCache.filter(d => _dokladySedi(d, q));
 
   let html = '';
   if (!rows.length) {
-    html += '<p style="color:var(--muted);padding:16px">' +
-      (_dokladyCache.length ? 'Nic nenalezeno.' : 'Zatím žádné vystavené doklady.') + '</p>';
+    html += `<div class="firm-empty"><svg class="ico ico-lg" aria-hidden="true"><use href="#i-receipt"></use></svg><span>${
+      _dokladyCache.length ? 'Nic nenalezeno' : 'Žádné doklady'}</span></div>`;
   } else {
-    html += `<table class="doklady-table">
-      <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th>Účel</th><th></th></tr></thead>
-      <tbody>${rows.map(d => `
-        <tr>
-          <td><b>${esc(String(d.cislo))}</b></td>
-          <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
-          <td>${esc(String(d.prijato_od || ''))}</td>
-          <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
-          <td>${esc(String(d.ucel || ''))}</td>
-          <td style="white-space:nowrap">
-            <a href="/ppd-print/${esc(String(d.cislo))}" target="_blank" class="btn-sm" style="text-decoration:none" title="Vytisknout na A5"><svg class="ico"><use href="#i-printer"></use></svg> Tisk</a>
-            <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none;margin-left:4px"><svg class="ico"><use href="#i-receipt"></use></svg> PDF</a>
-            <button class="btn-sm" style="margin-left:4px" data-soubor="ppd_${esc(String(d.cislo))}.pdf" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico"><use href="#i-share"></use></svg> Sdílet</button>
-            <button onclick="deleteDoklad('${esc(String(d.cislo))}')" title="Smazat doklad" style="margin-left:6px;border:none;background:none;color:#dc2626;cursor:pointer;font-size:16px;font-weight:700;line-height:1;vertical-align:middle;">✕</button>
-          </td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    // Po měsících s počtem a součtem — přesně to se hledá při účetní uzávěrce.
+    const mesice = new Map();
+    rows.forEach(d => {
+      const k = _dokMesicKlic(d.datum);
+      if (!mesice.has(k)) mesice.set(k, []);
+      mesice.get(k).push(d);
+    });
+    [...mesice.keys()].sort().reverse().forEach(k => {
+      const list = mesice.get(k);
+      const soucet = list.reduce((acc, d) => acc + _dokCastka(d.castka), 0);
+      html += `<div class="dok-mesic">${esc(_dokMesicNazev(k))}<span>${list.length} · ${_kcFmt(soucet)}</span></div>`;
+      html += list.map(d => _dokladKarta(d, false)).join('');
+    });
   }
 
   // Deleted receipts live in the append-only backup and can be restored.
-  const del = _dokladyDeletedCache || [];
+  const del = (_dokladyDeletedCache || []).filter(d => _dokladySedi(d, q));
   if (del.length) {
-    html += `<details class="doklady-deleted" style="margin-top:16px">
-      <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 4px;user-select:none"><svg class="ico"><use href="#i-trash"></use></svg> Smazané doklady — záloha (${del.length}) · lze obnovit</summary>
-      <table class="doklady-table" style="margin-top:6px">
-        <thead><tr><th>č.</th><th>Datum</th><th>Přijato od</th><th>Částka</th><th></th></tr></thead>
-        <tbody>${del.map(d => `
-          <tr style="opacity:.75">
-            <td><b>${esc(String(d.cislo))}</b></td>
-            <td style="white-space:nowrap">${esc(String(d.datum || ''))}</td>
-            <td>${esc(String(d.prijato_od || ''))}</td>
-            <td style="white-space:nowrap">${esc(String(d.castka || ''))} Kč</td>
-            <td style="white-space:nowrap">
-              <a href="/download/ppd_${esc(String(d.cislo))}.pdf" target="_blank" class="btn-sm" style="text-decoration:none"><svg class="ico"><use href="#i-receipt"></use></svg> PDF</a>
-              <button onclick="restoreDoklad('${esc(String(d.cislo))}')" title="Obnovit doklad" class="btn-sm" style="margin-left:6px;color:#059669;border-color:#059669;font-weight:700">↩︎ Obnovit</button>
-            </td>
-          </tr>`).join('')}</tbody>
-      </table>
+    html += `<details class="dok-deleted">
+      <summary><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg>Smazané <span class="firm-count">${del.length}</span></summary>
+      <div class="dok-list">${del.map(d => _dokladKarta(d, true)).join('')}</div>
     </details>`;
   }
   body.innerHTML = html;
