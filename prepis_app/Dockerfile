@@ -38,6 +38,7 @@ COPY ppd_push.py ./ppd_push.py
 COPY ppd.py ./ppd.py
 COPY scripts/ppd_do_evidence.py ./scripts/ppd_do_evidence.py
 COPY hledani.py ./hledani.py
+COPY hledani_ai.py ./hledani_ai.py
 COPY prefill.py ./prefill.py
 COPY pm.py ./pm.py
 COPY sdileni.py ./sdileni.py
