@@ -70,7 +70,9 @@ def _system_prompt(db_path: str, today: date) -> str:
         " Období ve větě uváděj podle pole obdobi z výsledku nástroje; dnešní datum jako konec období nepřidávej."
         " Navazuj na předchozí otázky v konverzaci: 'a v září?', 'a pro Albion?', 'tu první', "
         "'ano' se vztahují k minulé odpovědi — převezmi z ní období, filtry i metriku a změň "
-        "jen to, co se mění. Čísla z minulých odpovědí nepoužívej, vždy znovu zavolej nástroj."
+        "jen to, co se mění. Čísla z minulých odpovědí nepoužívej, vždy znovu zavolej nástroj. "
+        "Minulé odpovědi byly spočítané z dat — nekomentuj je, neopravuj je a srovnání "
+        "s nimi uveď jen tehdy, když se na něj uživatel ptá."
     )
 
 
@@ -129,6 +131,13 @@ def emphasize(text: str):
     from markupsafe import Markup, escape
     safe = str(escape(plain_sentence(text) if (text or "").count("**") % 2 else text))
     return Markup(_EM.sub(lambda m: '<strong class="ask-em">' + m.group(1) + "</strong>", safe).replace("**", ""))
+
+
+def _two_sentences(text: str) -> str:
+    """Nejvýš dvě věty (styl „jen hlavní závěr"); tečka za číslicí („1. 10.")
+    konec věty není."""
+    vety = [v.strip() for v in re.findall(r".+?(?:(?<!\d)[.!?](?=\s|$)|$)", text.strip()) if v.strip()]
+    return " ".join(vety[:2])
 
 
 def _clean_sentence(text: str) -> str:
@@ -264,7 +273,7 @@ def ask(question: str, *, db_path, today: date, client=None, historie=None) -> d
                 clarifies = final.name == "doptat_se"
                 if not clarifies and last_result is None:
                     raise AssistantUnavailable("Model odpověděl bez datového výsledku.")
-                marked = _clean_sentence(data.get("veta", "")) if not clarifies else ""
+                marked = _two_sentences(_clean_sentence(data.get("veta", ""))) if not clarifies else ""
                 sentence = plain_sentence(marked)
                 return {"typ": final.name, "veta": sentence, "veta_znaceno": marked,
                         "veta_overena": (verify_sentence(sentence, results, question=question, today=today)

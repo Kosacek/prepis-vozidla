@@ -432,3 +432,8 @@ def test_kolo_does_not_trigger_backup(tmp_path, monkeypatch):
     with app.test_client() as client:
         client.post("/zeptej/kolo", json={"q": "Cardion"})
     assert calls == []
+
+
+def test_answer_is_capped_at_two_sentences():
+    assert assistant._two_sentences("V září **470 000 Kč**. V říjnu méně. Oprava: nic.") == "V září **470 000 Kč**. V říjnu méně."
+    assert assistant._two_sentences("Od 1. 10. do 31. 10. celkem 5 Kč.") == "Od 1. 10. do 31. 10. celkem 5 Kč."
