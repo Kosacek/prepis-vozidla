@@ -110,7 +110,9 @@ def system_prompt(today: date, lide: list[str]) -> str:
         f"Lidé (profily): {', '.join(lide) or 'neznámí'}. 'Já/jsem dělal' bez jména "
         "znamená všechny. Doklady si nepamatují, kdo je vystavil. "
         "Jedno volání nástroje obvykle stačí. "
-        "Styl věty v odpoved: pod větou je seznam se všemi záznamy, takže věta říká jen "
+        "Ty vidíš jen ukázku řádků, ale uživatel má pod větou seznam úplně všech "
+        "záznamů — o počtu zobrazených řádků ani o seznamu nemluv. "
+        "Styl věty v odpoved: věta říká jen "
         "hlavní závěr — nejvýš 2 krátké věty a nejvýš 3 čísla (kolik, kdo vede, kdy "
         "naposledy), dohromady nejvýš 25 slov. Nevyjmenovávej, co je v seznamu pod "
         "větou, a nepopisuj jednotlivé záznamy. Datum piš '15. 7.', částky '4 773 Kč'. "
@@ -205,7 +207,6 @@ def pro_model(nazev: str, vysledek: dict) -> dict:
     else:
         out["polozky"] = [{k: f.get(k) for k in ("nazev", "ico", "id", "has_plna_moc")}
                           for f in radky[:MODEL_ROWS]]
-    out["zobrazeno_radku"] = min(len(radky), MODEL_ROWS)
     return out
 
 
