@@ -2095,9 +2095,19 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   font-weight: 600; overflow-wrap: anywhere;
 }
 .ask-turn .ask-a { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
-.ask-bar-card { margin-top: var(--sp-5); }
+/* Pole pro otázku zůstává nahoře (pod lištou), odpovědi se skládají pod něj. */
+.ask-bar-card {
+  position: sticky; top: calc(55px + var(--sp-3)); z-index: 50;
+  margin-bottom: var(--sp-5); box-shadow: var(--shadow);
+}
+.ask-examples[hidden] { display: none; }
+.ask-table-toggle { margin-top: var(--sp-4); }
+.ask-table-toggle summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+.ask-table-toggle .ask-table-scroll { margin-top: var(--sp-2); }
 .ask-nova { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .ask-nova[hidden] { display: none; }
 @media (max-width: 600px) {
   .ask-nova span { display: none; }
 }
+/* Volné místo pod posledním kolem, ať jde nová otázka vždy odrolovat pod pole. */
+.ask-thread:not(:empty)::after { content: ""; display: block; height: 45vh; }

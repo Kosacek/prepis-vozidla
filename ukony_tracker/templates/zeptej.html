@@ -10,6 +10,18 @@
   </button>
 </div>
 
+<div class="card ask-bar-card">
+  <form method="get" action="/zeptej" class="ask-form" id="ask-form">
+    <input type="search" name="q" class="ask-input" value="" autocomplete="off"
+           autofocus placeholder="{{ 'Zeptej se dál…' if kolo else 'Zeptej se na úkony nebo PPD' }}">
+    <button type="submit" class="btn btn-primary">Zeptat se</button>
+  </form>
+</div>
+
+<div class="card ask-examples" id="ask-examples" {% if kolo %}hidden{% endif %}><div class="muted small">Příklady — klikni:</div>
+  <div class="chips">{% for p in priklady %}<a class="chip" href="/zeptej?q={{ p|urlencode }}" data-ask="{{ p }}">{{ p }}</a>{% endfor %}</div>
+</div>
+
 {# Konverzace: každá otázka je jedno kolo (bublina + odpověď). První kolo může
    přijít rovnou z /zeptej?q=… (odkazy, bez JS); další přidává JS přes
    POST /zeptej/kolo a posílá shrnutí předchozích kol, takže „a v září?"
@@ -18,20 +30,14 @@
   {% if kolo %}
   <div class="ask-turn" data-q="{{ kolo.q }}" data-shrnuti="{{ shrnuti }}">
     <div class="ask-q">{{ kolo.q }}</div>
-    {% with q=kolo.q, ai=kolo.ai, res=kolo.res, fallback_reason=kolo.fallback_reason, explanation=kolo.explanation, ai_rows=kolo.ai_rows %}
+    {% with q=kolo.q, ai=kolo.ai, res=kolo.res, fallback_reason=kolo.fallback_reason, explanation=kolo.explanation, ai_rows=kolo.ai_rows, graf=kolo.graf %}
       <div class="ask-a">{% include '_zeptej_kolo.html' %}</div>
     {% endwith %}
   </div>
   {% endif %}
 </div>
 
-<div class="card ask-bar-card">
-  <form method="get" action="/zeptej" class="ask-form" id="ask-form">
-    <input type="search" name="q" class="ask-input" value="" autocomplete="off"
-           autofocus placeholder="{{ 'Zeptej se dál…' if kolo else 'Zeptej se na úkony nebo PPD' }}">
-    <button type="submit" class="btn btn-primary">Zeptat se</button>
-  </form>
-</div>
+
 
 <template id="ask-thinking-tpl">
   <div class="card ask-thinking is-in" role="status" aria-live="polite">
@@ -46,11 +52,10 @@
   </div>
 </template>
 
-<div class="card ask-examples" id="ask-examples" {% if kolo %}hidden{% endif %}><div class="muted small">Příklady — klikni:</div>
-  <div class="chips">{% for p in priklady %}<a class="chip" href="/zeptej?q={{ p|urlencode }}" data-ask="{{ p }}">{{ p }}</a>{% endfor %}</div>
-</div>
+
 {% include '_ukon_modal.html' %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=9"></script>
 <script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/zeptej.js') }}?v=1"></script>
+<script>window.FIRMA_COLORS = {{ firma_colors|tojson }};</script>
+<script src="{{ url_for('static', filename='js/zeptej.js') }}?v=2"></script>
 {% endblock %}

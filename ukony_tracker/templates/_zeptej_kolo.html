@@ -17,10 +17,13 @@
     {% set result = ai.vysledek or {} %}
     {% if ai.graf != 'zadny' and result.radky and ai.nastroj == 'agregace' %}
       <div class="ask-chart ask-reveal" style="--i:1"><canvas role="img" aria-label="Graf výsledků"
-        data-rows="{{ result.radky|tojson|forceescape }}" data-kind="{{ ai.graf }}"></canvas></div>
+        data-rows="{{ result.radky|tojson|forceescape }}" data-kind="{{ ai.graf }}"
+        data-graf="{{ graf|tojson|forceescape }}"></canvas></div>
     {% endif %}
     {% if result.upozorneni %}<p class="ask-warning ask-reveal" style="--i:2">{{ result.upozorneni }}{% if result.bez_zpracovatele %} Bez zpracovatele: {{ result.bez_zpracovatele }} úkonů.{% endif %}</p>{% endif %}
     {% if ai.nastroj == 'agregace' %}
+      {% set dlouha = graf and result.radky|length > 8 %}
+      {% if dlouha %}<details class="ask-table-toggle ask-reveal" style="--i:3"><summary>Tabulka · {{ result.radky|length }} řádků</summary>{% endif %}
       <div class="ask-table-scroll ask-reveal" style="--i:3"><table class="ask-table">
         <thead><tr><th>Skupina</th><th>Hodnota</th><th>Úkonů</th></tr></thead>
         <tbody>{% for row in result.radky %}<tr>
@@ -29,6 +32,7 @@
           <td>{{ row.pocet }}</td>
         </tr>{% endfor %}</tbody>
       </table></div>
+      {% if dlouha %}</details>{% endif %}
     {% elif ai.nastroj == 'doklady_ppd' %}
       <p class="ask-ppd-summary ask-reveal" style="--i:1">{{ result.pocet }} dokladů · {{ result.soucet_kc|kc }} Kč přijaté hotovosti</p>
       {% if result.polozky %}<div class="ask-table-scroll"><table class="ask-table">

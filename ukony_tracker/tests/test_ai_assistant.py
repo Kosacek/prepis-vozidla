@@ -437,3 +437,24 @@ def test_kolo_does_not_trigger_backup(tmp_path, monkeypatch):
 def test_answer_is_capped_at_two_sentences():
     assert assistant._two_sentences("V září **470 000 Kč**. V říjnu méně. Oprava: nic.") == "V září **470 000 Kč**. V říjnu méně."
     assert assistant._two_sentences("Od 1. 10. do 31. 10. celkem 5 Kč.") == "Od 1. 10. do 31. 10. celkem 5 Kč."
+
+
+def test_time_development_is_drawn_as_cumulative_line():
+    from routes.ask import _graf
+    ai = {"typ": "odpoved", "nastroj": "agregace", "graf": "sloupcovy",
+          "vysledek": {"obdobi": {"od": "2026-08-13", "do": "2026-10-13"}},
+          "volani": [{"name": "agregace", "input": query(metrika="pocet", skupiny=["tyden"])}]}
+    g = _graf(ai)
+    assert g["kumulativni"] and g["kind"] == "cara" and g["cas"] == "tyden"
+    assert g["od"] == "2026-08-13" and g["kc"] is False
+
+
+def test_comparisons_and_averages_stay_bars():
+    from routes.ask import _graf
+    base = {"typ": "odpoved", "nastroj": "agregace", "graf": "sloupcovy",
+            "vysledek": {"obdobi": PERIOD}}
+    firmy = dict(base, volani=[{"name": "agregace", "input": query(skupiny=["firma"])}])
+    assert _graf(firmy)["kumulativni"] is False and _graf(firmy)["kind"] == "sloupcovy"
+    prumer = dict(base, volani=[{"name": "agregace", "input": query(skupiny=["den_v_tydnu"], prumer_na="den_v_tydnu")}])
+    assert _graf(prumer)["kumulativni"] is False
+    assert _graf(dict(base, graf="zadny", volani=firmy["volani"])) is None

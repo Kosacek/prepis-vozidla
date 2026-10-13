@@ -129,7 +129,30 @@ def _odpoved(conn, q: str, historie=None) -> dict:
         "fallback": fallback_reason,
     }, ensure_ascii=False, default=str))
     return {"q": q, "ai": ai, "res": res, "fallback_reason": fallback_reason,
-            "explanation": explanation, "ai_rows": rows}
+            "explanation": explanation, "ai_rows": rows, "graf": _graf(ai)}
+
+
+CASOVE_SKUPINY = ("den", "tyden", "mesic")
+ADITIVNI_METRIKY = ("pocet", "soucet_kc", "nezaplaceno_kc", "zaplaceno_kc")
+
+
+def _graf(ai) -> dict | None:
+    """Jak kreslit graf odpovědi. Vývoj v čase u sčítatelné metriky = rostoucí
+    čáry (průběžný součet) přesně jako „Firmy" na přehledu — David čekal právě
+    ten graf, ne týdenní sloupce."""
+    if not ai or ai.get("typ") != "odpoved" or ai.get("nastroj") != "agregace":
+        return None
+    if ai.get("graf", "zadny") == "zadny":
+        return None
+    params = ((ai.get("volani") or [{}])[-1].get("input")) or {}
+    vysledek = ai.get("vysledek") or {}
+    skupiny = list(params.get("skupiny") or [])
+    obdobi = vysledek.get("obdobi") or params.get("obdobi") or {}
+    cas = next((g for g in skupiny if g in CASOVE_SKUPINY), None)
+    kumulativni = bool(cas) and params.get("metrika") in ADITIVNI_METRIKY         and params.get("prumer_na") in (None, "zadny") and len(skupiny) <= 2
+    return {"kind": "cara" if kumulativni else ai.get("graf"), "skupiny": skupiny, "cas": cas,
+            "od": obdobi.get("od"), "do": obdobi.get("do"), "kumulativni": kumulativni,
+            "kc": params.get("metrika") != "pocet"}
 
 
 def _shrnuti(kolo: dict) -> str:
