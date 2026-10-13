@@ -8,6 +8,7 @@ deterministické hledani.hledej — hledání tím nikdy nespadne.
 """
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import time
@@ -118,7 +119,14 @@ def system_prompt(today: date, lide: list[str]) -> str:
         "větou, a nepopisuj jednotlivé záznamy. Datum piš '15. 7.', částky '4 773 Kč'. "
         "Zvýrazni **dvojitými hvězdičkami** 1–3 nejdůležitější údaje a nic jiného. "
         "Žádné odrážky, seznamy ani nové řádky. Tykej (ty), nikdy nevykej. "
-        "Když nic nenajdeš, řekni to rovnou a jednou větou. V doptat_se nabídni "
+        "Když výsledek obsahuje mimo_obdobi, jméno v datech je, jen ne v tom období: řekni "
+        "to a kdy bylo naposledy ('V září pro **JE & NE** nic, poslední doklad **6. 10.**'). "
+        "Když výsledek nic nenajde a obsahuje podobna_jmena, NEodpovídej 'nic není' — "
+        "použij doptat_se ('Pro „JE NE“ nic nemám. Myslíš tuhle firmu?') a v možnostech "
+        "nabídni celé dotazy s tím jménem (např. 'Doklady za září pro JE & NE, SPOL. S R.O.'). "
+        "Navazuj na předchozí otázky v konverzaci: 'a za říjen?', 'tu první', 'ano' se "
+        "vztahují k minulé odpovědi. "
+        "Když nic nenajdeš a podobná jména nejsou, řekni to rovnou a jednou větou. V doptat_se nabídni "
         "konkrétní krátké dotazy, jak by je napsal uživatel (např. 'Co jsem dělal dnes?')."
     )
 
@@ -131,12 +139,64 @@ def _period(params: dict) -> tuple[str | None, str | None]:
     return ok(params.get("od")), ok(params.get("do"))
 
 
+def _slova(text) -> list[str]:
+    return re.findall(r"[a-z0-9]+", hledani.fold(text))
+
+
+def sedi_text(hledat: str, *hodnoty) -> bool:
+    """Volné hledání jména, jak ho člověk napíše.
+
+    „JE NE" musí najít „JE & NE, spol. s r.o.": každé hledané slovo musí být
+    začátkem některého slova v hodnotě (interpunkce a diakritika se ignorují).
+    Záložně se porovná text bez mezer a znaků („jene" v „jenespolsro")."""
+    dotaz = _slova(hledat)
+    if not dotaz:
+        return False
+    for hodnota in hodnoty:
+        slova = _slova(hodnota)
+        if all(any(w.startswith(q) for w in slova) for q in dotaz):
+            return True
+        kompakt = "".join(dotaz)
+        if len(kompakt) >= 4 and kompakt in "".join(slova):
+            return True
+    return False
+
+
+def podobna_jmena(hledat: str, jmena, limit: int = 3) -> list[str]:
+    """Nejpodobnější uložená jména, když hledání nic nenašlo — model se pak
+    může doptat „Myslíš JE & NE, SPOL. S R.O.?"."""
+    dotaz = "".join(_slova(hledat))
+    if len(dotaz) < 2:
+        return []
+    skore = []
+    for jmeno in {j.strip() for j in jmena if j and str(j).strip()}:
+        kompakt = "".join(_slova(jmeno))
+        if not kompakt:
+            continue
+        # Krátký dotaz proti dlouhému jménu: porovnej se začátkem jména stejné délky.
+        r = max(difflib.SequenceMatcher(None, dotaz, kompakt).ratio(),
+                difflib.SequenceMatcher(None, dotaz, kompakt[:len(dotaz) + 2]).ratio())
+        if r >= 0.6:
+            skore.append((r, jmeno))
+    skore.sort(key=lambda x: (-x[0], x[1]))
+    return [j for _, j in skore[:limit]]
+
+
 def _kdo_sedi(v: dict, kdo: list[str]) -> bool:
     profil = hledani.fold(v.get("profil"))
     return any(hledani.fold(k) == profil for k in kdo)
 
 
-def nastroj_zadosti(params: dict, vystupy: list[dict]) -> dict:
+def _mimo_obdobi(vsechny: list[dict], datum_klic, jmeno_klic: str) -> dict:
+    """Jméno v datech JE, jen ne v hledaném období — ať odpověď řekne „v září
+    nic, poslední 6. 10." místo „nic nemám" nebo zbytečného doptávání."""
+    data = sorted(datum_klic(x) for x in vsechny)
+    jmena = [x.get(jmeno_klic) for x in vsechny if x.get(jmeno_klic)]
+    return {"pocet": len(vsechny), "naposledy": data[-1] if data else None,
+            "jmeno": max(set(jmena), key=jmena.count) if jmena else None}
+
+
+def nastroj_zadosti(params: dict, vystupy: list[dict], jmena=None) -> dict:
     od, do = _period(params)
     typy = [t for t in params.get("typy") or [] if t in KINDS]
     kdo = [k for k in params.get("kdo") or [] if isinstance(k, str) and k.strip()]
@@ -146,21 +206,32 @@ def nastroj_zadosti(params: dict, vystupy: list[dict]) -> dict:
         rows = [v for v in rows if v["kind"] in typy]
     if kdo:
         rows = [v for v in rows if _kdo_sedi(v, kdo)]
+    def sedi(v):
+        return hledani.sedi_vystup(v, hledat) or sedi_text(
+            hledat, v.get("od"), v.get("na"), v.get("znacka"), v.get("profil"))
     if hledat:
-        rows = [v for v in rows if hledani.sedi_vystup(v, hledat)]
+        rows = [v for v in rows if sedi(v)]
     podle_typu: dict[str, int] = {}
     podle_kdo: dict[str, int] = {}
     for v in rows:
         podle_typu[v["typ"]] = podle_typu.get(v["typ"], 0) + 1
         jmeno = v.get("profil") or "neuvedeno"
         podle_kdo[jmeno] = podle_kdo.get(jmeno, 0) + 1
-    return {"obdobi": {"od": od, "do": do}, "pocet": len(rows),
-            "podle_typu": podle_typu, "podle_kdo": podle_kdo,
-            "naposledy": rows[0]["datum"] if rows else None,
-            "_radky": rows[:hledani.LIMIT]}
+    out = {"obdobi": {"od": od, "do": do}, "pocet": len(rows),
+           "podle_typu": podle_typu, "podle_kdo": podle_kdo,
+           "naposledy": rows[0]["datum"] if rows else None,
+           "_radky": rows[:hledani.LIMIT]}
+    if hledat and not rows:
+        vsechny = [v for v in vystupy if sedi(v)]
+        if vsechny:
+            out["mimo_obdobi"] = _mimo_obdobi(vsechny, lambda v: v["datum"], "na")
+        else:
+            out["podobna_jmena"] = podobna_jmena(
+                hledat, jmena if jmena is not None else [x for v in vystupy for x in (v.get("od"), v.get("na"))])
+    return out
 
 
-def nastroj_doklady(params: dict, doklady: list[dict]) -> dict:
+def nastroj_doklady(params: dict, doklady: list[dict], jmena=None) -> dict:
     od, do = _period(params)
     rows = [d for d in doklady if hledani._in_period(hledani._norm_datum(d.get("datum")), od, do)]
     if params.get("cislo") not in (None, ""):
@@ -173,25 +244,39 @@ def nastroj_doklady(params: dict, doklady: list[dict]) -> dict:
         if castka is not None:
             rows = [d for d in rows if hledani._castka(d.get("castka")) == castka]
     hledat = hledani.fold((params.get("hledat") or "").strip())
+    klic = hledani._rzkey(hledat)
+
+    def sedi(d):
+        return sedi_text(hledat, d.get("prijato_od"), d.get("ucel")) or (
+            len(klic) >= 4 and klic in hledani._rzkey(d.get("vozidlo")))
     if hledat:
-        klic = hledani._rzkey(hledat)
-        rows = [d for d in rows if any(hledat in hledani.fold(d.get(k))
-                                       for k in ("prijato_od", "vozidlo", "ucel"))
-                or (len(klic) >= 4 and klic in hledani._rzkey(d.get("vozidlo")))]
+        rows = [d for d in rows if sedi(d)]
     rows = sorted(rows, key=lambda d: (hledani._norm_datum(d.get("datum")),
                                        hledani._castka(d.get("cislo"))), reverse=True)
     soucet = sum(hledani._castka(d.get("castka")) for d in rows)
-    return {"obdobi": {"od": od, "do": do}, "pocet": len(rows),
-            "soucet_kc": round(soucet), "_radky": hledani._dok_out(rows)}
+    out = {"obdobi": {"od": od, "do": do}, "pocet": len(rows),
+           "soucet_kc": round(soucet), "_radky": hledani._dok_out(rows)}
+    if hledat and not rows:
+        vsechny = [d for d in doklady if sedi(d)]
+        if vsechny:
+            out["mimo_obdobi"] = _mimo_obdobi(
+                vsechny, lambda d: hledani._norm_datum(d.get("datum")), "prijato_od")
+        else:
+            out["podobna_jmena"] = podobna_jmena(
+                hledat, jmena if jmena is not None else [d.get("prijato_od") for d in doklady])
+    return out
 
 
-def nastroj_firmy(params: dict, firmy: list[dict]) -> dict:
+def nastroj_firmy(params: dict, firmy: list[dict], jmena=None) -> dict:
     hledat = hledani.fold((params.get("hledat") or "").strip())
     rows = firmy
     if hledat:
-        rows = [f for f in firmy if any(hledat in hledani.fold(f.get(k))
-                                        for k in ("nazev", "ico", "id"))]
-    return {"pocet": len(rows), "_radky": rows[:hledani.LIMIT]}
+        rows = [f for f in firmy if sedi_text(hledat, f.get("nazev"), f.get("ico"), f.get("id"))]
+    out = {"pocet": len(rows), "_radky": rows[:hledani.LIMIT]}
+    if hledat and not rows:
+        out["podobna_jmena"] = podobna_jmena(
+            hledat, jmena if jmena is not None else [f.get("nazev") for f in firmy])
+    return out
 
 
 def pro_model(nazev: str, vysledek: dict) -> dict:
@@ -319,20 +404,47 @@ def _volat(post: Callable, api_key: str, body: dict, timeout: float) -> dict:
     return data
 
 
+MAX_HISTORIE = 4      # předchozích otázek, na které se dá navázat
+
+
+def historie_zprav(historie) -> list[dict]:
+    """Předchozí kola konverzace jako zprávy pro model.
+
+    Historie přichází od prohlížeče, takže se bere jen text, ořízne se a nikdy
+    se z ní nečtou čísla pro kontrolu věty — ta věří jen datům z tohoto kola."""
+    zpravy: list[dict] = []
+    if not isinstance(historie, list):
+        return zpravy
+    for kolo in historie[-MAX_HISTORIE:]:
+        if not isinstance(kolo, dict):
+            continue
+        q = str(kolo.get("q") or "").strip()[:300]
+        a = str(kolo.get("a") or "").strip()[:600]
+        if q and a:
+            zpravy += [{"role": "user", "content": q},
+                       {"role": "assistant", "content": a}]
+    return zpravy
+
+
 def zeptej(otazka: str, vystupy: list[dict], doklady: list[dict], firmy: list[dict], *,
-           api_key: str, post: Callable, today: date | None = None) -> dict:
+           api_key: str, post: Callable, today: date | None = None,
+           historie=None) -> dict:
     """Vrátí slovník ve tvaru hledani.hledej(...) + ``ai``/``veta``/``tokeny``."""
     if not api_key:
         raise AINedostupna("Chybí ANTHROPIC_API_KEY.")
     today = today or date.today()
     started = time.monotonic()
     lide = sorted({v["profil"] for v in vystupy if v.get("profil")})
+    # Podobná jména se hledají napříč vším — „Albyon" v dokladech má najít
+    # i uloženou firmu Albion Cars, i když od ní doklad zatím není.
+    jmena = ([f.get("nazev") for f in firmy] + [d.get("prijato_od") for d in doklady]
+             + [x for v in vystupy for x in (v.get("od"), v.get("na"))])
     nastroje = {
-        "zadosti": lambda p: nastroj_zadosti(p, vystupy),
-        "doklady": lambda p: nastroj_doklady(p, doklady),
-        "firmy": lambda p: nastroj_firmy(p, firmy),
+        "zadosti": lambda p: nastroj_zadosti(p, vystupy, jmena),
+        "doklady": lambda p: nastroj_doklady(p, doklady, jmena),
+        "firmy": lambda p: nastroj_firmy(p, firmy, jmena),
     }
-    messages: list[dict] = [{"role": "user", "content": otazka}]
+    messages: list[dict] = historie_zprav(historie) + [{"role": "user", "content": otazka}]
     vysledky: list[tuple[str, dict]] = []
     tokeny = {"input_tokens": 0, "output_tokens": 0}
     prompt = system_prompt(today, lide)
@@ -401,8 +513,10 @@ def _vystup(final: dict, vysledky: list[tuple[str, dict]], otazka: str, today: d
             "otazka": "", "moznosti": []}
     inp = final.get("input") or {}
     if final.get("name") == "doptat_se":
-        return {**base, "headline": inp.get("otazka", ""), "otazka": inp.get("otazka", ""),
-                "moznosti": [m for m in inp.get("moznosti") or [] if isinstance(m, str)][:3]}
+        moznosti = [m for m in inp.get("moznosti") or [] if isinstance(m, str)][:3]
+        otazka_zpet = _ocisti(inp.get("otazka", ""))
+        return {**base, "headline": otazka_zpet, "otazka": otazka_zpet, "moznosti": moznosti,
+                "shrnuti": otazka_zpet + (" Možnosti: " + " | ".join(moznosti) if moznosti else "")}
     if not vysledky:
         raise AINedostupna("Odpověď bez datového výsledku.")
     out = dict(base)
@@ -418,4 +532,6 @@ def _vystup(final: dict, vysledky: list[tuple[str, dict]], otazka: str, today: d
     videl = [pro_model(nazev, v) for nazev, v in vysledky]
     if znacena and overit_vetu(bez_hvezdicek(znacena), videl, otazka, today):
         out["veta"] = znacena
+    nalezeno = ", ".join(f"{k}: {len(out[k])}" for k in ("vystupy", "doklady", "firmy") if out[k])
+    out["shrnuti"] = (bez_hvezdicek(out["veta"]) or out["headline"]) + (f" (nalezeno {nalezeno})" if nalezeno else "")
     return out

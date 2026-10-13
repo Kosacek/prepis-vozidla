@@ -4,6 +4,7 @@ Model se tu nahrazuje skriptovaným `post`: každé volání vrátí další př
 odpověď, takže se testuje celá smyčka (nástroj → výsledek → věta → kontrola
 čísel) bez sítě. Data jsou stejná jako v test_hledani.py.
 """
+import copy
 from datetime import date
 
 import pytest
@@ -36,7 +37,7 @@ def scripted(*turns):
     queue = list(turns)
 
     def post(url, headers=None, json=None, timeout=None):
-        calls.append(json)
+        calls.append(copy.deepcopy(json))
         item = queue.pop(0)
         return item if isinstance(item, _Resp) else _Resp(item)
     post.calls = calls
@@ -243,3 +244,104 @@ def test_long_answer_keeps_only_the_main_point():
 
 def test_three_sentences_become_two():
     assert hledani_ai._zkrat("Jedna. Dvě. Tři.") == "Jedna. Dvě."
+
+
+# ── volné jméno, podobná jména, konverzace ───────────────────────────────────
+
+def test_name_without_punctuation_matches():
+    assert hledani_ai.sedi_text("je ne", "JE & NE, SPOL. S R.O.")
+    assert hledani_ai.sedi_text("JE&NE", "JE & NE, SPOL. S R.O.")
+    assert hledani_ai.sedi_text("cardion", "AUTO CARDION s. r. o.")
+    assert not hledani_ai.sedi_text("je ne", "JELÍNEK PETR")   # „ne" není začátek slova
+
+
+def test_receipts_find_payer_written_loosely(data):
+    vys, dok, fir = data
+    dok = dok + [{"cislo": 160, "datum": "2026-09-10", "prijato_od": "JE & NE, SPOL. S R.O.",
+                  "castka": 3900, "ucel": "přepis", "vozidlo": ""}]
+    post = scripted(_turn(_tool("doklady", {"od": "2026-09-01", "do": "2026-09-30", "hledat": "JE NE"})),
+                    _turn(_tool("odpoved", {"veta": "**1 doklad**."}, "t2")))
+    res = hledani_ai.zeptej("doklady za září JE NE", vys, dok, fir, api_key="k", post=post, today=TODAY)
+    assert [d["cislo"] for d in res["doklady"]] == [160]
+
+
+def test_nothing_found_offers_similar_names(data):
+    vys, dok, fir = data
+    v = hledani_ai.nastroj_firmy({"hledat": "Albyon"}, fir)
+    assert v["pocet"] == 0
+    assert v["podobna_jmena"][0] == "Albion Cars s.r.o."
+    assert "podobna_jmena" in hledani_ai.pro_model("firmy", v)
+
+
+def test_similar_names_ignore_nonsense():
+    assert hledani_ai.podobna_jmena("xqzw", ["AUTO CARDION s. r. o.", "Albion Cars s.r.o."]) == []
+
+
+def test_history_is_sent_before_the_question(data):
+    post = scripted(_turn(_tool("firmy", {})), _turn(_tool("odpoved", {"veta": "**2 firmy**."}, "t2")))
+    hist = [{"q": "doklady za září", "a": "V září 47 dokladů."}, {"q": "", "a": "skip"}, "nonsense"]
+    vys, dok, fir = data
+    hledani_ai.zeptej("a firmy?", vys, dok, fir, api_key="k", post=post, today=TODAY, historie=hist)
+    msgs = post.calls[0]["messages"]
+    assert [m["role"] for m in msgs] == ["user", "assistant", "user"]
+    assert msgs[0]["content"] == "doklady za září" and msgs[2]["content"] == "a firmy?"
+
+
+def test_history_is_capped_and_trimmed():
+    hist = [{"q": f"q{i}" + "x" * 500, "a": "a"} for i in range(10)]
+    msgs = hledani_ai.historie_zprav(hist)
+    assert len(msgs) == 2 * hledani_ai.MAX_HISTORIE
+    assert len(msgs[0]["content"]) == 300
+    assert hledani_ai.historie_zprav("nope") == []
+
+
+def test_numbers_from_history_do_not_pass_the_check(data):
+    # Historie je od prohlížeče — číslo z ní nesmí „ověřit" větu.
+    post = scripted(_turn(_tool("firmy", {})), _turn(_tool("odpoved", {"veta": "Bylo jich **47**."}, "t2")))
+    vys, dok, fir = data
+    res = hledani_ai.zeptej("a kolik?", vys, dok, fir, api_key="k", post=post, today=TODAY,
+                            historie=[{"q": "x", "a": "Bylo 47 dokladů."}])
+    assert res["veta"] == ""
+
+
+def test_answer_carries_summary_for_next_turn(data):
+    post = scripted(_turn(_tool("firmy", {"hledat": "cardion"})),
+                    _turn(_tool("odpoved", {"veta": "Mám **1 firmu**."}, "t2")))
+    res = ask(post, data, "firma cardion")
+    assert res["shrnuti"].startswith("Mám 1 firmu.") and "firmy: 1" in res["shrnuti"]
+
+
+def test_clarifying_summary_lists_options(data):
+    post = scripted(_turn(_tool("doptat_se", {"otazka": "Myslíš tuhle firmu?",
+                                              "moznosti": ["Doklady pro JE & NE"]})))
+    assert ask(post, data, "je ne")["shrnuti"] == "Myslíš tuhle firmu? Možnosti: Doklady pro JE & NE"
+
+
+def test_route_post_passes_history(client, monkeypatch):
+    import app as app_module
+    seen = {}
+    monkeypatch.setattr(app_module, "ANTHROPIC_API_KEY", "k")
+    monkeypatch.setattr(app_module, "_hledani_casy", {})
+
+    def fake(q, *a, **kw):
+        seen.update(q=q, historie=kw.get("historie"))
+        return {"ai": True, "headline": "x", "veta": "", "tokeny": {}}
+    monkeypatch.setattr(app_module.hledani_ai, "zeptej", fake)
+    res = client.post("/api/hledat", json={"q": "a za říjen?", "historie": [{"q": "září", "a": "nic"}]})
+    assert res.get_json()["ai"] is True
+    assert seen == {"q": "a za říjen?", "historie": [{"q": "září", "a": "nic"}]}
+
+
+def test_name_outside_period_reports_last_date(data):
+    vys, dok, fir = data
+    v = hledani_ai.nastroj_doklady({"od": "2026-09-01", "do": "2026-09-30", "hledat": "novak"}, dok)
+    assert v["pocet"] == 0
+    assert v["mimo_obdobi"] == {"pocet": 1, "naposledy": "2026-07-15", "jmeno": "JAN NOVÁK"}
+    assert "podobna_jmena" not in v
+
+
+def test_similar_names_come_from_everything(data):
+    vys, dok, fir = data
+    jmena = [f["nazev"] for f in fir]
+    v = hledani_ai.nastroj_doklady({"hledat": "Albyon"}, dok, jmena)
+    assert v["podobna_jmena"] == ["Albion Cars s.r.o."]

@@ -27,6 +27,10 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.24.0", date(2026, 10, 13), "Zeptej se se doptá a navazuje",
+            ("Napíšeš jméno firmy jen přibližně a nabídne ti tu správnou.",
+             "Můžeš se ptát dál – třeba „a za říjen?“ – a ví, o čem je řeč."),
+            demo="v1_24_0"),
     Release("1.23.0", date(2026, 10, 13), "Hledání rozumí normální větě",
             ("Zeptej se třeba „Kolik převodů udělal Roman tento měsíc?“ – "
              "odpověď spočítá z tvých žádostí a dokladů.",

@@ -1,0 +1,61 @@
+{# Demo for release 1.24.0 (Zeptej se se doptá a navazuje): a loose name
+   "JE NE" gets the answer "Myslíš tuhle firmu?", the offered firm chip is
+   tapped and the follow-up answer drops in below. CSS-only, 6s loop; app
+   tokens only. Included by _whats_new.html. #}
+<style>
+  .dz1240-demo {
+    box-sizing: border-box; height: 134px; padding: 10px 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    font-size: 11px; line-height: 1.25; color: var(--wn-ink);
+  }
+  .dz1240-mini {
+    height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px;
+    padding: 8px 10px; border-radius: 10px; border: 1px solid var(--wn-line); background: var(--wn-card);
+    overflow: hidden;
+  }
+  .dz1240-q {
+    align-self: flex-end; padding: 3px 9px; border-radius: 10px 10px 3px 10px;
+    background: var(--wn-soft); color: var(--wn-accent); font-size: 10.5px; font-weight: 600; white-space: nowrap;
+  }
+  .dz1240-a { font-size: 11px; }
+  .dz1240-chip {
+    align-self: flex-start; padding: 3px 8px; border: 1.5px solid var(--wn-line); border-radius: 999px;
+    font-size: 10px; font-weight: 600; white-space: nowrap;
+    animation: dz1240-chip 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1240-q2 { opacity: 0; animation: dz1240-in 6s cubic-bezier(.2, .7, .3, 1) infinite; animation-delay: 0s; }
+  .dz1240-a2 { opacity: 0; animation: dz1240-in2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1240-em {
+    font-weight: 700; background-image: linear-gradient(var(--wn-accent), var(--wn-accent));
+    background-repeat: no-repeat; background-position: 0 100%; background-size: 100% 2px; padding-bottom: 1px;
+  }
+  .dz1240-stack { display: flex; flex-direction: column; gap: 6px; animation: dz1240-up 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1240-chip {
+    0%, 30% { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); transform: none; }
+    34% { transform: scale(.93); }
+    38%, 92% { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; transform: none; }
+    100% { background: var(--wn-card); border-color: var(--wn-line); color: var(--wn-ink); }
+  }
+  @keyframes dz1240-in { 0%, 38% { opacity: 0; transform: translateY(-4px); } 44%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @keyframes dz1240-in2 { 0%, 50% { opacity: 0; transform: translateY(-4px); } 58%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @keyframes dz1240-up { 0%, 40% { transform: none; } 50%, 92% { transform: translateY(-38px); } 100% { transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dz1240-chip, .dz1240-q2, .dz1240-a2, .dz1240-stack { animation: none; }
+    .dz1240-chip { background: var(--wn-accent); border-color: var(--wn-accent); color: #fff; }
+    .dz1240-q2, .dz1240-a2 { opacity: 1; }
+    .dz1240-stack { transform: translateY(-38px); }
+  }
+</style>
+<div class="dz1240-demo" aria-hidden="true">
+  <div class="dz1240-mini">
+    <div class="dz1240-stack">
+      <span class="dz1240-q">doklady za září JE NE</span>
+      <div class="dz1240-a">Pro „JE NE“ nic nemám. Myslíš tuhle firmu?</div>
+      <span class="dz1240-chip">Doklady za září pro JE &amp; NE, SPOL. S R.O.</span>
+      <span class="dz1240-q dz1240-q2">Doklady za září pro JE &amp; NE…</span>
+      <div class="dz1240-a dz1240-a2">V září <span class="dz1240-em">4 doklady</span> za <span class="dz1240-em">15 600 Kč</span>.</div>
+    </div>
+  </div>
+</div>

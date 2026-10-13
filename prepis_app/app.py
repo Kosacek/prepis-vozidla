@@ -61,7 +61,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.23.0"
+__version__ = "1.24.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1986,7 +1986,7 @@ def _hledani_ai_povoleno() -> bool:
         return True
 
 
-@app.route("/api/hledat", methods=["GET"])
+@app.route("/api/hledat", methods=["GET", "POST"])
 def api_hledat():
     """History search over výstupy + doklady + firmy.
 
@@ -1995,7 +1995,12 @@ def api_hledat():
     sentence with any figure not in the result). Falls back to the deterministic
     parser (hledani.hledej) on no key, API error, rate limit or ?rezim=jednoduchy.
     """
-    q = (request.args.get("q") or "").strip()
+    # POST nese i předchozí kola konverzace („a za říjen?" navazuje na minulou
+    # odpověď); GET zůstává pro prázdný dotaz (příklady) a jednoduché volání.
+    telo = request.get_json(silent=True) if request.method == "POST" else None
+    telo = telo if isinstance(telo, dict) else {}
+    q = str(telo.get("q") or request.args.get("q") or "").strip()[:300]
+    historie = telo.get("historie")
     vystupy = hledani.nacti_vystupy(DATA_DIR)
     doklady = ppd.read_ppd_log(DATA_DIR)
     firmy = read_firmy()
@@ -2011,7 +2016,8 @@ def api_hledat():
     else:
         try:
             res = hledani_ai.zeptej(q, vystupy, doklady, firmy,
-                                    api_key=ANTHROPIC_API_KEY, post=requests.post)
+                                    api_key=ANTHROPIC_API_KEY, post=requests.post,
+                                    historie=historie)
             _log.info("hledani_ai %s", json.dumps({"q": q, "ms": res.get("ms"),
                       "tokeny": res.get("tokeny"), "veta": bool(res.get("veta"))},
                       ensure_ascii=False))

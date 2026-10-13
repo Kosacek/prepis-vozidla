@@ -433,6 +433,15 @@
   .ask-go:disabled { opacity: .6; cursor: default; }
   #hledani-body { padding-top: 0; flex: 1 1 auto; min-height: 0; }
   .ask-spark { color: var(--primary); }
+  .ask-head-akce { display: flex; align-items: center; gap: 6px; }
+  .ask-nova { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1.5px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+  .ask-nova:hover, .ask-nova:focus-visible { border-color: var(--primary); background: var(--accent); color: var(--primary); }
+  .ask-nova[hidden] { display: none; }
+  /* Konverzace: otázka vpravo jako bublina, odpověď pod ní; kola oddělená čárou. */
+  .ask-turn { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 4px; }
+  .ask-turn + .ask-turn { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .ask-q { align-self: flex-end; max-width: 85%; padding: 7px 12px; border-radius: 14px 14px 4px 14px; background: var(--accent); color: var(--primary); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+  .ask-a { min-width: 0; }
   .ask-headline { font-size: 17px; font-weight: 700; line-height: 1.4; letter-spacing: -.01em; }
   .ask-headline--ai { font-size: 16px; font-weight: 500; line-height: 1.55; letter-spacing: 0; }
   .ask-headline.unknown { color: var(--muted); font-weight: 600; }
@@ -463,13 +472,16 @@
   /* Přechod mezi kroky („Jemný"): starý krok vybledne doleva, nový přijede
      zprava. Odcházející krok je kopie bez id (.panel-ghost), aby se dal
      dovykreslit, zatímco skutečný panel už je schovaný. */
-  .container { position: relative; transition: max-width .34s cubic-bezier(.22, 1, .36, 1); }
-  .panel-ghost { position: absolute; margin: 0 !important; pointer-events: none; }
+  /* Šířka kontejneru se NEanimuje: při 1 → 2 (široký krok → úzký) se nový
+     krok během zužování přelamoval a stránka na zlomek vteřiny „poskočila".
+     Duch je position: fixed na místě, kde starý krok byl na obrazovce, takže
+     ho změna šířky ani výšky stránky nepohne. */
+  .panel-ghost { position: fixed; z-index: 1; margin: 0 !important; pointer-events: none; }
   .step-item:not(:last-child)::after { transform-origin: left center; }
 
   @media (prefers-reduced-motion: reduce) {
     .ask-reveal, .ask-thinking svg.ask-orb, .ask-dots i, .ask-skeleton span { animation: none; }
-    .ask-verb, .container { transition: none; }
+    .ask-verb { transition: none; }
   }
 
   /* ── Hledání v historii ──────────────────────────────────────────────────
@@ -587,6 +599,7 @@
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/><path d="M9 13h6M9 17h4"/></symbol>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6z"/><path d="M18 15l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></symbol>
+  <symbol id="i-novy" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 4h4"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/></symbol>
@@ -691,7 +704,10 @@
   <div class="modal-box">
     <div class="modal-header">
       <h3><svg class="ico ask-spark" aria-hidden="true"><use href="#i-spark"></use></svg> Zeptej se</h3>
-      <button type="button" class="modal-close" onclick="closeHledaniModal()" title="Zavřít" aria-label="Zavřít">×</button>
+      <div class="ask-head-akce">
+        <button type="button" class="ask-nova" id="hledani-nova" onclick="hledaniNova()" title="Nová konverzace" aria-label="Nová konverzace" hidden><svg class="ico" aria-hidden="true"><use href="#i-novy"></use></svg></button>
+        <button type="button" class="modal-close" onclick="closeHledaniModal()" title="Zavřít" aria-label="Zavřít">×</button>
+      </div>
     </div>
     <form class="ask-bar" onsubmit="event.preventDefault();spustHledani();">
       <div class="firm-search">
@@ -1677,7 +1693,6 @@ function _krokAnim(el, frames, opts) {
 // Kopie odcházejícího kroku bez id a name — žádná duplicitní id, do kopie
 // nejde kliknout ani se z ní nic neodešle.
 function _krokDuch(from, rect) {
-  const box = document.querySelector('.container').getBoundingClientRect();
   const g = from.cloneNode(true);
   g.removeAttribute('id');
   g.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
@@ -1685,8 +1700,8 @@ function _krokDuch(from, rect) {
   g.classList.add('active', 'panel-ghost');
   g.setAttribute('aria-hidden', 'true');
   g.inert = true;
-  g.style.top = `${rect.top - box.top}px`;
-  g.style.left = `${rect.left - box.left}px`;
+  g.style.top = `${rect.top}px`;
+  g.style.left = `${rect.left}px`;
   g.style.width = `${rect.width}px`;
   from.parentNode.insertBefore(g, from);
   return g;
@@ -2549,8 +2564,11 @@ async function prefillFrom(file) {
 // jen vybere filtry a napíše větu, každý řádek níž je skutečný soubor / doklad
 // / firma a čísla ve větě prošla kontrolou. Bez AI odpoví deterministický
 // parser (hledani.py) — pak se ukáže „Jednodušší režim".
+// Je to konverzace: předchozí otázky zůstávají nahoře a server dostane jejich
+// shrnutí, takže „a za říjen?" nebo klik na nabídnutou firmu navazuje.
 let _hlPriklady = [];
 let _hlSeq = 0;
+let _hlKonverzace = [];   // [{q, a}] — a = shrnutí odpovědi pro další kolo
 const HL_SLOVESA = ['Listuju šanonem', 'Hrabu se v žádostech', 'Šmejdím v dokladech',
   'Lustruju razítka', 'Probírám fascikl', 'Budím archiv', 'Čtu techničáky',
   'Šťourám se v tabulkách', 'Cinkám korunama', 'Hledám ztracené kačky',
@@ -2559,20 +2577,27 @@ let _hlSlovesoTimer = null;
 
 async function openHledaniModal() {
   document.getElementById('hledani-modal').style.display = 'flex';
-  const q = document.getElementById('hledani-q');
-  q.value = '';
-  _hlSeq++;
-  _hlZastavSlovesa();
-  document.getElementById('hledani-go').disabled = false;
-  renderHledaniUvod();
-  setTimeout(() => q.focus(), 50);
+  hledaniNova();
   if (!_hlPriklady.length) {
     try {
       const res = await fetch('/api/hledat?q=').then(r => r.json());
       _hlPriklady = res.priklady || [];
-      if (!q.value.trim()) renderHledaniUvod();
+      if (!_hlKonverzace.length) renderHledaniUvod();
     } catch (e) { /* příklady jsou nice-to-have */ }
   }
+}
+
+// Nová konverzace — prázdné okno s příklady.
+function hledaniNova() {
+  _hlSeq++;
+  _hlKonverzace = [];
+  _hlZastavSlovesa();
+  const q = document.getElementById('hledani-q');
+  q.value = '';
+  document.getElementById('hledani-go').disabled = false;
+  document.getElementById('hledani-nova').hidden = true;
+  renderHledaniUvod();
+  setTimeout(() => q.focus(), 50);
 }
 
 function closeHledaniModal() {
@@ -2602,8 +2627,8 @@ function _hlZastavSlovesa() {
   if (_hlSlovesoTimer) { clearInterval(_hlSlovesoTimer); _hlSlovesoTimer = null; }
 }
 
-function _hlPremyslim() {
-  document.getElementById('hledani-body').innerHTML = `<div class="ask-thinking ask-reveal" role="status">
+function _hlPremyslimHtml() {
+  return `<div class="ask-thinking ask-reveal" role="status">
       <svg class="ask-orb" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" fill="currentColor"/>
         <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" opacity=".55"/>
@@ -2612,6 +2637,9 @@ function _hlPremyslim() {
         <div class="ask-thinking-label"><span class="ask-verb" id="hl-verb">Přemýšlím</span><span class="ask-dots"><i></i><i></i><i></i></span></div>
         <div class="ask-skeleton"><span></span><span></span><span></span></div>
       </div></div>`;
+}
+
+function _hlSpustSlovesa() {
   _hlZastavSlovesa();
   let posledni = 'Přemýšlím';
   _hlSlovesoTimer = setInterval(() => {
@@ -2627,23 +2655,45 @@ function _hlPremyslim() {
 }
 
 async function spustHledani() {
-  const q = (document.getElementById('hledani-q').value || '').trim();
-  if (!q) { renderHledaniUvod(); return; }
+  const input = document.getElementById('hledani-q');
+  const q = (input.value || '').trim();
+  if (!q) { if (!_hlKonverzace.length) renderHledaniUvod(); return; }
   const seq = ++_hlSeq;
   const tlacitko = document.getElementById('hledani-go');
   tlacitko.disabled = true;
-  _hlPremyslim();
+  input.value = '';
+
+  // Nové kolo se přidá pod předchozí; úvodní příklady zmizí.
+  const body = document.getElementById('hledani-body');
+  if (!_hlKonverzace.length) body.innerHTML = '';
+  body.querySelectorAll('.ask-turn .ask-examples, .ask-turn .ask-choices').forEach(e => e.remove());
+  const kolo = document.createElement('div');
+  kolo.className = 'ask-turn';
+  kolo.innerHTML = `<div class="ask-q ask-reveal">${esc(q)}</div><div class="ask-a">${_hlPremyslimHtml()}</div>`;
+  body.appendChild(kolo);
+  kolo.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  _hlSpustSlovesa();
+
+  const historie = _hlKonverzace.slice(-4);
+  let res = null;
   try {
-    const res = await fetch('/api/hledat?q=' + encodeURIComponent(q)).then(r => r.json());
-    if (seq !== _hlSeq) return;
-    renderHledani(res);
-  } catch (e) {
-    if (seq !== _hlSeq) return;
-    document.getElementById('hledani-body').innerHTML =
-      '<div class="ask-headline unknown ask-reveal">Hledání se nepovedlo.</div>';
-  } finally {
-    if (seq === _hlSeq) { _hlZastavSlovesa(); tlacitko.disabled = false; }
+    res = await fetch('/api/hledat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q, historie }),
+    }).then(r => r.json());
+  } catch (e) { /* níž */ }
+  if (seq !== _hlSeq) return;
+  _hlZastavSlovesa();
+  tlacitko.disabled = false;
+  const odpoved = kolo.querySelector('.ask-a');
+  if (!res) {
+    odpoved.innerHTML = '<div class="ask-headline unknown ask-reveal">Hledání se nepovedlo.</div>';
+    return;
   }
+  odpoved.innerHTML = _hlOdpovedHtml(res);
+  _hlKonverzace.push({ q, a: res.shrnuti || res.veta || res.headline || '' });
+  document.getElementById('hledani-nova').hidden = false;
+  input.focus();
 }
 
 // **x** z AI věty → tučně + modré podtržení. Nejdřív se escapuje, pak značí.
@@ -2670,7 +2720,7 @@ function _hlSdilet(url) {
     title="Kód pro sdílení — příjemce nepotřebuje heslo"><svg class="ico"><use href="#i-share"></use></svg></button>`;
 }
 
-function renderHledani(res) {
+function _hlOdpovedHtml(res) {
   let i = 0;
   const r = () => ` ask-reveal" style="--i:${Math.min(i++, 12)}`;
   let h = '';
@@ -2720,7 +2770,7 @@ function renderHledani(res) {
   }
 
   if (!res.understood) h += _hlChips('Zkus třeba');
-  document.getElementById('hledani-body').innerHTML = h;
+  return h;
 }
 
 async function openDokladyModal() {
