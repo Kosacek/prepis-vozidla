@@ -1,0 +1,46 @@
+{# Demo for release 2.2 (Zeptej se navazuje): a first question and its answer,
+   then the follow-up "a v září?" pops in as a blue bubble and the new answer
+   (same metric, September) drops in below with its figure underlined.
+   CSS-only, 6s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de22-demo {
+    box-sizing: border-box; height: 134px; padding: 8px 12px; margin-bottom: var(--sp-4);
+    overflow: hidden; border-radius: 14px; background: var(--bg); color: var(--ink);
+    font-size: 11px; line-height: 1.3;
+  }
+  .de22-stack { display: flex; flex-direction: column; gap: 6px; animation: de22-up 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de22-q {
+    align-self: flex-end; padding: 3px 10px; border-radius: 11px 11px 3px 11px;
+    background: var(--accent); color: var(--accent-ink); font-size: 10.5px; font-weight: 600; white-space: nowrap;
+  }
+  .de22-a {
+    padding: 6px 9px; border-radius: var(--radius-sm); background: var(--card);
+    border: 1px solid var(--line); font-size: 11px;
+  }
+  .de22-em {
+    font-weight: 700; background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat; background-position: 0 100%; background-size: 100% 2px; padding-bottom: 1px;
+  }
+  .de22-q2 { opacity: 0; animation: de22-in 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de22-a2 { opacity: 0; animation: de22-in2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de22-a2 .de22-em { animation: de22-em 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes de22-in { 0%, 30% { opacity: 0; transform: translateY(-4px) scale(.96); } 36%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @keyframes de22-in2 { 0%, 48% { opacity: 0; transform: translateY(-5px); } 56%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @keyframes de22-em { 0%, 56% { background-size: 0 2px; } 66%, 92% { background-size: 100% 2px; } 100% { background-size: 0 2px; } }
+  @keyframes de22-up { 0%, 34% { transform: none; } 46%, 92% { transform: translateY(-34px); } 100% { transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .de22-stack, .de22-q2, .de22-a2, .de22-a2 .de22-em { animation: none; }
+    .de22-q2, .de22-a2 { opacity: 1; }
+    .de22-stack { transform: translateY(-34px); }
+  }
+</style>
+<div class="de22-demo" aria-hidden="true">
+  <div class="de22-stack">
+    <span class="de22-q">Kolik jsme vydělali v říjnu?</span>
+    <div class="de22-a">V říjnu <span class="de22-em">48 300 Kč</span>, nejvíc Albion.</div>
+    <span class="de22-q de22-q2">a v září?</span>
+    <div class="de22-a de22-a2">V září <span class="de22-em">61 200 Kč</span>, nejvíc Cardion.</div>
+  </div>
+</div>

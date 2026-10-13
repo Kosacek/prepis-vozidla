@@ -68,6 +68,9 @@ def _system_prompt(db_path: str, today: date) -> str:
         "1–3 nejdůležitější údaje (hlavní číslo s jednotkou, jméno vítěze nebo období) "
         "a nic jiného; nikdy nezvýrazňuj celou větu."
         " Období ve větě uváděj podle pole obdobi z výsledku nástroje; dnešní datum jako konec období nepřidávej."
+        " Navazuj na předchozí otázky v konverzaci: 'a v září?', 'a pro Albion?', 'tu první', "
+        "'ano' se vztahují k minulé odpovědi — převezmi z ní období, filtry i metriku a změň "
+        "jen to, co se mění. Čísla z minulých odpovědí nepoužívej, vždy znovu zavolej nástroj."
     )
 
 
@@ -187,7 +190,29 @@ def _api_error(exc: Exception) -> bool:
                for cls in type(exc).__mro__)
 
 
-def ask(question: str, *, db_path, today: date, client=None) -> dict:
+MAX_HISTORIE = 4      # předchozích kol konverzace, na která se dá navázat
+
+
+def historie_zprav(historie) -> list[dict]:
+    """Předchozí kola konverzace jako zprávy pro model („a za září?" navazuje).
+
+    Historie přichází od prohlížeče: bere se jen text, ořízne se a nikdy se
+    z ní nečtou čísla pro kontrolu věty — ta věří jen výsledkům tohoto kola."""
+    zpravy: list[dict] = []
+    if not isinstance(historie, list):
+        return zpravy
+    for kolo in historie[-MAX_HISTORIE:]:
+        if not isinstance(kolo, dict):
+            continue
+        q = str(kolo.get("q") or "").strip()[:300]
+        a = str(kolo.get("a") or "").strip()[:800]
+        if q and a:
+            zpravy += [{"role": "user", "content": q},
+                       {"role": "assistant", "content": a}]
+    return zpravy
+
+
+def ask(question: str, *, db_path, today: date, client=None, historie=None) -> dict:
     started = time.monotonic()
     if client is None:
         if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -200,7 +225,7 @@ def ask(question: str, *, db_path, today: date, client=None) -> dict:
     effort = os.environ.get("ZEPTEJ_EFFORT", "low")
     if effort not in {"low", "medium", "high"}:
         effort = "low"
-    messages = [{"role": "user", "content": question}]
+    messages = historie_zprav(historie) + [{"role": "user", "content": question}]
     calls: list[dict] = []
     results: list[dict] = []
     last_result = None

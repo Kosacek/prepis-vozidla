@@ -2081,3 +2081,23 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .dup-list .recent-row { grid-template-columns: auto 78px 100px minmax(0, 1fr) auto auto auto; }
   .dup-list .recent-row .tag { display: none; }
 }
+
+/* ------------------------------------------------------------
+   Zeptej se — konverzace (otázka jako bublina vpravo, odpověď pod ní)
+   ------------------------------------------------------------ */
+.ask-thread { display: flex; flex-direction: column; gap: var(--sp-5); }
+.ask-thread:empty { display: none; }
+.ask-turn { display: flex; flex-direction: column; gap: var(--sp-3); scroll-margin-top: var(--sp-4); }
+.ask-turn .ask-answer, .ask-turn .ask-thinking, .ask-turn .recent-card { margin-top: 0; }
+.ask-q {
+  align-self: flex-end; max-width: 85%; padding: 8px 14px;
+  border-radius: 16px 16px 4px 16px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 600; overflow-wrap: anywhere;
+}
+.ask-turn .ask-a { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.ask-bar-card { margin-top: var(--sp-5); }
+.ask-nova { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.ask-nova[hidden] { display: none; }
+@media (max-width: 600px) {
+  .ask-nova span { display: none; }
+}

@@ -27,6 +27,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.2", date(2026, 10, 13),
+        "Zeptej se navazuje na předchozí otázku",
+        ("Ptej se dál – třeba „a v září?“ nebo „a pro Albion?“ – a ví, o čem je řeč.",
+         "Předchozí otázky a odpovědi zůstávají vidět nad sebou."),
+        demo="v2_2",
+    ),
+    Release(
         "2.1", date(2026, 10, 12),
         "V Příchozích vidíš, co je duplikát",
         ("U možného duplikátu uvidíš stávající i příchozí úkon jako běžné řádky "

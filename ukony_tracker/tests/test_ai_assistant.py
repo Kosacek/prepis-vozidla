@@ -226,7 +226,7 @@ def test_route_ai_chart_table_clarification_and_ppd(tmp_path, monkeypatch):
               "tokeny": {}, "ms": 1}
         monkeypatch.setattr(ask_route.ai_assistant, "ask", lambda *a, **k: ai)
         body = client.get("/zeptej?q=Albion").get_data(as_text=True)
-        assert "Albion 1 300 Kč" in body and 'id="ask-chart"' in body
+        assert "Albion 1 300 Kč" in body and 'data-rows="' in body
         assert "Jak jsem to spočítal" in body and "Roman se zapisuje" in body
         assert "<td>Albion</td>" in body and "Přemýšlím" in body
         ai["veta_overena"] = False
@@ -355,3 +355,80 @@ def test_emphasis_markers_render_safely_and_do_not_affect_number_check():
     results = [{"radky": [{"skupina": [], "hodnota": 523, "pocet": 523}]}]
     assert verify_sentence(plain_sentence("**523** úkonů"), results)
     assert not verify_sentence(plain_sentence("**524** úkonů"), results)
+
+
+# ── konverzace ───────────────────────────────────────────────────────────────
+
+def test_history_goes_before_the_question(ai_db):
+    fake = FakeClient([response(block("agregace", query())),
+                       response(block("odpoved", {"veta": "Celkem 1 300 Kč", "graf": "zadny"}, "call-2"))])
+    hist = [{"q": "Kolik v říjnu?", "a": "1 300 Kč [období říjen]"}, {"q": "", "a": "x"}, "nonsense"]
+    assistant.ask("a v září?", db_path=ai_db, today=TODAY, client=fake, historie=hist)
+    msgs = fake.calls[0]["messages"]
+    assert [m["role"] for m in msgs[:3]] == ["user", "assistant", "user"]
+    assert msgs[0]["content"] == "Kolik v říjnu?" and msgs[2]["content"] == "a v září?"
+
+
+def test_history_is_capped_and_trimmed():
+    hist = [{"q": "q" * 500, "a": "a" * 900} for _ in range(9)]
+    msgs = assistant.historie_zprav(hist)
+    assert len(msgs) == 2 * assistant.MAX_HISTORIE
+    assert len(msgs[0]["content"]) == 300 and len(msgs[1]["content"]) == 800
+    assert assistant.historie_zprav({"q": "x"}) == []
+
+
+def _kolo_app(tmp_path, monkeypatch):
+    import app as appmod
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "t.db"))
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    app = appmod.create_app()
+    app.testing = True
+    return app
+
+
+def test_kolo_endpoint_returns_html_and_summary_with_history(tmp_path, monkeypatch):
+    from routes import ask as ask_route
+    app = _kolo_app(tmp_path, monkeypatch)
+    seen = {}
+    ai = {"typ": "odpoved", "veta": "V září 2 úkony", "veta_overena": True, "graf": "zadny",
+          "predpoklady": "", "nastroj": "agregace",
+          "vysledek": {"radky": [{"skupina": [], "hodnota": 2, "pocet": 2}], "metrika": "pocet",
+                       "obdobi": PERIOD, "pouzite_filtry": {}},
+          "volani": [{"name": "agregace", "input": query(metrika="pocet")}], "tokeny": {}, "ms": 1}
+
+    def fake_ask(q, **kw):
+        seen.update(q=q, historie=kw.get("historie"))
+        return ai
+    monkeypatch.setattr(ask_route.ai_assistant, "ask", fake_ask)
+    with app.test_client() as client:
+        r = client.post("/zeptej/kolo", json={"q": "a v září?", "historie": [{"q": "říjen", "a": "3"}]})
+        data = r.get_json()
+    assert r.status_code == 200
+    assert "V září 2 úkony" in data["html"] and "<html" not in data["html"]
+    assert data["shrnuti"].startswith("V září 2 úkony [Nástroj agregace; období")
+    assert seen == {"q": "a v září?", "historie": [{"q": "říjen", "a": "3"}]}
+
+
+def test_kolo_clarification_summary_and_empty_question(tmp_path, monkeypatch):
+    from routes import ask as ask_route
+    app = _kolo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(ask_route.ai_assistant, "ask", lambda *a, **k: {
+        "typ": "doptat_se", "otazka": "Myslíš Albion?", "moznosti": ["Tržby Albion"],
+        "veta": "", "veta_overena": False, "graf": "zadny", "vysledek": None,
+        "nastroj": None, "volani": [], "tokeny": {}, "ms": 1})
+    with app.test_client() as client:
+        data = client.post("/zeptej/kolo", json={"q": "albyon"}).get_json()
+        assert data["shrnuti"] == "Myslíš Albion? Možnosti: Tržby Albion"
+        assert 'data-ask="Tržby Albion"' in data["html"]
+        assert client.post("/zeptej/kolo", json={"q": "  "}).status_code == 400
+
+
+def test_kolo_does_not_trigger_backup(tmp_path, monkeypatch):
+    from routes import ask as ask_route
+    app = _kolo_app(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(db, "backup_db", lambda *a, **k: calls.append(1))
+    monkeypatch.setattr(ask_route.ai_assistant, "ask", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
+    with app.test_client() as client:
+        client.post("/zeptej/kolo", json={"q": "Cardion"})
+    assert calls == []

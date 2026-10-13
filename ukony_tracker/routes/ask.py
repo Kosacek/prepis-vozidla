@@ -9,7 +9,7 @@ import uuid
 from contextlib import closing
 from datetime import date
 
-from flask import Blueprint, render_template, request, session
+from flask import Blueprint, jsonify, render_template, request, session
 
 import config
 import db
@@ -99,40 +99,82 @@ def _listed_ukony(ai: dict):
         ).fetchall()
 
 
-@bp.get("/zeptej")
-def ask():
-    conn = db.get_db()
-    q = (request.args.get("q") or "").strip()
+def _odpoved(conn, q: str, historie=None) -> dict:
+    """Jedno kolo „Zeptej se": AI (s historií konverzace), jinak pravidlový parser."""
     ai = None
     res = None
     fallback_reason = None
     rows = []
     explanation = None
-    if q:
-        started = time.monotonic()
-        if request.args.get("rezim") == "jednoduchy":
-            fallback_reason = "vyžádaný jednoduchý režim"
-        elif not _rate_allowed():
-            fallback_reason = "limit 30 dotazů za 10 minut"
-        else:
-            try:
-                ai = ai_assistant.ask(q, db_path=config.DB_PATH, today=date.today())
-                rows = _listed_ukony(ai)
-                explanation = _explanation(ai)
-            except Exception as exc:
-                fallback_reason = f"{type(exc).__name__}: {exc}"
-                ai = None
-        if fallback_reason:
-            res = ask_service.answer(conn, q)
-        logger.info("%s", json.dumps({
-            "otazka": q, "volani": (ai or {}).get("volani", []),
-            "tokeny": (ai or {}).get("tokeny", {}),
-            "ms": (ai or {}).get("ms", round((time.monotonic() - started) * 1000)),
-            "veta_overena": (ai or {}).get("veta_overena", False),
-            "fallback": fallback_reason,
-        }, ensure_ascii=False, default=str))
+    started = time.monotonic()
+    if request.args.get("rezim") == "jednoduchy":
+        fallback_reason = "vyžádaný jednoduchý režim"
+    elif not _rate_allowed():
+        fallback_reason = "limit 30 dotazů za 10 minut"
+    else:
+        try:
+            ai = ai_assistant.ask(q, db_path=config.DB_PATH, today=date.today(), historie=historie)
+            rows = _listed_ukony(ai)
+            explanation = _explanation(ai)
+        except Exception as exc:
+            fallback_reason = f"{type(exc).__name__}: {exc}"
+            ai = None
+    if fallback_reason:
+        res = ask_service.answer(conn, q)
+    logger.info("%s", json.dumps({
+        "otazka": q, "historie": len(historie or []), "volani": (ai or {}).get("volani", []),
+        "tokeny": (ai or {}).get("tokeny", {}),
+        "ms": (ai or {}).get("ms", round((time.monotonic() - started) * 1000)),
+        "veta_overena": (ai or {}).get("veta_overena", False),
+        "fallback": fallback_reason,
+    }, ensure_ascii=False, default=str))
+    return {"q": q, "ai": ai, "res": res, "fallback_reason": fallback_reason,
+            "explanation": explanation, "ai_rows": rows}
+
+
+def _shrnuti(kolo: dict) -> str:
+    """Co si prohlížeč pošle zpátky jako historii: věta + jak byla spočítaná,
+    aby „a v září?" mohlo převzít období, filtry i metriku."""
+    ai, res = kolo["ai"], kolo["res"]
+    if ai and ai.get("typ") == "doptat_se":
+        moznosti = " | ".join(ai.get("moznosti") or [])
+        return (ai.get("otazka") or "") + (f" Možnosti: {moznosti}" if moznosti else "")
+    if ai:
+        veta = ai.get("veta") if ai.get("veta_overena") else ""
+        e = kolo.get("explanation") or {}
+        jak = (f"Nástroj {ai.get('nastroj')}; období {e.get('obdobi', '—')}; metrika {e.get('metrika', '—')}; "
+               f"skupiny {e.get('skupiny', '—')}; filtry {e.get('filtry', '—')}.")
+        return f"{veta} [{jak}]".strip()
+    return (res or {}).get("headline", "") if isinstance(res, dict) else getattr(res, "headline", "")
+
+
+def _kontext_kola(conn) -> dict:
+    return {"firma_colors": colors_service.firma_color_map(conn), "limit": ask_service.ROW_LIMIT}
+
+
+@bp.get("/zeptej")
+def ask():
+    conn = db.get_db()
+    q = (request.args.get("q") or "").strip()[:300]
+    kolo = _odpoved(conn, q) if q else None
     return render_template(
-        "zeptej.html", q=q, ai=ai, res=res, fallback_reason=fallback_reason,
-        explanation=explanation, ai_rows=rows, priklady=PRIKLADY,
-        firma_colors=colors_service.firma_color_map(conn), limit=ask_service.ROW_LIMIT,
+        "zeptej.html", q=q, kolo=kolo, shrnuti=_shrnuti(kolo) if kolo else "",
+        priklady=PRIKLADY, **_kontext_kola(conn),
     )
+
+
+@bp.post("/zeptej/kolo")
+def kolo():
+    """Další kolo konverzace: tělo {q, historie:[{q, a}]} → HTML odpovědi + shrnutí.
+
+    POST jen kvůli historii v těle (do URL by se nevešla); nic nezapisuje, proto
+    je vyjmutý z automatické zálohy v app.py."""
+    conn = db.get_db()
+    telo = request.get_json(silent=True)
+    telo = telo if isinstance(telo, dict) else {}
+    q = str(telo.get("q") or "").strip()[:300]
+    if not q:
+        return jsonify(error="prázdný dotaz"), 400
+    kolo_ = _odpoved(conn, q, telo.get("historie"))
+    html = render_template("_zeptej_kolo.html", **kolo_, **_kontext_kola(conn))
+    return jsonify(html=html, shrnuti=_shrnuti(kolo_))

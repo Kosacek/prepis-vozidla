@@ -68,7 +68,10 @@ def create_app():
     @app.before_request
     def _auto_backup():
         from flask import request
-        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Otázka pro „Zeptej se" je POST jen kvůli historii konverzace v těle —
+        # nic nezapisuje, a záloha při každé otázce by vytlačila skutečné
+        # zálohy z rotace posledních 30.
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.endpoint != "ask.kolo":
             db.backup_db()
 
     @app.context_processor
