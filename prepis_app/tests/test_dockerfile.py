@@ -12,7 +12,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 def test_every_local_import_is_copied():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     docker = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    imported = set(re.findall(r"^\s*(?:import|from)\s+(\w+)", app, re.M))
+    # Jen importy na nejvyšší úrovni — líný `import updater` v try (stará
+    # desktopová verze) do image patřit nemá.
+    imported = set(re.findall(r"^(?:import|from)\s+(\w+)", app, re.M))
     local = {m for m in imported if (ROOT / f"{m}.py").exists()}
     missing = [m for m in sorted(local) if f"COPY {m}.py" not in docker]
     assert not missing, f"Dockerfile nekopíruje: {missing}"
