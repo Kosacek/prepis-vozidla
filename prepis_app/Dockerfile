@@ -19,7 +19,7 @@ ENV TZ=Europe/Prague \
     DATA_DIR=/data
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libjpeg62-turbo zlib1g libfreetype6 ca-certificates tzdata \
+    libjpeg62-turbo zlib1g libfreetype6 ca-certificates tzdata fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Installed Python packages from the deps stage
@@ -29,7 +29,7 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 # Cache buster — bump on every source change shipped to the NAS. The QNAP
 # SMB share can keep a stale snapshot across builds; changing this value
 # forces all subsequent layers (the COPYs below) to rebuild.
-ARG CACHEBUST=2026-10-14-nahled-diakritika
+ARG CACHEBUST=2026-10-14-nahled-arial
 
 # App code (read-only assets baked into the image; writable state lives on /data)
 COPY app.py ./app.py

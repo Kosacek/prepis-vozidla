@@ -27,7 +27,24 @@ from functools import lru_cache
 
 _log = logging.getLogger(__name__)
 
-PISMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "fonts", "DejaVuSans.ttf")
+# Písmo hodnot polí. Chrome vyplněná pole tiskne Arialem (Helvetica z /DA),
+# takže náhled má vypadat stejně: Liberation Sans má Arialovy rozměry i české
+# znaky (v kontejneru z balíčku fonts-liberation, viz Dockerfile), na Windows
+# rovnou Arial. DejaVu je jen záchrana — čeština v něm je, ale je širší a v
+# náhledu působilo nepřirozeně (David, 2026-10-14).
+KANDIDATI_PISMA = (
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "fonts", "DejaVuSans.ttf"),
+)
+
+
+def najdi_pismo(kandidati=KANDIDATI_PISMA) -> str:
+    return next((k for k in kandidati if os.path.isfile(k)), kandidati[-1])
+
+
+PISMO = najdi_pismo()
 
 _FF_VICERADKOVE = 1 << 12
 _FF_COMB = 1 << 24
@@ -73,7 +90,8 @@ def _textova_pole(stranka) -> list[dict]:
         hodnota = g("/V")
         if g("/FT") != "/Tx" or hodnota is None or not str(hodnota).strip():
             continue
-        m = re.search(r"([\d.]+)\s+Tf", str(g("/DA") or ""))
+        da = str(g("/DA") or "")
+        m = re.search(r"([\d.]+)\s+Tf", da)
         ff = int(g("/Ff") or 0)
         mk = w.get("/MK") or {}
         bc = [float(c) for c in (mk.get("/BC") or [])]
@@ -84,12 +102,21 @@ def _textova_pole(stranka) -> list[dict]:
             "ramecek_sirka": float(bs.get("/W", 1)),
             "rect": [float(x) for x in w["/Rect"]],
             "text": str(hodnota),
+            "barva": _barva_z_da(da),
             "velikost": float(m.group(1)) if m else 0.0,
             "comb": int(g("/MaxLen") or 0) if ff & _FF_COMB else 0,
             "viceradkove": bool(ff & _FF_VICERADKOVE),
             "q": int(g("/Q") or 0),
         })
     return pole
+
+
+def _barva_z_da(da: str) -> int:
+    """Barva textu z /DA („0 g", „.27 .27 .27 rg", „0 0 0 1 k") jako šedá."""
+    m = re.search(r"((?:[\d.]+\s+){1,4})(g|rg|k)(?![A-Za-z])", da)
+    if not m:
+        return 0
+    return _seda([float(x) for x in m.group(1).split()])
 
 
 def _seda(barva: list[float]) -> int:
@@ -152,8 +179,9 @@ def _dopis_pole(obrazek, pole: list[dict], vyska_pt: float, meritko: float) -> N
             kresli.rectangle([x0 * meritko, (vyska_pt - y1) * meritko,
                               x1 * meritko, (vyska_pt - y0) * meritko],
                              outline=p["ramecek"], width=max(1, round(p["ramecek_sirka"] * meritko)))
-        # Auto velikost (0 Tf) jako v prohlížečích: na výšku pole, max 12 b.
-        vel = p["velikost"] or min(12.0, (vyska - 4) * 0.8)
+        # Auto velikost (0 Tf): změřeno proti Chrome/PDFium na našich
+        # tiskopisech — pole 20 b ~ písmo 13,3 b, pole 17 b ~ 11,1 b.
+        vel = p["velikost"] or (vyska - 2) * 0.74
         text = p["text"]
         if not p["comb"] and not p["viceradkove"]:
             while vel > 4 and _pismo(vel * meritko).getlength(text) / meritko > sirka - 4:
@@ -167,11 +195,11 @@ def _dopis_pole(obrazek, pole: list[dict], vyska_pt: float, meritko: float) -> N
             bunka = sirka / p["comb"]
             for i, znak in enumerate(text[:p["comb"]]):
                 cx = (x0 + bunka * (i + 0.5)) * meritko
-                kresli.text((cx, stred_y), znak, font=pismo, fill=0, anchor="mm")
+                kresli.text((cx, stred_y), znak, font=pismo, fill=p["barva"], anchor="mm")
         elif p["viceradkove"]:
             y = (vyska_pt - y1 + 2) * meritko
             for radek in text.splitlines() or [text]:
-                kresli.text(((x0 + 2) * meritko, y), radek, font=pismo, fill=0, anchor="la")
+                kresli.text(((x0 + 2) * meritko, y), radek, font=pismo, fill=p["barva"], anchor="la")
                 y += vel * 1.15 * meritko
         else:
             if p["q"] == 1:
@@ -180,7 +208,7 @@ def _dopis_pole(obrazek, pole: list[dict], vyska_pt: float, meritko: float) -> N
                 xy, kotva = ((x1 - 2) * meritko, stred_y), "rm"
             else:
                 xy, kotva = ((x0 + 2) * meritko, stred_y), "lm"
-            kresli.text(xy, text, font=pismo, fill=0, anchor=kotva)
+            kresli.text(xy, text, font=pismo, fill=p["barva"], anchor=kotva)
 
 
 @lru_cache(maxsize=32)

@@ -248,3 +248,26 @@ def test_comb_pole_rozdeli_znaky_do_policek(zadost_s_hacky):
         _, pole = nahled.bez_textovych_poli(f.read(), 0)
     vin = next(p for p in pole if p["text"] == "TMBEK6NW7M3158470")
     assert vin["comb"] == 17
+
+
+def test_nahled_pise_arialovym_pismem_ne_dejavu():
+    """DejaVu je širší než Arial, kterým tiskne Chrome — v náhledu působilo
+    nepřirozeně. Liberation Sans (Linux) / Arial (Windows) mají přednost."""
+    assert "DejaVu" not in nahled.PISMO, nahled.PISMO
+
+
+def test_najdi_pismo_vezme_prvni_existujici(tmp_path):
+    a, b = tmp_path / "a.ttf", tmp_path / "b.ttf"
+    b.write_bytes(b"x")
+    assert nahled.najdi_pismo((str(a), str(b), "zaloha.ttf")) == str(b)
+    assert nahled.najdi_pismo((str(a), "zaloha.ttf")) == "zaloha.ttf"
+
+
+@pytest.mark.parametrize("da, seda", [
+    ("/Helv 10 Tf 0 g", 0),
+    (".2666667 .2666667 .2666667 rg\n/F1 0 Tf", 68),   # plná moc — tmavě šedá
+    ("/Helv 0 Tf 0 0 0 1 k", 0),
+    ("/Helv 0 Tf", 0),
+])
+def test_barva_textu_podle_pole(da, seda):
+    assert nahled._barva_z_da(da) == seda
