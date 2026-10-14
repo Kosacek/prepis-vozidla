@@ -9,6 +9,7 @@ přidala ke kódu té žádosti.
 import os
 import re
 from datetime import datetime, timedelta
+import io
 import json
 
 import pytest
@@ -180,3 +181,70 @@ def test_nahled_se_neda_vyrobit_z_neplatneho_pdf(prod, tmp_path):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert f'href="/{kod}/0"' in html and "/nahled/" not in html
+
+
+# ── Diakritika v náhledu (2026-10-14) ──────────────────────────────────────
+# Na serveru (Linux, bez systémových písem) PDFium kreslí pole jen přes
+# Helvetica/WinAnsi: z „ŠTĚPÁN ČEŘOVSKÝ" zbylo „ŠT PÁN E OVSKÝ". Hodnoty polí
+# proto kreslí nahled.py sám písmem DejaVu Sans.
+
+import nahled
+
+CESKE = "ŠTĚPÁN ČEŘOVSKÝ ĎŇŤ"
+
+
+@pytest.fixture
+def zadost_s_hacky(tmp_path):
+    data = {"mode": "prevod", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+            "puvodni_jmeno": CESKE, "novy_jmeno": "JIŘÍ ŠŤASTNÝ"}
+    p = os.path.join(str(tmp_path), "zmeny_HACKY.pdf")
+    with open(p, "wb") as f:
+        f.write(A.fill_pdf(A.PDF_ZMENY, A.build_zmeny_fields(data)))
+    return p
+
+
+def _pole_jmena(cesta):
+    with open(cesta, "rb") as f:
+        _, pole = nahled.bez_textovych_poli(f.read(), 0)
+    return next(p for p in pole if p["text"] == CESKE)
+
+
+def test_textova_pole_se_z_pdfia_vyjmou_i_s_hodnotami(zadost_s_hacky):
+    import pypdf, io
+    with open(zadost_s_hacky, "rb") as f:
+        bez, pole = nahled.bez_textovych_poli(f.read(), 0)
+    assert CESKE in [p["text"] for p in pole]
+    zbyle = [a.get_object() for a in pypdf.PdfReader(io.BytesIO(bez)).pages[0].get("/Annots") or []]
+    assert all(a.get("/FT", a.get("/Parent", {}).get("/FT") if "/Parent" in a else None) != "/Tx"
+               for a in zbyle)
+
+
+def _inkoust(png, rect, vyska_pt):
+    from PIL import Image
+    im = Image.open(io.BytesIO(png))
+    s = nahled.MERITKO
+    x0, y0, x1, y1 = rect
+    vyrez = im.crop((int(x0 * s), int((vyska_pt - y1) * s), int(x1 * s), int((vyska_pt - y0) * s)))
+    return sum(vyrez.point(lambda px: 1 if px < 100 else 0).histogram()[1:])
+
+
+def test_hacky_v_nahledu_kresli_nase_pismo_ne_pdfium(zadost_s_hacky, monkeypatch):
+    pole = _pole_jmena(zadost_s_hacky)
+    nahled._png.cache_clear()
+    s_textem = nahled.stranka_png(zadost_s_hacky, 1)
+    monkeypatch.setattr(nahled, "_dopis_pole", lambda *a, **k: None)
+    nahled._png.cache_clear()
+    bez_textu = nahled.stranka_png(zadost_s_hacky, 1)
+    nahled._png.cache_clear()
+    vyska = 841.92
+    # Do obdélníku pole zasahuje i tečkovaná linka tiskopisu — proto rozdíl.
+    jen_linka = _inkoust(bez_textu, pole["rect"], vyska)
+    assert jen_linka < 600, "PDFium pořád kreslí pole sám"
+    assert _inkoust(s_textem, pole["rect"], vyska) - jen_linka > 600, "jméno v náhledu chybí"
+
+
+def test_comb_pole_rozdeli_znaky_do_policek(zadost_s_hacky):
+    with open(zadost_s_hacky, "rb") as f:
+        _, pole = nahled.bez_textovych_poli(f.read(), 0)
+    vin = next(p for p in pole if p["text"] == "TMBEK6NW7M3158470")
+    assert vin["comb"] == 17
