@@ -20,8 +20,10 @@ from functools import lru_cache
 
 _log = logging.getLogger(__name__)
 
-# ~100 DPI: A4 vyjde ~830 px na šířku — na telefonu ostré, jméno i RZ čitelné.
-MERITKO = 100 / 72
+# 144 DPI: A4 vyjde ~1190 × 1680 px. Na počítači se stránka ukazuje na celou
+# výšku okna (s Windows škálováním 125–150 % to je ~1300 px), při 100 DPI
+# byl text rozmazaný.
+MERITKO = 144 / 72
 MAX_STRAN = 12  # víc stránek žádný z našich dokumentů nemá; brzda proti nesmyslům
 
 # PDFium není vláknově bezpečné (gunicorn běží s vlákny i workery).

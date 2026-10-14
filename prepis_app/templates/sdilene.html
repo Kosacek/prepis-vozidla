@@ -24,48 +24,62 @@
             --border:#334155; --accent:#1e3a5f; --paper-shadow:0 2px 10px rgba(0,0,0,.4); }
   }
   * { box-sizing:border-box; }
-  body { margin:0; padding:20px 16px 32px; background:var(--bg); color:var(--text);
+  body { margin:0; padding:16px 16px 24px; background:var(--bg); color:var(--text);
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  .wrap { max-width:1040px; margin:0 auto; }
-  header { display:flex; align-items:baseline; gap:10px; margin:0 0 16px; }
+  header { display:flex; align-items:baseline; gap:10px; margin:0 0 14px; }
   h1 { font-size:20px; margin:0; }
   .kod { font-size:13px; font-weight:800; letter-spacing:.5px; color:var(--muted);
          border:1px solid var(--border); border-radius:6px; padding:1px 7px; }
   .pocet { margin-left:auto; font-size:13px; color:var(--muted); }
 
-  .doky { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); }
+  .doky { display:flex; flex-direction:column; gap:16px; }
   .dok { background:var(--card); border:1px solid var(--border); border-radius:14px;
-         padding:14px; display:flex; flex-direction:column; gap:12px; }
+         padding:14px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .hlava { display:flex; flex-direction:column; gap:10px; }
   .dok h2 { font-size:15px; margin:0; line-height:1.3; }
   .dok h2 small { display:block; font-weight:500; font-size:12px; color:var(--muted); margin-top:2px; }
+  .telo { display:flex; flex-direction:column; gap:10px; }
 
   .papir { display:block; width:100%; aspect-ratio:210/297; border:0; padding:0;
            background:#fff; border-radius:4px; box-shadow:var(--paper-shadow);
            cursor:zoom-in; overflow:hidden; }
   .papir img { display:block; width:100%; height:100%; object-fit:contain; }
-  .strany { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .strany { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; order:2; }
   .nahl { flex:0 0 56px; aspect-ratio:210/297; padding:0; border:2px solid transparent;
           border-radius:4px; background:#fff; cursor:pointer; overflow:hidden; }
   .nahl img { display:block; width:100%; height:100%; object-fit:contain; }
   .nahl[aria-current="true"] { border-color:var(--primary); }
 
-  .akce { display:flex; gap:8px; margin-top:auto; }
+  .akce { display:flex; gap:8px; }
   .btn { display:flex; align-items:center; justify-content:center; gap:7px;
          border-radius:10px; padding:11px 14px; font-size:15px; font-weight:700;
-         text-decoration:none; }
+         text-decoration:none; white-space:nowrap; }
   .btn-hl { flex:1; background:var(--primary); color:var(--primary-ink); }
   .btn-hl:hover { filter:brightness(1.08); }
   .btn-2 { border:1px solid var(--border); color:var(--text); background:transparent; }
   .btn-2:hover { border-color:var(--primary); color:var(--primary); background:var(--accent); }
   .btn svg { width:18px; height:18px; flex-shrink:0; }
 
-  .pata { margin-top:20px; font-size:12px; color:var(--muted); text-align:center; }
+  /* Počítač: stránka na celou výšku okna, dokumenty vedle sebe, miniatury
+     ve sloupci vlevo. Dřív byl náhled v úzkém sloupci a zabral čtvrtinu
+     obrazovky — na kontrolu, jestli je to ta správná žádost, málo. */
+  @media (min-width: 760px) {
+    .doky { flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+    .hlava { flex-direction:row; align-items:center; justify-content:space-between; gap:16px; }
+    .telo { flex-direction:row; align-items:flex-start; }
+    .strany { order:0; flex:none; flex-direction:column; overflow:visible; }
+    .nahl { flex:none; width:64px; }
+    .papir { width:auto; height:max(420px, calc(100vh - 168px)); max-width:calc(100vw - 140px); }
+    .btn-hl { flex:none; }
+  }
+
+  .pata { margin-top:18px; font-size:12px; color:var(--muted); text-align:center; }
 
   /* Zvětšená stránka přes celou obrazovku */
   .zoom { position:fixed; inset:0; z-index:10; background:rgba(15,23,42,.82);
           display:none; overflow:auto; padding:16px; cursor:zoom-out; }
   .zoom.ukaz { display:block; }
-  .zoom img { display:block; margin:0 auto; width:min(100%, 900px); height:auto;
+  .zoom img { display:block; margin:0 auto; width:min(100%, 1240px); height:auto;
               background:#fff; border-radius:4px; }
   @media (prefers-reduced-motion: no-preference) {
     .zoom.ukaz { animation:fade .15s ease-out; }
@@ -74,7 +88,7 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
+  <div>
     <header>
       <h1>Dokumenty k tisku</h1>
       <span class="kod">{{ kod }}</span>
@@ -84,11 +98,20 @@
     <div class="doky">
     {% for d in dokumenty %}
       <section class="dok">
-        <h2>{{ d.popis }}{% if d.strany %}<small>{{ d.strany }} {{ 'strana' if d.strany == 1 else ('strany' if d.strany < 5 else 'stran') }}</small>{% endif %}</h2>
+        <div class="hlava">
+          <h2>{{ d.popis }}{% if d.strany %}<small>{{ d.strany }} {{ 'strana' if d.strany == 1 else ('strany' if d.strany < 5 else 'stran') }}</small>{% endif %}</h2>
+          <div class="akce">
+            <a class="btn btn-hl" href="{{ d.url }}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/></svg>
+              Otevřít a tisknout
+            </a>
+            <a class="btn btn-2" href="{{ d.url }}?stahnout=1" title="Stáhnout PDF" aria-label="Stáhnout PDF">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            </a>
+          </div>
+        </div>
         {% if d.strany %}
-          <button type="button" class="papir" data-zoom title="Zvětšit">
-            <img src="{{ d.url }}/nahled/1" alt="{{ d.popis }}, strana 1" loading="lazy">
-          </button>
+        <div class="telo">
           {% if d.strany > 1 %}
           <div class="strany">
             {% for s in range(1, d.strany + 1) %}
@@ -99,16 +122,11 @@
             {% endfor %}
           </div>
           {% endif %}
-        {% endif %}
-        <div class="akce">
-          <a class="btn btn-hl" href="{{ d.url }}" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/></svg>
-            Otevřít a tisknout
-          </a>
-          <a class="btn btn-2" href="{{ d.url }}?stahnout=1" title="Stáhnout PDF" aria-label="Stáhnout PDF">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-          </a>
+          <button type="button" class="papir" data-zoom title="Zvětšit">
+            <img src="{{ d.url }}/nahled/1" alt="{{ d.popis }}, strana 1">
+          </button>
         </div>
+        {% endif %}
       </section>
     {% endfor %}
     </div>
