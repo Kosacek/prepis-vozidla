@@ -1,0 +1,96 @@
+{# Demo for release 1.25.0 (Náhled před tiskem): the code /1234 is tapped and a
+   page opens with a picture of each document — the žádost and its plná moc
+   under the same code — then "Tisk" lights up. CSS-only, 6s loop; app tokens
+   only. Included by _whats_new.html. #}
+<style>
+  .dz1250-demo {
+    box-sizing: border-box; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1250-sms {
+    flex: none; box-sizing: border-box; width: 70px; padding: 8px 9px; display: grid; gap: 4px;
+    border: 1px solid var(--wn-line); border-radius: 12px 12px 12px 3px; background: var(--wn-card);
+    animation: dz1250-sms 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1250-msg { font-size: 9.5px; color: var(--wn-muted); }
+  .dz1250-link {
+    justify-self: start; padding: 1px 4px; margin: 0 -4px; border-radius: 4px;
+    font-size: 13px; font-weight: 800; color: var(--wn-accent);
+    text-decoration: underline; text-underline-offset: 2px; font-variant-numeric: tabular-nums;
+    animation: dz1250-tap 6s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .dz1250-docs { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .dz1250-doc {
+    box-sizing: border-box; display: grid; gap: 4px; padding: 6px;
+    border: 1px solid var(--wn-line); border-radius: 8px; background: var(--wn-card);
+    opacity: 0;
+  }
+  .dz1250-d1 { animation: dz1250-d1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1250-d2 { animation: dz1250-d2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1250-name { font-size: 9.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dz1250-paper {
+    height: 58px; padding: 5px 5px 0; box-sizing: border-box; display: grid; align-content: start; gap: 3px;
+    background: #fff; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .dz1250-paper i { display: block; height: 2px; border-radius: 1px; background: #cbd5e1; }
+  .dz1250-paper i.t { width: 60%; justify-self: center; height: 3px; background: #475569; }
+  .dz1250-paper i.v { width: 70%; background: #1e40af; }
+  .dz1250-paper i.s { width: 45%; }
+  .dz1250-btn {
+    height: 15px; border-radius: 5px; background: var(--wn-accent); color: #fff;
+    display: grid; place-items: center; font-size: 8.5px; font-weight: 800;
+  }
+  .dz1250-d1 .dz1250-btn { animation: dz1250-btn 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1250-sms {
+    0%, 4%   { opacity: 0; transform: scale(.85) translateY(6px); }
+    12%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: scale(.85) translateY(6px); }
+  }
+  @keyframes dz1250-tap {
+    0%, 20%  { background: transparent; transform: scale(1); }
+    25%      { background: var(--wn-soft); transform: scale(.94); }
+    32%, 100% { background: transparent; transform: scale(1); }
+  }
+  @keyframes dz1250-d1 {
+    0%, 28%  { opacity: 0; transform: translateY(8px) scale(.96); }
+    38%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(8px) scale(.96); }
+  }
+  @keyframes dz1250-d2 {
+    0%, 36%  { opacity: 0; transform: translateY(8px) scale(.96); }
+    46%, 92% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: translateY(8px) scale(.96); }
+  }
+  @keyframes dz1250-btn {
+    0%, 64%  { transform: scale(1); box-shadow: none; }
+    70%      { transform: scale(.92); box-shadow: 0 0 0 3px var(--wn-soft); }
+    78%, 100% { transform: scale(1); box-shadow: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: the page is open, both documents visible. */
+    .dz1250-sms, .dz1250-link, .dz1250-d1, .dz1250-d2, .dz1250-d1 .dz1250-btn { animation: none; }
+    .dz1250-sms, .dz1250-doc { opacity: 1; transform: none; }
+  }
+</style>
+<div class="dz1250-demo" aria-hidden="true">
+  <div class="dz1250-sms">
+    <span class="dz1250-msg">Kód:</span>
+    <span class="dz1250-link">/1234</span>
+  </div>
+  <div class="dz1250-docs">
+    <div class="dz1250-doc dz1250-d1">
+      <span class="dz1250-name">Žádost</span>
+      <div class="dz1250-paper"><i class="t"></i><i class="v"></i><i></i><i class="v"></i><i></i><i class="s"></i></div>
+      <span class="dz1250-btn">Tisk</span>
+    </div>
+    <div class="dz1250-doc dz1250-d2">
+      <span class="dz1250-name">Plná moc</span>
+      <div class="dz1250-paper"><i class="t"></i><i class="v"></i><i class="v"></i><i></i><i class="s"></i></div>
+      <span class="dz1250-btn">Tisk</span>
+    </div>
+  </div>
+</div>

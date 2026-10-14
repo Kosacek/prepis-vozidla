@@ -21,6 +21,7 @@ from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
+import nahled  # PNG náhledy stránek pro sdílenou stránku
 import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
 import hledani  # deterministic history search (no AI) — see hledani.py
 import hledani_ai  # AI hledání (Haiku vybere filtry, Python počítá) — see hledani_ai.py
@@ -61,7 +62,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.24.0"
+__version__ = "1.25.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1354,7 +1355,7 @@ _KOD_OKNO_S = 600            # 10 minut
 _kod_chyby: dict[str, list[float]] = {}
 _kod_zamek = threading.Lock()
 
-_KOD_CESTA = re.compile(r"^/\d{4}(/\d+)?$")
+_KOD_CESTA = re.compile(r"^/\d{4}(/\d+(/nahled/\d+)?)?$")
 
 
 def _JE_SDILECI_KOD(path: str) -> bool:
@@ -1918,12 +1919,26 @@ def api_plna_moc():
         "registracni_znacka": (vozidlo or {}).get("rz", ""),
         "vin": (vozidlo or {}).get("vin", ""),
     })
-    # Plná moc se sdílí stejně jako žádost — 4místný kód (sdileni.py).
-    kod = sdileni.vytvor_kod(DATA_DIR, [{"file": name, "kde": sdileni.KDE_OUTPUT,
-                                         "popis": f"Plná moc — {strana['jmeno']}"}])
+    kod = _kod_pro_plnou_moc(name, strana["jmeno"],
+                             None if rucne.get("jmeno") else data.get("zdroj"))
     return jsonify({"success": True, "url": f"/download/{name}", "soubor": name,
                     "zmocnenec": meta["kdo"], "zmocnitel": strana["jmeno"],
                     "s_vozidlem": bool(vozidlo), "sdilet": f"/{kod}"})
+
+
+def _kod_pro_plnou_moc(name: str, jmeno: str, zdroj: str | None) -> str:
+    """Plná moc k žádosti jde pod STEJNÝ kód jako ta žádost — protějšek má
+    jeden kód na celý úkon (sdileni.pripoj_k_baliku). Žádost bez živého kódu
+    (starší než kódy, nebo vypršelý) dostane nový kód i se svou plnou mocí;
+    ručně vyplněná plná moc bez žádosti dostane kód sama pro sebe."""
+    polozka = {"file": name, "kde": sdileni.KDE_OUTPUT, "popis": f"Plná moc — {jmeno}"}
+    zadost = os.path.basename(zdroj or "")
+    if not zadost or not os.path.isfile(os.path.join(DATA_DIR, "output", zadost)):
+        return sdileni.vytvor_kod(DATA_DIR, [polozka])
+    return (sdileni.pripoj_k_baliku(DATA_DIR, zadost, polozka)
+            or sdileni.vytvor_kod(DATA_DIR, [
+                {"file": zadost, "kde": sdileni.KDE_OUTPUT,
+                 "popis": sdileni.popis_souboru(zadost)}, polozka]))
 
 
 _SDILET_MAX_SOUBORU = 10
@@ -2205,37 +2220,53 @@ def _sdilena_cesta(polozka: dict) -> str:
     return os.path.join(DATA_DIR, polozka.get("kde") or "output", polozka.get("file") or "")
 
 
-def _posli_sdilenou(token: str, index=None):
-    """Sdílecí odkaz — bez přihlášení, jen na jeden balík, jen po omezenou
-    dobu (viz sdileni.py). Kód neexistuje/vypršel → stejná zpráva pro obojí,
-    ať se venku nedá rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho".
-
-    Jeden dokument se otevře rovnou — mezistránka s jedním tlačítkem je jen
-    klik navíc. Víc dokumentů dostane rozcestník, kde si protějšek vybere,
-    co tiskne."""
+def _sdilene_polozky(token: str):
+    """Existující dokumenty balíku, nebo odpověď 429/404 k vrácení rovnou.
+    Kód neexistuje/vypršel → stejná zpráva pro obojí, ať se venku nedá
+    rozlišit "nikdy neexistovalo" od "už bylo vidět moc dlouho"."""
     ip = _kdo_zkousi()
     zbyva = _kod_zablokovan(ip)
     if zbyva:
-        return ("Moc pokusů. Zkus to za chvíli.", 429, {"Retry-After": str(zbyva)})
-
+        return None, ("Moc pokusů. Zkus to za chvíli.", 429, {"Retry-After": str(zbyva)})
     polozky = sdileni.najdi(DATA_DIR, token) or []
     polozky = [x for x in polozky if os.path.exists(_sdilena_cesta(x))]
     if not polozky:
         _kod_netrefa(ip)
-        return _SDILENI_NEPLATI, 404
+        return None, (_SDILENI_NEPLATI, 404)
+    return polozky, None
 
-    if index is None and len(polozky) > 1:
-        return render_template("sdilene.html", kod=token, polozky=[
-            {"popis": x["popis"] or x["file"], "url": f"/{token}/{i}"}
+
+def _netrefa_404():
+    _kod_netrefa(_kdo_zkousi())
+    return _SDILENI_NEPLATI, 404
+
+
+def _posli_sdilenou(token: str, index=None, stranka: bool = True):
+    """Sdílecí odkaz — bez přihlášení, jen na jeden balík, jen po omezenou
+    dobu (viz sdileni.py).
+
+    Bez indexu VŽDY stránka s náhledem všech dokumentů, i když je jen jeden
+    (2026-10-14): dřív se jeden dokument otevřel rovnou jako PDF, a podle
+    prohlížeče se rovnou stáhl — nebylo vidět, co to je, a jestli je to ta
+    správná žádost. Starý dlouhý /s/<token> (stranka=False) dál vrací PDF."""
+    polozky, chyba = _sdilene_polozky(token)
+    if chyba:
+        return chyba
+
+    if index is None and stranka:
+        return render_template("sdilene.html", kod=token, dokumenty=[
+            {"popis": x["popis"] or x["file"], "url": f"/{token}/{i}",
+             "strany": nahled.pocet_stran(_sdilena_cesta(x))}
             for i, x in enumerate(polozky)
         ])
 
     i = 0 if index is None else index
     if i >= len(polozky):
-        _kod_netrefa(ip)
-        return _SDILENI_NEPLATI, 404
-    return send_file(_sdilena_cesta(polozky[i]), as_attachment=False,
-                     mimetype="application/pdf")
+        return _netrefa_404()
+    stahnout = request.args.get("stahnout") == "1"
+    return send_file(_sdilena_cesta(polozky[i]), mimetype="application/pdf",
+                     as_attachment=stahnout,
+                     download_name=polozky[i]["file"] if stahnout else None)
 
 
 @app.route("/<kod:kod>")
@@ -2246,14 +2277,28 @@ def sdilena_zadost_kod(kod):
 
 @app.route("/<kod:kod>/<int:index>")
 def sdilena_zadost_polozka(kod, index):
-    """Jeden dokument z balíku — na tohle míří tlačítka na rozcestníku."""
+    """Jeden dokument z balíku — na tohle míří tlačítka na stránce."""
     return _posli_sdilenou(kod, index)
+
+
+@app.route("/<kod:kod>/<int:index>/nahled/<int:strana>")
+def sdilena_zadost_nahled(kod, index, strana):
+    """PNG jedné stránky dokumentu z balíku (nahled.py)."""
+    polozky, chyba = _sdilene_polozky(kod)
+    if chyba:
+        return chyba
+    png = (nahled.stranka_png(_sdilena_cesta(polozky[index]), strana)
+           if index < len(polozky) else None)
+    if png is None:
+        return _netrefa_404()
+    return png, 200, {"Content-Type": "image/png",
+                      "Cache-Control": "private, max-age=600"}
 
 
 @app.route("/s/<token>")
 def sdilena_zadost(token):
     """Původní dlouhý tvar odkazu — drží při životě, co už je rozeslané."""
-    return _posli_sdilenou(token)
+    return _posli_sdilenou(token, stranka=False)
 
 # ── Version history + "Nová verze" bar (templates/_whats_new.html) ──────────
 from releases import CURRENT_RELEASE as _CURRENT_RELEASE, RELEASES as _RELEASES

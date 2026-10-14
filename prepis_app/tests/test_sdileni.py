@@ -154,7 +154,7 @@ def _cizinec(prod):
 def test_sdileny_odkaz_funguje_bez_prihlaseni(prod):
     """Celý smysl té funkce: cizí prohlížeč bez session cookie a bez hesla."""
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"] + "/0", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 200
     assert r.mimetype == "application/pdf"
 
@@ -177,7 +177,7 @@ def test_sdileny_odkaz_nema_bezpecnostni_hlavicky_pro_html(prod):
     """CSP se lepí jen na HTML (viz test_bezpecnost.py) — PDF přes /s/ musí
     dopadnout stejně jako přes /download/, jinak by šlo poznat rozdíl."""
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"] + "/0", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert "Content-Security-Policy" not in r.headers
 
 
@@ -209,7 +209,7 @@ def test_spravny_kod_projde_i_kdyz_nekdo_jiny_zkousel(prod):
     """Brzda nesmí zavřít odkaz tomu, kdo má správné číslo."""
     A._kod_chyby.clear()
     body = _generuj(prod)
-    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    r = _cizinec(prod).get(body["sdilet"] + "/0", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 200
     assert r.mimetype == "application/pdf"
     A._kod_chyby.clear()
@@ -271,7 +271,7 @@ def test_rozcestnik_je_slepa_ulicka_do_appky_nepusti(prod, tmp_path, monkeypatch
         assert zakazane not in html, f"rozcestník pouští dál do appky: {zakazane}"
     # Odkazy vedou výhradně na dokumenty toho jednoho balíku.
     odkazy = re.findall(r'href="([^"]+)"', html)
-    assert odkazy and all(re.fullmatch(rf"/{kod}/\d+", u) for u in odkazy), odkazy
+    assert odkazy and all(re.fullmatch(rf"/{kod}/\d+(\?stahnout=1)?", u) for u in odkazy), odkazy
 
 
 def test_jednotlive_dokumenty_z_baliku_jdou_otevrit(prod, tmp_path, monkeypatch):
@@ -282,14 +282,6 @@ def test_jednotlive_dokumenty_z_baliku_jdou_otevrit(prod, tmp_path, monkeypatch)
         r = cizi.get(f"/{kod}/{i}", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
         assert r.status_code == 200, i
         assert r.mimetype == "application/pdf", i
-
-
-def test_jeden_dokument_se_otevre_rovnou_bez_mezistranky(prod):
-    """Rozcestník s jediným tlačítkem by byl jen klik navíc."""
-    body = _generuj(prod)   # bez plné moci a bez PPD = jeden dokument
-    r = _cizinec(prod).get(body["sdilet"], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
-    assert r.status_code == 200
-    assert r.mimetype == "application/pdf"
 
 
 def test_index_mimo_balik_nic_nevyda(prod, tmp_path, monkeypatch):
@@ -333,7 +325,7 @@ def test_existujici_doklad_dostane_kod_a_otevre_se_bez_hesla(prod, tmp_path):
                   base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     kod = r.get_json()["sdilet"]
     assert re.fullmatch(r"/\d{4}", kod)
-    out = _cizinec(prod).get(kod, base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    out = _cizinec(prod).get(kod + "/0", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert out.status_code == 200 and out.mimetype == "application/pdf"
 
 

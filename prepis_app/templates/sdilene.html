@@ -1,47 +1,148 @@
 <!DOCTYPE html>
 <!--
-  Rozcestník sdíleného balíku. Vědomě slepá ulička: žádná navigace zpátky do
-  appky, žádné generování, žádné kroky průvodce — kdo přijde přes sdílecí
-  odkaz, má jen otevřít a vytisknout. Jeden dokument tuhle stránku vůbec
-  nevidí (otevře se rovnou PDF), viz _posli_sdilenou v app.py.
+  Stránka sdíleného balíku (/<kód>). Vědomě slepá ulička: žádná navigace
+  zpátky do appky, žádné generování — kdo přijde přes sdílecí kód, má jen
+  zkontrolovat a vytisknout.
+
+  Od 2026-10-14 ji vidí každý kód, i s jediným dokumentem: náhled stránek
+  (PNG z nahled.py, ne vložené PDF — viz tam proč) ukáže, CO to je, dřív než
+  se PDF otevře nebo stáhne. Tisk dál jde přes samotné PDF ve vlastní
+  záložce (CLAUDE.md: žádost se neotevírá v iframu).
 -->
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Dokumenty k vytištění</title>
+<title>Dokumenty {{ kod }}</title>
 <style>
   :root { --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#64748b;
-          --border:#e2e8f0; --primary:#2563eb; }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--text);
-         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  .wrap { max-width:520px; margin:0 auto; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .pod { font-size:13px; color:var(--muted); margin:0 0 20px; }
-  .doklad { display:flex; align-items:center; gap:12px; width:100%;
-            background:var(--card); border:1px solid var(--border); border-radius:12px;
-            padding:16px 18px; margin-bottom:10px; text-decoration:none; color:inherit;
-            font-size:15px; font-weight:600; }
-  .doklad:hover { border-color:var(--primary); }
-  .sipka { margin-left:auto; color:var(--primary); font-weight:700; }
-  .pata { margin-top:18px; font-size:12px; color:var(--muted); text-align:center; }
+          --border:#e2e8f0; --primary:#2563eb; --primary-ink:#fff; --accent:#eff6ff;
+          --paper-shadow:0 1px 2px rgba(15,23,42,.08), 0 4px 14px rgba(15,23,42,.06); }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#0f172a; --card:#1e293b; --text:#f1f5f9; --muted:#94a3b8; --border:#334155; }
+    :root { --bg:#0f172a; --card:#1e293b; --text:#f1f5f9; --muted:#94a3b8;
+            --border:#334155; --accent:#1e3a5f; --paper-shadow:0 2px 10px rgba(0,0,0,.4); }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:20px 16px 32px; background:var(--bg); color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1040px; margin:0 auto; }
+  header { display:flex; align-items:baseline; gap:10px; margin:0 0 16px; }
+  h1 { font-size:20px; margin:0; }
+  .kod { font-size:13px; font-weight:800; letter-spacing:.5px; color:var(--muted);
+         border:1px solid var(--border); border-radius:6px; padding:1px 7px; }
+  .pocet { margin-left:auto; font-size:13px; color:var(--muted); }
+
+  .doky { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); }
+  .dok { background:var(--card); border:1px solid var(--border); border-radius:14px;
+         padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .dok h2 { font-size:15px; margin:0; line-height:1.3; }
+  .dok h2 small { display:block; font-weight:500; font-size:12px; color:var(--muted); margin-top:2px; }
+
+  .papir { display:block; width:100%; aspect-ratio:210/297; border:0; padding:0;
+           background:#fff; border-radius:4px; box-shadow:var(--paper-shadow);
+           cursor:zoom-in; overflow:hidden; }
+  .papir img { display:block; width:100%; height:100%; object-fit:contain; }
+  .strany { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .nahl { flex:0 0 56px; aspect-ratio:210/297; padding:0; border:2px solid transparent;
+          border-radius:4px; background:#fff; cursor:pointer; overflow:hidden; }
+  .nahl img { display:block; width:100%; height:100%; object-fit:contain; }
+  .nahl[aria-current="true"] { border-color:var(--primary); }
+
+  .akce { display:flex; gap:8px; margin-top:auto; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:7px;
+         border-radius:10px; padding:11px 14px; font-size:15px; font-weight:700;
+         text-decoration:none; }
+  .btn-hl { flex:1; background:var(--primary); color:var(--primary-ink); }
+  .btn-hl:hover { filter:brightness(1.08); }
+  .btn-2 { border:1px solid var(--border); color:var(--text); background:transparent; }
+  .btn-2:hover { border-color:var(--primary); color:var(--primary); background:var(--accent); }
+  .btn svg { width:18px; height:18px; flex-shrink:0; }
+
+  .pata { margin-top:20px; font-size:12px; color:var(--muted); text-align:center; }
+
+  /* Zvětšená stránka přes celou obrazovku */
+  .zoom { position:fixed; inset:0; z-index:10; background:rgba(15,23,42,.82);
+          display:none; overflow:auto; padding:16px; cursor:zoom-out; }
+  .zoom.ukaz { display:block; }
+  .zoom img { display:block; margin:0 auto; width:min(100%, 900px); height:auto;
+              background:#fff; border-radius:4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .zoom.ukaz { animation:fade .15s ease-out; }
+    @keyframes fade { from { opacity:0 } to { opacity:1 } }
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Dokumenty k vytištění</h1>
-    <p class="pod">Klikni na dokument, otevře se v novém okně. Tisk pak přes Ctrl+P.</p>
-    {% for p in polozky %}
-      <a class="doklad" href="{{ p.url }}" target="_blank" rel="noopener">
-        {{ p.popis }}<span class="sipka">Otevřít →</span>
-      </a>
+    <header>
+      <h1>Dokumenty k tisku</h1>
+      <span class="kod">{{ kod }}</span>
+      {% if dokumenty|length > 1 %}<span class="pocet">{{ dokumenty|length }} {{ 'dokumenty' if dokumenty|length < 5 else 'dokumentů' }}</span>{% endif %}
+    </header>
+
+    <div class="doky">
+    {% for d in dokumenty %}
+      <section class="dok">
+        <h2>{{ d.popis }}{% if d.strany %}<small>{{ d.strany }} {{ 'strana' if d.strany == 1 else ('strany' if d.strany < 5 else 'stran') }}</small>{% endif %}</h2>
+        {% if d.strany %}
+          <button type="button" class="papir" data-zoom title="Zvětšit">
+            <img src="{{ d.url }}/nahled/1" alt="{{ d.popis }}, strana 1" loading="lazy">
+          </button>
+          {% if d.strany > 1 %}
+          <div class="strany">
+            {% for s in range(1, d.strany + 1) %}
+              <button type="button" class="nahl" data-src="{{ d.url }}/nahled/{{ s }}"
+                      aria-current="{{ 'true' if s == 1 else 'false' }}" title="Strana {{ s }}">
+                <img src="{{ d.url }}/nahled/{{ s }}" alt="Strana {{ s }}" loading="lazy">
+              </button>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endif %}
+        <div class="akce">
+          <a class="btn btn-hl" href="{{ d.url }}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/></svg>
+            Otevřít a tisknout
+          </a>
+          <a class="btn btn-2" href="{{ d.url }}?stahnout=1" title="Stáhnout PDF" aria-label="Stáhnout PDF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          </a>
+        </div>
+      </section>
     {% endfor %}
-    <p class="pata">Odkaz platí 30 dní od vystavení.</p>
+    </div>
+
+    <p class="pata">Platí 30 dní od vystavení.</p>
   </div>
+
+  <div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="Zvětšená stránka">
+    <img alt="">
+  </div>
+
+<script>
+  // Miniatura → přepne velký náhled na tu stránku.
+  document.querySelectorAll('.nahl').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var dok = b.closest('.dok');
+      dok.querySelector('.papir img').src = b.dataset.src;
+      dok.querySelectorAll('.nahl').forEach(function (x) {
+        x.setAttribute('aria-current', x === b ? 'true' : 'false');
+      });
+    });
+  });
+  // Velký náhled → přes celou obrazovku; zavře klik kamkoliv nebo Esc.
+  var zoom = document.getElementById('zoom');
+  document.querySelectorAll('[data-zoom]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      zoom.querySelector('img').src = b.querySelector('img').src;
+      zoom.classList.add('ukaz');
+    });
+  });
+  zoom.addEventListener('click', function () { zoom.classList.remove('ukaz'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') zoom.classList.remove('ukaz');
+  });
+</script>
 </body>
 </html>

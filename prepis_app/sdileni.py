@@ -130,9 +130,10 @@ def _zapis(data_dir: str, vyber) -> str:
         lock_fd.close()
 
 
-def _pripis(data_dir: str, token: str, polozky: list[dict]) -> None:
+def _pripis(data_dir: str, token: str, polozky: list[dict],
+            vytvoreno: str | None = None) -> None:
     radek = {"token": token, "soubory": polozky,
-             "vytvoreno": datetime.now().isoformat(timespec="seconds")}
+             "vytvoreno": vytvoreno or datetime.now().isoformat(timespec="seconds")}
     with open(_cesta(data_dir), "a", encoding="utf-8") as f:
         f.write(json.dumps(radek, ensure_ascii=False) + "\n")
 
@@ -179,6 +180,43 @@ def vytvor_token(data_dir: str, soubory) -> str:
     except Exception:
         pass
     return token
+
+
+def pripoj_k_baliku(data_dir: str, k_souboru: str, polozka: dict) -> str | None:
+    """Přidá dokument do živého balíku, ve kterém už leží `k_souboru`, a vrátí
+    jeho kód. Žádný živý balík s tím souborem → None (kód si razí volající).
+
+    Proč: plná moc vystavená k hotové žádosti dostávala vlastní kód, takže
+    protějšek měl dva kódy na jeden úkon (2026-10-14, a pětkrát přegenerovaná
+    plná moc = pět kódů). Znovu vystavená plná moc se stejným popisem nahradí
+    tu předchozí. Platnost kódu se tím neprodlužuje — počítá se od žádosti.
+    Nikdy nevyhazuje, stejně jako vytvor_kod."""
+    nova = _polozka(polozka)
+
+    def _vyber(_obsazene: set[str]) -> str | None:
+        videne: set[str] = set()
+        for d in reversed(_nacti(data_dir)):
+            token = str(d.get("token"))
+            if token in videne:
+                continue  # starší zápis téhož kódu — platí jen ten poslední
+            videne.add(token)
+            polozky = _polozky(d.get("soubory") or d.get("file") or [])
+            if not _nevyprsel(d) or not any(
+                    p["file"] == k_souboru and p["kde"] == KDE_OUTPUT for p in polozky):
+                continue
+            zbyle = [p for p in polozky
+                     if p["file"] != nova["file"]
+                     and not (nova["popis"] and p["popis"] == nova["popis"])]
+            _pripis(data_dir, token, zbyle + [nova], d["vytvoreno"])
+            return token
+        return None
+
+    try:
+        if not os.path.isdir(data_dir):
+            return None
+        return _zapis(data_dir, _vyber)
+    except Exception:
+        return None
 
 
 def najdi(data_dir: str, token: str) -> list[dict] | None:
