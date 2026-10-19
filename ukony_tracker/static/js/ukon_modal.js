@@ -138,10 +138,26 @@
     var link = document.querySelector('a.recent-row[href*="/ukony/' + uid + '/upravit"]');
     if (!link) return false;
     var tmp = document.createElement("div");
+    var item = link.closest(".ukony-item");
+    // /ukony/vse: vyměň celou položku (platba, iniciála, koš), jinde jen odkaz.
+    var freshItem = null;
+    if (item && data.item_html && item.closest(".ukony-list")) {
+      tmp.innerHTML = data.item_html.trim();
+      freshItem = tmp.querySelector(".ukony-item");
+    }
+    if (freshItem) {
+      item.parentNode.replaceChild(freshItem, item);
+      if (window.ukonyReplaceRow) window.ukonyReplaceRow(item, freshItem);
+      var freshLink = freshItem.querySelector("a.recent-row");
+      if (freshLink) {
+        freshLink.classList.add("row-saved");
+        setTimeout(function () { freshLink.classList.remove("row-saved"); }, 1200);
+      }
+      return true;
+    }
     tmp.innerHTML = (data.html || "").trim();
     var fresh = tmp.querySelector("a.recent-row");
     if (!fresh) return false;
-    var item = link.closest(".ukony-item");
     link.parentNode.replaceChild(fresh, link);
     if (item) {
       // /ukony/vse drží v obalu index pro hledání a cenu pro živý součet

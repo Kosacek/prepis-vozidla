@@ -553,3 +553,22 @@ def test_schema_setup_runs_once_per_process(client_fid, monkeypatch):
     monkeypatch.setattr(db, "init_schema", lambda conn: calls.append(1))
     c.get("/ukony/vse"); c.get("/firmy")
     assert calls == []
+
+
+def test_list_row_uses_initial_single_pay_toggle_and_trash_icon(client_fid):
+    from services.ingest_service import pridat_ukon
+    c, fid = client_fid
+    with c.application.app_context():
+        conn = db.get_db()
+        paid = pridat_ukon(conn, firma_id=fid, datum="2026-10-18", typ_kod="PŘEVOD",
+                           celkem=1300, zaplaceno_kc=1300, rz="8T25415", zpracoval="Roman")
+    page = c.get("/ukony/vse").get_data(as_text=True)
+    item = page[page.index('class="ukony-item"'):]
+    item = item[:item.index("</form>\n      </span>")]
+    assert item.count('class="kdo-av"') == 2 and ">R</span>" in item and "Přidal Roman" in item
+    assert 'class="badge ok">zapl.</span>' not in item      # no second "zapl." badge
+    assert "✓ Zaplaceno" in item and 'class="row-del"' in item and ">smazat<" not in item
+    r = c.post(f"/ukony/{paid}/upravit", data={"datum": "2026-10-18", "typ_kod": "PŘEVOD",
+               "celkem": "1300", "firma_id": fid, "back": "/ukony/vse"},
+               headers={"X-Requested-With": "fetch"})
+    assert 'class="ukony-item"' in r.get_json()["item_html"]

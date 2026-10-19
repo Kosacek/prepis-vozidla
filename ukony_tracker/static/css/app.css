@@ -2121,3 +2121,48 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .ukony-more span:nth-child(3) { animation-delay: .3s; }
 @keyframes ukony-more { 50% { opacity: .9; transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .ukony-more span { animation: none; } }
+
+/* ── /ukony/vse řádek: iniciála, jedna platba, koš (varianta A, 2026-10-19) ── */
+.lbl-m { display: none; }
+.row-kdo { display: none; }
+.kdo-av {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+  font-size: 0.72rem; font-weight: 700; line-height: 1; vertical-align: middle;
+}
+.row-del {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer;
+}
+.row-del:hover, .row-del:focus-visible { background: var(--flash-error-bg); color: var(--flash-error-ink); }
+.row-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+@media (max-width: 760px) {
+  .ukony-list .ukony-item { padding: 2px 0 6px; }
+  .ukony-list .ukony-item .recent-row { row-gap: 4px; padding: 12px var(--sp-3) 2px; }
+  /* 1. řádek: SPZ ……… cena */
+  .ukony-list .ukony-item .recent-rz { order: 1; font-size: 1.05rem; letter-spacing: 0.01em; }
+  .ukony-list .ukony-item .recent-kc { order: 2; margin-left: auto; font-size: 1rem; }
+  .ukony-list .ukony-item .recent-row::after { order: 3; }
+  /* 2. řádek: firma · typ · datum (bez roku) */
+  .ukony-list .ukony-item .recent-firma { order: 4; }
+  .ukony-list .ukony-item .recent-row .tag { order: 5; }
+  .ukony-list .ukony-item .recent-date { order: 6; }
+  .ukony-list .ukony-item .recent-date .yr { display: none; }
+  /* 3. řádek: VIN + poznámky, tlumeně */
+  .ukony-list .ukony-item .recent-mid { order: 7; }
+  .ukony-list .ukony-item .recent-vin { font-weight: 500; color: var(--muted); }
+  .ukony-list .ukony-item .recent-kdo { display: none; }
+  /* patička: platba vlevo, iniciála + koš vpravo */
+  .ukony-list .row-actions { flex: 1 1 100%; gap: var(--sp-2); padding: 4px var(--sp-2) 0 var(--sp-3); }
+  .ukony-list .row-actions .stav-slot { width: auto; justify-content: flex-start; }
+  .ukony-list .row-kdo { display: inline-flex; margin-left: auto; }
+  .ukony-list .lbl-d { display: none; }
+  .ukony-list .lbl-m { display: inline; }
+  .ukony-list .stav-slot .btn,
+  .ukony-list .stav-slot .badge-btn {
+    padding: 6px 14px; border-radius: var(--radius-pill); font-size: 0.8rem; font-weight: 600; line-height: 1.2;
+  }
+  .ukony-list .stav-slot .btn { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  .ukony-list .stav-slot .badge-btn { border: 1px solid transparent; }
+}

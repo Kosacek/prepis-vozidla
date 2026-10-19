@@ -1,13 +1,14 @@
-{# Payment toggle for the per-firm "Tento měsíc" list (ukony_entry.html) — the
-   badge doubles as the cancel button. Expects u.id / u.stav_platby /
-   u.zaplaceno_kc and back_url. Extracted so the AJAX pay/unpay response
-   (routes/ukony.py mark_paid) can re-render the exact same markup the page
-   renders on load — one source of truth, no drift. #}
+{# Payment toggle for the per-firm "Tento měsíc" list (ukony_entry.html) and
+   /ukony/vse — the badge doubles as the cancel button. Expects u.id /
+   u.stav_platby / u.zaplaceno_kc and back_url. Extracted so the AJAX pay/unpay
+   response (routes/ukony.py mark_paid) can re-render the exact same markup the
+   page renders on load — one source of truth, no drift. `.lbl-m` is the phone
+   label on /ukony/vse ("Zaplatit" / "✓ Zaplaceno"), `.lbl-d` everywhere else. #}
 {% if u.stav_platby == 'zaplaceno' %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
   <input type="hidden" name="castka" value="0">
   <input type="hidden" name="back" value="{{ back_url }}">
-  <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)">zapl. ✕</button>
+  <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)"><span class="lbl-d">zapl. ✕</span><span class="lbl-m">✓ Zaplaceno</span></button>
 </form>
 {% elif u.stav_platby == 'castecne' %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
@@ -19,6 +20,6 @@
 {% else %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
   <input type="hidden" name="back" value="{{ back_url }}">
-  <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno">✓ zapl.</button>
+  <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">Zaplatit</span></button>
 </form>
 {% endif %}

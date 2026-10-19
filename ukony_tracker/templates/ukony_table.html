@@ -66,7 +66,7 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=10"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=11"></script>
 <script src="{{ url_for('static', filename='js/ukon_new_form.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/orv_helpers.js') }}?v=2"></script>
@@ -175,6 +175,17 @@
   };
   // Smazani bez reloadu odebere radek z DOMu -- musi zmizet i odtud, jinak by
   // ho hledani a soucet dal pocitaly, dokud se stranka pristi nenacte.
+  // Uložená editace vymění celou položku — nový element převezme místo starého.
+  window.ukonyReplaceRow = function (oldItem, item) {
+    var i = rows.indexOf(oldItem);
+    item._s = fold(item.getAttribute('data-search'));
+    item._kc = parseInt(item.getAttribute('data-kc'), 10) || 0;
+    if (i >= 0) {
+      rest.kc += item._kc - (oldItem._kc || 0);
+      rows[i] = item;
+    }
+    apply();
+  };
   window.ukonyRemoveRow = function (item) {
     var i = rows.indexOf(item);
     if (i >= 0) rows.splice(i, 1);

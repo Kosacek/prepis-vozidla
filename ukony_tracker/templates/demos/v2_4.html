@@ -1,0 +1,38 @@
+{# Demo for release 2.4 (mobile row, layout A): a miniature úkon row whose
+   "Zaplatit" pill is tapped and turns into a green "✓ Zaplaceno"; initial and
+   trash sit bottom-right. CSS-only, 4s loop; app tokens only. #}
+<style>
+  .de24-demo { box-sizing: border-box; height: 134px; padding: 14px 16px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.3; }
+  .de24-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--card); }
+  .de24-line { display: flex; align-items: center; gap: 6px; }
+  .de24-rz { font-weight: 700; font-size: 13px; }
+  .de24-kc { margin-left: auto; font-weight: 700; font-size: 12px; }
+  .de24-dot { width: 6px; height: 6px; border-radius: 50%; background: #e5537a; }
+  .de24-tag { font-size: 8.5px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: var(--bg); color: var(--muted); }
+  .de24-muted { color: var(--muted); }
+  .de24-pay { position: relative; display: inline-grid; padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 10px; }
+  .de24-pay > span { grid-area: 1 / 1; }
+  .de24-off { border: 1px solid var(--line); border-radius: 999px; margin: -3px -10px; padding: 3px 10px;
+    animation: de24-off 4s ease infinite; }
+  .de24-on { opacity: 0; background: var(--flash-success-bg); color: var(--flash-success-ink); border-radius: 999px;
+    margin: -3px -10px; padding: 3px 10px; animation: de24-on 4s ease infinite; }
+  .de24-av { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-size: 9px; font-weight: 700; }
+  .de24-bin { width: 14px; height: 14px; color: var(--muted); }
+  @keyframes de24-off { 0%, 35% { opacity: 1; transform: none; } 40% { transform: scale(.94); } 46%, 92% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes de24-on { 0%, 40% { opacity: 0; transform: scale(.94); } 48%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .de24-off, .de24-on { animation: none; } .de24-off { opacity: 0; } .de24-on { opacity: 1; } }
+</style>
+<div class="de24-demo" aria-hidden="true">
+  <div class="de24-row">
+    <div class="de24-line"><span class="de24-rz">4B41310</span><span class="de24-kc">1 300 Kč</span></div>
+    <div class="de24-line"><span class="de24-dot"></span>Ostatní <span class="de24-tag">PŘEVOD</span><span class="de24-muted">19.10.</span></div>
+    <div class="de24-line de24-muted">TMBMY26Y174071603</div>
+    <div class="de24-line">
+      <span class="de24-pay"><span class="de24-off">Zaplatit</span><span class="de24-on">✓ Zaplaceno</span></span>
+      <span class="de24-av">P</span>
+      <svg class="de24-bin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>
+    </div>
+  </div>
+</div>

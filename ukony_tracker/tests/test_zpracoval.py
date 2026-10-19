@@ -88,4 +88,5 @@ def test_table_shows_kdo_badge(client_fid):
                           typ_kod="PŘEVOD", celkem=1300, rz="KDO111", zpracoval="David")
     body = c.get("/ukony/vse").get_data(as_text=True)
     assert 'class="recent-kdo"' in body                # badge slot in the row grid
-    assert 'class="kdo"' in body and "David" in body   # attribution badge
+    # attribution is an initial avatar (David 2026-10-19), full name on hover
+    assert 'class="kdo-av" title="Přidal David"' in body and ">D</span>" in body

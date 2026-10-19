@@ -296,9 +296,13 @@ def edit_save(uid):
             )
             # `search` drží index pro živé hledání v /ukony/vse — stejná pole
             # jako skládá šablona, ať filtr sedí i po výměně řádku.
+            item_html = render_template(
+                "_ukony_item.html", u=row, firma_colors=colors_service.firma_color_map(conn),
+                back_url=_safe_back(f.get("back")) or url_for("ukony.table"),
+            )
             parts = (row["rz"], row["vin"], row["orv"], row["poznamka"], row["prevod"],
                      row["firma_zkratka"], row["typ_kod"], row["zpracoval"])
-            return jsonify(ok=True, html=html, celkem=int(row["celkem"]),
+            return jsonify(ok=True, html=html, item_html=item_html, celkem=int(row["celkem"]),
                            search=" ".join(p for p in parts if p).lower())
         flash("Úkon upraven.", "success")
     except (ValueError, sqlite3.IntegrityError):
