@@ -2111,3 +2111,13 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 /* Volné místo pod posledním kolem, ať jde nová otázka vždy odrolovat pod pole. */
 .ask-thread:not(:empty)::after { content: ""; display: block; height: 45vh; }
+
+/* /ukony/vse — starší řádky se načítají (tři tečky dole v seznamu) */
+.ukony-more { display: flex; justify-content: center; gap: 6px; padding: var(--sp-4) 0; }
+.ukony-more[hidden] { display: none; }
+.ukony-more span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .35;
+  animation: ukony-more 1s ease-in-out infinite; }
+.ukony-more span:nth-child(2) { animation-delay: .15s; }
+.ukony-more span:nth-child(3) { animation-delay: .3s; }
+@keyframes ukony-more { 50% { opacity: .9; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .ukony-more span { animation: none; } }

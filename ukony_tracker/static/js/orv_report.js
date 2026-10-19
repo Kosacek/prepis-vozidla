@@ -41,7 +41,8 @@
   }
   function valuesFor(result) {
     const changes = result.zmeny || {};
-    const keys = ['rz', 'orv'].filter(k => changes[k]);
+    // Unchanged fields only add noise next to a real change.
+    const keys = ['rz', 'orv'].filter(k => changes[k] && changes[k].pred !== changes[k].po);
     return keys.map(k => detailLine(FIELD_LABELS[k], changes[k].pred, changes[k].po));
   }
   function scannedFacts(result) {
@@ -64,7 +65,11 @@
     preview.append(image);
     const body = el('div', 'orv-result-body');
     const heading = el('div', 'orv-result-heading');
-    heading.append(el('span', 'orv-status', LABELS[state] || 'Ke kontrole'));
+    const overwritten = state === 'doplneno' && (result.prepsano || []).length;
+    const chips = el('span', 'orv-chips');
+    chips.append(el('span', 'orv-status', overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
+    if (photo.upraveno) chips.append(el('span', 'orv-edited', '✓ Upraveno'));
+    heading.append(chips);
     if (result.ukon && result.ukon.id) {
       const open = el('button', 'orv-open-ukon', 'Otevřít úkon');
       open.type = 'button'; open.dataset.ukon = result.ukon.id;
@@ -99,7 +104,7 @@
       }
       body.append(el('div', 'orv-result-message', result.zprava || LABELS[state]));
     }
-    if (!['zalozeno', 'doplneno', 'uz_doplneno'].includes(state)) {
+    if (photo.blob && !['zalozeno', 'doplneno', 'uz_doplneno'].includes(state)) {
       const retry = el('button', 'btn orv-retry', 'Zkusit znovu');
       retry.type = 'button'; retry.addEventListener('click', () => onRetry && onRetry(photo));
       body.append(retry);

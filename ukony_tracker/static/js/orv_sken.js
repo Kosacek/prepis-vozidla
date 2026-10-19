@@ -2,6 +2,7 @@
   let active;
   const H = window.OrvHelpers;
   const ok = r => r && ['zalozeno', 'doplneno', 'uz_doplneno'].includes(r.stav);
+  const LAST = window.OrvLast;
   function mount(root) {
     const el = id => root.querySelector('#orv-' + id);
     let photos = [], running = false, dead = false, closing = false, imported = false;
@@ -81,12 +82,42 @@
       photo.retry.hidden = !r || ok(r);
       photo.retry.disabled = running;
     }
-    function summary() {
+    function summary(save = true) {
       photos.forEach(photo => { photo.row = null; photo.retry = null; });
       window.OrvReport.render(root, photos, photo => run([photo]));
-      el('summary').hidden = false;
+      el('capture').hidden = el('process').hidden = true;
+      el('summary').hidden = el('results').hidden = false;
       el('done').hidden = false;
+      el('last').hidden = true;
       el('step').textContent = '3 · Hotovo';
+      if (save) LAST.save(photos);
+    }
+    // Uložení v editaci → karta auta dostane „Upraveno" a report se uloží znovu.
+    function onSaved(event) {
+      const id = String(event.detail && event.detail.id);
+      let hit = false;
+      photos.forEach(p => {
+        if (p.result && p.result.ukon && String(p.result.ukon.id) === id) { p.upraveno = true; hit = true; }
+      });
+      if (hit && !running) { processed = true; summary(); }
+    }
+    document.addEventListener('ukon:saved', onSaved);
+    function showLast() {
+      const stored = LAST.load();
+      if (!stored || running) return;
+      camera.stop(); notice('');
+      photos.forEach(p => URL.revokeObjectURL(p.url));
+      el('thumbnails').replaceChildren();
+      photos = stored.items.map((item, i) => ({id: i + 1, url: item.thumb || '', thumb: item.thumb || '', result: item.result,
+        upraveno: !!item.upraveno, blob: null}));
+      serial = photos.length;
+      summary(false);
+      el('step').textContent = LAST.label(stored.at);
+    }
+    function offerLast() {
+      const stored = LAST.load();
+      el('last').hidden = !stored;
+      if (stored) el('last-time').textContent = LAST.label(stored.at);
     }
     async function upload(photo) {
       photo.busy = true; row(photo);
@@ -142,15 +173,17 @@
       el('thumbnails').replaceChildren(); el('results').replaceChildren();
       el('results').hidden = el('summary').hidden = el('done').hidden = el('assign').hidden = true;
       el('capture').hidden = el('process').hidden = false;
-      el('step').textContent = '1 · Foť'; controls(); camera.start();
+      el('step').textContent = '1 · Foť'; controls(); offerLast(); camera.start();
     }
     function destroy() {
       dead = true; camera.destroy(); thinking.stop();
+      document.removeEventListener('ukon:saved', onSaved);
       photos.forEach(p => { URL.revokeObjectURL(p.url); if (p.abort) p.abort.abort(); });
       photos = [];
     }
     el('process').addEventListener('click', () => run(photos.slice()));
     el('again').addEventListener('click', reset);
+    el('last').addEventListener('click', showLast);
     const person = el('zpracoval');
     try { person.value = localStorage.getItem('ukony_zpracoval') || ''; } catch (_) {}
     person.addEventListener('change', () => {
@@ -193,6 +226,7 @@
       }
     });
     el('preview').querySelector('.orv-preview-close').addEventListener('click', () => el('preview').close());
+    offerLast();
     camera.start();
     return {destroy, close: function (event) {
       camera.stop();

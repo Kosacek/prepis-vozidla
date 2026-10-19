@@ -13,8 +13,8 @@ class Element {
   remove() {}
   querySelector(name) { return this.nodes[name] || (this.nodes[name] = new Element()); }
 }
-function environment() {
-  const ids = new Map(), handlers = {}, requests = [], renders = [];
+function environment(stored = null) {
+  const ids = new Map(), handlers = {}, requests = [], renders = [], saves = [];
   let add, reloads = 0, maxActive = 0, inFlight = 0, stops = 0, revoked = 0;
   const el = name => {
     if (!ids.has(name)) ids.set(name, new Element());
@@ -22,8 +22,11 @@ function environment() {
   };
   const root = {querySelector: id => el(id.slice(5)), querySelectorAll: () => []};
   const document = {getElementById: () => root, createElement: () => new Element(),
-    addEventListener: (name, fn) => { handlers[name] = fn; }};
+    addEventListener: (name, fn) => { handlers[name] = fn; },
+    removeEventListener: name => { delete handlers[name]; }};
   const window = {
+    OrvLast: {save: photos => saves.push(photos.map(p => ({...p.result, upraveno: !!p.upraveno}))),
+      load: () => stored, label: () => 'Dnes 9:05'},
     OrvHelpers: H, Thinking: () => ({start() {}, stop() {}}),
     OrvReport: {render(_, photos) { renders.push(photos.map(p => p.result)); }, selected() { return []; }, updateCreateCount() {}},
     OrvCamera: (_, addPhoto) => {
@@ -42,7 +45,7 @@ function environment() {
     })
   });
   handlers['ukon:scan-shown']();
-  return {el, handlers, requests, renders, add: () => add({size: 100}),
+  return {el, handlers, requests, renders, saves, add: () => add({size: 100}),
     stats: () => ({reloads, maxActive, inFlight, stops, revoked})};
 }
 const tick = () => new Promise(setImmediate);
@@ -107,4 +110,31 @@ test('batch accepts at most thirty photos', () => {
   assert.equal(e.el('thumbnails').children.length, 30);
   assert.ok(e.el('note').textContent.includes('30'));
   e.handlers['ukon:modal-closing']({preventDefault() {}});
+});
+
+test('saving an edited úkon keeps the report and marks that car as edited', async () => {
+  const e = environment();
+  e.add();
+  const done = e.el('process').handlers.click();
+  e.requests[0](success);
+  await done;
+  assert.equal(e.saves.length, 1);
+  e.handlers['ukon:saved']({detail: {id: '1'}});
+  assert.equal(e.saves.length, 2);
+  assert.equal(e.saves[1][0].upraveno, true);
+  assert.equal(e.el('results').hidden, false);
+  assert.equal(e.el('summary').hidden, false);
+  assert.equal(e.stats().reloads, 0);
+});
+
+test('last scan button reopens the stored report without re-saving it', () => {
+  const e = environment({at: 1, items: [{thumb: 'data:x', result: success, upraveno: true}]});
+  assert.equal(e.el('last').hidden, false);
+  assert.equal(e.el('last-time').textContent, 'Dnes 9:05');
+  e.el('last').handlers.click();
+  assert.deepEqual(e.renders.at(-1), [success]);
+  assert.equal(e.el('summary').hidden, false);
+  assert.equal(e.el('capture').hidden, true);
+  assert.equal(e.el('last').hidden, true);
+  assert.equal(e.saves.length, 0);
 });

@@ -61,7 +61,9 @@ def hledat_ukony():
 @bp.post("/api/ukony/<int:uid>/doplnit")
 def doplnit_ukon(uid):
     try:
-        return jsonify(vehicle_fill_service.doplnit(db.get_db(), uid, request.get_json(silent=True)))
+        result = vehicle_fill_service.doplnit(db.get_db(), uid, request.get_json(silent=True))
+        result.pop("prepsano", None)  # fill-only API: never overwrites, keep its response shape
+        return jsonify(result)
     except vehicle_fill_service.FillError as exc:
         return jsonify(exc.data), exc.status
 

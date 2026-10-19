@@ -187,12 +187,21 @@ def backup_db(db_path: str | None = None, min_interval_sec: int | None = None) -
     return dest
 
 
+# Schema/migrations run once per DB file per process, not on every request:
+# init_schema always ends in a write commit, which on the NAS disk cost
+# 65–115 ms per page load. Keyed by inode too, so a swapped-in file is migrated.
+_schema_ready: set[tuple[str, int]] = set()
+
+
 # Flask request-scoped connection
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
         os.makedirs(config.DATA_DIR, exist_ok=True)
         g.db = connect(config.DB_PATH)
-        init_schema(g.db)
+        key = (config.DB_PATH, os.stat(config.DB_PATH).st_ino)
+        if key not in _schema_ready:
+            init_schema(g.db)
+            _schema_ready.add(key)
     return g.db
 
 

@@ -1,4 +1,3 @@
-{% import "_macros.html" as m with context %}
     <div class="ukony-item" data-kc="{{ u.celkem|int }}" data-firma="{{ u.firma_id }}" data-mesic="{{ u.datum[:7] }}" data-typ="{{ u.typ_kod }}" data-stav="{{ u.stav_platby }}"
          data-search="{{ ((u.rz or '') ~ ' ' ~ (u.vin or '') ~ ' ' ~ (u.orv or '') ~ ' ' ~ (u.poznamka or '') ~ ' ' ~ (u.prevod or '') ~ ' ' ~ u.firma_zkratka ~ ' ' ~ u.typ_kod ~ ' ' ~ (u.zpracoval or '')) | lower }}">
       <a class="recent-row" href="/ukony/{{ u.id }}/upravit?back={{ back_url | urlencode }}">
@@ -13,7 +12,7 @@
            the ellipsis), then the auto převod arrow. #}
         <span class="recent-mid small"><b class="recent-vin">{{ u.vin or '' }}</b>{% if u.poznamka %}<span class="recent-pozn muted">{{ u.poznamka }}</span>{% endif %}{% if u.prevod %}<span class="recent-pozn muted">{{ u.prevod }}</span>{% endif %}</span>
         <span class="recent-pay">{% include "_pay_badge.html" %}</span>
-        <span class="recent-kdo">{{ m.person_badge(u.zpracoval) }}</span>
+        <span class="recent-kdo">{% if u.zpracoval %}<span class="kdo" title="Přidal {{ u.zpracoval }}">{{ u.zpracoval }}</span>{% endif %}</span>
         <span class="recent-kc"><b>{{ u.celkem|kc }} Kč</b></span>
       </a>
       <span class="row-actions actions">

@@ -98,8 +98,9 @@ def make(conn):
     ({"orv": "UBE037263"}, "doplneno", ["rz"]),
     ({"rz": "5AB1234"}, "doplneno", ["orv"]),
     ({"rz": " 5ab-1234 ", "orv": " ube 037263 "}, "uz_doplneno", []),
-    ({"rz": "9ZZ9999"}, "konflikt", []),
-    ({"orv": "ABC123456"}, "konflikt", []),
+    ({"rz": "9ZZ9999"}, "doplneno", ["rz", "orv"]),
+    ({"orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
+    ({"rz": "9ZZ9999", "orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
 ])
 def test_fill_matrix(conn, make, fields, expected, changes):
     uid = make(**fields)
@@ -110,9 +111,11 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     assert result["ukon"] == {"id": uid, "datum": "2026-10-08", "firma": "BSAuto",
                               "typ": "ZÁPIS", "celkem": 1300.0}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
-    if expected == "konflikt":
-        assert after == before
-        assert next(iter(fields.values())) in result["zprava"]
+    overwritten = [k for k, v in fields.items() if v.strip().upper().replace(" ", "").replace("-", "")
+                   != (DATA["orv_cislo"] if k == "orv" else DATA[k])]
+    assert result.get("prepsano", []) == overwritten
+    for key in overwritten:
+        assert result["zmeny"][key]["pred"] == fields[key]
     for key in changes:
         assert after[key] == DATA["orv_cislo" if key == "orv" else key]
     assert not conn.in_transaction
@@ -209,6 +212,25 @@ def test_multiple_matches(conn, make, other_fields, expected):
         assert result["ukon"]["id"] == target
     else:
         assert ukony_repo.get(conn, target)["rz"] is None
+
+
+def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
+    old = make(datum="2026-01-05", rz="1AA1111", orv="AAA111111")
+    new = make(datum="2026-09-01", rz="1AA1111", orv="AAA111111")
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == new
+    assert result["prepsano"] == ["rz", "orv"]
+    assert ukony_repo.get(conn, new)["orv"] == DATA["orv_cislo"]
+    assert ukony_repo.get(conn, old)["orv"] == "AAA111111"
+
+
+def test_api_fill_still_refuses_to_overwrite(conn, make):
+    from services.vehicle_fill_service import FillError, doplnit
+    uid = make(orv="ABC123456")
+    with pytest.raises(FillError) as exc:
+        doplnit(conn, uid, {"orv": "UBE037263"})
+    assert exc.value.status == 409
+    assert ukony_repo.get(conn, uid)["orv"] == "ABC123456"
 
 
 def test_ambiguity_beyond_api_display_limit(conn, make):

@@ -1,0 +1,199 @@
+<title>Řádek úkonu na mobilu</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a row of phone-width columns (current + 3 options), each a real-scale mock of the /ukony/vse list. */
+:root{
+  --bg:#f3f4f7; --card:#ffffff; --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea;
+  --accent:#0071e3; --ok:#1a7f3c; --ok-bg:#e3f5e8; --warn:#8a5a00; --warn-bg:#fdf1d6;
+  --danger:#c4291c; --danger-bg:#fde8e6; --chip:#eef0f4; --frame:#d9dbe2;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111214; --card:#1c1d20; --ink:#f2f2f4; --muted:#9a9aa1; --line:#2c2d31;
+  --accent:#4c9dff; --ok:#5fd38a; --ok-bg:#163522; --warn:#f0c060; --warn-bg:#3a2e12;
+  --danger:#ff7468; --danger-bg:#3b1a17; --chip:#2a2b30; --frame:#33343a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111214; --card:#1c1d20; --ink:#f2f2f4; --muted:#9a9aa1; --line:#2c2d31;
+  --accent:#4c9dff; --ok:#5fd38a; --ok-bg:#163522; --warn:#f0c060; --warn-bg:#3a2e12;
+  --danger:#ff7468; --danger-bg:#3b1a17; --chip:#2a2b30; --frame:#33343a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+h1{font-size:1.6rem;margin:0 0 6px;text-wrap:balance;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:0 0 28px;max-width:62ch;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:28px;align-items:start}
+.opt{display:flex;flex-direction:column;gap:12px;min-width:0}
+.opt h2{font-size:1.05rem;margin:0;display:flex;align-items:baseline;gap:8px}
+.opt h2 .tag{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.opt p{margin:0;color:var(--muted);line-height:1.45;font-size:.88rem}
+.opt ul{margin:0;padding-left:18px;color:var(--muted);font-size:.85rem;line-height:1.5}
+.phone{border:1px solid var(--frame);border-radius:22px;background:var(--bg);padding:10px;display:flex;flex-direction:column;gap:8px;max-width:375px;width:100%}
+.c{background:var(--card);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;position:relative;overflow:hidden}
+.row{display:flex;align-items:center;gap:8px;min-width:0}
+.sp{margin-left:auto}
+.muted{color:var(--muted)} .sm{font-size:.82rem}
+.rz{font-weight:700;font-size:1.02rem;letter-spacing:.01em}
+.kc{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.typ{font-size:.68rem;font-weight:700;letter-spacing:.04em;background:var(--chip);color:var(--muted);border-radius:6px;padding:2px 6px}
+.vin{font-family:var(--mono);font-size:.82rem;letter-spacing:.02em}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.av{width:24px;height:24px;border-radius:50%;background:var(--chip);color:var(--muted);font-size:.7rem;font-weight:700;display:grid;place-items:center;flex:none}
+.icon{width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.icon:hover{background:var(--danger-bg);color:var(--danger)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pay{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 12px;font:inherit;font-size:.8rem;font-weight:600;cursor:pointer}
+.pay.is-paid{background:var(--ok-bg);border-color:transparent;color:var(--ok)}
+.pay.is-part{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+/* current (reference) */
+.old .badge{font-size:.72rem;border-radius:6px;padding:2px 7px;background:var(--ok-bg);color:var(--ok);font-weight:600}
+.old .who{font-size:.72rem;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.old .del{font-size:.76rem;background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:3px 8px}
+.old .zap{font-size:.76rem;border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.flag{position:absolute;right:10px;top:-9px;font-size:.66rem;background:var(--danger);color:#fff;border-radius:999px;padding:1px 7px}
+/* option B */
+.chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);background:transparent;flex:none;display:grid;place-items:center;cursor:pointer;color:transparent;padding:0}
+.chk.is-paid{background:var(--ok);border-color:var(--ok);color:var(--card)}
+.chk.is-part{border-color:var(--warn);background:conic-gradient(var(--warn) 0 50%,transparent 0)}
+.b-body{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+/* option C */
+.swipe{position:relative;border-radius:14px;overflow:hidden;background:var(--danger)}
+.swipe .under{position:absolute;inset:0;display:flex;justify-content:flex-end;align-items:center;padding-right:22px;color:#fff;font-size:.8rem;font-weight:600;gap:6px}
+.swipe .c{border-radius:0}
+.swipe.demo .c{animation:swipe 4s ease-in-out infinite}
+@keyframes swipe{0%,30%{transform:translateX(0)}45%,70%{transform:translateX(-86px)}85%,100%{transform:translateX(0)}}
+@media (prefers-reduced-motion:reduce){.swipe.demo .c{animation:none;transform:translateX(-86px)}}
+.paid-ic{color:var(--ok);font-weight:700}
+.choose{margin-top:4px;align-self:flex-start;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.choose[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.note{margin-top:30px;color:var(--muted);font-size:.85rem;max-width:62ch;line-height:1.5}
+</style>
+
+<h1>Řádek úkonu na mobilu</h1>
+<p class="lead">Tři návrhy pro seznam Úkony. Stejná data, jiné uspořádání. Na tlačítka zaplaceno se dá klepnout. Napiš mi písmeno, které se ti líbí (nebo co z kterého vzít).</p>
+
+<div class="grid">
+
+  <section class="opt old">
+    <h2>Teď <span class="tag">pro srovnání</span></h2>
+    <div class="phone">
+      <div class="c">
+        <div class="row sm muted">19.10.2026 <span class="typ">PŘEVOD</span><span class="sp kc" style="color:var(--ink)">1 300 Kč</span></div>
+        <div class="row"><span class="rz">4B41310</span><span class="dot" style="background:#e5537a"></span><span class="sm">Ostatní</span><span class="who">Petr</span></div>
+        <div class="row ell"><span class="vin">TMBMY26Y174071603</span> <span class="muted sm">NOVÝ DOMOV</span></div>
+        <div class="muted sm ell">NOVÝ DOMOV, stavební bytové družstvo → JAN STUCHLÍK</div>
+        <div class="row" style="position:relative"><span class="zap">✓ zapl.</span><span class="del">smazat</span></div>
+      </div>
+      <div class="c">
+        <span class="flag">2× zapl.</span>
+        <div class="row sm muted">18.10.2026 <span class="typ">ORV</span><span class="badge">zapl.</span><span class="sp kc" style="color:var(--ink)">1 000 Kč</span></div>
+        <div class="row"><span class="rz">8T25415</span><span class="dot" style="background:#3a7bd5"></span><span class="sm">BSAuto</span><span class="who">Roman</span></div>
+        <div class="row ell"><span class="vin">TMBEK6NW7M3158470</span> <span class="muted sm">Z TECHNIČÁKU</span></div>
+        <div class="row"><span class="badge">zapl. ✕</span><span class="del">smazat</span></div>
+      </div>
+    </div>
+    <ul><li>„zapl." dvakrát</li><li>jméno uprostřed</li><li>„smazat" jako text vlevo</li></ul>
+  </section>
+
+  <section class="opt">
+    <h2>A · Akce dole</h2>
+    <div class="phone">
+      <div class="c">
+        <div class="row"><span class="rz">4B41310</span><span class="sp kc">1 300 Kč</span></div>
+        <div class="row sm"><span class="dot" style="background:#e5537a"></span>Ostatní <span class="typ">PŘEVOD</span><span class="muted">19. 10.</span></div>
+        <div class="row ell"><span class="vin muted">TMBMY26Y174071603</span></div>
+        <div class="muted sm ell">NOVÝ DOMOV → JAN STUCHLÍK</div>
+        <div class="row" style="margin-top:4px"><button class="pay" data-pay>Zaplatit</button><span class="sp"></span><span class="av" title="Petr">P</span><button class="icon" aria-label="Smazat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+      </div>
+      <div class="c">
+        <div class="row"><span class="rz">8T25415</span><span class="sp kc">1 000 Kč</span></div>
+        <div class="row sm"><span class="dot" style="background:#3a7bd5"></span>BSAuto <span class="typ">ORV</span><span class="muted">18. 10.</span></div>
+        <div class="row ell"><span class="vin muted">TMBEK6NW7M3158470</span></div>
+        <div class="row" style="margin-top:4px"><button class="pay is-paid" data-pay>✓ Zaplaceno</button><span class="sp"></span><span class="av" title="Roman">R</span><button class="icon" aria-label="Smazat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+      </div>
+      <div class="c">
+        <div class="row"><span class="rz">1AB2345</span><span class="sp kc">1 500 Kč</span></div>
+        <div class="row sm"><span class="dot" style="background:#2fa36b"></span>Cardion <span class="typ">DOVOZ</span><span class="muted">17. 10.</span></div>
+        <div class="row ell"><span class="vin muted">WVWZZZ1KZ8W012345</span></div>
+        <div class="row" style="margin-top:4px"><button class="pay is-part" data-pay>Částečně 500</button><span class="sp"></span><span class="av" title="David">D</span><button class="icon" aria-label="Smazat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+      </div>
+    </div>
+    <p>RZ a cena nahoře velké. Dole jedno tlačítko platby (klepnutím přepíná), vpravo kdo to zadal a koš.</p>
+    <button class="choose" data-choose="A" aria-pressed="false">Chci A</button>
+  </section>
+
+  <section class="opt">
+    <h2>B · Odškrtávání</h2>
+    <div class="phone">
+      <div class="c"><div class="row" style="align-items:flex-start;gap:12px">
+        <button class="chk" data-chk aria-label="Zaplaceno"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+        <div class="b-body">
+          <div class="row"><span class="rz">4B41310</span><span class="typ">PŘEVOD</span><span class="sp kc">1 300 Kč</span></div>
+          <div class="row sm"><span class="dot" style="background:#e5537a"></span>Ostatní<span class="muted">· 19. 10. · Petr</span></div>
+          <div class="row"><span class="vin muted ell">TMBMY26Y174071603</span><button class="icon sp" aria-label="Smazat" style="margin:-6px -8px -8px auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+        </div></div></div>
+      <div class="c"><div class="row" style="align-items:flex-start;gap:12px">
+        <button class="chk is-paid" data-chk aria-label="Zaplaceno"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+        <div class="b-body">
+          <div class="row"><span class="rz">8T25415</span><span class="typ">ORV</span><span class="sp kc">1 000 Kč</span></div>
+          <div class="row sm"><span class="dot" style="background:#3a7bd5"></span>BSAuto<span class="muted">· 18. 10. · Roman</span></div>
+          <div class="row"><span class="vin muted ell">TMBEK6NW7M3158470</span><button class="icon sp" aria-label="Smazat" style="margin:-6px -8px -8px auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+        </div></div></div>
+      <div class="c"><div class="row" style="align-items:flex-start;gap:12px">
+        <button class="chk is-part" data-chk aria-label="Částečně zaplaceno"></button>
+        <div class="b-body">
+          <div class="row"><span class="rz">1AB2345</span><span class="typ">DOVOZ</span><span class="sp kc">1 500 Kč</span></div>
+          <div class="row sm"><span class="dot" style="background:#2fa36b"></span>Cardion<span class="muted">· 17. 10. · David</span></div>
+          <div class="row"><span class="vin muted ell">WVWZZZ1KZ8W012345</span><button class="icon sp" aria-label="Smazat" style="margin:-6px -8px -8px auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>
+        </div></div></div>
+    </div>
+    <p>Kolečko vlevo = zaplaceno, jako odškrtnutý úkol. Seznam se dá projet očima: co není zelené, není zaplacené. Koš vpravo dole.</p>
+    <button class="choose" data-choose="B" aria-pressed="false">Chci B</button>
+  </section>
+
+  <section class="opt">
+    <h2>C · Kompaktní + přejetí</h2>
+    <div class="phone">
+      <div class="swipe demo"><div class="under"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>Smazat</div>
+        <div class="c">
+          <div class="row"><span class="rz">4B41310</span><span class="dot" style="background:#e5537a"></span><span class="sm">Ostatní</span><span class="typ">PŘEVOD</span><span class="sp kc">1 300 Kč</span></div>
+          <div class="row sm muted"><span class="vin ell">…74071603</span><span>· 19. 10.</span><span class="sp av" title="Petr">P</span></div>
+        </div></div>
+      <div class="swipe"><div class="c">
+          <div class="row"><span class="rz">8T25415</span><span class="dot" style="background:#3a7bd5"></span><span class="sm">BSAuto</span><span class="typ">ORV</span><span class="sp kc"><span class="paid-ic">✓</span> 1 000 Kč</span></div>
+          <div class="row sm muted"><span class="vin ell">…M3158470</span><span>· 18. 10.</span><span class="sp av" title="Roman">R</span></div>
+        </div></div>
+      <div class="swipe"><div class="c">
+          <div class="row"><span class="rz">1AB2345</span><span class="dot" style="background:#2fa36b"></span><span class="sm">Cardion</span><span class="typ">DOVOZ</span><span class="sp kc" style="color:var(--warn)">500 / 1 500</span></div>
+          <div class="row sm muted"><span class="vin ell">…8W012345</span><span>· 17. 10.</span><span class="sp av" title="David">D</span></div>
+        </div></div>
+    </div>
+    <p>Dva řádky na auto, víc aut na obrazovku. Přejetí doleva = smazat, doprava = zaplaceno. Žádná tlačítka na očích, ale gesto se musíš naučit.</p>
+    <button class="choose" data-choose="C" aria-pressed="false">Chci C</button>
+  </section>
+</div>
+
+<p class="note">Ve všech variantách: smazání se pořád potvrzuje, jméno je jen iniciála (celé po podržení), převod „z → na" se zobrazí jen tam, kde je. Na počítači zůstane řádek na šířku jako teď.</p>
+
+<script>
+document.querySelectorAll('[data-pay]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var paid = !b.classList.contains('is-paid');
+    b.classList.remove('is-part');
+    b.classList.toggle('is-paid', paid);
+    b.textContent = paid ? '✓ Zaplaceno' : 'Zaplatit';
+  });
+});
+document.querySelectorAll('[data-chk]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    b.classList.remove('is-part');
+    if (!b.firstElementChild) b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    b.classList.toggle('is-paid');
+  });
+});
+document.querySelectorAll('[data-choose]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('[data-choose]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+  });
+});
+</script>

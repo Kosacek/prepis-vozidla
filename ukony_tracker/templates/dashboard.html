@@ -109,6 +109,7 @@
   window.PER_TYP = {{ per_typ_chart|tojson }};
   window.FIRMA_COLORS = {{ firma_colors|tojson }};
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=19"></script>
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=9"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=10"></script>
 {% endblock %}

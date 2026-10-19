@@ -117,22 +117,25 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
         if len(rows) > 1:
             candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
-            if len(candidates) != 1:
+            if len(candidates) > 1:
                 result.update(stav="vice_shod", zprava="Více shod — úkon nelze jednoznačně vybrat.")
                 return result
-            rows = candidates
+            # Nothing awaits a value → the photo updates the newest úkon of that car.
+            rows = candidates or rows[:1]
         if rows:
             row = rows[0]
             result["ukon"] = _view(row)
             if not values:
                 result.update(stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
                 return result
-            filled = doplnit(conn, row["id"], values)
+            filled = doplnit(conn, row["id"], values, prepsat=True)
             result["doplneno"] = filled["zmeneno"]
+            result["prepsano"] = filled["prepsano"]
             result["zmeny"] = {field: {"pred": row[field], "po": filled[field]} for field in values}
             changed = filled["zmeneno"]
-            result.update(stav="doplneno" if changed else "uz_doplneno",
-                          zprava=("Doplněno." if changed else "Údaje souhlasí."))
+            message = ("Přepsáno podle fotky." if filled["prepsano"] else
+                       "Doplněno." if changed else "Údaje souhlasí.")
+            result.update(stav="doplneno" if changed else "uz_doplneno", zprava=message)
             return result
 
         if not data.get("vin") and not data.get("rz"):

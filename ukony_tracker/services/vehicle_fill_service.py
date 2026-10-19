@@ -39,7 +39,12 @@ def transaction(conn):
         raise
 
 
-def doplnit(conn, uid, payload):
+def doplnit(conn, uid, payload, *, prepsat=False):
+    """Fill empty RZ/ORV; with prepsat a differing value is replaced, not refused.
+
+    The integration API stays fill-only (409). An ORV photo is newer than
+    anything typed in, so the scan passes prepsat=True.
+    """
     if not isinstance(payload, dict) or not any(k in payload for k in ("rz", "orv")):
         raise FillError(400, "Zadejte RZ nebo ORV.")
     values = {}
@@ -54,15 +59,19 @@ def doplnit(conn, uid, payload):
         ukon = ukony_repo.get(conn, uid)
         if ukon is None:
             raise FillError(404, "Úkon nenalezen.")
-        changes = {}
+        changes, overwritten = {}, []
         for field, value in values.items():
             existing = ukon[field]
             if not existing or not existing.strip():
                 changes[field] = value
+            elif normalize(existing) != value and prepsat:
+                changes[field] = value
+                overwritten.append(field)
             elif normalize(existing) != value:
                 error = "RZ už je vyplněná jinak." if field == "rz" else "ORV už je vyplněné jinak."
                 raise FillError(409, error, pole=field, stavajici=existing)
         if changes:
             ukony_repo.update(conn, uid, commit=False, **changes)
         return {"id": uid, "rz": changes.get("rz", ukon["rz"]),
-                "orv": changes.get("orv", ukon["orv"]), "zmeneno": list(changes)}
+                "orv": changes.get("orv", ukon["orv"]), "zmeneno": list(changes),
+                "prepsano": overwritten}

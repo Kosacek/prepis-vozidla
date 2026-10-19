@@ -524,3 +524,32 @@ def test_delete_without_ajax_still_redirects(client_fid):
     r = c.post(f"/ukony/{uid}/smazat", data={"back": "/ukony/vse"})
     assert r.status_code in (302, 303)
     assert r.headers["Location"].endswith("/ukony/vse")
+
+
+def test_full_list_renders_newest_page_then_fragment_has_the_rest(client_fid):
+    from routes.ukony import LIST_FIRST
+    from services.ingest_service import pridat_ukon
+    c, fid = client_fid
+    with c.application.app_context():
+        conn = db.get_db()
+        for i in range(LIST_FIRST + 5):
+            pridat_ukon(conn, firma_id=fid, datum=f"2026-{(i % 9) + 1:02d}-10", typ_kod="PŘEVOD",
+                        celkem=100, rz=f"1AB{i:04d}")
+    page = c.get("/ukony/vse?typ=PŘEVOD").get_data(as_text=True)
+    assert page.count('class="ukony-item"') == LIST_FIRST
+    assert f'data-pocet="{LIST_FIRST + 5}"' in page
+    assert f'data-kc-celkem="{(LIST_FIRST + 5) * 100}"' in page
+    assert f'<span id="ukony-count">{LIST_FIRST + 5}</span>' in page
+    rest = c.get(f"/ukony/vse?typ=PŘEVOD&od={LIST_FIRST}&fragment=1").get_data(as_text=True)
+    assert rest.count('class="ukony-item"') == 5
+    assert "<html" not in rest
+    # the edit link goes back to the list with its filter, not to the fragment URL
+    assert "fragment" not in rest and "back=/ukony/vse%3Ftyp%3DP" in rest
+
+
+def test_schema_setup_runs_once_per_process(client_fid, monkeypatch):
+    c, _ = client_fid
+    calls = []
+    monkeypatch.setattr(db, "init_schema", lambda conn: calls.append(1))
+    c.get("/ukony/vse"); c.get("/firmy")
+    assert calls == []

@@ -9,6 +9,22 @@
   var lastFocused = null;
   var openSerial = 0;
   var closeTimer;
+  // Techničák report parked while one of its úkony is edited on top of it:
+  // closing or saving the edit brings the very same report back (live nodes,
+  // listeners and photos intact) instead of throwing it away.
+  var scanStash = null;
+
+  function restoreScan(savedId) {
+    var stash = scanStash;
+    scanStash = null;
+    ++openSerial;
+    modalBody.replaceChildren.apply(modalBody, stash.nodes);
+    modalCard.classList.remove("modal-card--new");
+    modalCard.classList.add("modal-card--scan");
+    modalCard.scrollTop = stash.scroll;
+    document.dispatchEvent(new CustomEvent("ukon:scan-restored", { detail: { id: savedId || null } }));
+    if (stash.focus && stash.focus.isConnected) stash.focus.focus({ preventScroll: true });
+  }
 
   function openModal(url, isNew, isScan) {
     var serial = ++openSerial;
@@ -22,11 +38,11 @@
       })
       .then(function (html) {
         if (serial !== openSerial) return;
+        if (!scanStash) lastFocused = document.activeElement;
         modalBody.innerHTML = html;
         modalCard.classList.toggle("modal-card--new", !!isNew);
         modalCard.classList.toggle("modal-card--scan", !!isScan);
         if (isNew) document.dispatchEvent(new CustomEvent('ukon:new-form-shown', { detail: { form: modalBody.querySelector('#ukon-form') } }));
-        lastFocused = document.activeElement;
         modal.hidden = false;
         if (isScan) document.dispatchEvent(new CustomEvent('ukon:scan-shown'));
         // Reserve the width the scrollbar occupied before overflow:hidden hides
@@ -45,12 +61,14 @@
       })
       .catch(function () {
         if (serial !== openSerial) return;
+        if (scanStash) { restoreScan(); return; }
         if (isScan) { window.alert('Skenování se nepodařilo otevřít. Obnovte stránku a zkuste to znovu.'); return; }
         window.location.href = isNew ? '/ukony' : url.replace(/[?&]modal=1/, "");
       });
   }
 
-  function closeModal() {
+  function closeModal(savedId) {
+    if (scanStash) { restoreScan(savedId); return; }
     var event = new CustomEvent('ukon:modal-closing', {cancelable: true});
     if (!document.dispatchEvent(event)) return;
     ++openSerial;
@@ -59,19 +77,17 @@
     document.body.style.paddingRight = "";
     closeTimer = setTimeout(function () { modal.hidden = true; modalBody.innerHTML = ""; }, 280);
     if (lastFocused && lastFocused.focus) lastFocused.focus();
-    if (modal.dataset.scanRefresh === "1") {
-      delete modal.dataset.scanRefresh;
-      window.location.reload();
-    }
     var url = new URL(window.location.href);
     if (url.searchParams.has('novy')) {
       url.searchParams.delete('novy');
       history.replaceState({}, '', url.pathname + url.search + url.hash);
     }
   }
-  window.UkonModal = {close: closeModal, openEdit: function (uid) {
-    document.dispatchEvent(new CustomEvent('ukon:scan-navigate'));
-    modal.dataset.scanRefresh = "1";
+  window.UkonModal = {close: function () { closeModal(); }, openEdit: function (uid) {
+    if (modalCard.classList.contains("modal-card--scan") && !scanStash) {
+      scanStash = { nodes: Array.prototype.slice.call(modalBody.childNodes),
+                    scroll: modalCard.scrollTop, focus: document.activeElement };
+    }
     openModal('/ukony/' + encodeURIComponent(uid) + '/upravit?modal=1', false, false);
   }};
   window.addEventListener('pagehide', function () {
@@ -138,6 +154,17 @@
     return true;
   }
 
+  function showFormError(form, text) {
+    var box = form.querySelector(".modal-form-error");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "flash flash-error modal-form-error";
+      box.setAttribute("role", "alert");
+      form.prepend(box);
+    }
+    box.textContent = text;
+  }
+
   modalBody.addEventListener("submit", function (e) {
     var form = e.target.closest("form");
     if (!form) return;
@@ -152,15 +179,23 @@
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
-        if (!res.ok || !res.d.ok) throw new Error((res.d && res.d.error) || "chyba");
-        if (!swapRow(m[1], res.d)) { window.location.reload(); return; }
+        if (!res.ok || !res.d.ok) {
+          var err = new Error((res.d && res.d.error) || "chyba");
+          err.shown = !!(res.d && res.d.error);
+          throw err;
+        }
+        // Řádek není na stránce: bez reportu techničáku stačí reload; s ním
+        // se stránka obnoví až při zavření skenu (sken zmizet nesmí).
+        if (!swapRow(m[1], res.d) && !scanStash) { window.location.reload(); return; }
         // stránka s výběrem firmy si drží odpovědi v cache — po editaci ji zahoď
         document.dispatchEvent(new CustomEvent("ukon:saved", { detail: { id: m[1] } }));
-        closeModal();
+        closeModal(m[1]);
       })
-      .catch(function () {
-        // cokoliv nečekaného → klasické odeslání, ať se změna nikdy neztratí
+      .catch(function (err) {
         if (btn) btn.disabled = false;
+        // Validační chyba → ukaž ji přímo v okně, žádný skok na jinou stránku.
+        if (err && err.shown) { showFormError(form, err.message); return; }
+        // cokoliv nečekaného → klasické odeslání, ať se změna nikdy neztratí
         form.submit();
       });
   });

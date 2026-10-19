@@ -1,0 +1,57 @@
+{# Demo for release 2.3 (Techničák report stays): a scan result card shows the
+   ORV being overwritten, the edit sheet slides up over it and away again, and
+   the same card comes back with "✓ Upraveno". CSS-only, 5s loop; app tokens
+   only. Included by _whats_new.html. #}
+<style>
+  .de23-demo {
+    position: relative; box-sizing: border-box; height: 134px; padding: 12px; margin-bottom: var(--sp-4);
+    overflow: hidden; border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.3;
+  }
+  .de23-card {
+    display: grid; grid-template-columns: 46px 1fr; gap: 9px; padding: 8px; border-radius: 12px;
+    background: var(--card); border: 2px solid var(--accent);
+  }
+  .de23-photo { height: 46px; border-radius: 7px; background: linear-gradient(135deg, var(--line), var(--bg)); }
+  .de23-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .de23-head { display: flex; align-items: center; gap: 5px; }
+  .de23-chip { white-space: nowrap; padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 700; background: var(--bg); color: var(--accent); }
+  .de23-ok { background: var(--flash-success-bg); color: var(--flash-success-ink); opacity: 0;
+    animation: de23-ok 5s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de23-open { white-space: nowrap; margin-left: auto; color: var(--accent); font-weight: 700; font-size: 9.5px; border-radius: 6px; padding: 1px 4px;
+    animation: de23-tap 5s ease infinite; }
+  .de23-line { font-size: 10.5px; }
+  .de23-line s { color: var(--muted); }
+  .de23-line b { font-weight: 700; }
+  .de23-sheet {
+    position: absolute; left: 12px; right: 12px; bottom: 0; height: 92px; padding: 10px 12px;
+    border-radius: 14px 14px 0 0; background: var(--card); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 6px; transform: translateY(105%);
+    animation: de23-sheet 5s cubic-bezier(.2, .7, .3, 1) infinite;
+  }
+  .de23-field { height: 14px; border-radius: 5px; background: var(--bg); }
+  .de23-save { margin-top: auto; align-self: flex-end; padding: 3px 12px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 10px; }
+
+  @keyframes de23-tap { 0%, 18% { background: transparent; } 22%, 26% { background: var(--bg); } 30%, 100% { background: transparent; } }
+  @keyframes de23-sheet { 0%, 24% { transform: translateY(105%); } 34%, 58% { transform: none; } 68%, 100% { transform: translateY(105%); } }
+  @keyframes de23-ok { 0%, 66% { opacity: 0; transform: scale(.9); } 74%, 94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .de23-sheet, .de23-ok, .de23-open { animation: none; }
+    .de23-ok { opacity: 1; }
+  }
+</style>
+<div class="de23-demo" aria-hidden="true">
+  <div class="de23-card">
+    <span class="de23-photo"></span>
+    <div class="de23-body">
+      <div class="de23-head"><span class="de23-chip">Přepsáno</span><span class="de23-chip de23-ok">✓ Upraveno</span><span class="de23-open">Otevřít</span></div>
+      <div class="de23-line">ORV <s>AAA111111</s> → <b>UBE037263</b></div>
+      <div class="de23-line">8T25415 · BSAuto</div>
+    </div>
+  </div>
+  <div class="de23-sheet">
+    <span class="de23-field"></span><span class="de23-field" style="width:70%"></span>
+    <span class="de23-save">Uložit</span>
+  </div>
+</div>

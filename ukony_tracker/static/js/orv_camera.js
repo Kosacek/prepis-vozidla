@@ -90,8 +90,11 @@
     try {
       const img = new Image();
       img.src = url;
-      await img.decode();
-      return await camera.jpeg(img, img.naturalWidth, img.naturalHeight);
+      // A decode that never settles must not lock the gallery: after 6 s send
+      // the original file, the server converts it anyway.
+      const late = new Promise((_, reject) => setTimeout(() => reject(Error('slow')), 6000));
+      await Promise.race([img.decode(), late]);
+      return await Promise.race([camera.jpeg(img, img.naturalWidth, img.naturalHeight), late]);
     } catch (_) { return file; }
     finally { URL.revokeObjectURL(url); }
   };

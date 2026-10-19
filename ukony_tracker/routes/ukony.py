@@ -185,6 +185,9 @@ def add(firma_id):
     return redirect(url_for("ukony.entry", firma_id=firma_id, **carry))
 
 
+LIST_FIRST = 100
+
+
 @bp.get("/ukony/vse")
 def table():
     conn = db.get_db()
@@ -197,14 +200,28 @@ def table():
         year, month = (int(x) for x in mesic.split("-"))
     rows = ukony_repo.list(conn, firma_id=firma_id, year=year, month=month, typ_kod=typ, stav=stav)
     total = sum(r["celkem"] for r in rows)
+    # Back link for the edit form = this list with its filters, never the
+    # fragment URL the remaining rows were fetched from.
+    filters = {k: v for k, v in request.args.items() if k not in ("od", "fragment")}
+    back_url = url_for("ukony.table", **filters)
+    colors = colors_service.firma_color_map(conn)  # same dot colors as the dashboard
+    # Rendering every úkon at once was 2.3 MB / ~2 s on the NAS. The page shows
+    # the newest LIST_FIRST rows; the rest come from ?od=N&fragment=1 when the
+    # user scrolls down or starts searching.
+    od = max(request.args.get("od", type=int) or 0, 0)
+    if request.args.get("fragment"):
+        return render_template("_ukony_rows.html", ukony=rows[od:], back_url=back_url,
+                               firma_colors=colors)
     return render_template(
         "ukony_table.html",
-        ukony=rows,
+        ukony=rows[:LIST_FIRST],
+        pocet=len(rows),
         firmy=firmy_repo.list_all(conn),
         typy=typy_repo.list_active(conn),
         total=total,
+        back_url=back_url,
         sel={"firma": firma_id, "mesic": mesic, "typ": typ, "stav": stav},
-        firma_colors=colors_service.firma_color_map(conn),  # same dot colors as the dashboard
+        firma_colors=colors,
     )
 
 

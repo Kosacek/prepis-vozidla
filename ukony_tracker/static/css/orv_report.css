@@ -81,3 +81,14 @@
 @media (prefers-reduced-motion:reduce) {
   .orv-sken .ask-reveal,.orv-result {animation:none!important; transition:none!important; scroll-behavior:auto!important;}
 }
+.orv-heading {display:flex; flex-wrap:wrap; align-items:center; column-gap:10px;}
+.orv-heading .orv-step {flex-basis:100%; margin:0;}
+.orv-last {display:inline-flex; align-items:center; gap:6px; min-height:36px; margin-left:auto; padding:0 12px;
+  border:1px solid var(--line,#e5e5ea); border-radius:999px; background:var(--card,#fff); color:var(--accent,#0071e3);
+  font:inherit; font-size:.82rem; font-weight:650; cursor:pointer;}
+.orv-last:hover {background:var(--bg,#f3f4f7);}
+.orv-last[hidden] {display:none;}
+.orv-edited {display:inline-flex; align-items:center; min-height:26px; border-radius:999px; padding:2px 9px;
+  background:#e2f5e9; color:#12683a; font-size:.74rem; font-weight:700;}
+.orv-chips {display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px;}
+.modal-form-error {margin-bottom:12px;}

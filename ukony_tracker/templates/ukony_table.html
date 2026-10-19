@@ -47,32 +47,33 @@
       <a href="/ukony/vse" class="btn btn-sm" id="filter-reset">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
-      <span id="ukony-count">{{ ukony|length }}</span> úkonů · <span id="ukony-sum">{{ total|kc }}</span> Kč
+      <span id="ukony-count">{{ pocet }}</span> úkonů · <span id="ukony-sum">{{ total|kc }}</span> Kč
     </div>
   </form>
 </div>
 
 {# ── List — same row design as the dashboard's "Poslední úkony" (whole row is a
      link opening the edit modal), plus a trailing action cluster per row. ── #}
-{% set back_url = request.full_path %}
 <div class="card recent-card">
-  <div class="recent-list ukony-list">
+  <div class="recent-list ukony-list" data-pocet="{{ pocet }}" data-kc-celkem="{{ total|int }}">
     {% for u in ukony %}
     {% include "_ukony_item.html" %}
     {% else %}
     <p class="center muted" style="padding: var(--sp-6);">Žádné úkony neodpovídají filtru.</p>
     {% endfor %}
   </div>
+  <div class="ukony-more" id="ukony-more" {{ 'hidden' if pocet <= ukony|length }} aria-hidden="true"><span></span><span></span><span></span></div>
 </div>
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=9"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=10"></script>
 <script src="{{ url_for('static', filename='js/ukon_new_form.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/orv_helpers.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/orv_camera.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/orv_report.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/orv_sken.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/orv_camera.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/orv_report.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/orv_last.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/orv_sken.js') }}?v=4"></script>
 
 <script>
 (function () {
@@ -100,11 +101,71 @@
       r.style.display = show ? '' : 'none';
       if (show) { n++; sum += r._kc; }
     });
+    // Starší řádky ještě nedorazily → bez hledání ukaž součty ze serveru,
+    // při hledání „…", dokud se nenačte zbytek.
+    if (rest.pending) {
+      if (!q) { n = rest.pocet; sum = rest.kc; }
+      else { n = '…'; sum = null; }
+    }
     if (countEl) countEl.textContent = n;
-    if (sumEl) sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    if (sumEl) sumEl.textContent = sum == null ? '…' : String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
+
+  // -- Starší řádky na vyžádání ------------------------------------------------
+  // Stránka přijde s nejnovějšími úkony; zbytek se dotáhne jedním požadavkem,
+  // až uživatel dojede ke konci seznamu nebo začne hledat.
+  var moreEl = document.getElementById('ukony-more');
+  var rest = {pending: false, loading: false, pocet: 0, kc: 0, serial: 0};
+  var observer = null;
+  function setupRest() {
+    rest.serial++;
+    rest.loading = false;
+    rest.pocet = parseInt(listEl.getAttribute('data-pocet'), 10) || 0;
+    rest.kc = parseInt(listEl.getAttribute('data-kc-celkem'), 10) || 0;
+    rest.pending = rows.length < rest.pocet;
+    if (moreEl) moreEl.hidden = !rest.pending;
+    if (observer) observer.disconnect();
+    if (rest.pending && moreEl && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) loadRest();
+      }, {rootMargin: '1200px 0px'});
+      observer.observe(moreEl);
+    }
+  }
+  function loadRest() {
+    if (!rest.pending || rest.loading) return;
+    rest.loading = true;
+    var serial = rest.serial;
+    var q = new URLSearchParams(window.location.search);
+    q.set('od', String(rows.length));
+    q.set('fragment', '1');
+    fetch('/ukony/vse?' + q.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { if (!r.ok) throw new Error('http'); return r.text(); })
+      .then(function (html) {
+        if (serial !== rest.serial) return;  // mezitím se změnil filtr
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        var frag = document.createDocumentFragment();
+        tmp.querySelectorAll('.ukony-item').forEach(function (item) { frag.appendChild(item); });
+        listEl.appendChild(frag);
+        rest.pending = false;
+        if (observer) observer.disconnect();
+        if (moreEl) moreEl.hidden = true;
+        rebuildRows();
+        apply();
+      })
+      .catch(function () { if (serial === rest.serial) rest.loading = false; });
+  }
+
+  // Pojistka k IntersectionObserveru (některé webview ho u skrytých stránek pozdrží).
+  window.addEventListener('scroll', function () {
+    if (rest.pending && moreEl && moreEl.getBoundingClientRect().top < window.innerHeight + 1200) loadRest();
+  }, {passive: true});
+
   rebuildRows();
-  input.addEventListener('input', apply);
+  setupRest();
+  input.addEventListener('focus', loadRest);
+  input.addEventListener('input', function () { loadRest(); apply(); });
   // Po ulozeni ukonu bez reloadu se vymeni jeden radek -- sem si modal rekne
   // o prepocet jeho indexu a souctu, at filtr i suma dal sedi.
   window.ukonySyncRow = function (item) {
@@ -117,6 +178,8 @@
   window.ukonyRemoveRow = function (item) {
     var i = rows.indexOf(item);
     if (i >= 0) rows.splice(i, 1);
+    rest.pocet = Math.max(0, rest.pocet - 1);
+    rest.kc -= item._kc || 0;
     apply();
   };
   window.ukonyAddRow = function (html) {
@@ -132,6 +195,8 @@
     var empty = listEl.querySelector('p.center.muted');
     if (empty) empty.remove();
     listEl.prepend(item);
+    rest.pocet++;
+    rest.kc += parseInt(item.getAttribute('data-kc'), 10) || 0;
     rebuildRows();
     apply();
     var link = item.querySelector('.recent-row');
@@ -160,9 +225,13 @@
         var freshList = doc.querySelector('.ukony-list');
         if (!freshList || !listEl) throw new Error('no-list');
         listEl.innerHTML = freshList.innerHTML;
+        listEl.setAttribute('data-pocet', freshList.getAttribute('data-pocet') || '0');
+        listEl.setAttribute('data-kc-celkem', freshList.getAttribute('data-kc-celkem') || '0');
         if (doc.title) document.title = doc.title;
         history.replaceState({}, '', url);
         rebuildRows();
+        setupRest();
+        if (input.value.trim()) loadRest();
         apply();
       })
       .catch(function () { window.location.href = url; })  // cokoliv se pokazi -> klasicke nacteni
