@@ -3,7 +3,7 @@ import base64
 import os
 import re
 from contextvars import ContextVar
-from datetime import date
+from datetime import date, timedelta
 
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import orv_service, pricing_service
@@ -12,6 +12,10 @@ from services.ingest_service import pridat_ukon
 from services.vehicle_fill_service import FillError, doplnit, transaction
 
 MODEL = "claude-haiku-5-5"
+# A techničák belongs to an úkon from the last few days (real scans: 0–7 days).
+# An older úkon of the same car is a previous sale — cars get sold and bought
+# back — so it is never filled or overwritten; the scan creates a new úkon.
+MATCH_WINDOW_DAYS = 30
 tokens = ContextVar("orv_scan_tokens", default=0)
 PROMPT = """Přečti přední stranu českého Osvědčení o registraci vozidla, část I.
 Fotka může být natočená, vzhůru nohama, zkosená nebo s odleskem.
@@ -112,9 +116,14 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
     values = {key: data.get(source) for key, source in (("rz", "rz"), ("orv", "orv_cislo"))
               if data.get(source)}
     with transaction(conn):
-        rows = ukony_repo.find_by_vehicle_any_firm(
+        found = ukony_repo.find_by_vehicle_any_firm(
             conn, vin=data.get("vin"),
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
+        since = (date.today() - timedelta(days=MATCH_WINDOW_DAYS)).isoformat()
+        rows = [u for u in found if (u["datum"] or "") >= since]
+        older = [u for u in found if (u["datum"] or "") < since]
+        if older and not rows:
+            result["predchozi"] = _view(older[0])
         if len(rows) > 1:
             candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
             if len(candidates) > 1:

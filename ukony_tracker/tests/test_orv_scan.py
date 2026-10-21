@@ -1,6 +1,7 @@
 """Offline scan contract, atomic fill matrix, upload and session boundaries."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from datetime import date, timedelta
 from io import BytesIO
 from types import SimpleNamespace as NS
 
@@ -14,6 +15,7 @@ from services import orv_images, orv_scan_service as scan
 from services.ingest_service import pridat_ukon
 
 VIN = "TMBEK6NW7M3158470"
+RECENT = (date.today() - timedelta(days=3)).isoformat()   # inside the match window
 DATA = {"typ": "orv", "rz": "5AB1234", "vin": VIN, "orv_cislo": "UBE037263",
         "provozovatel": "BSAuto s.r.o."}
 
@@ -88,7 +90,7 @@ def test_no_legible_fields_and_missing_tool():
 def make(conn):
     fid = firmy_repo.create(conn, nazev="BSAuto", zkratka="BS")
     def create(**fields):
-        return pridat_ukon(conn, **({"firma_id": fid, "datum": "2026-10-08", "typ_kod": "ZÁPIS",
+        return pridat_ukon(conn, **({"firma_id": fid, "datum": RECENT, "typ_kod": "ZÁPIS",
                                    "celkem": 1300, "vin": VIN} | fields))
     return create
 
@@ -108,7 +110,7 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     after = dict(ukony_repo.get(conn, uid))
     assert result["stav"] == expected and result["doplneno"] == changes
-    assert result["ukon"] == {"id": uid, "datum": "2026-10-08", "firma": "BSAuto",
+    assert result["ukon"] == {"id": uid, "datum": RECENT, "firma": "BSAuto",
                               "typ": "ZÁPIS", "celkem": 1300.0}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
     overwritten = [k for k, v in fields.items() if v.strip().upper().replace(" ", "").replace("-", "")
@@ -215,13 +217,34 @@ def test_multiple_matches(conn, make, other_fields, expected):
 
 
 def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
-    old = make(datum="2026-01-05", rz="1AA1111", orv="AAA111111")
-    new = make(datum="2026-09-01", rz="1AA1111", orv="AAA111111")
+    old = make(datum=(date.today() - timedelta(days=20)).isoformat(), rz="1AA1111", orv="AAA111111")
+    new = make(datum=RECENT, rz="1AA1111", orv="AAA111111")
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     assert result["stav"] == "doplneno" and result["ukon"]["id"] == new
     assert result["prepsano"] == ["rz", "orv"]
     assert ukony_repo.get(conn, new)["orv"] == DATA["orv_cislo"]
     assert ukony_repo.get(conn, old)["orv"] == "AAA111111"
+
+
+@pytest.mark.parametrize("filled", [True, False])
+def test_car_back_after_window_is_a_new_ukon_not_the_old_one(conn, make, filled):
+    # 2026-10-21: EL375AT from August (JE & NE) got its ORV overwritten by a
+    # new techničák — the car had been sold and bought back. Old úkony stay as they are.
+    old_date = (date.today() - timedelta(days=scan.MATCH_WINDOW_DAYS + 1)).isoformat()
+    fields = {"rz": "1AA1111", "orv": "UBC425944"} if filled else {}
+    old = make(datum=old_date, **fields)
+    before = dict(ukony_repo.get(conn, old))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert dict(ukony_repo.get(conn, old)) == before
+    assert result["stav"] in ("zalozeno", "bez_firmy")
+    assert result["predchozi"]["id"] == old and result["predchozi"]["datum"] == old_date
+
+
+def test_window_edge_still_matches(conn, make):
+    edge = (date.today() - timedelta(days=scan.MATCH_WINDOW_DAYS)).isoformat()
+    uid = make(datum=edge)
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
 
 
 def test_api_fill_still_refuses_to_overwrite(conn, make):
@@ -362,7 +385,7 @@ def test_happy_json_sniffs_bytes_and_logs(client, vision, monkeypatch):
     with client.application.app_context():
         c = db.get_db()
         fid = firmy_repo.create(c, nazev="BSAuto", zkratka="BS")
-        uid = pridat_ukon(c, firma_id=fid, datum="2026-10-08", typ_kod="ZÁPIS", celkem=1300, vin=VIN)
+        uid = pridat_ukon(c, firma_id=fid, datum=RECENT, typ_kod="ZÁPIS", celkem=1300, vin=VIN)
     result = post(client, mime="application/octet-stream")
     assert result.status_code == 200 and result.json["stav"] == "doplneno"
     assert result.json["ukon"]["id"] == uid and result.json["doplneno"] == ["rz", "orv"]

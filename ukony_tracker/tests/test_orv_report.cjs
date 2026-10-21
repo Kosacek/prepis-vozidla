@@ -29,3 +29,11 @@ test('Czech car and create-button plurals handle one, two to four and five plus'
   assert.deepEqual([1, 2, 4, 5].map(R.czechCars), ['auto', 'auta', 'auta', 'aut']);
   assert.deepEqual([1, 2, 4, 5].map(R.czechJobs), ['úkon', 'úkony', 'úkony', 'úkonů']);
 });
+
+test('a car seen before shows the earlier úkon, not as a match', () => {
+  globalThis.document = {createElement: () => ({textContent: ''})};
+
+  const line = R.earlier({predchozi: {id: 883, datum: '2026-08-26', firma: 'JE & NE', typ: 'PŘEVOD'}});
+  assert.equal(line.textContent, 'Dříve 26. 8. 2026 · JE & NE · PŘEVOD');
+  assert.equal(R.earlier({}), null);
+});

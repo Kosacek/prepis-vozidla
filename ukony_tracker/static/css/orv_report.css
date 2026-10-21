@@ -92,3 +92,4 @@
   background:#e2f5e9; color:#12683a; font-size:.74rem; font-weight:700;}
 .orv-chips {display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px;}
 .modal-form-error {margin-bottom:12px;}
+.orv-earlier {font-size:.8rem; color:var(--muted,#6e6e73);}

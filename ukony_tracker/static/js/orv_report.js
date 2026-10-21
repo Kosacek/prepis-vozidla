@@ -52,6 +52,13 @@
     facts.forEach(([label, value]) => list.append(el('span', 'orv-fact', label + ' ' + value)));
     return list;
   }
+  // Auto už u nás bylo dřív (prodané a zpět vykoupené) → nový úkon, starý zůstal.
+  function earlier(result) {
+    const p = result.predchozi;
+    if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(p.datum || '')) return null;
+    const d = Number(p.datum.slice(8)) + '. ' + Number(p.datum.slice(5, 7)) + '. ' + p.datum.slice(0, 4);
+    return el('div', 'orv-earlier', 'Dříve ' + d + ' · ' + (p.firma || '') + ' · ' + (p.typ || ''));
+  }
   function card(photo, onRetry) {
     const result = photo.result || {};
     const state = result.stav || 'chyba';
@@ -90,6 +97,8 @@
         fields.forEach(([k, value]) => body.append(detailLine(FIELD_LABELS[k], value, value)));
       }
     }
+    const before = earlier(result);
+    if (before && (state === 'zalozeno' || state === 'bez_firmy')) body.append(before);
     if (state === 'zalozeno' && result.ukon) {
       const u = result.ukon;
       const price = new Intl.NumberFormat('cs-CZ', {maximumFractionDigits: 0}).format(u.celkem || 0);
@@ -168,7 +177,7 @@
     button.textContent = 'Založit ' + count + ' ' + czechJobs(count);
     button.disabled = count === 0;
   }
-  const api = {czechCars, czechJobs, group, bannerState, totals, render, selected, updateCreateCount};
+  const api = {earlier, czechCars, czechJobs, group, bannerState, totals, render, selected, updateCreateCount};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OrvReport = api;
 })(typeof window !== 'undefined' ? window : globalThis);
