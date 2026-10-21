@@ -35,6 +35,28 @@ def normalize_name(value: str | None) -> str:
     return " ".join(words)
 
 
+_TITLES = {"ING", "MGR", "BC", "JUDR", "MUDR", "MVDR", "PHDR", "RNDR", "PHARMDR", "DIS",
+           "CSC", "PHD", "MBA", "DR", "DOC", "PROF", "ARCH"}
+
+
+def same_party(a: str | None, b: str | None) -> bool | None:
+    """Is it the same person/company? None when either name is missing.
+
+    Order-free word sets (an ORV prints "ŠEBESTA JAKUB", the žádost "Ing. Jakub
+    Šebesta"), titles and legal forms ignored; a shorter name inside a longer
+    one counts when it is specific enough (2+ words, or one word of 5+ chars).
+    """
+    words_a = set(normalize_name(a).split()) - _TITLES
+    words_b = set(normalize_name(b).split()) - _TITLES
+    if not words_a or not words_b:
+        return None
+    if words_a == words_b:
+        return True
+    small, big = sorted((words_a, words_b), key=len)
+    specific = len(small) >= 2 or len(next(iter(small))) >= 5
+    return small <= big and specific
+
+
 def match_firma(conn, name: str | None) -> dict | None:
     """Return one confident active-firm match; ambiguity is always rejected.
 

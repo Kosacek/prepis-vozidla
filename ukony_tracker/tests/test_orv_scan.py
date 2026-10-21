@@ -15,7 +15,7 @@ from services import orv_images, orv_scan_service as scan
 from services.ingest_service import pridat_ukon
 
 VIN = "TMBEK6NW7M3158470"
-RECENT = (date.today() - timedelta(days=3)).isoformat()   # inside the match window
+RECENT = date.today().isoformat()   # inside the match window
 DATA = {"typ": "orv", "rz": "5AB1234", "vin": VIN, "orv_cislo": "UBE037263",
         "provozovatel": "BSAuto s.r.o."}
 
@@ -217,7 +217,7 @@ def test_multiple_matches(conn, make, other_fields, expected):
 
 
 def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
-    old = make(datum=(date.today() - timedelta(days=20)).isoformat(), rz="1AA1111", orv="AAA111111")
+    old = make(datum=(date.today() - timedelta(days=1)).isoformat(), rz="1AA1111", orv="AAA111111")
     new = make(datum=RECENT, rz="1AA1111", orv="AAA111111")
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     assert result["stav"] == "doplneno" and result["ukon"]["id"] == new
@@ -245,6 +245,26 @@ def test_window_edge_still_matches(conn, make):
     uid = make(datum=edge)
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+
+
+@pytest.mark.parametrize("prevod,operator,same", [
+    ("AUTO CARDION s. r. o. → XYZ s.r.o.", "XYZ, s.r.o.", True),          # scanning that sale
+    ("AUTO CARDION s. r. o. → XYZ s.r.o.", "Auto Cardion s.r.o.", False),  # bought back = new sale
+    ("Ing. Jakub Šebesta → JE & NE, spol. s r.o.", "JE & NE spol. s r. o.", True),
+    ("JE & NE, spol. s r.o. → Ing. Jakub Šebesta", "ŠEBESTA JAKUB", True),
+    ("JE & NE, spol. s r.o. → Ing. Jakub Šebesta", "ŠEBESTA PETR", False),
+    ("AUTO CARDION s. r. o. → XYZ s.r.o.", None, True),                   # unreadable → date only
+    (None, "XYZ s.r.o.", True),                                            # no transfer line → date only
+])
+def test_owner_on_orv_must_be_the_new_owner_of_that_sale(conn, make, prevod, operator, same):
+    uid = make(prevod=prevod)
+    before = dict(ukony_repo.get(conn, uid))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "provozovatel": operator}))
+    if same:
+        assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    else:
+        assert dict(ukony_repo.get(conn, uid)) == before
+        assert result["stav"] in ("zalozeno", "bez_firmy") and result["predchozi"]["id"] == uid
 
 
 def test_api_fill_still_refuses_to_overwrite(conn, make):

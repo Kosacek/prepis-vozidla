@@ -7,15 +7,31 @@ from datetime import date, timedelta
 
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import orv_service, pricing_service
-from services.firma_match import match_firma
+from services.firma_match import match_firma, same_party
 from services.ingest_service import pridat_ukon
 from services.vehicle_fill_service import FillError, doplnit, transaction
 
 MODEL = "claude-haiku-5-5"
-# A techničák belongs to an úkon from the last few days (real scans: 0–7 days).
-# An older úkon of the same car is a previous sale — cars get sold and bought
-# back — so it is never filled or overwritten; the scan creates a new úkon.
-MATCH_WINDOW_DAYS = 30
+# A techničák belongs only to an úkon from today or yesterday whose new owner
+# (right side of the "z koho → na koho" line) is the provozovatel on the ORV.
+# Anything else is another sale — cars get sold and bought back — so it is
+# never filled or overwritten; the scan creates a new úkon (David 2026-10-21:
+# rather a new úkon to check than a missed one).
+MATCH_WINDOW_DAYS = 1
+
+
+def _new_owner(prevod):
+    """Right side of "původní → nový"; None when the line has no arrow."""
+    if not isinstance(prevod, str) or "→" not in prevod:
+        return None
+    return prevod.rsplit("→", 1)[1].strip() or None
+
+
+def _same_sale(ukon, data, since):
+    if (ukon["datum"] or "") < since:
+        return False
+    # Unknown owner on either side → the date alone decides.
+    return same_party(_new_owner(ukon["prevod"]), data.get("provozovatel")) is not False
 tokens = ContextVar("orv_scan_tokens", default=0)
 PROMPT = """Přečti přední stranu českého Osvědčení o registraci vozidla, část I.
 Fotka může být natočená, vzhůru nohama, zkosená nebo s odleskem.
@@ -120,10 +136,10 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
             conn, vin=data.get("vin"),
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
         since = (date.today() - timedelta(days=MATCH_WINDOW_DAYS)).isoformat()
-        rows = [u for u in found if (u["datum"] or "") >= since]
-        older = [u for u in found if (u["datum"] or "") < since]
-        if older and not rows:
-            result["predchozi"] = _view(older[0])
+        rows = [u for u in found if _same_sale(u, data, since)]
+        other = [u for u in found if u not in rows]
+        if other and not rows:
+            result["predchozi"] = _view(other[0])
         if len(rows) > 1:
             candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
             if len(candidates) > 1:
