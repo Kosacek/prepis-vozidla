@@ -93,24 +93,37 @@
 
   /* Žádosti bez myši: štítek ↵ u toho, co právě udělá Enter (static/klavesnice.js
      nastavuje body[data-enter]). U návrhů je to zvýrazněný řádek. */
-  /* Badge = a flex item of a centred flex button, the arrow is a drawn icon
-     centred in it (a glyph like ↵ rides the text baseline and looks off). */
-  #quick-scan-btn, #nav-next, #output-card .out-reset .btn { display: inline-flex; align-items: center; justify-content: center; }
+  /* Klávesové štítky (Enter, ←): kreslená ikona optický vycentrovaná ve
+     štítku (posunutá podle těžiště čar, ne podle obdélníku — šipka Enteru má
+     váhu dole, šipka doleva vlevo) a štítek jako flex položka tlačítka. Znak
+     ↵ z písma sedí na účaří a vycentrovat nejde. */
+  #quick-scan-btn, #nav-next, #nav-back, #output-card .out-reset .btn { display: inline-flex; align-items: center; justify-content: center; }
   body[data-enter="sken"] #quick-scan-btn::after,
   body[data-enter="dal"] #nav-next::after,
   body[data-enter="nova"] #output-card .out-reset .btn::after,
-  .firm-option.active:not(.add-new)::after {
+  .firm-option.active:not(.add-new)::after,
+  #nav-back::before {
     content: ""; flex: none; width: 24px; height: 20px; margin-left: 10px; border-radius: 5px; box-sizing: border-box;
-    background: rgba(255,255,255,.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/svg%3E") center / 13px 13px no-repeat;
+    background: rgba(255,255,255,.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(-.3 -.9)'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/g%3E%3C/svg%3E") center / 13px 13px no-repeat;
     border: 1px solid rgba(255,255,255,.4);
   }
   body[data-enter="nova"] #output-card .out-reset .btn::after,
   .firm-option.active:not(.add-new)::after {
-    background: #f1f3f5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/svg%3E") center / 13px 13px no-repeat; border-color: #d1d5db;
+    background: #f1f3f5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(-.3 -.9)'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/g%3E%3C/svg%3E") center / 13px 13px no-repeat; border-color: #d1d5db;
+  }
+  #nav-back::before {
+    margin: 0 10px 0 0; background: #f1f3f5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(.9 0)'%3E%3Cpath d='M19 12H5'/%3E%3Cpolyline points='11 6 5 12 11 18'/%3E%3C/g%3E%3C/svg%3E") center / 13px 13px no-repeat; border-color: #d1d5db;
   }
   .firm-option.active:not(.add-new) { position: relative; padding-right: 44px; }
   .firm-option.active:not(.add-new)::after { position: absolute; right: 10px; top: calc(50% - 10px); margin: 0; }
   body:has(.firm-dropdown.open) #nav-next::after { display: none; }
+  /* Telefon/tablet nemá klávesnici — štítky by jen zabíraly místo (na 375 px
+     tlačily „Zpět" pod číslo verze). */
+  @media (hover: none) and (pointer: coarse) {
+    #quick-scan-btn::after, #nav-next::after, #nav-back::before,
+    #output-card .out-reset .btn::after, .firm-option.active:not(.add-new)::after { display: none !important; }
+    .firm-option.active:not(.add-new) { padding-right: 13px; }
+  }
   .okna-blokovana { margin-top: 10px; font-size: 13px; color: #9a5b00; }
 
   /* Tahák zkratek (klávesa ?) */
@@ -1441,10 +1454,10 @@
 
 <!-- Fixed nav bar -->
 <div class="nav-bar">
-  <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">← Zpět</button>
+  <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">Zpět</button>
   {# Version + its history (templates/_whats_new.html). #}
   <button type="button" id="app-version-bar" class="app-ver" data-releases-open aria-label="Verze {{ APP_VERSION }} – co je nového">v{{ APP_VERSION }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.4" r=".6" fill="currentColor"/></svg></button>
-  <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
+  <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat</button>
 </div>
 <div class="kb-hints">
   <span class="kb-hint"><span class="kb-key">Enter</span> další krok</span>
@@ -1723,7 +1736,7 @@ function navBack() {
     document.getElementById('ppd-card').style.display = 'block';
     document.getElementById('nav-next').style.display = '';
     document.getElementById('nav-next').disabled = false;
-    document.getElementById('nav-back').textContent = '← Zpět';
+    document.getElementById('nav-back').textContent = 'Zpět';
     buildSummary();
     ppdNahledUpdate();
     return;
@@ -1866,7 +1879,7 @@ function _aktivujPanel(n) {
 
   // Nav bar
   document.getElementById('nav-back').style.display = flowIdx > 0 ? '' : 'none';
-  document.getElementById('nav-next').textContent = (flowIdx === FLOWS[appMode].panels.length - 1) ? 'Generovat PDF' : 'Pokračovat →';
+  document.getElementById('nav-next').textContent = (flowIdx === FLOWS[appMode].panels.length - 1) ? 'Generovat PDF' : 'Pokračovat';
   // Plná moc má vlastní tlačítko uvnitř karty — generovat žádost tu nedává smysl.
   document.getElementById('nav-next').style.display = (n === 6) ? 'none' : '';
 
@@ -3543,7 +3556,7 @@ async function generatePDFs() {
       document.getElementById('output-card').style.display = 'block';
       document.getElementById('nav-next').style.display = 'none';
       document.getElementById('nav-back').style.display = '';
-      document.getElementById('nav-back').textContent = '← Upravit údaje';
+      document.getElementById('nav-back').textContent = 'Upravit údaje';
       const nova = document.querySelector('#output-card .out-reset .btn');
       if (nova) nova.focus();
       if (otevrit && typeof otevriVsechnyDokumenty === 'function') otevriVsechnyDokumenty();

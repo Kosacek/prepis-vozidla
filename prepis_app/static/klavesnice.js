@@ -128,7 +128,7 @@
       stary.replaceWith(novy);
       vynulujStav();
       document.getElementById('nav-back').style.display = 'none';
-      document.getElementById('nav-back').textContent = '← Zpět';
+      document.getElementById('nav-back').textContent = 'Zpět';
       const dal = document.getElementById('nav-next');
       dal.style.display = ''; dal.disabled = false;
       _kameraOtoceniUI();
