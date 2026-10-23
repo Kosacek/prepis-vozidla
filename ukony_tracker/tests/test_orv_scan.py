@@ -126,8 +126,8 @@ def test_fill_matrix(conn, make, fields, expected, changes):
 def test_vin_preference_creates_even_if_rz_belongs_to_another_vin(conn, make):
     make(vin="OTHER", rz=DATA["rz"])
     before = conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0]
-    assert scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())["stav"] == "zalozeno"
-    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before + 1
+    assert scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())["stav"] == "bez_firmy"
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}))
     assert result["stav"] == "doplneno" and result["doplneno"] == ["orv"]
 
@@ -230,7 +230,8 @@ def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
 def test_car_back_after_window_is_a_new_ukon_not_the_old_one(conn, make, filled):
     # 2026-10-21: EL375AT from August (JE & NE) got its ORV overwritten by a
     # new techničák — the car had been sold and bought back. Old úkony stay as they are.
-    old_date = (date.today() - timedelta(days=scan.MATCH_WINDOW_DAYS + 1)).isoformat()
+    window = scan.MATCH_WINDOW_DAYS if filled else scan.AWAITING_WINDOW_DAYS
+    old_date = (date.today() - timedelta(days=window + 1)).isoformat()
     fields = {"rz": "1AA1111", "orv": "UBC425944"} if filled else {}
     old = make(datum=old_date, **fields)
     before = dict(ukony_repo.get(conn, old))
@@ -265,6 +266,32 @@ def test_owner_on_orv_must_be_the_new_owner_of_that_sale(conn, make, prevod, ope
     else:
         assert dict(ukony_repo.get(conn, uid)) == before
         assert result["stav"] in ("zalozeno", "bez_firmy") and result["predchozi"]["id"] == uid
+
+
+def test_new_car_waiting_for_its_plate_is_filled_days_later(conn, make):
+    # 2026-10-23: NOVÉ úkony from 21.10. with empty RZ/ORV (Cardion) were
+    # skipped as "too old" and the scan made duplicate ORV rows instead.
+    two_days = (date.today() - timedelta(days=2)).isoformat()
+    uid = make(datum=two_days, typ_kod="NOVÉ", prevod="CARDION s.r.o.")
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert ukony_repo.get(conn, uid)["rz"] == DATA["rz"]
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_complete_ukon_from_two_days_ago_is_not_overwritten(conn, make):
+    uid = make(datum=(date.today() - timedelta(days=2)).isoformat(), rz="1AA1111", orv="UBC425944")
+    before = dict(ukony_repo.get(conn, uid))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "bez_firmy" and result["predchozi"]["id"] == uid
+    assert dict(ukony_repo.get(conn, uid)) == before
+
+
+def test_waiting_ukon_older_than_window_is_left_alone(conn, make):
+    old = (date.today() - timedelta(days=scan.AWAITING_WINDOW_DAYS + 1)).isoformat()
+    uid = make(datum=old)
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "bez_firmy" and ukony_repo.get(conn, uid)["rz"] is None
 
 
 def test_api_fill_still_refuses_to_overwrite(conn, make):

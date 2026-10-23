@@ -46,10 +46,8 @@ def fragment():
     _session_id()  # Set cookie before the browser launches parallel uploads.
     conn = db.get_db()
     types = typy_repo.list_active(conn)
-    default_type = next((t["kod"] for t in types if t["kod"] == "ORV"),
-                        types[0]["kod"] if types else "")
     return render_template("_orv_sken.html", firmy=firmy_repo.list_all(conn, only_active=True),
-                           typy=types, default_typ=default_type, profily=config.PROFILY), \
+                           typy=types, profily=config.PROFILY), \
         200, {"Cache-Control": "no-store"}
 
 

@@ -37,3 +37,12 @@ test('a car seen before shows the earlier úkon, not as a match', () => {
   assert.equal(line.textContent, 'Dříve 26. 8. 2026 · JE & NE · PŘEVOD');
   assert.equal(R.earlier({}), null);
 });
+
+test('new cars need a chosen type; the firm from the document is preselected', () => {
+  const R = require('../static/js/orv_report.js');
+  const sel = (firm, typ) => ({querySelector: id => ({'#orv-batch-firma': {value: firm}, '#orv-batch-typ': {value: typ}})[id]});
+  const photos = [{result: {stav: 'bez_firmy'}, firmaOverride: '7'}, {result: {stav: 'bez_firmy'}}];
+  assert.deepEqual(R.selected(sel('', ''), photos), []);
+  assert.deepEqual(R.selected(sel('', 'NOVÉ'), photos).map(x => [x.firma_id, x.typ_kod]), [['7', 'NOVÉ']]);
+  assert.equal(R.selected(sel('3', 'PŘEVOD'), photos).length, 2);
+});

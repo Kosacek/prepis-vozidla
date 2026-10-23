@@ -48,7 +48,7 @@
     <div id="orv-counts" class="orv-counts" aria-label="Souhrn výsledků"></div>
   </div>
   <form id="orv-assign" class="card orv-assign ask-reveal" hidden>
-    <h3>K jaké firmě přiřadit?</h3>
+    <h3>Nová auta</h3>
     <div class="orv-assign-defaults">
       <label>Firma
         <select id="orv-batch-firma">
@@ -57,8 +57,9 @@
         </select>
       </label>
       <label>Typ
-        <select id="orv-batch-typ">
-          {% for typ in typy %}<option value="{{ typ.kod }}" {{ 'selected' if typ.kod == default_typ }}>{{ typ.kod }}</option>{% endfor %}
+        <select id="orv-batch-typ" required>
+          <option value="" selected>—</option>
+          {% for typ in typy %}<option value="{{ typ.kod }}">{{ typ.kod }}</option>{% endfor %}
         </select>
       </label>
     </div>

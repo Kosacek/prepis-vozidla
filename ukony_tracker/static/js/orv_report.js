@@ -1,7 +1,7 @@
 (function (root) {
   const GROUPS = {konflikt: 0, vice_shod: 0, bez_firmy: 0, nenalezeno: 0, chyba: 0,
     zalozeno: 1, doplneno: 2, uz_doplneno: 3, necitelne: 4};
-  const LABELS = {konflikt: 'Ke kontrole', vice_shod: 'Více shod', bez_firmy: 'Nepřiřazeno',
+  const LABELS = {konflikt: 'Ke kontrole', vice_shod: 'Více shod', bez_firmy: 'Nové auto',
     nenalezeno: 'Nenalezeno', chyba: 'Chyba', zalozeno: 'Založeno', doplneno: 'Doplněno',
     uz_doplneno: 'Beze změny', necitelne: 'Nečitelné'};
   const FIELD_LABELS = {rz: 'RZ', orv: 'ORV'};
@@ -149,10 +149,12 @@
       const name = result.rz || result.vin || 'Bez RZ/VIN';
       row.append(el('div', 'orv-unassigned-car', name +
         (result.orv_cislo ? ' · ORV ' + result.orv_cislo : '') +
-        (result.provozovatel ? ' · ' + result.provozovatel : '') + ' · Nepřiřazeno'));
+        (result.provozovatel ? ' · ' + result.provozovatel : '')));
       const select = el('select', 'orv-car-firma');
       select.setAttribute('aria-label', 'Firma pro ' + name);
-      const inherit = el('option', '', 'Použít společnou firmu'); inherit.value = '';
+      // Firma z techničáku je jen předvybraná; potvrzuje ji uživatel.
+      if (photo.firmaOverride === undefined && result.navrh_firma_id) photo.firmaOverride = String(result.navrh_firma_id);
+      const inherit = el('option', '', 'Společná firma'); inherit.value = '';
       select.append(inherit);
       rootEl.querySelectorAll('#orv-batch-firma option').forEach(opt => {
         if (!opt.value) return;
@@ -169,7 +171,7 @@
     const firm = rootEl.querySelector('#orv-batch-firma').value;
     const typ = rootEl.querySelector('#orv-batch-typ').value;
     return photos.filter(p => p.result && p.result.stav === 'bez_firmy').map(p => ({photo: p,
-      firma_id: p.firmaOverride || firm, typ_kod: typ})).filter(x => x.firma_id);
+      firma_id: p.firmaOverride || firm, typ_kod: typ})).filter(x => x.firma_id && x.typ_kod);
   }
   function updateCreateCount(rootEl, photos) {
     const count = selected(rootEl, photos).length;

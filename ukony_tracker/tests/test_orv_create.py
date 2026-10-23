@@ -61,17 +61,12 @@ def _ready(conn, *, override=1300):
     return fid
 
 
-def test_auto_create_uses_match_type_price_today_and_photo_fields(conn):
+def test_scan_never_creates_an_ukon_and_only_preselects_the_firm(conn):
+    # David 2026-10-23: no automatic "ORV · 1 000 Kč · Z TECHNIČÁKU" rows.
     fid = _ready(conn)
     result = scan.zpracuj(conn, b"photo", "image/jpeg", client=FakeClient(PHOTO), zpracoval="David")
-    assert result["stav"] == "zalozeno"
-    u = ukony_repo.get(conn, result["ukon"]["id"])
-    assert result["ukon"] == {"id": u["id"], "datum": date.today().isoformat(),
-                              "firma": "BSAuto", "typ": "ORV", "celkem": 1300.0}
-    assert (u["firma_id"], u["typ_kod"], u["celkem"], u["datum"]) == (
-        fid, "ORV", 1300, date.today().isoformat())
-    assert (u["rz"], u["vin"], u["orv"]) == (PHOTO["rz"], VIN, PHOTO["orv_cislo"])
-    assert (u["poznamka"], u["zpracoval"], u["zdroj"]) == ("Z TECHNIČÁKU", "David", "orv_sken")
+    assert result["stav"] == "bez_firmy" and result["navrh_firma_id"] == fid
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 0
 
 
 def test_no_confident_firm_returns_bez_firmy_without_insert_and_no_identifier_stays_uncreated(conn):
@@ -79,7 +74,7 @@ def test_no_confident_firm_returns_bez_firmy_without_insert_and_no_identifier_st
     before = conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0]
     unmatched = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(
         {**PHOTO, "provozovatel": "Neznámá společnost"}))
-    assert unmatched["stav"] == "bez_firmy"
+    assert unmatched["stav"] == "bez_firmy" and unmatched["navrh_firma_id"] is None
     assert {k: unmatched[k] for k in ("rz", "vin", "orv_cislo", "provozovatel", "vin_zdroj")} == {
         "rz": PHOTO["rz"], "vin": VIN, "orv_cislo": PHOTO["orv_cislo"],
         "provozovatel": "Neznámá společnost", "vin_zdroj": "foto"}
@@ -89,10 +84,23 @@ def test_no_confident_firm_returns_bez_firmy_without_insert_and_no_identifier_st
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before
 
 
-def test_same_vehicle_is_created_once_for_repeated_and_concurrent_photos(conn):
-    _ready(conn)
-    first = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(PHOTO))
-    second = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(PHOTO))
+def test_user_chosen_firm_and_type_create_with_price_and_no_note(conn):
+    fid = _ready(conn)
+    data = {**PHOTO, "vin_zdroj": "foto"}
+    result = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV", zpracoval="David")
+    assert result["stav"] == "zalozeno"
+    u = ukony_repo.get(conn, result["ukon"]["id"])
+    assert (u["firma_id"], u["typ_kod"], u["celkem"], u["datum"]) == (
+        fid, "ORV", 1300, date.today().isoformat())
+    assert (u["rz"], u["vin"], u["orv"]) == (PHOTO["rz"], VIN, PHOTO["orv_cislo"])
+    assert (u["poznamka"], u["zpracoval"], u["zdroj"]) == (None, "David", "orv_sken")
+
+
+def test_same_vehicle_is_created_once_for_repeated_and_concurrent_assignments(conn):
+    fid = _ready(conn)
+    data = {**PHOTO, "vin_zdroj": "foto"}
+    first = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV")
+    second = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV")
     assert [first["stav"], second["stav"]] == ["zalozeno", "uz_doplneno"]
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
 
@@ -102,7 +110,7 @@ def test_same_vehicle_is_created_once_for_repeated_and_concurrent_photos(conn):
     def process(_):
         c = db.connect(path)
         try:
-            return scan.zpracuj(c, b"p", "image/jpeg", client=FakeClient(PHOTO))["stav"]
+            return scan.zalozit_pro_firmu(c, data, firma_id=fid, typ_kod="ORV")["stav"]
         finally:
             c.close()
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -110,16 +118,6 @@ def test_same_vehicle_is_created_once_for_repeated_and_concurrent_photos(conn):
     assert states.count("zalozeno") == 1
     assert states.count("uz_doplneno") == 2
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
-
-
-def test_missing_orv_type_uses_first_active_type_and_marks_fallback(conn):
-    _ready(conn)
-    conn.execute("DELETE FROM typy_ukonu WHERE kod='ORV'")
-    conn.commit()
-    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(PHOTO))
-    assert result["stav"] == "zalozeno"
-    assert result["ukon"]["typ"] == "KOLA" and result["typ_nahrada"] is True
-    assert "KOLA" in result["zprava"]
 
 
 @pytest.fixture

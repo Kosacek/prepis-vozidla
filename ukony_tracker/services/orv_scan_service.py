@@ -12,12 +12,15 @@ from services.ingest_service import pridat_ukon
 from services.vehicle_fill_service import FillError, doplnit, transaction
 
 MODEL = "claude-haiku-5-5"
-# A techničák belongs only to an úkon from today or yesterday whose new owner
-# (right side of the "z koho → na koho" line) is the provozovatel on the ORV.
-# Anything else is another sale — cars get sold and bought back — so it is
-# never filled or overwritten; the scan creates a new úkon (David 2026-10-21:
-# rather a new úkon to check than a missed one).
+# Which existing úkon a techničák belongs to (David 2026-10-21/23):
+# - an úkon still WAITING for its RZ/ORV (typically NOVÉ from the last days)
+#   is filled, up to AWAITING_WINDOW_DAYS old;
+# - a COMPLETE úkon is overwritten only from today/yesterday (MATCH_WINDOW_DAYS);
+# - in both cases the ORV provozovatel must be the úkon's new owner when both
+#   are known. Anything else is another sale (cars get sold and bought back):
+#   the old úkon stays untouched and the user decides about a new one.
 MATCH_WINDOW_DAYS = 1
+AWAITING_WINDOW_DAYS = 30
 
 
 def _new_owner(prevod):
@@ -27,8 +30,10 @@ def _new_owner(prevod):
     return prevod.rsplit("→", 1)[1].strip() or None
 
 
-def _same_sale(ukon, data, since):
-    if (ukon["datum"] or "") < since:
+def _same_sale(ukon, data, values):
+    awaiting = any(not (ukon[k] or "").strip() for k in values)
+    days = AWAITING_WINDOW_DAYS if awaiting else MATCH_WINDOW_DAYS
+    if (ukon["datum"] or "") < (date.today() - timedelta(days=days)).isoformat():
         return False
     # Unknown owner on either side → the date alone decides.
     return same_party(_new_owner(ukon["prevod"]), data.get("provozovatel")) is not False
@@ -112,13 +117,6 @@ def _view(ukon):
             "typ": ukon["typ_kod"], "celkem": float(ukon["celkem"])}
 
 
-def _default_type(conn):
-    types = typy_repo.list_active(conn)
-    orv_type = next((t for t in types if t["kod"] == "ORV"), None)
-    chosen = orv_type or (types[0] if types else None)
-    return (chosen["kod"], not bool(orv_type)) if chosen else (None, False)
-
-
 def _base(data):
     return {"stav": "chyba", "rz": data.get("rz"), "vin": data.get("vin"),
             "orv_cislo": data.get("orv_cislo"), "provozovatel": data.get("provozovatel"),
@@ -135,8 +133,7 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
         found = ukony_repo.find_by_vehicle_any_firm(
             conn, vin=data.get("vin"),
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
-        since = (date.today() - timedelta(days=MATCH_WINDOW_DAYS)).isoformat()
-        rows = [u for u in found if _same_sale(u, data, since)]
+        rows = [u for u in found if _same_sale(u, data, values)]
         other = [u for u in found if u not in rows]
         if other and not rows:
             result["predchozi"] = _view(other[0])
@@ -167,15 +164,17 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
             result.update(stav="nenalezeno", zprava="Chybí čitelná RZ i VIN.")
             return result
         if auto_firma:
+            # Never create from the photo alone (David 2026-10-23: no automatic
+            # "ORV · 1 000 Kč" rows) — the user picks firm and type at the end
+            # of the batch; the firm on the ORV is only pre-selected.
             matched = match_firma(conn, data.get("provozovatel"))
-            firma_id = matched["firma_id"] if matched else None
-        if not firma_id:
-            result.update(stav="bez_firmy", zprava="Firma nebyla jednoznačně nalezena.")
+            result.update(stav="bez_firmy", zprava="Nové auto — vyber firmu a typ.",
+                          navrh_firma_id=matched["firma_id"] if matched else None)
             return result
-        fallback_type = False
-        if typ_kod is None:
-            typ_kod, fallback_type = _default_type(conn)
-        typ = typy_repo.get_by_kod(conn, typ_kod) if typ_kod else None
+        if not firma_id or not typ_kod:
+            result.update(stav="bez_firmy", zprava="Vyber firmu a typ.")
+            return result
+        typ = typy_repo.get_by_kod(conn, typ_kod)
         if not typ or not typ["aktivni"]:
             result.update(stav="chyba", zprava="Typ úkonu není aktivní.")
             return result
@@ -189,16 +188,14 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
         uid = pridat_ukon(
             conn, firma_id=firma_id, datum=today, typ_kod=typ_kod, celkem=price,
             rz=data.get("rz"), vin=data.get("vin"), orv=data.get("orv_cislo"),
-            poznamka="Z TECHNIČÁKU", zpracoval=zpracoval, zdroj="orv_sken", commit=False,
+            zpracoval=zpracoval, zdroj="orv_sken", commit=False,
         )
         result["ukon"] = {"id": uid, "datum": today, "firma": firm["nazev"],
                            "typ": typ_kod, "celkem": price}
         result["zmeny"] = {field: {"pred": None, "po": value}
                            for field, value in (("rz", data.get("rz")),
                                                 ("orv", data.get("orv_cislo"))) if value}
-        result.update(stav="zalozeno", zprava="Nový úkon založen.", typ_nahrada=fallback_type)
-        if fallback_type:
-            result["zprava"] = f"Typ ORV není aktivní; použit typ {typ_kod}."
+        result.update(stav="zalozeno", zprava="Nový úkon založen.")
         return result
 
 
