@@ -93,18 +93,23 @@
 
   /* Žádosti bez myši: štítek ↵ u toho, co právě udělá Enter (static/klavesnice.js
      nastavuje body[data-enter]). U návrhů je to zvýrazněný řádek. */
+  /* Badge = a flex item of a centred flex button, the arrow is a drawn icon
+     centred in it (a glyph like ↵ rides the text baseline and looks off). */
+  #quick-scan-btn, #nav-next, #output-card .out-reset .btn { display: inline-flex; align-items: center; justify-content: center; }
   body[data-enter="sken"] #quick-scan-btn::after,
   body[data-enter="dal"] #nav-next::after,
   body[data-enter="nova"] #output-card .out-reset .btn::after,
   .firm-option.active:not(.add-new)::after {
-    content: "↵"; display: inline-grid; place-items: center; min-width: 22px; height: 20px;
-    margin-left: 8px; padding: 0 5px; border-radius: 5px; font: 600 12px/1 ui-monospace, Consolas, monospace;
-    background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.45); color: inherit; vertical-align: middle;
+    content: ""; flex: none; width: 24px; height: 20px; margin-left: 10px; border-radius: 5px; box-sizing: border-box;
+    background: rgba(255,255,255,.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/svg%3E") center / 13px 13px no-repeat;
+    border: 1px solid rgba(255,255,255,.4);
   }
   body[data-enter="nova"] #output-card .out-reset .btn::after,
-  .firm-option.active:not(.add-new)::after { background: #f1f3f5; border-color: #d1d5db; color: #374151; }
-  .firm-option.active:not(.add-new) { position: relative; padding-right: 42px; }
-  .firm-option.active:not(.add-new)::after { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); margin: 0; }
+  .firm-option.active:not(.add-new)::after {
+    background: #f1f3f5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 10 4 15 9 20'/%3E%3Cpath d='M20 4v7a4 4 0 0 1-4 4H4'/%3E%3C/svg%3E") center / 13px 13px no-repeat; border-color: #d1d5db;
+  }
+  .firm-option.active:not(.add-new) { position: relative; padding-right: 44px; }
+  .firm-option.active:not(.add-new)::after { position: absolute; right: 10px; top: calc(50% - 10px); margin: 0; }
   body:has(.firm-dropdown.open) #nav-next::after { display: none; }
   .okna-blokovana { margin-top: 10px; font-size: 13px; color: #9a5b00; }
 
