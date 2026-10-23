@@ -18,7 +18,7 @@ import pytest
 
 TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "templates", "index.html")
 START = "let cameraStream = null;"
-END = "window.addEventListener('pagehide', () => { closeCamera(); });"
+END = "window.addEventListener('pagehide', () => { closeCamera('pagehide'); });"
 
 # Falešný prohlížeč: jen to, na co kód kamery sahá.
 FAKE = r"""
@@ -89,11 +89,29 @@ def test_odchod_z_kroku_1_behem_otevirani_kameru_pusti():
     assert s["zive"] == 0, "kamera běží skrytá i po odchodu z kroku 1"
 
 
-def test_pozde_dorazeny_proud_se_zastavi_i_bez_closeCamera():
-    """Pojistka: i kdyby closeCamera nikdo nezavolal, proud z kroku, kde už
-    nejsme, se nesmí ujmout."""
-    s = _spust("tryAutoOpenCamera(); await pockej(20); stav.panel = 3;")
-    assert s["zive"] == 0
+def test_proud_dorazeny_po_odchodu_z_kroku_1_se_ujme_a_je_jen_jeden():
+    """Od v1.26.0 kamera běží celou dobu (David, 2026-10-23) — proud, který
+    dorazí, až když je uživatel o krok dál, se ujme. Osiřelý ale být nesmí:
+    drží ho cameraStream, takže ho closeCamera i pagehide najdou."""
+    s = _spust("tryAutoOpenCamera(); await pockej(20); stav.panel = 3; await pockej(150);"
+               " tryAutoOpenCamera(); stav.panel = 1; tryAutoOpenCamera();")
+    assert s["otevreno"] == 1 and s["zive"] == 1
+
+
+def test_patnact_zadosti_za_sebou_kamera_se_zapne_jen_jednou():
+    """To hlavní z v1.26.0: po ~5 zapnutích a vypnutích USB kamera zamrzla.
+    Nová žádost stránku neobnovuje a kroky kameru nevypínají — za celý den
+    se tedy zapne jednou."""
+    s = _spust("""
+      for (let i = 0; i < 15; i++) {
+        stav.panel = 1; tryAutoOpenCamera();
+        await pockej(i === 0 ? 150 : 10);
+        stav.panel = 4; await pockej(10);
+        stav.panel = 5; await pockej(10);
+      }
+      stav.panel = 1; tryAutoOpenCamera();
+    """)
+    assert s["otevreno"] == 1 and s["zastaveno"] == 0 and s["zive"] == 1
 
 
 def test_nova_zadost_kameru_pusti_pred_obnovenim_stranky():

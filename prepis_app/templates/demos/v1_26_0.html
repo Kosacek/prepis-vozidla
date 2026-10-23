@@ -1,0 +1,77 @@
+{# Demo for release 1.26.0 (Žádost bez myši): three keystrokes in turn —
+   Enter (ORV photo is scanned), Enter (a suggestion is taken), Ctrl+Enter
+   (the documents fan out as tabs). Each key presses down and its result
+   appears under it. CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1260-demo {
+    box-sizing: border-box; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center;
+    font-size: 10px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1260-krok { display: grid; justify-items: center; gap: 8px; }
+  .dz1260-keys { display: flex; gap: 3px; height: 26px; align-items: flex-end; }
+  .dz1260-key {
+    height: 22px; padding: 0 7px; display: grid; place-items: center; border-radius: 5px;
+    font: 700 10px/1 ui-monospace, Consolas, monospace; background: var(--wn-card);
+    border: 1px solid var(--wn-line); border-bottom-width: 3px; color: var(--wn-ink);
+  }
+  .dz1260-k1 .dz1260-key { animation: dz1260-p1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-k2 .dz1260-key { animation: dz1260-p2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-k3 .dz1260-key { animation: dz1260-p3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-vysl {
+    box-sizing: border-box; width: 100%; height: 58px; border: 1px solid var(--wn-line); border-radius: 8px;
+    background: var(--wn-card); display: grid; place-items: center; opacity: .35; position: relative;
+  }
+  .dz1260-k1 .dz1260-vysl { animation: dz1260-v1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-k2 .dz1260-vysl { animation: dz1260-v2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-k3 .dz1260-vysl { animation: dz1260-v3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  /* 1: ORV under the camera, a scan line passes */
+  .dz1260-orv { width: 46px; height: 30px; border-radius: 3px; background: var(--wn-soft); position: relative; overflow: hidden; }
+  .dz1260-orv::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--wn-accent);
+    animation: dz1260-scan 6s linear infinite; }
+  /* 2: a suggestion row with ↵ */
+  .dz1260-navrh { width: 80%; padding: 5px 6px; border-radius: 5px; background: var(--wn-soft);
+    box-shadow: inset 2px 0 0 var(--wn-accent); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 3: three tabs fanning out */
+  .dz1260-tab { position: absolute; width: 34px; height: 40px; border-radius: 3px; background: #fff;
+    border: 1px solid var(--wn-line); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .dz1260-t1 { animation: dz1260-t1 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-t2 { animation: dz1260-t2 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .dz1260-t3 { animation: dz1260-t3 6s cubic-bezier(.2, .7, .3, 1) infinite; }
+
+  @keyframes dz1260-p1 { 0%, 8% { transform: none; border-bottom-width: 3px; } 11% { transform: translateY(2px); border-bottom-width: 1px; background: var(--wn-soft); } 16%, 100% { transform: none; border-bottom-width: 3px; } }
+  @keyframes dz1260-p2 { 0%, 38% { transform: none; border-bottom-width: 3px; } 41% { transform: translateY(2px); border-bottom-width: 1px; background: var(--wn-soft); } 46%, 100% { transform: none; border-bottom-width: 3px; } }
+  @keyframes dz1260-p3 { 0%, 64% { transform: none; border-bottom-width: 3px; } 67% { transform: translateY(2px); border-bottom-width: 1px; background: var(--wn-soft); } 72%, 100% { transform: none; border-bottom-width: 3px; } }
+  @keyframes dz1260-v1 { 0%, 10% { opacity: .35; } 16%, 92% { opacity: 1; border-color: var(--wn-accent); } 100% { opacity: .35; } }
+  @keyframes dz1260-v2 { 0%, 40% { opacity: .35; } 46%, 92% { opacity: 1; border-color: var(--wn-accent); } 100% { opacity: .35; } }
+  @keyframes dz1260-v3 { 0%, 66% { opacity: .35; } 72%, 92% { opacity: 1; border-color: var(--wn-accent); } 100% { opacity: .35; } }
+  @keyframes dz1260-scan { 0%, 10% { top: -2px; opacity: 0; } 12% { opacity: 1; } 30% { top: 30px; opacity: 1; } 31%, 100% { top: 30px; opacity: 0; } }
+  @keyframes dz1260-t1 { 0%, 66% { transform: none; } 76%, 92% { transform: translateX(-16px) rotate(-6deg); } 100% { transform: none; } }
+  @keyframes dz1260-t2 { 0%, 66% { transform: none; } 76%, 92% { transform: none; } 100% { transform: none; } }
+  @keyframes dz1260-t3 { 0%, 66% { transform: none; } 76%, 92% { transform: translateX(16px) rotate(6deg); } 100% { transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: all three results shown, tabs fanned out. */
+    .dz1260-demo *, .dz1260-orv::after { animation: none !important; }
+    .dz1260-vysl { opacity: 1; }
+    .dz1260-t1 { transform: translateX(-16px) rotate(-6deg); }
+    .dz1260-t3 { transform: translateX(16px) rotate(6deg); }
+  }
+</style>
+<div class="dz1260-demo" aria-hidden="true">
+  <div class="dz1260-krok dz1260-k1">
+    <div class="dz1260-keys"><span class="dz1260-key">Enter</span></div>
+    <div class="dz1260-vysl"><span class="dz1260-orv"></span></div>
+  </div>
+  <div class="dz1260-krok dz1260-k2">
+    <div class="dz1260-keys"><span class="dz1260-key">Enter</span></div>
+    <div class="dz1260-vysl"><span class="dz1260-navrh">AUTO CARDION ↵</span></div>
+  </div>
+  <div class="dz1260-krok dz1260-k3">
+    <div class="dz1260-keys"><span class="dz1260-key">Ctrl</span><span class="dz1260-key">Enter</span></div>
+    <div class="dz1260-vysl">
+      <span class="dz1260-tab dz1260-t1"></span><span class="dz1260-tab dz1260-t3"></span><span class="dz1260-tab dz1260-t2"></span>
+    </div>
+  </div>
+</div>

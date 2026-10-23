@@ -27,6 +27,11 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.26.0", date(2026, 10, 23), "Žádost bez myši",
+            ("Enter vyfotí ORV, vezme návrh a jde dál; Ctrl+Enter otevře "
+             "všechny dokumenty k tisku. Zkratky ukáže klávesa ?.",
+             "Kamera teď běží pořád, tak by už neměla zamrzat."),
+            demo="v1_26_0"),
     Release("1.25.0", date(2026, 10, 14), "Náhled před tiskem",
             ("Kód teď vždycky ukáže obrázek každého dokumentu, ať hned vidíš, "
              "že tiskneš ten správný.",

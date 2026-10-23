@@ -91,6 +91,38 @@
   .kb-hint  { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; }
   .kb-key   { background:#f1f3f5; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; font-size:10px; font-family:monospace; color:#374151; }
 
+  /* Žádosti bez myši: štítek ↵ u toho, co právě udělá Enter (static/klavesnice.js
+     nastavuje body[data-enter]). U návrhů je to zvýrazněný řádek. */
+  body[data-enter="sken"] #quick-scan-btn::after,
+  body[data-enter="dal"] #nav-next::after,
+  body[data-enter="nova"] #output-card .out-reset .btn::after,
+  .firm-option.active:not(.add-new)::after {
+    content: "↵"; display: inline-grid; place-items: center; min-width: 22px; height: 20px;
+    margin-left: 8px; padding: 0 5px; border-radius: 5px; font: 600 12px/1 ui-monospace, Consolas, monospace;
+    background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.45); color: inherit; vertical-align: middle;
+  }
+  body[data-enter="nova"] #output-card .out-reset .btn::after,
+  .firm-option.active:not(.add-new)::after { background: #f1f3f5; border-color: #d1d5db; color: #374151; }
+  .firm-option.active:not(.add-new) { position: relative; padding-right: 42px; }
+  .firm-option.active:not(.add-new)::after { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); margin: 0; }
+  body:has(.firm-dropdown.open) #nav-next::after { display: none; }
+  .okna-blokovana { margin-top: 10px; font-size: 13px; color: #9a5b00; }
+
+  /* Tahák zkratek (klávesa ?) */
+  .tahak-scrim { position: fixed; inset: 0; z-index: 900; background: rgba(15,23,42,.45); display: none;
+                 align-items: center; justify-content: center; padding: 16px; }
+  .tahak-scrim.open { display: flex; }
+  .tahak { background: var(--card); border-radius: 16px; box-shadow: 0 12px 48px rgba(0,0,0,.22); width: 100%;
+           max-width: 420px; padding: 20px 22px; display: grid; gap: 16px; }
+  .th-nadpis { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .th-radek { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: center; font-size: 14px; padding: 3px 0; }
+  .th-klavesy { display: flex; align-items: center; gap: 3px; }
+  .th-klavesy kbd { font: 600 12px/1 ui-monospace, Consolas, monospace; background: #f6f7f9; border: 1px solid #d1d5db;
+                    border-bottom-width: 2px; border-radius: 5px; padding: 4px 7px 3px; color: var(--text); }
+  .th-mezi { color: var(--muted); font-size: 12px; }
+  @media (prefers-reduced-motion: no-preference) { .tahak-scrim.open .tahak { animation: tahak-in .16s ease-out; } }
+  @keyframes tahak-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+
   /* Cards */
   .card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); padding: 28px 34px; margin-bottom: 20px; box-shadow: var(--shadow); }
   .card-title { font-size: 21px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
@@ -794,7 +826,7 @@
           </button>
         </div>
         <div class="scan-actions">
-          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (NumPad Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV <span class="scan-kbd">⌨ NumPad Enter</span></button>
+          <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV</button>
           <button id="evidence-scan-btn" onclick="pridatDoEvidence()" title="Najde auto v evidenci a doplní RZ, nebo založí nový úkon" style="padding:10px 14px;background:#fff;border:1.5px solid var(--primary);color:var(--primary);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Přidat do evidence</button>
         </div>
       </div>
@@ -1254,6 +1286,7 @@
           <button id="btn-pojisteni" class="btn-download btn-ckp" onclick="checkInsurance()" style="display:none;" title="Otevře ČKP s předvyplněným VIN (nebo SPZ) — zaškrtni prohlášení nahoře a vyřeš captchu sám"><svg class="ico"><use href="#i-shield"></use></svg> Pojištění (ČKP)</button>
         </div>
       </div>
+      <div id="okna-blokovana" class="okna-blokovana" hidden></div>
       <div id="plne-moce-links" style="display:none;flex-direction:column;align-items:center;gap:4px"></div>
       <div class="out-reset">
         <button class="btn btn-secondary" onclick="resetForm()">Nová žádost</button>
@@ -1409,9 +1442,10 @@
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat →</button>
 </div>
 <div class="kb-hints">
-  <span class="kb-hint"><span class="kb-key">Enter</span> / <span class="kb-key">→</span> další krok</span>
-  <span class="kb-hint"><span class="kb-key">Esc</span> / <span class="kb-key">←</span> zpět</span>
-  <span class="kb-hint"><span class="kb-key">Ctrl</span>+<span class="kb-key">Enter</span> generovat PDF</span>
+  <span class="kb-hint"><span class="kb-key">Enter</span> další krok</span>
+  <span class="kb-hint"><span class="kb-key">Esc</span> zpět</span>
+  <span class="kb-hint"><span class="kb-key">Ctrl</span>+<span class="kb-key">Enter</span> vytisknout vše</span>
+  <span class="kb-hint"><span class="kb-key">?</span> zkratky</span>
 
 </div>
 
@@ -1526,6 +1560,9 @@ function prvniPrazdne(panelEl) {
 let appMode = 'prevod';
 let flowIdx = 0;
 let generatedUrls = {};
+// Ctrl+Enter / Enter na posledním kroku: po vygenerování rovnou otevřít
+// všechny dokumenty (static/klavesnice.js). Klik myší nechává výsledek jako dřív.
+let _otevritPoGenerovani = false;
 // Stable id for THIS žádost — sent to the evidence tracker so regenerating the
 // same form doesn't create a duplicate úkon. A fresh page ("Nová žádost"
 // reloads) gets a new one.
@@ -1578,34 +1615,58 @@ function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'TEXTAREA') return;
 
-  // Panel 1: Tab cycles between mode cards, Enter selects + advances
+  // Krok 1 (Žádosti bez myši, v1.26.0): číslice 1–6 vyberou typ, Enter
+  // vyfotí ORV a sken sám posune dál; Shift+Enter jde dál bez skenu. Plná moc
+  // nic neskenuje. Platí i pro Enter na numerické klávesnici (e.key je stejný).
   if (currentPanel() === 1) {
     const cards = Array.from(document.querySelectorAll('.mode-card'));
+    const vPoli = ['INPUT', 'SELECT'].includes(e.target.tagName);
     if (e.key === 'Tab') {
       e.preventDefault();
       const idx = cards.indexOf(document.activeElement);
       cards[(idx + 1) % cards.length].focus();
       return;
     }
-    if (e.key === 'Enter') {
+    // Podle fyzické klávesy (e.code): na české klávesnici horní řada píše
+    // „+ěščřž", ne číslice. Funguje i numerická klávesnice.
+    const cislo = /^(?:Digit|Numpad)([1-9])$/.exec(e.code || '');
+    if (!vPoli && !e.ctrlKey && !e.altKey && !e.metaKey && cislo && cards[+cislo[1] - 1]) {
+      e.preventDefault();
+      selectMode(cards[+cislo[1] - 1], true);
+      cards[+cislo[1] - 1].focus();
+      return;
+    }
+    if (e.key === 'Enter' && !e.ctrlKey) {
+      if (e.target.tagName === 'BUTTON' && !e.target.classList.contains('mode-card')) return;
       e.preventDefault();
       const focused = document.activeElement;
-      if (focused.classList.contains('mode-card')) selectMode(focused);
-      navNext();
+      if (focused && focused.classList.contains('mode-card')) selectMode(focused, true);
+      if (!e.shiftKey && cameraStream && appMode !== 'pm') quickScanOrv();
+      else navNext();
       return;
     }
   }
 
-
+  const hotovo = document.getElementById('output-card').style.display !== 'none';
   if (e.key === 'Enter' && e.ctrlKey) {
     e.preventDefault();
-    generatePDFs();   // show results card; user presses the print buttons
+    if (hotovo) { otevriVsechnyDokumenty(); return; }
+    _otevritPoGenerovani = appMode !== 'pm';
+    generatePDFs();   // a po vygenerování rovnou otevře všechny dokumenty
     return;
   }
   if (e.key === 'Enter') {
     if (e.target.classList.contains('btn-lookup') || e.target.classList.contains('type-btn')) return;
-    if (currentPanel() === 5 && document.getElementById('output-card').style.display !== 'none') return;
+    if (hotovo) {
+      // Všechno vytištěné, zpátky v appce (Ctrl+W) → Enter = nová žádost.
+      // Zaměřené tlačítko (Kopírovat odkaz…) ale dál dělá to svoje.
+      if (['BUTTON', 'A'].includes(e.target.tagName)) return;
+      e.preventDefault();
+      resetForm();
+      return;
+    }
     e.preventDefault();
+    if (flowIdx >= FLOWS[appMode].panels.length - 1 && appMode !== 'pm') _otevritPoGenerovani = true;
     navNext();
   }
   if (e.key === 'Escape') navBack();
@@ -1628,12 +1689,12 @@ function popiskyVlastnika() {
   set('prov-sekce-nadpis',  novy ? 'Nový provozovatel' : 'Provozovatel');
 }
 
-function selectMode(el) {
+function selectMode(el, zustat = false) {
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   appMode = el.dataset.mode;
   renderStepper();
-  setTimeout(() => navNext(), 150);
+  if (!zustat) setTimeout(() => navNext(), 150);
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -1748,9 +1809,9 @@ function activatePanel(n) {
 }
 
 function _aktivujPanel(n) {
-  // Close camera when leaving panel-1 so the device is fully released
-  // (i když se zrovna otevírá — jinak by dorazila až po odchodu a běžela skrytá)
-  if (n !== 1 && (cameraStream || _camOpening)) closeCamera();
+  // Kamera se při odchodu z kroku 1 NEvypíná (David, 2026-10-23): po ~5
+  // zapnutích a vypnutích se USB kamera na Windows zasekla. Běží celou dobu,
+  // co je appka otevřená, a „Nová žádost" stránku neobnovuje (static/klavesnice.js).
   document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`panel-${n}`).classList.add('active');
   // The generate step uses a wider two-column layout (inputs + Shrnutí sidebar).
@@ -3440,6 +3501,8 @@ async function generatePDFs() {
   document.getElementById('ppd-card').style.display = 'none';
   document.getElementById('evidence-card').style.display = 'none';   // hide too — else it stays stuck under the "Hotovo!" card
 
+  const otevrit = _otevritPoGenerovani;
+  _otevritPoGenerovani = false;
   try {
     const res    = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     const result = await res.json();
@@ -3476,6 +3539,9 @@ async function generatePDFs() {
       document.getElementById('nav-next').style.display = 'none';
       document.getElementById('nav-back').style.display = '';
       document.getElementById('nav-back').textContent = '← Upravit údaje';
+      const nova = document.querySelector('#output-card .out-reset .btn');
+      if (nova) nova.focus();
+      if (otevrit && typeof otevriVsechnyDokumenty === 'function') otevriVsechnyDokumenty();
     } else {
       document.getElementById('summary-card').style.display = 'block';
       document.getElementById('nav-next').disabled = false;
@@ -3638,10 +3704,11 @@ function _otevriProud() {
   const gen = _camGen;
   const p = (async () => {
     const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    // Mezitím se kamera zavřela nebo se odešlo z kroku 1 → hned pustit,
-    // jinak by běžela skrytá a držela ovladač.
-    if (gen !== _camGen || currentPanel() !== 1) { _zastavProud(s); return null; }
+    // Mezitím se kamera zavřela → hned pustit, jinak by běžela a nikdo by ji
+    // už nezavřel. (Odchod z kroku 1 ji nezavírá — běží celou dobu.)
+    if (gen !== _camGen) { _zastavProud(s); return null; }
     cameraStream = s;
+    if (typeof kameraZapnuta === 'function') kameraZapnuta(s);
     const video = document.getElementById('camera-video');
     video.srcObject = s;
     try { await video.play(); } catch (_) { /* play may need user gesture later */ }
@@ -3669,6 +3736,7 @@ async function tryAutoOpenCamera(attempt = 0) {
     await _otevriProud();
     _camRetryArmed = false;
   } catch (e) {
+    if (typeof kameraLog === 'function') kameraLog('chyba', `${e && e.name}: ${e && e.message} (pokus ${attempt + 1})`);
     const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
     if (!blocked && attempt < 5 && currentPanel() === 1) {
       // Zařízení se ještě uvolňuje — dát mu víc času než dřív (0,5 → 2,5 s),
@@ -3777,7 +3845,6 @@ async function quickScanOrv() {
 
     if (resultEl) { resultEl.className = 'scan-result ok'; resultEl.textContent = '✓ ' + filled.join(', '); }
     if (skenPosunoutDal(startIdx, startMode)) {
-      closeCamera();
       navNext();
     } else {
       // Už je jinde: data se vyplnila, ale nikam se neskáče — jen se obnoví
@@ -3792,17 +3859,7 @@ async function quickScanOrv() {
   }
 }
 
-// NumPad Enter shortcut on Step 1 with camera open.
-document.addEventListener('keydown', (e) => {
-  if (e.code !== 'NumpadEnter') return;
-  if (currentPanel() !== 1) return;
-  if (!cameraStream) return;
-  if (_scanInFlight) return;
-  const tag = e.target && e.target.tagName;
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-  e.preventDefault();
-  quickScanOrv();
-});
+// Enter (i ten na numerické klávesnici) skenuje přes hlavní obsluhu klávesnice.
 
 // ── Přidat do evidence ze skenu ORV ──────────────────────────────────────────
 // Typický případ: auto se nejdřív zapsalo (úkon v evidenci bez RZ), teď přišlo
@@ -3991,7 +4048,7 @@ async function zapisNovyUkon() {
 // Tlačítko „Kamera": vždycky čistý restart — pustit, co je otevřené i co se
 // zrovna otevírá, chvíli počkat na uvolnění zařízení a otevřít znovu.
 async function openCamera() {
-  closeCamera();
+  closeCamera('ruční restart');
   // Otevírání, které ještě běží, po closeCamera samo skončí a pustí proud;
   // počkat na něj, jinak by se k němu nové otevření jen připojilo.
   if (_camOpening) { try { await _camOpening; } catch (_) {} }
@@ -4003,8 +4060,9 @@ async function openCamera() {
   }
 }
 
-function closeCamera() {
+function closeCamera(duvod = '') {
   _camGen++;                     // zneplatní i otevírání, které ještě běží
+  if (cameraStream && typeof kameraLog === 'function') kameraLog('vypnuta', duvod);
   const video = document.getElementById('camera-video');
   if (video) {
     video.pause();
@@ -4028,7 +4086,7 @@ function _kameraUI(bezi) {
 // Obnovení stránky („Nová žádost"), zavření záložky, odchod jinam — kameru
 // pustit výslovně. Spoléhat na úklid prohlížeče nestačí: nová stránka pak
 // sahá po kameře, kterou stará ještě nepustila.
-window.addEventListener('pagehide', () => { closeCamera(); });
+window.addEventListener('pagehide', () => { closeCamera('pagehide'); });
 
 function setVal(id, val) {
   const el = document.getElementById(id);
@@ -4152,7 +4210,10 @@ async function scanDoc(input, target) {
 }
 
 function resetForm() {
-  closeCamera();       // pustit kameru dřív, než ji nová stránka bude chtít
+  // Bez obnovení stránky, ať kamera běží dál (static/klavesnice.js). Kdyby
+  // to selhalo, postaru: pustit kameru a obnovit.
+  if (typeof novaZadost === 'function' && novaZadost()) return;
+  closeCamera('reload');
   location.reload();
 }
 
@@ -4203,6 +4264,7 @@ setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (
 // the camera straight away — previously it only opened on Back-navigation.
 tryAutoOpenCamera();
 </script>
+<script src="/static/klavesnice.js?v={{ APP_VERSION }}"></script>
 <script>
 // ── Kdo vyplňuje (profil) ─────────────────────────────────────────────────────
 // A per-device label of who's filling it out, sent with each žádost so the Úkony

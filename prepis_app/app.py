@@ -62,7 +62,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.25.3"
+__version__ = "1.26.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2152,6 +2152,45 @@ def api_scan():
     if not _has_data(result):
         result = scan_document(rotate_180(image_b64, mime_type), mime_type)
     return jsonify(result)
+
+KAMERA_LOG = "kamera_log.jsonl"
+_KAMERA_LOG_MAX = 512 * 1024
+_KAMERA_UDALOST = re.compile(r"^[a-z_]{1,30}$")
+
+
+@app.route("/api/kamera-log", methods=["POST"])
+def api_kamera_log():
+    """Záznam kamery z prohlížeče (static/klavesnice.js): zapnutí, vypnutí,
+    chyby, restarty hlídače. USB kamera po pár žádostech zamrzala a bez
+    záznamu se nedalo zjistit kdy a proč. Soubor drží jen posledních ~0,5 MB."""
+    data = request.get_json(silent=True) or {}
+    udalost = str(data.get("udalost") or "")
+    if not _KAMERA_UDALOST.match(udalost):
+        return jsonify({"success": False}), 400
+    radek = {"ts": datetime.now().isoformat(timespec="seconds"), "udalost": udalost,
+             "detail": str(data.get("detail") or "")[:300],
+             "ua": (request.headers.get("User-Agent") or "")[:120]}
+    _log.info("kamera %s: %s", udalost, radek["detail"])
+    cesta = os.path.join(DATA_DIR, KAMERA_LOG)
+    try:
+        if os.path.exists(cesta) and os.path.getsize(cesta) > _KAMERA_LOG_MAX:
+            # Nechat novější polovinu — staré záznamy už nikdo číst nebude.
+            with open(cesta, encoding="utf-8") as f:
+                radky = f.readlines()
+            zbytek, velikost = [], 0
+            for r in reversed(radky):
+                velikost += len(r.encode("utf-8"))
+                if velikost > _KAMERA_LOG_MAX // 2:
+                    break
+                zbytek.insert(0, r)
+            with open(cesta, "w", encoding="utf-8") as f:
+                f.writelines(zbytek)
+        with open(cesta, "a", encoding="utf-8") as f:
+            f.write(json.dumps(radek, ensure_ascii=False) + "\n")
+    except OSError as e:
+        _log.warning("kamera log: %s", e)
+    return jsonify({"success": True})
+
 
 @app.route("/api/scan-orv", methods=["POST"])
 def api_scan_orv():

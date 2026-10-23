@@ -127,6 +127,12 @@ const navNext = () => state.next++;
 const navBack = () => state.back++;
 const generatePDFs = () => state.generated++;
 const currentPanel = () => 3;
+// Žádosti bez myši (v1.26.0): globální obsluha teď sahá i na tohle.
+elements['output-card'] = { style: { display: 'none' } };
+const FLOWS = { prevod: { panels: [1, 4, 2, 3, 5] } };
+let appMode = 'prevod', flowIdx = 3, _otevritPoGenerovani = false, cameraStream = null;
+const otevriVsechnyDokumenty = () => state.opened = (state.opened || 0) + 1;
+const resetForm = () => state.reset = (state.reset || 0) + 1;
 const ppdNahledScheduled = () => state.preview++;
 const lookupIco = prefix => state.ares = elements[prefix + '_ico'].value;
 let _ppdAresTimer = null;
