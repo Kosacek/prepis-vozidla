@@ -47,6 +47,16 @@ def vozidla(text: str | None) -> list[str]:
     return out
 
 
+def auta(text: str | None) -> list[tuple[str, str]]:
+    """(as written, key) per car — the page shows what was written ("1AB 2345")."""
+    seen: dict[str, str] = {}
+    for part in _SPLIT.split(text or ""):
+        shown, key = " ".join(part.split()).upper(), _key(part)
+        if key and key not in seen:
+            seen[key] = shown
+    return [(shown, key) for key, shown in seen.items()]
+
+
 def set_explicit(conn, cislo: int, ukon_ids: list[int]) -> None:
     """Remember exactly which úkony a doklad issued from evidence pays."""
     with conn:
@@ -87,8 +97,12 @@ def compute(conn) -> Links:
     by_doklad: dict[int, list[int]] = {}
     missing: dict[int, list[str]] = {}
     firma: dict[int, int | None] = {}
-    for d in conn.execute("SELECT cislo, datum, castka, vozidlo, zadost_id, prijato_ico"
-                          " FROM ppd WHERE smazano=0"):
+    for d in conn.execute("SELECT cislo, datum, castka, vozidlo, zadost_id, prijato_ico, smazano"
+                          " FROM ppd"):
+        if d["smazano"]:
+            # A deleted doklad pays nothing; it keeps only the payer's firm for the filter.
+            firma[d["cislo"]] = firma_by_ico.get(_digits(d["prijato_ico"]))
+            continue
         cars = vozidla(d["vozidlo"])
         if d["cislo"] in explicit:
             linked = set(explicit[d["cislo"]])

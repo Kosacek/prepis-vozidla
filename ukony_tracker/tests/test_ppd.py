@@ -338,7 +338,7 @@ def test_doklady_renders_link_and_hides_deleted_by_default(client):
     assert '<a href="/doklady">Doklady</a>' in body
     assert 'data-cislo="101"' in body and 'data-cislo="102"' not in body
     assert "14.06.2026" in body and "JAN ŽIŽKA" in body and "1AB 2345" in body
-    assert f'href="/ukony/{uid}/upravit"' in body
+    assert f'href="/ukony/{uid}/upravit?back=' in body
     assert '<span id="doklady-count">1</span>' in body
     assert '<span id="doklady-sum">1\u00a0300</span>' in body
     body = client.get("/doklady?smazane=1").get_data(as_text=True)
@@ -396,3 +396,63 @@ def test_doklady_uses_existing_login_gate(client, monkeypatch):
     with client.session_transaction() as session:
         session["authed"] = True
     assert client.get("/doklady").status_code == 200
+
+
+# ── Doklady 2.5: fixed rows, drawer with úkony, firm filter ────────────────
+
+def _jene_doklad_179(client):
+    """Doklad č. 179 for five JE & NE cars plus one car evidence doesn't know."""
+    with client.application.app_context():
+        conn = db.get_db()
+        jene = firmy_repo.create(conn, nazev="JE & NE, spol. s r.o.", zkratka="JE & NE", ico="44960263")
+        other = firmy_repo.create(conn, nazev="Cardion", zkratka="Cardion", ico="04156854")
+        ids = [_ukon(conn, jene, datum="2026-10-07", rz=rz, typ_kod="NOVÉ")
+               for rz in ("3BR9196", "2BP1720", "3BR5699", "4AB0001", "4AB0002")]
+        ppd_repo.upsert(conn, _record(cislo=179, datum="08.10.2026", castka=6500,
+                                      prijato_od="JE & NE, SPOL. S R.O.", prijato_ico="44960263",
+                                      vozidlo="3BR9196, 2BP1720, 3BR5699, 4AB0001, 4AB0002, 9ZZ9999"))
+        ppd_repo.upsert(conn, _record(cislo=180, datum="08.10.2026", castka=500,
+                                      prijato_ico="04156854", vozidlo=""))
+    return jene, other, ids
+
+
+def test_doklad_row_opens_a_drawer_with_its_ukony(client):
+    jene, _, ids = _jene_doklad_179(client)
+    body = client.get("/doklady").get_data(as_text=True)
+    assert 'aria-expanded="false" aria-controls="doklad-179"' in body
+    assert 'id="doklad-179" hidden' in body
+    assert body.count('class="ukony-item"') == 5
+    assert all(f'/ukony/{uid}/upravit?back=' in body for uid in ids)
+    assert "5 úkonů" in body
+    assert "9ZZ9999 — úkon nenalezen" in body
+    assert "Úkony celkem 6 500 Kč · doklad 6 500 Kč" in body
+
+
+def test_doklad_row_shows_two_cars_and_a_count(client):
+    _jene_doklad_179(client)
+    row = client.get("/doklady").get_data(as_text=True).split('data-cislo="179"')[1].split("</button>")[0]
+    assert row.count('class="auto-chip"') == 2 and '+4</span>' in row
+    assert "JE &amp; NE" in row and "08.10.2026" in row
+
+
+def test_firm_filter_uses_the_firm_of_the_ukony_or_the_payer(client):
+    jene, other, _ = _jene_doklad_179(client)
+    body = client.get(f"/doklady?firma={jene}").get_data(as_text=True)
+    assert 'data-cislo="179"' in body and 'data-cislo="180"' not in body
+    assert '<span id="doklady-count">1</span>' in body
+    body = client.get(f"/doklady?firma={other}").get_data(as_text=True)
+    assert 'data-cislo="180"' in body and 'data-cislo="179"' not in body
+    assert f'<option value="{other}" selected>' in body
+
+
+def test_live_search_covers_firm_and_ukony_cars(client):
+    _jene_doklad_179(client)
+    item = client.get("/doklady").get_data(as_text=True).split('data-cislo="179"')[1].split(">")[0]
+    assert "je &amp; ne" in item and "3br9196" in item
+
+
+def test_month_field_says_all_months_while_empty(client):
+    body = client.get("/doklady").get_data(as_text=True)
+    assert 'class="month-field" data-empty="1"' in body and "Všechny měsíce" in body
+    body = client.get("/doklady?mesic=2026-06").get_data(as_text=True)
+    assert 'class="month-field" data-empty="0"' in body

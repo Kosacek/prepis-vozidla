@@ -173,6 +173,17 @@ def list(
     return conn.execute(" ".join(q), args).fetchall()
 
 
+def list_by_ids(conn: sqlite3.Connection, ids) -> dict[int, sqlite3.Row]:
+    """Úkony by id with the firm shortcut, same columns as list() (Doklady drawer)."""
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return {}
+    marks = ",".join("?" for _ in ids)
+    return {r["id"]: r for r in conn.execute(
+        "SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u JOIN firmy f ON f.id=u.firma_id"
+        f" WHERE u.id IN ({marks})", ids)}
+
+
 def _fold(s: str) -> str:
     """Lowercase and strip diacritics so 'martinu' matches 'MARTINŮ'."""
     return "".join(

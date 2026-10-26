@@ -1,0 +1,8 @@
+{# Month filter that iPhone Safari can't shrink to a dot: an empty
+   <input type="month"> with appearance:none has no size there. The field gets
+   the same size as the other filters and shows "Všechny měsíce" while empty
+   (data-empty is kept in sync by base.html). Expects month_name, month_value. #}
+<label class="month-field" data-empty="{{ '0' if month_value else '1' }}">
+  <input type="month" name="{{ month_name }}" value="{{ month_value or '' }}" class="filter-month" aria-label="Měsíc"{% if month_submit %} onchange="this.form.submit()"{% endif %}>
+  <span class="month-field__placeholder" aria-hidden="true">Všechny měsíce</span>
+</label>

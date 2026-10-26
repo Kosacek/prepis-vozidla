@@ -6,7 +6,8 @@ from datetime import date
 from flask import Blueprint, abort, jsonify, render_template, request
 
 import db
-from repositories import ppd_repo
+from repositories import firmy_repo, ppd_repo, ukony_repo
+from services import colors_service, ppd_links
 
 bp = Blueprint("ppd", __name__)
 
@@ -48,10 +49,12 @@ def import_doklady():
 
 @bp.get("/doklady")
 def doklady():
-    # Běžná stránka používá stejnou session bránu jako přehled úkonů.
+    # Běžná stránka používá stejnou session bránu jako přehled úkonů. Firma,
+    # měsíc a smazané filtruje server (odkaz jde uložit), hledání i živě v JS.
     mesic = (request.args.get("mesic") or "").strip()
     q = (request.args.get("q") or "").strip()
     smazane = request.args.get("smazane") == "1"
+    firma = request.args.get("firma", type=int)
     od = do = None
     if mesic:
         try:
@@ -63,8 +66,16 @@ def doklady():
         except ValueError:
             abort(400, description="Neplatný měsíc.")
     conn = db.get_db()
-    rows = ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=smazane)
-    total = ppd_repo.totals(conn, od, do, q=q, include_deleted=smazane)
+    links = ppd_links.for_request()
+    rows = [r for r in ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=smazane, limit=None)
+            if firma is None or links.firma.get(r["cislo"]) == firma]
+    ukony = ukony_repo.list_by_ids(conn, (uid for r in rows for uid in links.by_doklad.get(r["cislo"], [])))
+    firmy = firmy_repo.list_all(conn)
     return render_template(
-        "doklady.html", doklady=rows, total=total, mesic=mesic, q=q, smazane=smazane,
+        "doklady.html", doklady=rows, links=links, ukony=ukony,
+        firmy=firmy, firmy_by_id={f["id"]: f for f in firmy},
+        firma_colors=colors_service.firma_color_map(conn),
+        total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
+        mesic=mesic, q=q, smazane=smazane, firma=firma,
+        auta=ppd_links.auta, back_url=request.full_path.rstrip("?"),
     )

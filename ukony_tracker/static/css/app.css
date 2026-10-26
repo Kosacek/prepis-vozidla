@@ -1676,11 +1676,6 @@ body.modal-open { overflow: hidden; }
   .row-actions { padding: 0 var(--sp-3) 8px var(--sp-3); }
 }
 
-/* Doklady používají stejné řádky jako úkony, pouze s vlastními šesti sloupci. */
-.doklady-list .recent-row {
-  grid-template-columns: minmax(64px, max-content) 78px minmax(0, 1fr) minmax(100px, 180px) auto auto;
-}
-
 /* ── Mobile: úkon rows stack instead of overflowing ─────────────────────────
    All three row lists (dashboard "Poslední úkony", /ukony/vse, and the
    per-firm "Tento měsíc" list) share the .recent-row grid, whose fixed pixel
@@ -2165,4 +2160,103 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   }
   .ukony-list .stav-slot .btn { background: transparent; border: 1px solid var(--line); color: var(--ink); }
   .ukony-list .stav-slot .badge-btn { border: 1px solid transparent; }
+}
+
+/* ── Doklady (2.5) ─────────────────────────────────────────────────────────
+   Same fixed slots as the Úkony rows so nothing jumps: č. | datum | firma |
+   přijato od | auta | částka | úkony | ▸. A tap opens the drawer with the
+   úkony the doklad pays (same _ukony_item.html as Úkony). */
+.doklady-list { display: grid; }
+.doklad-item { border-bottom: 1px solid var(--line); }
+.doklad-item:last-child { border-bottom: none; }
+.doklad-item[hidden] { display: none; }
+.doklad-row {
+  display: grid;
+  grid-template-columns: 62px 92px 112px minmax(0, 1fr) 236px 96px 90px 14px;
+  gap: var(--sp-3);
+  align-items: center;
+  width: 100%;
+  padding: 11px var(--sp-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.doklad-row:hover { background: var(--bg); }
+.doklad-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.doklad-meta { display: contents; }
+.doklad-cislo { white-space: nowrap; }
+.doklad-datum { font-size: 0.8125rem; white-space: nowrap; }
+.doklad-firma { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+.doklad-od { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doklad-auta { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
+.auto-chip {
+  font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em; white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; background: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+.auto-chip.more { color: var(--muted); }
+.auto-chip.is-chybi { border-color: #f3b4ad; background: #fde9e7; color: #9b1c13; }
+.doklad-kc { text-align: right; white-space: nowrap; }
+.doklad-pocet {
+  justify-self: end; white-space: nowrap; font-size: 0.75rem; font-weight: 650;
+  border-radius: var(--radius-pill); padding: 2px 9px;
+  background: var(--flash-info-bg); color: var(--flash-info-ink);
+}
+.doklad-pocet.is-zadny { background: var(--bg); color: var(--muted); }
+.doklad-chev::before {
+  content: ""; display: block; width: 7px; height: 7px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg); transition: transform .15s ease;
+}
+.doklad-row[aria-expanded="true"] .doklad-chev::before { transform: rotate(45deg); }
+.doklad-item.is-open > .doklad-row { background: var(--bg); }
+.doklad-item.is-smazany .doklad-cislo { text-decoration: line-through; color: var(--muted); }
+.doklad-drawer { margin: 2px var(--sp-3) var(--sp-3); padding-left: var(--sp-3); border-left: 3px solid var(--accent); }
+.doklad-chybi { color: #9b1c13; font-size: 0.85rem; font-weight: 600; padding: 8px var(--sp-3); }
+.doklad-souhrn { color: var(--muted); font-size: 0.8125rem; padding: 6px var(--sp-3) 2px; }
+.doklad-sedi { color: var(--flash-success-ink); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .doklad-chev::before { transition: none; } }
+
+@media (max-width: 760px) {
+  .doklad-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "cislo kc" "meta meta" "auta auta" "pocet chev";
+    gap: 6px var(--sp-3);
+    padding: 12px var(--sp-3);
+  }
+  .doklad-cislo { grid-area: cislo; font-size: 1.05rem; }
+  .doklad-kc { grid-area: kc; font-size: 1.05rem; }
+  .doklad-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: 0.8125rem; color: var(--muted); min-width: 0; }
+  .doklad-meta .doklad-firma { order: -1; color: var(--ink); font-weight: 600; }
+  .doklad-meta .doklad-datum::before, .doklad-meta .doklad-od::before { content: "· "; }
+  .doklad-meta .doklad-od { white-space: normal; }
+  .doklad-auta { grid-area: auta; flex-wrap: wrap; }
+  .doklad-pocet { grid-area: pocet; justify-self: start; }
+  .doklad-chev { grid-area: chev; justify-self: end; padding-right: 4px; }
+  .doklad-drawer { margin: 0 var(--sp-2) var(--sp-3); padding-left: var(--sp-2); }
+}
+
+/* ── Month filter (_month_field.html) ──────────────────────────────────────
+   iPhone Safari draws an empty <input type="month"> with appearance:none as
+   a dot: it has no intrinsic size. Fixed size like the other filters, plus a
+   visible "Všechny měsíce" while empty. */
+.month-field { position: relative; display: inline-flex; min-width: 10.5rem; }
+.month-field input[type="month"] { width: 100%; min-height: 36px; box-sizing: border-box; }
+.month-field input[type="month"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+.month-field__placeholder {
+  display: none; position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 0.875rem; pointer-events: none;
+}
+.month-field[data-empty="1"] .month-field__placeholder { display: block; }
+.month-field[data-empty="1"] input[type="month"] { color: transparent; }
+.month-field[data-empty="1"]:focus-within .month-field__placeholder { display: none; }
+.month-field[data-empty="1"]:focus-within input[type="month"] { color: var(--ink); }
+@media (max-width: 760px) {
+  .month-field { width: 100%; min-width: 0; }
+  .month-field input[type="month"] { min-height: 40px; }
+  .month-field__placeholder { font-size: 16px; }
 }

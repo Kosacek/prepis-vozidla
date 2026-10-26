@@ -28,7 +28,7 @@
         {% endfor %}
       </select>
 
-      <input type="month" name="mesic" value="{{ sel.mesic }}" class="filter-month">
+      {% with month_name="mesic", month_value=sel.mesic %}{% include "_month_field.html" %}{% endwith %}
 
       <select name="typ" class="filter-select">
         <option value="">Všechny typy</option>

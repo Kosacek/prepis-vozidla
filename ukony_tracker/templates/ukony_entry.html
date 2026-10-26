@@ -8,7 +8,7 @@
 {% else %}
 <div class="month-line">
   <form method="get" action="/ukony/{{ firma.id }}">
-    <input type="month" name="mesic" value="{{ mesic }}" onchange="this.form.submit()">
+    {% with month_name="mesic", month_value=mesic, month_submit=True %}{% include "_month_field.html" %}{% endwith %}
   </form>
   <div class="muted"><b>{{ pocet }}</b> úkonů · <b>{{ total|int }} Kč</b></div>
 </div>

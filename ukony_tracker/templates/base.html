@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=75">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=76">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/orv_report.css') }}?v=5">
 </head>
 <body>
@@ -65,6 +65,13 @@
       }
     }catch(e){ if(st && (el.value || '').replace(/\s/g,'').toUpperCase() === raw){ st.style.color='#c33'; st.textContent='✗ Chyba spojení'; } }
   }
+  // Month filters (_month_field.html): "Všechny měsíce" shows only while empty.
+  ['input', 'change'].forEach(function (type) {
+    document.addEventListener(type, function (e) {
+      var field = e.target.closest && e.target.closest('.month-field');
+      if (field) field.dataset.empty = e.target.value ? '0' : '1';
+    });
+  });
   </script>
 </body>
 </html>
