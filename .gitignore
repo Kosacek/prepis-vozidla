@@ -33,3 +33,6 @@ ukony_tracker/.pytest_cache/
 ukony_tracker/**/__pycache__/
 
 ukony_tracker/.env
+
+# graphify knowledge-graph output
+**/graphify-out/
