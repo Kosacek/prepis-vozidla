@@ -38,6 +38,17 @@ test('a car seen before shows the earlier úkon, not as a match', () => {
   assert.equal(R.earlier({}), null);
 });
 
+test('an unreadable ORV number is spelled out next to what was read', () => {
+  globalThis.document = {createElement: () => ({textContent: '', className: '', children: [],
+    append(...nodes) { this.children.push(...nodes); }})};
+  const facts = R.readFacts({rz: '3BR9309', orv_cislo: null});
+  assert.deepEqual(facts.children.map(n => [n.textContent, n.className]),
+    [['RZ 3BR9309', 'orv-fact'], ['ORV nepřečteno', 'orv-fact orv-fact-missing']]);
+  assert.deepEqual(R.readFacts({rz: null, orv_cislo: 'UBP588302'}).children.map(n => n.textContent),
+    ['RZ nepřečteno', 'ORV UBP588302']);
+  assert.equal(R.readFacts({}), null);
+});
+
 test('new cars need a chosen type; the firm from the document is preselected', () => {
   const R = require('../static/js/orv_report.js');
   const sel = (firm, typ) => ({querySelector: id => ({'#orv-batch-firma': {value: firm}, '#orv-batch-typ': {value: typ}})[id]});

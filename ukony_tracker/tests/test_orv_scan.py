@@ -297,6 +297,94 @@ def test_plate_only_read_never_offers_the_car_as_new(conn, make):
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
 
 
+class SeqClient(FakeClient):
+    """Returns one payload per read, so the second look can differ from the first."""
+    def __init__(self, *reads):
+        super().__init__(reads[0])
+        self.reads = list(reads)
+
+    def create(self, **kwargs):
+        self.data = self.reads[min(len(self.calls), len(self.reads) - 1)]
+        return super().create(**kwargs)
+
+
+OTHER_VIN = "TMBAAAAAA00000001"
+
+
+def registry(table):
+    return lambda orv: ({"success": True, "vin": table[orv]} if orv in table
+                        else {"success": False, "error": "Vozidlo nenalezeno"})
+
+
+def test_second_look_finds_the_unread_orv_number_and_fills(conn, make):
+    # Scan 1 on 26.10. would have paired by itself: the app reads the photo a
+    # second time before giving up on a missing ORV number.
+    uid = make(typ_kod="NOVÉ")
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": None}, {**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({DATA["orv_cislo"]: VIN}))
+    assert len(client.calls) == 2
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert "Druhé čtení" in client.calls[1]["system"]
+    assert "Druhé čtení" not in client.calls[0]["system"]
+
+
+def test_second_look_corrects_a_misread_that_hit_another_car(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    misread = "UBE037268"
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": misread}, {**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({misread: OTHER_VIN, DATA["orv_cislo"]: VIN}))
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert ukony_repo.get(conn, uid)["orv"] == DATA["orv_cislo"]
+
+
+def test_two_different_readings_never_offer_a_new_car(conn):
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": "UBE037268"}, {**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({"UBE037268": OTHER_VIN, DATA["orv_cislo"]: VIN}))
+    assert result["stav"] == "necitelne"
+    assert "UBE037268" in result["zprava"] and DATA["orv_cislo"] in result["zprava"]
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 0
+
+
+def test_one_reading_of_a_new_car_is_not_enough(conn):
+    client = SeqClient({**DATA, "vin": None}, {**DATA, "vin": None, "orv_cislo": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({DATA["orv_cislo"]: VIN}))
+    assert result["stav"] == "necitelne" and "znovu" in result["zprava"]
+
+
+def test_two_matching_readings_offer_a_new_car(conn):
+    client = SeqClient({**DATA, "vin": None}, {**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({DATA["orv_cislo"]: VIN}))
+    assert len(client.calls) == 2
+    assert result["stav"] == "bez_firmy" and result["vin"] == VIN
+
+
+def test_a_paired_scan_reads_the_photo_once(conn, make):
+    make()
+    client = FakeClient({**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client,
+                          lookup=registry({DATA["orv_cislo"]: VIN}))
+    assert result["stav"] == "doplneno" and len(client.calls) == 1
+
+
+def test_second_look_failure_keeps_the_safe_first_answer(conn, make):
+    make(typ_kod="NOVÉ")
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": None})
+    calls = []
+    def flaky(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 2:
+            raise TimeoutError("provider down")
+        return FakeClient.create(client, **kwargs)
+    client.create = flaky
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client)
+    assert result["stav"] == "necitelne" and "znovu" in result["zprava"]
+
+
 def test_registry_without_vin_never_offers_the_car_as_new(conn, make):
     uid = make(typ_kod="NOVÉ")
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}))

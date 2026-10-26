@@ -52,6 +52,16 @@
     facts.forEach(([label, value]) => list.append(el('span', 'orv-fact', label + ' ' + value)));
     return list;
   }
+  // Co sken z dokladu opravdu přečetl: nepřečtené číslo ORV musí být vidět
+  // (26.10. bez něj vznikl duplikát), ať je jasné, proč fotit znovu.
+  function readFacts(result) {
+    if (!result.rz && !result.orv_cislo) return null;
+    const list = el('div', 'orv-facts');
+    list.append(el('span', 'orv-fact', 'RZ ' + (result.rz || 'nepřečteno')),
+      el('span', result.orv_cislo ? 'orv-fact' : 'orv-fact orv-fact-missing',
+        'ORV ' + (result.orv_cislo || 'nepřečteno')));
+    return list;
+  }
   // Auto už u nás bylo dřív (prodané a zpět vykoupené) → nový úkon, starý zůstal.
   function earlier(result) {
     const p = result.predchozi;
@@ -108,9 +118,8 @@
       const facts = scannedFacts(result); if (facts) body.append(facts);
       body.append(el('div', 'orv-unmatched-owner', result.provozovatel || 'Provozovatel neuveden'));
     } else if (state === 'vice_shod' || state === 'nenalezeno' || state === 'necitelne' || state === 'chyba') {
-      if (state === 'vice_shod' || state === 'nenalezeno') {
-        const facts = scannedFacts(result); if (facts) body.append(facts);
-      }
+      const facts = state === 'vice_shod' || state === 'nenalezeno' ? scannedFacts(result) : readFacts(result);
+      if (facts) body.append(facts);
       body.append(el('div', 'orv-result-message', result.zprava || LABELS[state]));
     }
     if (photo.blob && !['zalozeno', 'doplneno', 'uz_doplneno'].includes(state)) {
@@ -179,7 +188,8 @@
     button.textContent = 'Založit ' + count + ' ' + czechJobs(count);
     button.disabled = count === 0;
   }
-  const api = {earlier, czechCars, czechJobs, group, bannerState, totals, render, selected, updateCreateCount};
+  const api = {earlier, readFacts, czechCars, czechJobs, group, bannerState, totals, render, selected,
+    updateCreateCount};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OrvReport = api;
 })(typeof window !== 'undefined' ? window : globalThis);

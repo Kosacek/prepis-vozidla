@@ -1,5 +1,6 @@
 import hmac
 import os
+import threading
 
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -7,8 +8,23 @@ import config
 import db
 
 
+def _warm_imports():
+    """Importing the Anthropic SDK takes ~21 s on the NAS's ARM CPU. Done
+    inside the first techničák scan or Zeptej question after a restart, it made
+    the first scans of 26.10. take 26–36 s; load it in the background at boot."""
+    def load():
+        try:
+            import anthropic  # noqa: F401
+            from PIL import Image, ImageOps  # noqa: F401
+        except Exception:
+            pass  # the request that needs it will report the problem
+    threading.Thread(target=load, name="warm-imports", daemon=True).start()
+
+
 def create_app():
     app = Flask(__name__)
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        _warm_imports()
     from services.orv_images import ScanRequest
     app.request_class = ScanRequest
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)

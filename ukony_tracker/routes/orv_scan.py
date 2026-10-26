@@ -79,9 +79,10 @@ def scan():
     except Exception:
         return jsonify(error="Fotku se nepodařilo zpracovat. Zkuste to znovu."), 500
     finally:
-        logger.info("stav=%s ukon=%s ms=%d tokens=%d", result["stav"],
+        logger.info("stav=%s ukon=%s ms=%d cteni=%d tokens=%d", result["stav"],
                     (result.get("ukon") or {}).get("id", "-"),
-                    round((time.monotonic() - start) * 1000), orv_scan_service.tokens.get())
+                    round((time.monotonic() - start) * 1000), 2 if result.get("druhe_cteni") else 1,
+                    orv_scan_service.tokens.get())
 
 
 @bp.post("/ukony/orv-sken/zalozit")
