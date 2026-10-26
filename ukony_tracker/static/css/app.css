@@ -2260,3 +2260,10 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .month-field input[type="month"] { min-height: 40px; }
   .month-field__placeholder { font-size: 16px; }
 }
+
+/* Orange "Zaplatit": a doklad pays this úkon, confirm the payment (2.5). */
+.stav-slot .btn.pay-doklad,
+.ukony-list .stav-slot .btn.pay-doklad {
+  background: var(--flash-warning-bg); color: #754600; border: 1px solid #d98a00;
+}
+.stav-slot .btn.pay-doklad:hover { background: #fde7b0; }

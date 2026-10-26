@@ -18,8 +18,15 @@
   <button type="submit" class="badge warn badge-btn" title="Zrušit platbu">{{ u.zaplaceno_kc|int }} ✕</button>
 </form>
 {% else %}
+{# A doklad pays this úkon (services/ppd_links.py): the button turns orange and
+   only asks to confirm the payment — never marked paid by itself (David 2026-10-26). #}
+{% set dk = ukon_doklady(u.id) %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
   <input type="hidden" name="back" value="{{ back_url }}">
+  {% if dk %}
+  <button type="submit" class="btn btn-sm pay-doklad" title="Doklad č. {{ dk|join(', ') }} — potvrď platbu"><span class="lbl-d">✓ č. {{ dk[0] }}</span><span class="lbl-m">Zaplatit · doklad č. {{ dk[0] }}</span></button>
+  {% else %}
   <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">Zaplatit</span></button>
+  {% endif %}
 </form>
 {% endif %}
