@@ -26,6 +26,10 @@ INTEGRATION_API_KEY = os.environ.get("INTEGRATION_API_KEY", "")
 # ORV (same source the zadosti app uses). Empty → the lookup returns a clear
 # "missing key" message instead of failing to boot.
 DATAOVOZIDLECH_API_KEY = os.environ.get("DATAOVOZIDLECH_API_KEY", "")
+# Žádosti issue every doklad (one numbering series); evidence asks them over the
+# docker network. Empty = "Nový doklad" says it isn't switched on yet.
+ZADOSTI_API_URL = os.environ.get("ZADOSTI_API_URL", "")
+ZADOSTI_PUBLIC_URL = os.environ.get("ZADOSTI_PUBLIC_URL", "https://zadosti.spznaklic.cz")
 
 ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}"
 BACKUP_RETENTION = 30

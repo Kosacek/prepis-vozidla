@@ -2267,3 +2267,33 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   background: var(--flash-warning-bg); color: #754600; border: 1px solid #d98a00;
 }
 .stav-slot .btn.pay-doklad:hover { background: #fde7b0; }
+
+/* "Nový doklad" dialog (2.5) */
+.doklad-new { max-width: 560px; }
+.doklad-new [hidden] { display: none !important; }  /* grid/flex rules below would beat [hidden] */
+.doklad-new h2 { margin: 0 0 var(--sp-4); }
+.doklad-new form { display: grid; gap: var(--sp-3); }
+.doklad-new .field { margin: 0; }
+.dn-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.dn-ukony { display: grid; }
+.dn-ukony__label { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.dn-ukon {
+  display: grid; grid-template-columns: 20px 96px auto minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
+  padding: 8px 10px; border: 1.5px solid var(--line); border-top-width: 0; cursor: pointer; font-size: 0.875rem;
+}
+.dn-ukony__label + .dn-ukon { border-top-width: 1.5px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.dn-ukon:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.dn-ukony__label + .dn-ukon:last-child { border-radius: var(--radius-sm); }
+.dn-ukon:has(input:checked) { background: var(--bg); }
+.dn-ukon__auto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dn-ukon__meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dn-ukon__kc { white-space: nowrap; }
+.dn-error { margin: 0; color: var(--flash-error-ink); background: var(--flash-error-bg); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 0.875rem; }
+.dn-submit { width: 100%; justify-content: center; text-align: center; }
+.dn-done { display: grid; gap: var(--sp-3); }
+.dn-done__title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--flash-success-ink); }
+@media (max-width: 760px) {
+  .dn-ukon { grid-template-columns: 20px minmax(0, 1fr) auto; }
+  .dn-ukon .tag { display: none; }
+  .dn-ukon__meta { grid-column: 2 / -1; }
+}

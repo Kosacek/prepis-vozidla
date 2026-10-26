@@ -1,13 +1,14 @@
 """Příjem PPD ze zadosti a přehled dokladů v evidenci."""
 import calendar
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, abort, jsonify, render_template, request
 
 import db
 from repositories import firmy_repo, ppd_repo, ukony_repo
-from services import colors_service, ppd_links
+from services import colors_service, doklad_issue, ppd_links
+from services.ingest_service import normalize_profil
 
 bp = Blueprint("ppd", __name__)
 
@@ -79,3 +80,33 @@ def doklady():
         mesic=mesic, q=q, smazane=smazane, firma=firma,
         auta=ppd_links.auta, back_url=request.full_path.rstrip("?"),
     )
+
+
+@bp.get("/doklady/novy/ukony")
+def novy_ukony():
+    """Unpaid úkony of a firm from the last 90 days that no doklad pays yet."""
+    conn = db.get_db()
+    firma = firmy_repo.get(conn, request.args.get("firma", type=int) or 0)
+    if not firma:
+        return jsonify(error="Vyber firmu."), 400
+    paid_by_doklad = ppd_links.for_request().by_ukon
+    od = (date.today() - timedelta(days=90)).isoformat()
+    rows = [u for u in ukony_repo.list(conn, firma_id=firma["id"])
+            if u["stav_platby"] != "zaplaceno" and u["datum"] >= od and u["id"] not in paid_by_doklad]
+    return jsonify(
+        firma={"nazev": firma["nazev"], "ico": firma["ico"] or ""},
+        ukony=[{"id": u["id"], "datum": u["datum"], "vozidlo": u["rz"] or u["vin"] or "",
+                "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or ""}
+               for u in rows],
+    )
+
+
+@bp.post("/doklady/novy")
+def novy():
+    conn = db.get_db()
+    try:
+        req = doklad_issue.validate(conn, request.get_json(silent=True))
+        req["zpracoval"] = normalize_profil(req["zpracoval"])
+        return jsonify(doklad_issue.vystavit(conn, req)), 201
+    except doklad_issue.IssueError as e:
+        return jsonify(error=str(e)), e.status

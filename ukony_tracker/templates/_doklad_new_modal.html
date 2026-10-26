@@ -1,0 +1,45 @@
+{# "Nový doklad" (2.5): pick a firm, tick its unpaid úkony, and žádosti issue
+   the doklad (number + PDF). Same overlay styling as the úkon modal. #}
+<div class="modal-backdrop" id="doklad-modal" hidden>
+  <div class="modal-card card doklad-new" role="dialog" aria-modal="true" aria-labelledby="doklad-new-title">
+    <button class="modal-close" type="button" aria-label="Zavřít" data-doklad-close>&times;</button>
+    <h2 id="doklad-new-title">Nový doklad</h2>
+    <form id="doklad-new-form" novalidate>
+      <div class="field">
+        <label for="dn-firma">Firma</label>
+        <select id="dn-firma" required>
+          <option value="">Vyber firmu</option>
+          {% for f in firmy if f.aktivni %}
+          <option value="{{ f.id }}">{{ f.zkratka }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="dn-ukony" id="dn-ukony" aria-live="polite"></div>
+      <div class="field">
+        <label for="dn-od">Přijato od</label>
+        <input id="dn-od" maxlength="120" autocomplete="off" required>
+      </div>
+      <div class="form-row dn-row">
+        <div class="field">
+          <label for="dn-ico">IČO</label>
+          <input id="dn-ico" inputmode="numeric" maxlength="12" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="dn-castka">Částka (Kč)</label>
+          <input id="dn-castka" type="number" inputmode="numeric" min="1" step="1" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dn-ucel">Účel</label>
+        <input id="dn-ucel" value="ZASTUPOVÁNÍ NA MMB" maxlength="80" autocomplete="off">
+      </div>
+      <p class="dn-error" id="dn-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary dn-submit" id="dn-submit" disabled>Vystavit doklad</button>
+    </form>
+    <div class="dn-done" id="dn-done" hidden>
+      <p class="dn-done__title" id="dn-done-title"></p>
+      <a class="btn btn-primary dn-submit" id="dn-print" href="#" target="_blank" rel="noopener">Tisk A5</a>
+      <button type="button" class="btn dn-submit" data-doklad-close>Hotovo</button>
+    </div>
+  </div>
+</div>
