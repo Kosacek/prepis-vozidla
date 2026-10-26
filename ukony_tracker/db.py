@@ -110,6 +110,12 @@ CREATE TABLE IF NOT EXISTS ppd (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ppd_datum ON ppd(datum);
+-- Doklad vystavený z evidence ví přesně, které úkony platí (services/ppd_links.py).
+CREATE TABLE IF NOT EXISTS ppd_ukony (
+  ppd_cislo INTEGER NOT NULL,
+  ukon_id INTEGER NOT NULL,
+  PRIMARY KEY (ppd_cislo, ukon_id)
+);
 CREATE TABLE IF NOT EXISTS orv_scan_rate (sid TEXT NOT NULL, stamp REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_orv_scan_rate ON orv_scan_rate(sid, stamp);
 """
