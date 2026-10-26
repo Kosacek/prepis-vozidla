@@ -5,9 +5,11 @@
 
 <div class="page-header ukony-header">
   <h1>Doklady</h1>
+  {% if novy_doklad %}
   <div class="header-actions">
     <button type="button" class="btn btn-primary" data-doklad-novy>+ Nový doklad</button>
   </div>
+  {% endif %}
 </div>
 
 {# Same filter bar as Úkony: live search + firma / měsíc / smazané (server-side, linkable). #}
@@ -47,8 +49,8 @@
 </div>
 
 {% include "_ukon_modal.html" %}
-{% include "_doklad_new_modal.html" %}
+{% if novy_doklad %}{% include "_doklad_new_modal.html" %}{% endif %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=11"></script>
 <script src="{{ url_for('static', filename='js/doklady.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=2"></script>
 {% endblock %}

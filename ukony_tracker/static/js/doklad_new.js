@@ -14,6 +14,12 @@
   var submit = document.getElementById('dn-submit');
   var done = document.getElementById('dn-done');
   var castkaTyped = false, busy = false, issued = false, serial = 0, lastFocused = null;
+  // One id per doklad, kept across retries so žádosti never issue it twice.
+  var requestId = '';
+  function newId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
 
   function kc(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' Kč'; }
   function el(tag, cls, text) {
@@ -70,6 +76,7 @@
   function open() {
     lastFocused = document.activeElement;
     form.hidden = false; done.hidden = true; issued = false; busy = false; castkaTyped = false;
+    requestId = newId();
     form.reset(); list.replaceChildren(); showError(''); refresh();
     var filter = document.querySelector('#doklady-filter select[name=firma]');
     if (filter && filter.value && firma.querySelector('option[value="' + filter.value + '"]')) {
@@ -111,7 +118,7 @@
       body: JSON.stringify({
         firma_id: parseInt(firma.value, 10), ukony: ticked().map(function (b) { return parseInt(b.value, 10); }),
         prijato_od: od.value, prijato_ico: ico.value, castka: parseInt(castka.value, 10), ucel: ucel.value,
-        zpracoval: profil
+        zpracoval: profil, request_id: requestId
       })
     }).then(function (r) { return r.json().then(function (d) { return {ok: r.ok, d: d}; }); })
       .then(function (res) {

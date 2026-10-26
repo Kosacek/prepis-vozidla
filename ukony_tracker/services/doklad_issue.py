@@ -51,9 +51,14 @@ def validate(conn, payload) -> dict:
     if ico and not re.fullmatch(r"\d{1,12}", ico):
         raise IssueError("IČO smí mít jen číslice.")
     ucel = " ".join(str(payload.get("ucel") or UCEL).split())[:80] or UCEL
+    # One id per doklad, reused on retry: žádosti return the doklad already
+    # issued for it instead of a second number (timeout retry, double click).
+    request_id = payload.get("request_id")
+    if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,64}", request_id):
+        raise IssueError("Chybí request_id dokladu — obnov stránku a zkus to znovu.")
     ordered = sorted(ukony.values(), key=lambda u: (u["datum"], u["id"]))
     return {"firma": firma, "ukony": ordered, "castka": castka, "prijato_od": prijato_od,
-            "prijato_ico": ico, "ucel": ucel,
+            "prijato_ico": ico, "ucel": ucel, "request_id": request_id,
             "zpracoval": payload.get("zpracoval") if isinstance(payload.get("zpracoval"), str) else None}
 
 
@@ -64,7 +69,7 @@ def vystavit(conn, req: dict) -> dict:
     body = {"prijato_od": req["prijato_od"], "prijato_ico": req["prijato_ico"],
             "castka": req["castka"], "ucel": req["ucel"],
             "vozidla": [u["rz"] or u["vin"] for u in req["ukony"] if u["rz"] or u["vin"]],
-            "zpracoval": req["zpracoval"]}
+            "zpracoval": req["zpracoval"], "request_id": req["request_id"]}
     try:
         response = requests.post(config.ZADOSTI_API_URL.rstrip("/") + "/api/ppd/vystavit", json=body,
                                  headers={"X-Api-Key": config.INTEGRATION_API_KEY}, timeout=20)
@@ -79,7 +84,8 @@ def vystavit(conn, req: dict) -> dict:
     if response.status_code == 400 and isinstance(data, dict) and data.get("error"):
         raise IssueError(str(data["error"]), 502)
     doklad = data.get("doklad") if isinstance(data, dict) else None
-    if response.status_code != 201 or not isinstance(doklad, dict):
+    # 201 = new doklad, 200 = the one already issued for this request_id.
+    if response.status_code not in (200, 201) or not isinstance(doklad, dict):
         raise IssueError("Doklad se nepodařilo vystavit.", 502)
     row, _ = ppd_repo.upsert(conn, doklad)
     ppd_links.set_explicit(conn, row["cislo"], [u["id"] for u in req["ukony"]])

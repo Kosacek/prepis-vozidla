@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, abort, jsonify, render_template, request
 
+import config
 import db
 from repositories import firmy_repo, ppd_repo, ukony_repo
 from services import colors_service, doklad_issue, ppd_links
@@ -79,6 +80,8 @@ def doklady():
         total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
         mesic=mesic, q=q, smazane=smazane, firma=firma,
         auta=ppd_links.auta, back_url=request.full_path.rstrip("?"),
+        # "Nový doklad" appears once žádosti can issue doklady (ZADOSTI_API_URL set).
+        novy_doklad=bool(config.ZADOSTI_API_URL),
     )
 
 

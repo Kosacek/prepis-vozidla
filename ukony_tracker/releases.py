@@ -27,6 +27,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.5", date(2026, 10, 26),
+        "Doklady ukážou, co platí",
+        ("Klepni na doklad a vyjedou jeho úkony. Nezaplacený má oranžové Zaplatit, jen potvrdíš.",
+         "Doklady najdeš i podle firmy a výběr měsíce už funguje i na iPhonu."),
+        demo="v2_5",
+    ),
+    Release(
         "2.4", date(2026, 10, 19),
         "Přehlednější úkony na mobilu",
         ("Značka a cena nahoře, platba je jedno tlačítko: Zaplatit ↔ ✓ Zaplaceno.",

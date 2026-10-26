@@ -85,12 +85,16 @@ neodpoví, modal ukáže srozumitelnou chybu a nic se neuloží.
 ```json
 {"prijato_od": "JE & NE, SPOL. S R.O.", "prijato_ico": "44960263",
  "castka": 2600, "ucel": "ZASTUPOVÁNÍ NA MMB",
- "vozidla": ["3BR9309", "3BR7164"], "zpracoval": "David"}
+ "vozidla": ["3BR9309", "3BR7164"], "zpracoval": "David",
+ "request_id": "6f1c2a1e-6b1d-4c55-9a3e-2f0a9d1b7c44"}
 ```
 
 Žádosti udělají totéž co při vystavení dokladu u žádosti: `reserve_ppd_number_and_log`,
 `build_ppd_pdf`, `append_backup`, push do evidence. Odpověď `201`:
 `{"doklad": <stejný záznam jako PUT /api/ppd>, "print_url": "/ppd-print/<cislo>"}`.
+`request_id` (doplněno na žádost koordinátora): jedno id na doklad, evidence ho vytvoří při otevření
+dialogu a při opakování posílá stejné. Pro už použité `request_id` vrátí žádosti `200` se stejným
+dokladem (žádné nové číslo); evidence bere `200` i `201` jako úspěch.
 Chyby: `400 {"error"}`, `401` špatný klíč. Evidence potřebuje env `ZADOSTI_API_URL`
 (`http://zadosti-app:8089`).
 

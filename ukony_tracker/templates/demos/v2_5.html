@@ -1,0 +1,45 @@
+{# Demo for release 2.5 (Doklady): doklad č. 179 is tapped, the chevron turns
+   and its úkony slide out underneath; the unpaid one has the orange
+   "Zaplatit · č. 179". CSS-only, 4s loop; app tokens only. #}
+<style>
+  .de25-demo { box-sizing: border-box; height: 150px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.3; overflow: hidden; }
+  .de25-card { border-radius: 12px; background: var(--card); padding: 9px 11px; }
+  .de25-line { display: flex; align-items: center; gap: 6px; }
+  .de25-c { font-weight: 700; font-size: 12.5px; }
+  .de25-kc { margin-left: auto; font-weight: 700; font-size: 12px; }
+  .de25-dot { width: 6px; height: 6px; border-radius: 50%; background: #5ac8fa; }
+  .de25-muted { color: var(--muted); }
+  .de25-chip { font-size: 9px; font-weight: 700; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .de25-count { font-size: 9px; font-weight: 700; border-radius: 999px; padding: 1px 6px;
+    background: var(--flash-info-bg); color: var(--flash-info-ink); }
+  .de25-chev { margin-left: auto; width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(-45deg); animation: de25-chev 4s ease infinite; }
+  .de25-drawer { max-height: 0; overflow: hidden; margin-top: 6px; border-left: 2px solid var(--accent); padding-left: 7px;
+    animation: de25-open 4s ease infinite; }
+  .de25-u { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+  .de25-u:last-child { border-bottom: 0; }
+  .de25-u b { font-size: 10.5px; }
+  .de25-paid { margin-left: auto; font-size: 8.5px; font-weight: 700; border-radius: 999px; padding: 1px 6px;
+    background: var(--flash-success-bg); color: var(--flash-success-ink); }
+  .de25-orange { margin-left: auto; font-size: 8.5px; font-weight: 700; border-radius: 999px; padding: 1px 6px;
+    background: var(--flash-warning-bg); color: #754600; border: 1px solid #d98a00; }
+  @keyframes de25-chev { 0%, 22% { transform: rotate(-45deg); } 30%, 88% { transform: rotate(45deg); } 96%, 100% { transform: rotate(-45deg); } }
+  @keyframes de25-open { 0%, 22% { max-height: 0; } 36%, 88% { max-height: 80px; } 98%, 100% { max-height: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .de25-chev { animation: none; transform: rotate(45deg); }
+    .de25-drawer { animation: none; max-height: 80px; }
+  }
+</style>
+<div class="de25-demo" aria-hidden="true">
+  <div class="de25-card">
+    <div class="de25-line"><span class="de25-c">č. 179</span><span class="de25-kc">6 500 Kč</span></div>
+    <div class="de25-line de25-muted"><span class="de25-dot"></span><b style="color:var(--ink)">JE &amp; NE</b> · 08.10. · JE &amp; NE, spol. s r.o.</div>
+    <div class="de25-line" style="margin-top:3px"><span class="de25-chip">3BR9196</span><span class="de25-chip">2BP1720</span><span class="de25-muted">+3</span><span class="de25-count">5 úkonů</span><span class="de25-chev"></span></div>
+    <div class="de25-drawer">
+      <div class="de25-u"><b>3BR9196</b><span class="de25-muted">NOVÉ · 06.10.</span><span class="de25-paid">✓ Zaplaceno</span></div>
+      <div class="de25-u"><b>2BP1720</b><span class="de25-muted">PŘEVOD · 07.10.</span><span class="de25-paid">✓ Zaplaceno</span></div>
+      <div class="de25-u"><b>3BR5699</b><span class="de25-muted">NOVÉ · 07.10.</span><span class="de25-orange">Zaplatit · č. 179</span></div>
+    </div>
+  </div>
+</div>

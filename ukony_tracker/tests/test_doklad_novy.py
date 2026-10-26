@@ -73,7 +73,7 @@ def zadosti(monkeypatch):
 def _body(data, **over):
     return {"firma_id": data["jene"], "ukony": [data["a"], data["b"]], "prijato_od": "JE & NE, spol. s r.o.",
             "prijato_ico": "44960263", "castka": 2600, "ucel": "ZASTUPOVÁNÍ NA MMB", "zpracoval": "David",
-            **over}
+            "request_id": "6f1c2a1e-6b1d-4c55-9a3e-2f0a9d1b7c44", **over}
 
 
 def test_picker_lists_unpaid_recent_ukony_of_the_firm_without_a_doklad(client, data):
@@ -93,7 +93,7 @@ def test_issue_sends_the_contract_and_links_the_chosen_ukony(client, data, zados
     assert call["headers"] == {"X-Api-Key": "shared-key"}
     assert call["json"] == {"prijato_od": "JE & NE, spol. s r.o.", "prijato_ico": "44960263", "castka": 2600,
                             "ucel": "ZASTUPOVÁNÍ NA MMB", "vozidla": ["3BR9309", "TMBER6NW0V3099310"],
-                            "zpracoval": "David"}
+                            "zpracoval": "David", "request_id": "6f1c2a1e-6b1d-4c55-9a3e-2f0a9d1b7c44"}
     with client.application.app_context():
         conn = db.get_db()
         assert ppd_repo.get_by_cislo(conn, 183)["castka"] == 2600
@@ -108,6 +108,9 @@ def test_issue_sends_the_contract_and_links_the_chosen_ukony(client, data, zados
     ({"castka": "2600"}, "Částka"),
     ({"prijato_od": "  "}, "Přijato od"),
     ({"firma_id": 999}, "firm"),
+    ({"request_id": ""}, "request_id"),
+    ({"request_id": "x" * 70}, "request_id"),
+    ({"request_id": "bad id!"}, "request_id"),
 ])
 def test_invalid_requests_never_reach_zadosti(client, data, zadosti, over, error):
     calls, _ = zadosti
@@ -148,3 +151,22 @@ def test_page_has_the_new_doklad_dialog(client, data):
     body = client.get("/doklady").get_data(as_text=True)
     assert 'data-doklad-novy' in body and 'id="doklad-modal"' in body
     assert f'<option value="{data["jene"]}">JE &amp; NE</option>' in body
+
+
+def test_button_stays_hidden_until_zadosti_can_issue(client, data, monkeypatch):
+    monkeypatch.setattr(config, "ZADOSTI_API_URL", "")
+    body = client.get("/doklady").get_data(as_text=True)
+    assert "data-doklad-novy" not in body and 'id="doklad-modal"' not in body
+
+
+def test_repeated_request_id_returns_the_same_doklad_as_success(client, data, zadosti):
+    # Žádosti answer 200 with the already-issued doklad for a repeated request_id.
+    first = client.post("/doklady/novy", json=_body(data))
+    zadosti[1]["response"].status_code = 200
+    again = client.post("/doklady/novy", json=_body(data))
+    assert first.status_code == 201 and again.status_code == 201
+    assert first.get_json() == again.get_json()
+    assert [c["json"]["request_id"] for c in zadosti[0]] == ["6f1c2a1e-6b1d-4c55-9a3e-2f0a9d1b7c44"] * 2
+    with client.application.app_context():
+        conn = db.get_db()
+        assert conn.execute("SELECT COUNT(*) FROM ppd WHERE cislo=183").fetchone()[0] == 1
