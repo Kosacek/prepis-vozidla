@@ -20,6 +20,7 @@ from datetime import time as _time_of_day
 from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
+import ppd_api  # POST /api/ppd/vystavit — evidence vystavuje doklady — see ppd_api.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import nahled  # PNG náhledy stránek pro sdílenou stránku
 import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
@@ -62,7 +63,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.27.0"
+__version__ = "1.28.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1385,6 +1386,10 @@ def _require_login():
     path = _rq.path
     if path == "/login" or path == "/healthz" or path.startswith("/static"):
         return
+    # Volá ho server evidence, ne prohlížeč: místo session ho hlídá klíč
+    # integrace (viz api_ppd_vystavit).
+    if path == "/api/ppd/vystavit":
+        return
     # Sdílecí odkaz musí jít otevřít bez hesla — to je celý smysl (poslat
     # hotovou žádost mimo appku). Bezpečné jen díky tomu, že token je
     # neuhádnutelný náhodný řetězec a časem vyprší — viz sdileni.py.
@@ -2082,6 +2087,46 @@ def api_ppd_delete(number):
         except Exception as e:
             _log.warning("PPD delete push skipped: %s", e)
     return jsonify({"success": True, "removed": removed})
+
+
+@app.route("/api/ppd/vystavit", methods=["POST"])
+def api_ppd_vystavit():
+    """Evidence vystavuje doklad („Nový doklad" v /doklady) — viz ppd_api.py.
+
+    Klíč integrace místo přihlášení. Nenastavený klíč = cesta vypnutá, nikdy
+    otevřená. Špatný klíč počítá stejná brzda jako špatné heslo.
+    """
+    import tracker_push
+    klic = tracker_push.UKONY_API_KEY
+    if not klic:
+        return jsonify({"error": "Vystavování dokladů přes API není zapnuté."}), 503
+    ip = _kdo_zkousi()
+    zbyva = _zbyva_zamceno(ip)
+    if zbyva:
+        return jsonify({"error": "Příliš mnoho pokusů."}), 429, {"Retry-After": str(zbyva)}
+    poslany = (request.headers.get("X-Api-Key") or "").encode("utf-8")
+    if not hmac.compare_digest(poslany, klic.encode("utf-8")):
+        _zapis_spatne_heslo(ip)
+        return jsonify({"error": "Špatný klíč."}), 401
+    try:
+        udaje = ppd_api.over(request.get_json(silent=True))
+    except ppd_api.Chyba as e:
+        return jsonify({"error": str(e)}), 400
+
+    def adresa_podle_ico(ico: str) -> str:
+        firma = next((f for f in read_firmy() if str(f.get("ico") or "").strip() == ico), None)
+        return (firma or {}).get("adresa") or ""
+
+    doklad, novy = ppd_api.vystav(DATA_DIR, udaje, adresa_podle_ico)
+    if novy:
+        try:
+            import ppd_push
+            ppd_push.push_async(doklad, DATA_DIR)
+        except Exception as e:
+            _log.warning("PPD push skipped: %s", e)
+        _log.info("PPD %s vystaven přes API (%s)", doklad["cislo"], udaje["zpracoval"] or "?")
+    return (jsonify({"doklad": doklad, "print_url": f"/ppd-print/{doklad['cislo']}"}),
+            201 if novy else 200)
 
 
 @app.route("/ppd-print/<int:number>")
