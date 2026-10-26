@@ -175,7 +175,8 @@ def test_invalid_registry_vin_is_ignored_and_explained(conn):
     photo_data = {**DATA, "vin": None}
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo_data),
                           lookup=lambda _orv: {"success": True, "vin": "not a vin!"})
-    assert result["stav"] == "bez_firmy" and result["vin"] is None
+    assert result["stav"] == "chyba" and result["vin"] is None
+    assert "Registr" in result["zprava"]
     assert result["vin_zdroj"] is None
     assert result["rz"] == DATA["rz"] and result["orv_cislo"] == DATA["orv_cislo"]
 
@@ -276,6 +277,41 @@ def test_new_car_waiting_for_its_plate_is_filled_days_later(conn, make):
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
     assert ukony_repo.get(conn, uid)["rz"] == DATA["rz"]
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_plate_only_read_never_offers_the_car_as_new(conn, make):
+    # 2026-10-26: the first photo of a JE & NE techničák gave the RZ but no ORV
+    # number, so no VIN. The NOVÉ úkon waiting with only its VIN stayed
+    # invisible, "Nové auto" let David create a duplicate (#1523). The rescan
+    # read the ORV number, got the VIN and paired with the waiting úkon.
+    uid = make(typ_kod="NOVÉ", prevod="Haustech s.r.o.")
+    before = dict(ukony_repo.get(conn, uid))
+    first = scan.zpracuj(conn, b"p", "image/jpeg",
+                         client=FakeClient({**DATA, "vin": None, "orv_cislo": None}))
+    assert first["stav"] == "necitelne" and "znovu" in first["zprava"]
+    assert dict(ukony_repo.get(conn, uid)) == before
+    rescan = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}),
+                          lookup=lambda _orv: {"success": True, "vin": VIN})
+    assert rescan["stav"] == "doplneno" and rescan["ukon"]["id"] == uid
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_registry_without_vin_never_offers_the_car_as_new(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "vin": None}))
+    assert result["stav"] == "chyba" and "Registr" in result["zprava"]
+    assert result["rz"] == DATA["rz"] and result["orv_cislo"] == DATA["orv_cislo"]
+    assert ukony_repo.get(conn, uid)["rz"] is None
+
+
+def test_assigning_a_car_without_vin_creates_nothing(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    fid = ukony_repo.get(conn, uid)["firma_id"]
+    data = {"rz": DATA["rz"], "vin": None, "orv_cislo": None, "provozovatel": None,
+            "vin_zdroj": None}
+    result = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="NOVÉ")
+    assert result["stav"] == "necitelne"
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
 
 

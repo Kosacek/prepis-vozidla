@@ -163,6 +163,15 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
         if not data.get("vin") and not data.get("rz"):
             result.update(stav="nenalezeno", zprava="Chybí čitelná RZ i VIN.")
             return result
+        if not data.get("vin"):
+            # Without a VIN the scan cannot see an úkon still waiting for its
+            # RZ (a NOVÉ from žádosti has only the VIN), so the car must never
+            # be offered as new (2026-10-26: plate-only read → duplicate NOVÉ).
+            if data.get("orv_cislo"):
+                result.update(stav="chyba", zprava="Registr k číslu ORV nevrátil VIN — zkus to znovu.")
+            else:
+                result.update(stav="necitelne", zprava="Číslo ORV není čitelné — vyfoť techničák znovu.")
+            return result
         if auto_firma:
             # Never create from the photo alone (David 2026-10-23: no automatic
             # "ORV · 1 000 Kč" rows) — the user picks firm and type at the end

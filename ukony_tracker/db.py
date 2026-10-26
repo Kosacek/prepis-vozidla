@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import shutil
 import glob
@@ -176,15 +177,38 @@ def backup_db(db_path: str | None = None, min_interval_sec: int | None = None) -
     backup_dir = os.path.join(os.path.dirname(db_path), "backups")
     os.makedirs(backup_dir, exist_ok=True)
     interval = config.BACKUP_MIN_INTERVAL_SEC if min_interval_sec is None else min_interval_sec
-    existing = sorted(glob.glob(os.path.join(backup_dir, "tracker_*.db")))
-    if existing and interval and (time.time() - os.path.getmtime(existing[-1]) < interval):
+    existing = _auto_backups(backup_dir)
+    if existing and interval and (time.time() - _backup_time(existing[-1]) < interval):
         return None  # throttle: a recent backup already exists
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     dest = os.path.join(backup_dir, f"tracker_{stamp}.db")
     shutil.copy2(db_path, dest)
-    for old in sorted(glob.glob(os.path.join(backup_dir, "tracker_*.db")))[:-config.BACKUP_RETENTION]:
-        os.remove(old)
+    for old in _auto_backups(backup_dir)[:-config.BACKUP_RETENTION]:
+        try:
+            os.remove(old)
+        except FileNotFoundError:
+            pass  # a parallel request (batch of scan photos) pruned it first
     return dest
+
+
+# Only timestamped backups take part in throttle and rotation. Hand-made copies
+# (tracker_pred_rz_….db) sorted after them, so the throttle compared against an
+# August file — a backup on every POST — and they held 3 of the 30 slots.
+_AUTO_BACKUP = re.compile(r"tracker_([\d_]+)\.db")
+
+
+def _auto_backups(backup_dir: str) -> list[str]:
+    return sorted(p for p in glob.glob(os.path.join(backup_dir, "tracker_*.db"))
+                  if _AUTO_BACKUP.fullmatch(os.path.basename(p)))
+
+
+def _backup_time(path: str) -> float:
+    """When the backup was taken, from its name — copy2 keeps the DB's mtime."""
+    digits = _AUTO_BACKUP.fullmatch(os.path.basename(path)).group(1).replace("_", "")
+    try:
+        return datetime.strptime(digits, "%Y%m%d%H%M%S").timestamp()
+    except ValueError:
+        return os.path.getmtime(path)
 
 
 # Schema/migrations run once per DB file per process, not on every request:

@@ -79,6 +79,54 @@ class TestBackupDb:
         # Only the 3 newest should remain
         assert len(remaining) == 3
 
+    def test_throttle_counts_from_backup_time_not_db_mtime(self, tmp_path):
+        """copy2 keeps the DB's mtime; a DB last written an hour ago must not
+        make every later request take another backup."""
+        import time
+        src = tmp_path / "tracker.db"
+        src.write_bytes(b"x")
+        hour_ago = time.time() - 3600
+        os.utime(src, (hour_ago, hour_ago))
+        assert db_module.backup_db(str(src), min_interval_sec=300) is not None
+        assert db_module.backup_db(str(src), min_interval_sec=300) is None
+
+    def test_hand_made_copies_neither_defeat_throttle_nor_get_pruned(self, tmp_path):
+        """2026-10-26: tracker_pred_*.db copies sorted after the timestamped
+        backups, so the throttle compared against them (a backup on every POST)
+        and they ate 3 of the 30 rotation slots."""
+        import time
+        src = tmp_path / "tracker.db"
+        src.write_bytes(b"x")
+        backup_dir = tmp_path / "backups"
+        backup_dir.mkdir()
+        manual = backup_dir / "tracker_pred_rz_20200831_153041.db"
+        manual.write_bytes(b"manual")
+        old = time.time() - 86400 * 30
+        os.utime(manual, (old, old))
+        for i in range(4):
+            (backup_dir / f"tracker_20200101_00000{i}.db").write_bytes(b"old")
+        with patch("db.config") as mock_cfg:
+            mock_cfg.BACKUP_MIN_INTERVAL_SEC = 300
+            mock_cfg.BACKUP_RETENTION = 3
+            assert db_module.backup_db(str(src)) is not None
+            assert db_module.backup_db(str(src)) is None
+        names = sorted(p.name for p in backup_dir.iterdir())
+        assert manual.name in names
+        assert len([n for n in names if n != manual.name]) == 3
+
+    def test_prune_tolerates_a_file_removed_by_a_parallel_request(self, tmp_path):
+        """Parallel scan uploads prune the same old backup; the loser must not 500."""
+        src = tmp_path / "tracker.db"
+        src.write_bytes(b"x")
+        backup_dir = tmp_path / "backups"
+        backup_dir.mkdir()
+        for i in range(3):
+            (backup_dir / f"tracker_20200101_00000{i}.db").write_bytes(b"old")
+        with patch("db.config") as mock_cfg, \
+                patch("db.os.remove", side_effect=FileNotFoundError("gone")):
+            mock_cfg.BACKUP_RETENTION = 1
+            assert db_module.backup_db(str(src), min_interval_sec=0) is not None
+
 
 # ---------------------------------------------------------------------------
 # ares_service
