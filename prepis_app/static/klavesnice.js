@@ -20,17 +20,93 @@
   // ── Návrhy Chromu pryč ─────────────────────────────────────────────────────
   // Chrome přes náš seznam firem a jmen přikrýval svoje „naposledy napsané".
   // Necháváme jen návrhy appky.
+  //
+  // Výjimka: pole s data-navrhy (jiný doklad, žádost o změnu, poznámky,
+  // poznámka k úkonu). Tam se pořád píšou stejné věty („ZÁPIS A50-X") a
+  // návrhy chybí (David 2026-10-26). Chrome tam zůstává zapnutý (jeho staré
+  // záznamy) a appka k tomu nabízí dřív napsané texty, nejčastější nahoře:
+  // nové texty si Chrome sám neuloží, stránka se od 1.26 mezi žádostmi
+  // neobnovuje.
   const TEXTOVA = 'input:not([type=checkbox]):not([type=radio]):not([type=hidden])'
     + ':not([type=file]):not([type=button]):not([type=submit]), textarea';
   function bezNavrhuChrome(koren) {
     if (!koren || !koren.querySelectorAll) return;
     const pole = koren.matches && koren.matches(TEXTOVA) ? [koren] : [];
     pole.concat([...koren.querySelectorAll(TEXTOVA)]).forEach(el => {
+      if (el.hasAttribute('data-navrhy')) {
+        if (el.getAttribute('autocomplete') === 'off') el.removeAttribute('autocomplete');
+        if (el.id) el.setAttribute('list', 'navrhy-' + el.id);
+        return;
+      }
       if (el.getAttribute('autocomplete') !== 'off') el.setAttribute('autocomplete', 'off');
     });
     koren.querySelectorAll('form').forEach(f => f.setAttribute('autocomplete', 'off'));
   }
+
+  // Historie textů: localStorage { idPole: { TEXT: [kolikrát, kdy naposled] } }.
+  // <datalist> visí na <body>, ne v průvodci, takže přežije novou žádost.
+  const NAVRHY_KLIC = 'zadosti_navrhy';
+  const NAVRHU_NA_POLE = 30;
+  // Uložené hodnoty se berou s rezervou (jiný formát, ruční zásah): co nesedí,
+  // se přeskočí, aby kvůli tomu nespadla klávesnice ani generování.
+  const jeObjekt = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const platny = v => Array.isArray(v) && typeof v[0] === 'number' && typeof v[1] === 'number';
+  function nactiNavrhy() {
+    try {
+      const v = JSON.parse(localStorage.getItem(NAVRHY_KLIC) || '{}');
+      return jeObjekt(v) ? v : {};
+    } catch (_) { return {}; }
+  }
+  function seradNavrhy(texty) {
+    return Object.entries(jeObjekt(texty) ? texty : {})
+      .filter(([, v]) => platny(v))
+      .sort((a, b) => (b[1][0] - a[1][0]) || (b[1][1] - a[1][1]))
+      .map(([text]) => text);
+  }
+  function vykresliNavrhy() {
+    try {
+      const vse = nactiNavrhy();
+      document.querySelectorAll('input[data-navrhy]').forEach(el => {
+        const id = 'navrhy-' + el.id;
+        let seznam = document.getElementById(id);
+        if (!seznam) {
+          seznam = document.createElement('datalist');
+          seznam.id = id;
+          document.body.appendChild(seznam);
+        }
+        seznam.replaceChildren(...seradNavrhy(vse[el.id]).map(text => {
+          const o = document.createElement('option');
+          o.value = text;
+          return o;
+        }));
+      });
+    } catch (_) { /* návrhy jsou pohodlí */ }
+  }
+  // Volá generatePDFs po úspěchu s tím, co se odeslalo — obdoba odeslání
+  // formuláře, po kterém si Chrome text dřív zapamatoval. (Pole, které se
+  // v daném typu neposílá, se tak nepočítá, i když v něm text zůstal.)
+  window.zapamatujNavrhy = function (odeslano) {
+    try {
+      const vse = nactiNavrhy();
+      const ted = Date.now();
+      document.querySelectorAll('input[data-navrhy]').forEach(el => {
+        const hodnota = odeslano && el.id in odeslano ? odeslano[el.id] : el.value;
+        const text = String(hodnota || '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 200);
+        if (!text) return;
+        if (!jeObjekt(vse[el.id])) vse[el.id] = {};
+        const texty = vse[el.id];
+        Object.keys(texty).forEach(t => { if (!platny(texty[t])) delete texty[t]; });
+        texty[text] = [((texty[text] || [0])[0]) + 1, ted];
+        // Plný seznam: vypadne nejméně používaný, nikdy ale právě napsaný —
+        // jinak by se nový text mezi zaběhnuté už nikdy nedostal.
+        seradNavrhy(texty).filter(t => t !== text).slice(NAVRHU_NA_POLE - 1).forEach(t => delete texty[t]);
+      });
+      localStorage.setItem(NAVRHY_KLIC, JSON.stringify(vse));
+    } catch (_) { /* návrhy jsou pohodlí, žádost kvůli nim nespadne */ }
+    vykresliNavrhy();
+  };
   bezNavrhuChrome(document);
+  vykresliNavrhy();
   new MutationObserver(zmeny => zmeny.forEach(z => z.addedNodes.forEach(n => {
     if (n.nodeType === 1) bezNavrhuChrome(n);
   }))).observe(document.body, { childList: true, subtree: true });
@@ -76,8 +152,38 @@
     restarty.push(ted);
     kameraLog('restart', duvod);
     closeCamera('hlídač: ' + duvod);
-    setTimeout(() => tryAutoOpenCamera(), 800);
+    tryAutoOpenCamera();       // počká si sám (KAMERA_KLID_MS) — hned znovu USB kameru zasekne
   }
+
+  // Zamrzlý obraz: dokud stopa žije a není „mute", stojí jen přehrávač —
+  // stačí ho znovu napojit a zařízení zůstane otevřené (puštění a nové
+  // otevření je to, po čem se USB kamera zasekla). Restart, až když obraz
+  // zamrzne znovu do 15 s, nebo když ztichla sama stopa.
+  let oziveno = -Infinity;
+  function zamrzlyObraz() {
+    const t = cameraStream && cameraStream.getVideoTracks()[0];
+    const video = document.getElementById('camera-video');
+    if (t && !t.muted && video && performance.now() - oziveno > 15000) {
+      oziveno = performance.now();
+      posledniSnimek = oziveno;
+      kameraLog('oziveni', 'obraz zamrzl, stopa žije');
+      video.srcObject = null;
+      video.srcObject = cameraStream;
+      video.play().catch(() => {});
+      return;
+    }
+    restartKamery(t && t.muted ? 'obraz zamrzl (mute)' : 'obraz zamrzl');
+  }
+  window.kameraZamrzla = zamrzlyObraz;
+
+  // Schovaný nebo odscrollovaný náhled snímky nehlásí — to není zamrznutí.
+  function nahledVidet() {
+    const v = document.getElementById('camera-video');
+    if (!v || v.offsetParent === null) return false;
+    const r = v.getBoundingClientRect();
+    return r.width > 0 && r.bottom > 0 && r.top < window.innerHeight;
+  }
+
   setInterval(() => {
     const naKroku1 = currentPanel() === 1 && !document.hidden;
     if (naKroku1 && !bylNaKroku1) posledniSnimek = performance.now();  // náhled se teprve ukazuje
@@ -85,8 +191,9 @@
     if (!naKroku1 || !cameraStream || _scanInFlight) return;
     const t = cameraStream.getVideoTracks()[0];
     if (!t || t.readyState === 'ended') return restartKamery('stopa skončila');
+    if (!nahledVidet()) { posledniSnimek = performance.now(); return; }
     if (video0 && video0.requestVideoFrameCallback && performance.now() - posledniSnimek > 4000) {
-      restartKamery('obraz zamrzl');
+      zamrzlyObraz();
     }
   }, 1500);
 

@@ -190,6 +190,8 @@
   input[type=number] { -moz-appearance: textfield; }
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  /* Návrhy u poznámek (klavesnice.js) bez šipky — dřív je Chrome nabízel bez ní. */
+  input[data-navrhy]::-webkit-calendar-picker-indicator { display: none !important; }
   input:focus, select:focus { outline: none; border-color: var(--primary); background: #fff; }
   /* Fixed-length fields (VIN…) go green once filled to their EXACT max length —
      a "correct, nothing missing" cue. The .len-ok class is toggled by JS on the
@@ -410,6 +412,8 @@
   .scan-kbd { opacity: .7; font-weight: 500; font-size: 12px; }
   @media (max-width: 1100px) { .scan-kbd { display: none; } }
 
+  .cam-chyba { font-size: 13px; font-weight: 600; color: var(--error); margin-bottom: 8px; }
+  .cam-chyba[hidden] { display: none; }
   .scan-result { font-size: 12px; padding: 7px 9px; border-radius: 5px; margin-top: 7px; display: none; }
   .scan-result.ok      { background: #d1fae5; color: var(--success); display: block; }
   .scan-result.err     { background: #fee2e2; color: var(--error);   display: block; }
@@ -849,7 +853,8 @@
         </div>
       </div>
       <!-- Jen když kamera neběží (zamítnuté povolení, zaseknuté zařízení). -->
-      <button id="camera-zapnout" onclick="openCamera()" style="padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-camera"></use></svg> Zapnout kameru</button>
+      <div id="camera-chyba" class="cam-chyba" role="status" hidden></div>
+      <button id="camera-zapnout" onclick="openCamera()" style="padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><svg class="ico"><use href="#i-camera"></use></svg> <span id="camera-zapnout-text">Zapnout kameru</span></button>
       <canvas id="camera-canvas" style="display:none;"></canvas>
       <div class="scan-result" id="scan-all-result"></div>
     </div>
@@ -1096,7 +1101,7 @@
           <div class="form-grid">
             <div class="field full">
               <label>Jiný doklad k silničnímu vozidlu</label>
-              <input type="text" id="jiny_doklad" data-volitelne placeholder="napr. ZAPIS A50-X">
+              <input type="text" id="jiny_doklad" data-volitelne data-navrhy placeholder="napr. ZAPIS A50-X">
             </div>
           </div>
         </div>
@@ -1107,7 +1112,7 @@
           <div class="section-label">Žádá o provedení změny</div>
           <div class="form-grid">
             <div class="field full">
-              <input type="text" id="zadost_zmena" maxlength="80" placeholder="napr. zápis A50-X">
+              <input type="text" id="zadost_zmena" data-navrhy maxlength="80" placeholder="napr. zápis A50-X">
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:8px;">
@@ -1196,7 +1201,7 @@
           </div>
           <div class="field full-width">
             <label>Poznámky</label>
-            <input type="text" id="poznamky" data-volitelne placeholder="ZAPIS A50-X">
+            <input type="text" id="poznamky" data-volitelne data-navrhy placeholder="ZAPIS A50-X">
           </div>
         </div>
       </div>
@@ -1263,7 +1268,7 @@
             </div>
             <div class="field">
               <label>Poznámky</label>
-              <input type="text" id="evidence_poznamka" maxlength="120" placeholder="volitelná poznámka k úkonu" onblur="elZkontroluj()">
+              <input type="text" id="evidence_poznamka" data-navrhy maxlength="120" placeholder="volitelná poznámka k úkonu" onblur="elZkontroluj()">
             </div>
           </div>
           <!-- Bottom-right of the card: check it here instead of opening the
@@ -3526,6 +3531,7 @@ async function generatePDFs() {
     const result = await res.json();
     document.getElementById('loading').style.display = 'none';
     if (result.success) {
+      if (window.zapamatujNavrhy) zapamatujNavrhy(data);   // poznámky ap. příště nabídne (klavesnice.js)
       generatedUrls = { mode: appMode, zmeny: result.zmeny, zapis: result.zapis, zmena: result.zmena, '3rz': result['3rz'], vyvoz: result.vyvoz, ppd: result.ppd, ppd_print: result.ppd_print, plne_moce: result.plne_moce || [],
                         spz: data.registracni_znacka || '', vin: data.vin || '',
                         // JEDEN sdílecí odkaz na celý balík (žádost + plné moci + doklad).
@@ -3707,36 +3713,97 @@ function printPpd() {
 // opuštěním se kamera vždycky pustí.
 let cameraStream = null;
 let _camOpening = null;       // probíhající getUserMedia — další žádosti se k němu připojí
+let _camOpeningGen = -1;      // generace, pro kterou _camOpening otevírá
 let _camGen = 0;              // closeCamera ho zvýší; proud ze starší generace se hned zastaví
 let _scanInFlight = false;
 let _camRetryArmed = false;   // a pointerdown retry is already waiting
+let _camPokusTimer = null;    // naplánovaný další pokus — vždy nejvýš jeden
+let _camChyba = '';           // co řekne dlaždice, když kamera neběží ('' = nic)
+let _camChybaJmeno = '';      // e.name poslední chyby (NotAllowedError, NotFoundError …)
+let _camPustena = 0;          // kdy se kamera naposled pustila
+let _camZnovuTs = 0;          // poslední pokus po návratu do okna
+
+// Zaseknutá USB kamera (kamera_log.jsonl, 2026-10-26): každá mrtvá kamera
+// začala tím, že se pustila a hned zase otevřela — po obnovení stránky po ní
+// nová stránka sáhla za 1 s, hlídač ji restartoval za 0,8 s. První pokus pak
+// skončil „Timeout starting video source", každý další NotReadableError,
+// dokud někdo nepřepojil USB. Appka mezitím potichu zkoušela dál.
+//
+// Proto: mezi puštěním a dalším otevřením vždycky klid (i přes obnovení
+// stránky — localStorage), pár řídkých pokusů, pak to dlaždice řekne
+// (+ Zkusit znovu), a přepojení USB nebo návrat do okna to zkusí samo.
+const KAMERA_KLID_MS = 3000;
+const KAMERA_POKUSY_MS = [3000, 8000, 20000];
+const KAMERA_PUSTENA = 'zadosti_kamera_pustena';
+
+function _kameraPustena() {
+  _camPustena = Date.now();
+  try { localStorage.setItem(KAMERA_PUSTENA, String(_camPustena)); } catch (_) {}
+}
+
+function _kameraKlid() {
+  let t = _camPustena;
+  try { t = Math.max(t, Number(localStorage.getItem(KAMERA_PUSTENA)) || 0); } catch (_) {}
+  return Math.min(KAMERA_KLID_MS, Math.max(0, t + KAMERA_KLID_MS - Date.now()));
+}
+
+function _kameraChyba(e) {
+  const n = e && e.name;
+  _camChybaJmeno = n || '';
+  _camChyba = (n === 'NotAllowedError' || n === 'SecurityError') ? 'Kamera nemá povolení'
+    : (n === 'NotFoundError' || n === 'OverconstrainedError') ? 'Kamera není připojená'
+    : 'Kamera se zasekla — přepoj USB';
+  if (!cameraStream) _kameraUI(false);
+}
 
 function _zastavProud(s) {
   try { s.getTracks().forEach(t => t.stop()); } catch (_) {}
 }
 
+// Otevírá se právě teď pro platnou generaci? (Otevírání zrušené přes
+// closeCamera se nepočítá — připojit se k němu = kamera nenaskočí.)
+function _kameraSeOtevira() {
+  return !!_camOpening && _camOpeningGen === _camGen;
+}
+
 // Jediné místo, které kameru opravdu otevírá.
 function _otevriProud() {
   if (cameraStream) return Promise.resolve(cameraStream);
-  if (_camOpening) return _camOpening;
+  if (_kameraSeOtevira()) return _camOpening;
+  const predchozi = _camOpening;   // zrušené, ještě nedoběhlé — na zařízení nesahat současně
   const gen = _camGen;
   const p = (async () => {
-    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    if (predchozi) { try { await predchozi; } catch (_) {} }
+    const klid = _kameraKlid();
+    if (klid) await new Promise(r => setTimeout(r, klid));
+    if (gen !== _camGen) return null;            // mezitím se kamera zavřela
+    let s;
+    try {
+      s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch (e) {
+      _kameraPustena();      // nepovedený start zařízením taky cukne — další pokus až po klidu
+      throw e;
+    }
     // Mezitím se kamera zavřela → hned pustit, jinak by běžela a nikdo by ji
     // už nezavřel. (Odchod z kroku 1 ji nezavírá — běží celou dobu.)
-    if (gen !== _camGen) { _zastavProud(s); return null; }
+    if (gen !== _camGen) { _zastavProud(s); _kameraPustena(); return null; }
     cameraStream = s;
+    _camChyba = '';
+    clearTimeout(_camPokusTimer);
     if (typeof kameraZapnuta === 'function') kameraZapnuta(s);
     const video = document.getElementById('camera-video');
     video.srcObject = s;
-    try { await video.play(); } catch (_) { /* play may need user gesture later */ }
+    // Náhled ukázat hned: play() u proudu, ze kterého nepřijde snímek, visí
+    // a schovaný náhled by hlídač zamrzlého obrazu nikdy nepoznal.
     _kameraUI(true);
+    video.play().catch(() => { /* play may need user gesture later */ });
     return s;
   })();
   // Uklízet AŽ zvenku: kdyby getUserMedia selhal synchronně (třeba stránka
   // bez https nemá mediaDevices), vnitřní finally by proběhlo dřív než
   // přiřazení — _camOpening by navždy zůstal viset a kamera by už nešla.
   _camOpening = p;
+  _camOpeningGen = gen;
   p.then(() => {}, () => {}).then(() => { if (_camOpening === p) _camOpening = null; });
   return p;
 }
@@ -3744,22 +3811,22 @@ function _otevriProud() {
 // Try to auto-open the camera silently — meant to be on whenever Step 1 is
 // showing (initial load, after "Nová žádost", and on Back to Step 1). Once the
 // site has camera permission, getUserMedia resolves with no user gesture, so
-// this opens by itself. Two fallbacks: a retry with growing pauses for a busy
-// device (still releasing right after a reload/scan — NotReadableError), and a
-// one-shot click retry when the browser insists on a user gesture.
+// this opens by itself. Fallbacks: a few sparse retries for a busy device
+// (KAMERA_POKUSY_MS), and a one-shot click retry when the browser insists on
+// a user gesture. Every failure also tells the camera tile what is wrong.
 async function tryAutoOpenCamera(attempt = 0) {
-  if (cameraStream || _camOpening) return;                    // open / opening
+  if (cameraStream || _kameraSeOtevira()) return;             // open / opening
   if (typeof currentPanel === 'function' && currentPanel() !== 1) return;  // only on the scan step
   try {
     await _otevriProud();
     _camRetryArmed = false;
   } catch (e) {
     if (typeof kameraLog === 'function') kameraLog('chyba', `${e && e.name}: ${e && e.message} (pokus ${attempt + 1})`);
+    _kameraChyba(e);
     const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    if (!blocked && attempt < 5 && currentPanel() === 1) {
-      // Zařízení se ještě uvolňuje — dát mu víc času než dřív (0,5 → 2,5 s),
-      // místo aby se do napůl uvolněné kamery bušilo každých 400 ms.
-      setTimeout(() => tryAutoOpenCamera(attempt + 1), 500 * (attempt + 1));
+    if (!blocked && attempt < KAMERA_POKUSY_MS.length && currentPanel() === 1) {
+      clearTimeout(_camPokusTimer);
+      _camPokusTimer = setTimeout(() => tryAutoOpenCamera(attempt + 1), KAMERA_POKUSY_MS[attempt]);
       return;
     }
     if (_camRetryArmed) return;     // don't stack handlers
@@ -3775,6 +3842,26 @@ async function tryAutoOpenCamera(attempt = 0) {
     document.body.addEventListener('pointerdown', handler);
   }
 }
+
+// Přepojená USB kamera (devicechange) nebo návrat do okna: mrtvou kameru
+// zkusit znovu bez klikání. Z okna jen zaseknutou (bez povolení by Chrome
+// pokaždé znovu žádal a web nakonec zablokoval; nepřipojenou ohlásí
+// devicechange), jedním pokusem a nejvýš jednou za minutu — focus chodí často.
+const KAMERA_NE_Z_OKNA = ['NotAllowedError', 'SecurityError', 'NotFoundError', 'OverconstrainedError'];
+function _kameraZkusZnovu(zOkna = false) {
+  if (cameraStream || _kameraSeOtevira() || !_camChyba) return;
+  if (typeof currentPanel === 'function' && currentPanel() !== 1) return;
+  clearTimeout(_camPokusTimer);
+  if (!zOkna) { tryAutoOpenCamera(); return; }
+  if (KAMERA_NE_Z_OKNA.includes(_camChybaJmeno) || Date.now() - _camZnovuTs < 60000) return;
+  _camZnovuTs = Date.now();
+  tryAutoOpenCamera(KAMERA_POKUSY_MS.length);   // poslední pokus — žádná nová série
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', () => _kameraZkusZnovu());
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) _kameraZkusZnovu(true); });
+window.addEventListener('focus', () => _kameraZkusZnovu(true));
 
 // One-press capture + scan + advance. Bound to NumPad Enter and the
 // "Skenovat ORV" button. Single-shot only; in-flight guard ignores re-entry.
@@ -4063,23 +4150,26 @@ async function zapisNovyUkon() {
   }
 }
 
-// Tlačítko „Kamera": vždycky čistý restart — pustit, co je otevřené i co se
-// zrovna otevírá, chvíli počkat na uvolnění zařízení a otevřít znovu.
+// Tlačítko „Zapnout kameru" / „Zkusit znovu" (vidět jen, když kamera neběží).
+// Otevírání, které už běží, se jen připojí — zabít ho a hned otevřít znovu je
+// přesně to puštění a otevření, po kterém se USB kamera zasekne.
 async function openCamera() {
-  closeCamera('ruční restart');
-  // Otevírání, které ještě běží, po closeCamera samo skončí a pustí proud;
-  // počkat na něj, jinak by se k němu nové otevření jen připojilo.
-  if (_camOpening) { try { await _camOpening; } catch (_) {} }
-  await new Promise(r => setTimeout(r, 300));   // let the browser fully release the device
+  clearTimeout(_camPokusTimer);
+  if (cameraStream) closeCamera('ruční restart');
+  const text = document.getElementById('camera-zapnout-text');
+  if (text) text.textContent = 'Zapínám…';
   try {
     await _otevriProud();
-  } catch(e) {
-    alert('Kamera není dostupná: ' + e.message);
+  } catch (e) {
+    if (typeof kameraLog === 'function') kameraLog('chyba', `${e && e.name}: ${e && e.message} (tlačítko)`);
+    _kameraChyba(e);
   }
+  _kameraUI(!!cameraStream);
 }
 
 function closeCamera(duvod = '') {
   _camGen++;                     // zneplatní i otevírání, které ještě běží
+  clearTimeout(_camPokusTimer);
   if (cameraStream && typeof kameraLog === 'function') kameraLog('vypnuta', duvod);
   const video = document.getElementById('camera-video');
   if (video) {
@@ -4089,16 +4179,25 @@ function closeCamera(duvod = '') {
   if (cameraStream) {
     _zastavProud(cameraStream);
     cameraStream = null;
+    _kameraPustena();
+  } else if (_camOpening) {
+    _kameraPustena();   // otevírání ještě běží — zařízení se už mohlo hnout
   }
   _kameraUI(false);
 }
 
-// Kamera běží → náhled + tlačítka; neběží → jen „Zapnout kameru".
+// Kamera běží → náhled + tlačítka; neběží → „Zapnout kameru", a když víme
+// proč neběží, krátká hláška a „Zkusit znovu".
 function _kameraUI(bezi) {
   const container = document.getElementById('camera-container');
   const zapnout = document.getElementById('camera-zapnout');
+  const chyba = document.getElementById('camera-chyba');
+  const text = document.getElementById('camera-zapnout-text');
+  const hlaska = bezi ? '' : _camChyba;
   if (container) container.style.display = bezi ? '' : 'none';
   if (zapnout) zapnout.style.display = bezi ? 'none' : 'inline-flex';
+  if (chyba) { chyba.textContent = hlaska; chyba.hidden = !hlaska; }
+  if (text) text.textContent = hlaska ? 'Zkusit znovu' : 'Zapnout kameru';
 }
 
 // Obnovení stránky („Nová žádost"), zavření záložky, odchod jinam — kameru

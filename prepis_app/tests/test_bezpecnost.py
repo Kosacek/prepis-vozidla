@@ -186,3 +186,23 @@ def test_csp_se_nelepi_na_pdf(prod):
     assert r.mimetype != "text/html"
     assert "Content-Security-Policy" not in r.headers
     assert r.headers.get("X-Content-Type-Options") == "nosniff"
+
+
+# ── Verze bez vnitřních cest ─────────────────────────────────────────────────
+# /api/version vracela cestu k Pythonu, BASE_DIR a cwd (pozůstatek desktopové
+# .exe) a /api/debug-version k tomu i obsah souborů. Nic z UI to nečte.
+def _prihlaseny(prod):
+    prod.post("/login", data={"password": "heslo-jen-pro-test"},
+              base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    return prod
+
+
+def test_api_version_vraci_jen_verzi(prod):
+    r = _prihlaseny(prod).get("/api/version", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 200
+    assert r.get_json() == {"version": A.__version__}
+
+
+def test_debug_version_uz_neexistuje(prod):
+    r = _prihlaseny(prod).get("/api/debug-version", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
+    assert r.status_code == 404

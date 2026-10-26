@@ -1,0 +1,116 @@
+{# Demo for release 1.27.0 (Zaseknutá kamera se vzpamatuje): a miniature
+   Sken ORV tile — the preview runs, freezes, the tile says „Kamera se
+   zasekla — přepoj USB", a USB plug goes in and the preview comes back by
+   itself with a check. CSS-only, 6s loop; app tokens only. #}
+<style>
+  .dz1270-demo {
+    box-sizing: border-box; position: relative; height: 140px; padding: 12px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 1fr) 54px; gap: 10px; align-items: center;
+    font-size: 10px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1270-tile {
+    position: relative; height: 116px; padding: 8px; border-radius: 10px;
+    background: var(--wn-card); box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+    display: grid; grid-template-rows: auto 1fr; gap: 6px;
+  }
+  .dz1270-title { font-size: 11px; font-weight: 700; }
+  .dz1270-stage { position: relative; border-radius: 7px; overflow: hidden; }
+
+  /* Live preview: an ORV gently moving, then frozen, then back. */
+  .dz1270-view {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: var(--wn-ink); animation: dz1270-view 6s ease-in-out infinite;
+  }
+  .dz1270-doc {
+    width: 58px; padding: 6px 6px 7px; border-radius: 4px; background: var(--wn-card);
+    display: grid; gap: 3px; animation: dz1270-sway 6s ease-in-out infinite;
+  }
+  .dz1270-doc i { display: block; height: 3px; border-radius: 2px; background: var(--wn-line); }
+  .dz1270-doc i:nth-child(2) { width: 70%; }
+  .dz1270-doc b {
+    margin-top: 2px; padding: 2px 0; border: 1.5px solid var(--wn-ink); border-radius: 3px;
+    text-align: center; font-size: 9px; font-weight: 800; letter-spacing: .03em;
+  }
+  .dz1270-ok {
+    position: absolute; top: 5px; right: 5px; width: 16px; height: 16px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--success, #059669); color: #fff; opacity: 0;
+    animation: dz1270-ok 6s ease-in-out infinite;
+  }
+
+  /* The tile's message + retry button while the camera is stuck. */
+  .dz1270-err {
+    position: absolute; inset: 0; display: grid; align-content: center; justify-items: start; gap: 6px;
+    padding: 0 2px; opacity: 0; animation: dz1270-err 6s ease-in-out infinite;
+  }
+  .dz1270-msg { font-size: 10.5px; font-weight: 600; color: var(--error, #dc2626); }
+  .dz1270-btn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 8px;
+    border: 1.5px dashed var(--wn-line); border-radius: 6px; color: var(--wn-muted); font-weight: 600;
+  }
+
+  /* USB plug sliding into its port. */
+  .dz1270-usb { display: grid; justify-items: center; gap: 2px; color: var(--wn-muted); }
+  .dz1270-plug { animation: dz1270-plug 6s ease-in-out infinite; }
+  .dz1270-port { width: 26px; height: 10px; border-radius: 3px; border: 2px solid var(--wn-line); background: var(--wn-card); }
+
+  @keyframes dz1270-sway {
+    0%, 100% { transform: translateX(-3px) rotate(-2deg); }
+    12%      { transform: translateX(3px) rotate(2deg); }
+    24%, 66% { transform: translateX(1px) rotate(.5deg); }   /* zamrzlo */
+    78%      { transform: translateX(3px) rotate(2deg); }
+    90%      { transform: translateX(-3px) rotate(-2deg); }
+  }
+  @keyframes dz1270-view {
+    0%, 22%  { opacity: 1; filter: none; }
+    30%      { opacity: .55; filter: grayscale(1); }
+    34%, 68% { opacity: 0; }
+    74%, 100% { opacity: 1; filter: none; }
+  }
+  @keyframes dz1270-err {
+    0%, 32%  { opacity: 0; transform: translateY(4px); }
+    37%, 66% { opacity: 1; transform: none; }
+    71%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes dz1270-plug {
+    0%, 44%  { transform: translateY(-14px); opacity: .45; }
+    56%, 92% { transform: translateY(0); opacity: 1; }
+    100%     { transform: translateY(-14px); opacity: .45; }
+  }
+  @keyframes dz1270-ok {
+    0%, 74%  { opacity: 0; transform: scale(.5); }
+    79%      { opacity: 1; transform: scale(1.12); }
+    82%, 93% { opacity: 1; transform: none; }
+    100%     { opacity: 0; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: plug in, preview back, green check. */
+    .dz1270-demo .dz1270-doc,
+    .dz1270-demo .dz1270-view,
+    .dz1270-demo .dz1270-err,
+    .dz1270-demo .dz1270-plug,
+    .dz1270-demo .dz1270-ok { animation: none; }
+    .dz1270-demo .dz1270-err { opacity: 0; }
+    .dz1270-demo .dz1270-ok { opacity: 1; }
+  }
+</style>
+<div class="dz1270-demo" aria-hidden="true">
+  <div class="dz1270-tile">
+    <div class="dz1270-title">Sken ORV</div>
+    <div class="dz1270-stage">
+      <div class="dz1270-view">
+        <div class="dz1270-doc"><i></i><i></i><b>2AB 1234</b></div>
+        <span class="dz1270-ok"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      </div>
+      <div class="dz1270-err">
+        <span class="dz1270-msg">Kamera se zasekla — přepoj USB</span>
+        <span class="dz1270-btn"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-3z"/><circle cx="12" cy="13" r="3.5"/></svg> Zkusit znovu</span>
+      </div>
+    </div>
+  </div>
+  <div class="dz1270-usb">
+    <svg class="dz1270-plug" viewBox="0 0 24 32" width="22" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><rect x="6" y="10" width="12" height="12" rx="2"/><path d="M9 22v8M15 22v8"/></svg>
+    <span class="dz1270-port"></span>
+  </div>
+</div>

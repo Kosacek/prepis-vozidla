@@ -27,6 +27,11 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.27.0", date(2026, 10, 26), "Zaseknutá kamera se vzpamatuje",
+            ("Zamrzlý obraz se obnoví sám a po přepojení USB kamera naskočí "
+             "bez klikání.",
+             "Poznámky zase nabízejí, co jsi do nich psal dřív."),
+            demo="v1_27_0"),
     Release("1.26.0", date(2026, 10, 23), "Žádost bez myši",
             ("Enter vyfotí ORV, vezme návrh a jde dál; Ctrl+Enter otevře "
              "všechny dokumenty k tisku. Zkratky ukáže klávesa ?.",

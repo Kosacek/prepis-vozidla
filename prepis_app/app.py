@@ -62,7 +62,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.26.2"
+__version__ = "1.27.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2379,14 +2379,8 @@ def verze():
 # ── Update endpoints ─────────────────────────────────────────────────────────
 @app.route("/api/version")
 def api_version():
-    return jsonify({
-        "version": __version__,
-        "frozen": getattr(sys, "frozen", False),
-        "executable": sys.executable,
-        "MEIPASS": getattr(sys, "_MEIPASS", "N/A"),
-        "BASE_DIR": BASE_DIR,
-        "cwd": os.getcwd(),
-    })
+    # Jen verze — cesty k Pythonu a složkám (pozůstatek .exe) ven nepatří.
+    return jsonify({"version": __version__})
 
 
 @app.route("/api/evidence-meta")
@@ -2397,30 +2391,6 @@ def api_evidence_meta():
     import tracker_push
     meta = tracker_push.fetch_meta()
     return jsonify(meta or {"firmy": [], "typy": [], "ceny": {}, "ok": False})
-
-@app.route("/api/debug-version")
-def api_debug_version():
-    paths = {}
-    paths["frozen"] = getattr(sys, "frozen", False)
-    paths["sys.executable"] = sys.executable
-    paths["MEIPASS"] = getattr(sys, "_MEIPASS", "N/A")
-    paths["BASE_DIR"] = BASE_DIR
-    p1 = os.path.join(BASE_DIR, "VERSION")
-    paths["path1"] = p1
-    paths["path1_exists"] = os.path.exists(p1)
-    p2 = os.path.join(os.path.dirname(sys.executable), "_internal", "VERSION")
-    paths["path2"] = p2
-    paths["path2_exists"] = os.path.exists(p2)
-    paths["cwd"] = os.getcwd()
-    paths["resolved_version"] = __version__
-    # Try reading both right now
-    for key, path in [("path1_content", p1), ("path2_content", p2)]:
-        try:
-            with open(path) as f:
-                paths[key] = f.read().strip()
-        except Exception as e:
-            paths[key] = str(e)
-    return jsonify(paths)
 
 @app.route("/api/update-status")
 def api_update_status():
