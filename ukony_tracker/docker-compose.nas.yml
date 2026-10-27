@@ -16,6 +16,8 @@ services:
       DATAOVOZIDLECH_API_KEY: "${DATAOVOZIDLECH_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       ZEPTEJ_EFFORT: "${ZEPTEJ_EFFORT:-low}"
+      # "Nový doklad" (Doklady 2.5) asks žádosti for the number; empty = button hidden.
+      ZADOSTI_API_URL: "${ZADOSTI_API_URL:-}"
       DATA_DIR: "/data"
       HTTP_PORT: "8090"
       TZ: "Europe/Prague"
