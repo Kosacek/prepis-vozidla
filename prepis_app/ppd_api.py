@@ -10,6 +10,10 @@ Každé číslo je skutečný účetní doklad, proto:
 - nevalidní tělo se odmítne dřív, než se sáhne na číslování (over());
 - stejný request_id (opakování, dvojklik) vrátí už vystavený doklad a nové
   číslo nerezervuje — pod zámkem přes oba gunicorn workery (vystav()).
+
+Plátce ze žádosti (1.29.0): když evidence vystavuje doklad osobě ze žádosti,
+pošle i zadost_id + strana a adresa se vezme z hotové žádosti (adresa_platce).
+Jméno a IČO zůstanou, jak přišly — uživatel je v evidenci mohl opravit.
 """
 from __future__ import annotations
 
@@ -20,8 +24,10 @@ import re
 import threading
 from datetime import datetime
 
+import hledani
 import ppd
 import ppd_push
+import prefill
 
 try:
     import fcntl  # type: ignore
@@ -40,6 +46,7 @@ MAX_ZPRACOVAL = 60
 MAX_REQUEST_ID = 100
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
 _VIN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+STRANY = ("provozovatel", "vlastnik")
 
 VYSTAVENE = "ppd_api_vystavene.jsonl"   # request_id → doklad (idempotence + audit)
 _ZAMEK = "ppd_api.lock"
@@ -108,9 +115,11 @@ def over(telo) -> dict:
     prijato_ico = re.sub(r"\s", "", _text(telo, "prijato_ico", max_delka=20))
     if prijato_ico and (not prijato_ico.isdigit() or len(prijato_ico) > 12):
         raise Chyba("prijato_ico smí obsahovat jen číslice (nejvýš 12).")
-    request_id = _text(telo, "request_id", max_delka=MAX_REQUEST_ID)
-    if request_id and not _REQUEST_ID.match(request_id):
-        raise Chyba("request_id smí obsahovat jen písmena, číslice a . _ : -")
+    request_id = _id(telo, "request_id")
+    zadost_id = _id(telo, "zadost_id")
+    strana = _text(telo, "strana", max_delka=20).lower()
+    if strana and strana not in STRANY:
+        raise Chyba("strana smí být jen " + " nebo ".join(STRANY) + ".")
     return {
         "prijato_od": _text(telo, "prijato_od", povinne=True, max_delka=MAX_PRIJATO_OD),
         "prijato_ico": prijato_ico,
@@ -119,7 +128,35 @@ def over(telo) -> dict:
         "vozidla": _vozidla(telo.get("vozidla")),
         "zpracoval": _text(telo, "zpracoval", max_delka=MAX_ZPRACOVAL),
         "request_id": request_id,
+        "zadost_id": zadost_id,
+        "strana": strana,
     }
+
+
+def _id(telo: dict, klic: str) -> str:
+    hodnota = _text(telo, klic, max_delka=MAX_REQUEST_ID)
+    if hodnota and not _REQUEST_ID.match(hodnota):
+        raise Chyba(f"{klic} smí obsahovat jen písmena, číslice a . _ : -")
+    return hodnota
+
+
+def adresa_platce(data_dir: str, udaje: dict, adresa_podle_ico) -> str:
+    """Adresa na doklad: strana z hotové žádosti → uložená firma podle IČO → "".
+
+    Žádost se hledá jen když přišlo zadost_id i strana. Nenalezená žádost,
+    smazané nebo rozbité PDF ani žádná jiná chyba doklad nikdy neshodí.
+    """
+    if udaje.get("zadost_id") and udaje.get("strana"):
+        try:
+            for soubor in hledani.soubory_zadosti(data_dir, udaje["zadost_id"]):
+                adresa = prefill.adresa_strany(data_dir, soubor, udaje["strana"]).strip()
+                if adresa:
+                    return adresa
+        except Exception as e:
+            _log.warning("Adresa ze žádosti %s nejde přečíst (%s), beru firmu podle IČO",
+                         udaje["zadost_id"], e)
+    ico = udaje.get("prijato_ico") or ""
+    return (adresa_podle_ico(ico) if ico else "").strip()
 
 
 def _najdi_vystaveny(data_dir: str, request_id: str) -> dict | None:
@@ -166,8 +203,8 @@ def _pod_zamkem(data_dir: str, fn):
 def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
     """Vystaví doklad (nebo vrátí už vystavený pro stejný request_id).
 
-    adresa_podle_ico(ico) → adresa uložené firmy nebo "" (u dokladu k žádosti
-    ji doplní výběr firmy v UI). Vrací (doklad pro evidenci, nově_vystaven).
+    adresa_podle_ico(ico) → adresa uložené firmy nebo "" — záloha, když adresa
+    nejde vzít ze žádosti (adresa_platce). Vrací (doklad pro evidenci, nově_vystaven).
     Push do evidence je na volajícím — až po uvolnění zámku.
     """
     def _run():
@@ -178,7 +215,7 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
         # Plátce velkými písmeny jako u dokladu k žádosti; účel tak, jak přišel.
         payer = udaje["prijato_od"].upper()
         payer_ico = udaje["prijato_ico"]
-        payer_address = (adresa_podle_ico(payer_ico) if payer_ico else "").strip().upper()
+        payer_address = adresa_platce(data_dir, udaje, adresa_podle_ico).upper()
         purpose = udaje["ucel"]
         vozidla = udaje["vozidla"]
         # Jako u žádosti: SPZ přednostně, VIN jen když je to jediné auto bez značky.

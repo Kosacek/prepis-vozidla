@@ -256,6 +256,9 @@ def zapis_vystup(data_dir: str, files: list[str], data: dict) -> None:
             "na": (data.get("novy_jmeno") or "").strip(),
             # Kdo žádost vyplnil — aby šlo hledat „co dělal Roman dnes".
             "profil": (data.get("profil") or "").strip(),
+            # Tímhle id žádost zná evidence — přes něj najde doklad z evidence
+            # adresu plátce v hotovém PDF (soubory_zadosti).
+            "zadost_id": (data.get("zadost_id") or "").strip(),
         }
         if not rec["files"]:
             return
@@ -288,6 +291,27 @@ def nacti_index(data_dir: str) -> dict:
     except OSError:
         pass
     return out
+
+
+def soubory_zadosti(data_dir: str, zadost_id: str) -> list[str]:
+    """PDF žádosti s daným zadost_id (to, které zná evidence). Poslední zápis
+    vyhrává — znovu vygenerovaná nezměněná žádost má stejné id. Žádosti
+    z doby před zadost_id v indexu se nenajdou; nikdy nevyhodí."""
+    if not zadost_id:
+        return []
+    nalezene: list[str] = []
+    try:
+        with open(_index_path(data_dir), encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(rec, dict) and rec.get("zadost_id") == zadost_id:
+                    nalezene = [str(f) for f in rec.get("files") or []]
+    except OSError:
+        pass
+    return nalezene
 
 
 def nacti_vystupy(data_dir: str) -> list[dict]:

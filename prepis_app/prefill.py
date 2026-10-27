@@ -160,6 +160,26 @@ def strany(data_dir: str, filename: str) -> dict:
             "strany": out, "_zdroj": safe, "_typ": kind}
 
 
+# Strana, jak ji posílá evidence → role v tiskopisu. U převodu se bere NOVÝ
+# vlastník/provozovatel (pro toho se žádost psala), ostatní tiskopisy mají
+# jen jednoho. Provozovatel se vyplňuje jen když je jiný — jinak auto
+# provozuje vlastník, stejně jako to bere doklad k žádosti (resolve_payer_full).
+_ROLE_STRANY = {
+    "vlastnik": (("Nový vlastník", "Vlastník"),),
+    "provozovatel": (("Nový provozovatel", "Provozovatel"), ("Nový vlastník", "Vlastník")),
+}
+
+
+def adresa_strany(data_dir: str, filename: str, strana: str) -> str:
+    """Adresa (ulice, PSČ) vlastníka/provozovatele z hotové žádosti, nebo ""."""
+    podle_role = {s["role"]: s for s in strany(data_dir, filename)["strany"]}
+    for role in _ROLE_STRANY.get(strana, ()):
+        osoba = next((podle_role[r] for r in role if r in podle_role), None)
+        if osoba:
+            return osoba["adresa"]
+    return ""
+
+
 def typ_souboru(filename: str) -> str | None:
     """Typ tiskopisu z názvu. Rozbor názvu je jeden pro celou appku (hledani.py),
     aby starý i nový tvar názvu chápalo všechno stejně."""

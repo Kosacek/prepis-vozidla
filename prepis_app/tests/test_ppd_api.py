@@ -205,3 +205,152 @@ def test_telo_neni_objekt_400(api, data):
 def test_castka_jako_cele_cislo_v_plovouci_carce_projde(api):
     r = _post(api, {**TELO, "castka": 2600.0, "request_id": "f-1"})
     assert r.status_code == 201 and r.get_json()["doklad"]["castka"] == 2600
+
+
+# ── Adresa plátce ze žádosti (zadost_id + strana) ────────────────────────────
+# Evidence vystaví doklad osobě, pro kterou byla žádost psaná — obvykle nový
+# provozovatel, u nového auta je vlastníkem často leasing. Adresa se bere
+# z hotové žádosti na disku (prefill.py), nic nového se neukládá. Jméno a IČO
+# zůstanou, jak je poslala evidence: uživatel je tam mohl opravit.
+
+import hledani  # noqa: E402
+import prefill  # noqa: E402
+from pypdf import PdfReader  # noqa: E402
+
+PREVOD_LEASING = {
+    "mode": "prevod", "registracni_znacka": "1AB2345", "vin": "TMBEK6NW7M3158470",
+    "puvodni_jmeno": "PRODEJCE S.R.O.", "puvodni_ico": "27082440",
+    "puvodni_adresa": "STARÁ 1, BRNO", "puvodni_psc": "60200",
+    "novy_jmeno": "ČSOB LEASING, A.S.", "novy_ico": "63998980",
+    "novy_adresa": "Výmolova 353/3, Praha", "novy_psc": "15000",
+    "novy_prov_jiny": True, "novy_prov_jmeno": "JAN NOVÁK",
+    "novy_prov_rc_1": "850101", "novy_prov_rc_2": "1234",
+    "novy_prov_adresa": "Uzbecká 28, Brno", "novy_prov_psc": "62500",
+}
+ZADOST_ID = "3f2b8c1e-7d4a-4c6b-9e21-5a0f1b2c3d4e-0a1b2c3d"
+ADRESA_PROVOZOVATELE = "UZBECKÁ 28, BRNO, 62500"
+ADRESA_LEASINGU = "VÝMOLOVA 353/3, PRAHA, 15000"
+ADRESA_FIRMY = "VEVEŘÍ 102, BRNO"     # uložená firma z fixture api (IČO 44960263)
+
+
+def _ulozena_zadost(data_dir, data=None, kind="zmeny"):
+    """Hotová žádost na disku + řádek v indexu — přesně jako po /api/generate."""
+    data = PREVOD_LEASING if data is None else data
+    out = data_dir / "output"
+    out.mkdir(exist_ok=True)
+    builder, pdf = {"zmeny": (A.build_zmeny_fields, A.PDF_ZMENY),
+                    "zapis": (A.build_zapis_fields, A.PDF_ZAPIS)}[kind]
+    name = f"{kind}_NOVAK_1AB2345_20261027.pdf"
+    (out / name).write_bytes(A.fill_pdf(pdf, builder(data)))
+    hledani.zapis_vystup(str(data_dir), [f"/download/{name}"], {**data, "zadost_id": ZADOST_ID})
+    return name
+
+
+def _s_adresou(strana, **navic):
+    return {**TELO, "request_id": f"adr-{strana}", "zadost_id": ZADOST_ID, "strana": strana, **navic}
+
+
+def _adresa_v_zaloze(api):
+    return ppd.read_backup(str(api.data))[0]["adresa"] or ""
+
+
+def test_adresa_provozovatele_ze_zadosti(api):
+    _ulozena_zadost(api.data)
+    r = _post(api, _s_adresou("provozovatel"))
+    assert r.status_code == 201, r.get_json()
+    assert _adresa_v_zaloze(api) == ADRESA_PROVOZOVATELE
+    text = PdfReader(str(api.data / "output" / "ppd_1.pdf")).pages[0].extract_text()
+    assert "62500" in text, "adresa je i na vytištěném dokladu"
+
+
+def test_vlastnik_je_novy_vlastnik_ne_prodejce(api):
+    _ulozena_zadost(api.data)
+    assert _post(api, _s_adresou("vlastnik")).status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_LEASINGU
+
+
+def test_jmeno_a_ico_zustanou_jak_je_poslala_evidence(api):
+    _ulozena_zadost(api.data)
+    r = _post(api, _s_adresou("provozovatel", prijato_od="Jan Novák ml.", prijato_ico=""))
+    doklad = r.get_json()["doklad"]
+    assert (doklad["prijato_od"], doklad["prijato_ico"]) == ("JAN NOVÁK ML.", "")
+    zaloha = ppd.read_backup(str(api.data))[0]
+    assert zaloha["prijato_od"] == "JAN NOVÁK ML." and not zaloha["ico"]
+    assert zaloha["adresa"] == ADRESA_PROVOZOVATELE
+
+
+def test_adresa_ze_zadosti_ma_prednost_pred_firmou(api):
+    """IČO plátce může mít uloženou firmu — u žádosti platí adresa z tiskopisu."""
+    _ulozena_zadost(api.data)
+    _post(api, _s_adresou("vlastnik"))   # TELO nese IČO uložené firmy
+    assert _adresa_v_zaloze(api) == ADRESA_LEASINGU
+
+
+def test_provozovatel_bez_jineho_provozovatele_je_vlastnik(api):
+    """Bez „jiný provozovatel" provozuje auto vlastník — doklad k žádosti to bere stejně."""
+    _ulozena_zadost(api.data, {k: v for k, v in PREVOD_LEASING.items() if not k.startswith("novy_prov")})
+    _post(api, _s_adresou("provozovatel"))
+    assert _adresa_v_zaloze(api) == ADRESA_LEASINGU
+
+
+@pytest.mark.parametrize("strana, adresa", [("provozovatel", ADRESA_PROVOZOVATELE),
+                                            ("vlastnik", ADRESA_LEASINGU)])
+def test_zapis_noveho_vozidla(api, strana, adresa):
+    """Zápis má strany „Vlastník"/„Provozovatel" (bez „Nový")."""
+    _ulozena_zadost(api.data, {**PREVOD_LEASING, "mode": "zapis"}, kind="zapis")
+    _post(api, _s_adresou(strana))
+    assert _adresa_v_zaloze(api) == adresa
+
+
+def test_cela_cesta_od_generovani_zadosti(api, monkeypatch):
+    """Žádost vygenerovaná přes /api/generate, doklad z evidence s jejím zadost_id."""
+    monkeypatch.setattr(tracker_push, "push_async", lambda data, dd: None)
+    api.post("/login", data={"password": "heslo-jen-pro-test"})
+    r = api.post("/api/generate", json={**PREVOD_LEASING, "zadost_id": ZADOST_ID})
+    assert r.status_code == 200 and r.get_json()["success"]
+    assert _post(api, _s_adresou("provozovatel")).status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_PROVOZOVATELE
+
+
+@pytest.mark.parametrize("pripad", ["neznama_zadost", "smazane_pdf", "rozbite_pdf", "jen_strana"])
+def test_nenalezena_zadost_spadne_na_firmu_podle_ico(api, pripad):
+    name = _ulozena_zadost(api.data)
+    telo = _s_adresou("provozovatel")
+    if pripad == "neznama_zadost":
+        telo["zadost_id"] = "jina-zadost"
+    elif pripad == "smazane_pdf":
+        os.remove(api.data / "output" / name)
+    elif pripad == "rozbite_pdf":
+        (api.data / "output" / name).write_bytes(b"tohle neni pdf")
+    else:
+        del telo["zadost_id"]
+    r = _post(api, telo)
+    assert r.status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_FIRMY
+
+
+def test_bez_zadosti_a_bez_ico_je_adresa_prazdna(api):
+    r = _post(api, _s_adresou("provozovatel", zadost_id="jina-zadost", prijato_ico=""))
+    assert r.status_code == 201
+    assert _adresa_v_zaloze(api) == ""
+
+
+def test_chyba_pri_hledani_zadosti_doklad_neshodi(api, monkeypatch):
+    _ulozena_zadost(api.data)
+
+    def rozbite(*a, **k):
+        raise RuntimeError("disk")
+    monkeypatch.setattr(prefill, "strany", rozbite)
+    r = _post(api, _s_adresou("provozovatel"))
+    assert r.status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_FIRMY
+
+
+@pytest.mark.parametrize("zmena", [
+    {"zadost_id": "ne povoleno!"}, {"zadost_id": "z" * 101}, {"zadost_id": 5},
+    {"strana": "kupujici"}, {"strana": "vlastník-x"}, {"strana": 1}, {"strana": ["vlastnik"]},
+])
+def test_nevalidni_zadost_id_nebo_strana_400(api, zmena):
+    r = _post(api, {**_s_adresou("provozovatel"), **zmena})
+    assert r.status_code == 400 and r.get_json()["error"]
+    assert _zadny_doklad(api.data) and api.poslano == []

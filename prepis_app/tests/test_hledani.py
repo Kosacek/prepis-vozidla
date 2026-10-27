@@ -281,6 +281,36 @@ def test_index_roundtrip(tmp_path):
     assert idx["zmeny_20260715_100000.pdf"]["rz"] == "3BR4008"   # uppercased
 
 
+def test_index_najde_soubory_zadosti_podle_zadost_id(tmp_path):
+    """Evidence vystavuje doklad k žádosti jen se zadost_id — index je spojka
+    na hotové PDF (adresy jsou v něm, víc se nikde neukládá)."""
+    d = str(tmp_path)
+    hledani.zapis_vystup(d, ["/download/zmeny_A_20261027.pdf"], {"zadost_id": "seed-1-aaaa"})
+    hledani.zapis_vystup(d, ["/download/zapis_B_20261027.pdf"], {"zadost_id": "seed-1-bbbb"})
+    assert hledani.soubory_zadosti(d, "seed-1-aaaa") == ["zmeny_A_20261027.pdf"]
+    assert hledani.soubory_zadosti(d, "seed-1-bbbb") == ["zapis_B_20261027.pdf"]
+    assert hledani.soubory_zadosti(d, "neznama") == []
+    assert hledani.soubory_zadosti(d, "") == []
+
+
+def test_soubory_zadosti_posledni_generovani_vyhrava(tmp_path):
+    """Znovu vygenerovaná nezměněná žádost má stejné zadost_id — platí nejnovější PDF."""
+    d = str(tmp_path)
+    hledani.zapis_vystup(d, ["zmeny_A_20261027.pdf"], {"zadost_id": "z-1"})
+    hledani.zapis_vystup(d, ["zmeny_A_20261027_101500.pdf"], {"zadost_id": "z-1"})
+    assert hledani.soubory_zadosti(d, "z-1") == ["zmeny_A_20261027_101500.pdf"]
+
+
+def test_soubory_zadosti_bez_indexu_a_se_starymi_radky(tmp_path):
+    """Žádosti z doby před zadost_id v indexu se prostě nenajdou — nic nespadne."""
+    d = str(tmp_path)
+    assert hledani.soubory_zadosti(d, "z-1") == []
+    with open(os.path.join(d, hledani.INDEX_NAME), "w", encoding="utf-8") as fh:
+        fh.write("{neplatny json\n")
+        fh.write(json.dumps({"files": ["zmeny_X_20260715.pdf"], "rz": "1AB2345"}) + "\n")
+    assert hledani.soubory_zadosti(d, "z-1") == []
+
+
 def test_index_never_raises_on_bad_input(tmp_path):
     """Indexace nesmí nikdy shodit generování žádosti."""
     hledani.zapis_vystup("/nonexistent/dir", ["a.pdf"], {})
