@@ -79,7 +79,7 @@ def _body(data, **over):
 def test_picker_lists_unpaid_recent_ukony_of_the_firm_without_a_doklad(client, data):
     body = client.get(f"/doklady/novy/ukony?firma={data['jene']}").get_json()
     assert [u["id"] for u in body["ukony"]] == sorted([data["a"], data["b"]], reverse=True)
-    assert body["firma"] == {"nazev": "JE & NE, spol. s r.o.", "ico": "44960263"}
+    assert body["firma"] == {"nazev": "JE & NE, spol. s r.o.", "zkratka": "JE & NE", "ico": "44960263"}
     assert body["ukony"][0]["vozidlo"] in ("3BR9309", "TMBER6NW0V3099310")
 
 
@@ -170,3 +170,76 @@ def test_repeated_request_id_returns_the_same_doklad_as_success(client, data, za
     with client.application.app_context():
         conn = db.get_db()
         assert conn.execute("SELECT COUNT(*) FROM ppd WHERE cislo=183").fetchone()[0] == 1
+
+
+# --- Payer from the žádost (provozovatel / vlastník), 2026-10-27 ---------------
+
+def _zadost(conn, ukon_id, zadost_id, **parties):
+    from repositories import prichozi_repo
+    pid = prichozi_repo.create(conn, zadost_id=zadost_id, datum=TODAY, mode="zapis", status="auto", **parties)
+    conn.execute("UPDATE prichozi SET created_ukon_id=? WHERE id=?", (ukon_id, pid))
+    conn.commit()
+
+
+@pytest.fixture
+def parties(client, data):
+    with client.application.app_context():
+        conn = db.get_db()
+        # Leasing company owns the car, the client operates it (typical NOVÉ).
+        _zadost(conn, data["a"], "zad-a", novy_jmeno="Raiffeisen - Leasing, s.r.o.", novy_ico="61467863",
+                novy_prov_jmeno="EKOSTYREN s.r.o.", novy_prov_ico="25850512")
+        # No separate operator: the owner is the operator. A stale operator IČO
+        # without a name (box unticked in žádosti) is not a party.
+        _zadost(conn, data["b"], "zad-b", novy_jmeno="  RADIM   JANKŮ ", novy_ico="", novy_prov_ico="12345678")
+    return data
+
+
+def test_picker_carries_the_parties_of_each_zadost(client, parties):
+    body = client.get(f"/doklady/novy/ukony?firma={parties['jene']}").get_json()
+    by_id = {u["id"]: u for u in body["ukony"]}
+    assert by_id[parties["a"]]["zadost"] == {
+        "id": "zad-a",
+        "provozovatel": {"jmeno": "EKOSTYREN s.r.o.", "ico": "25850512"},
+        "vlastnik": {"jmeno": "Raiffeisen - Leasing, s.r.o.", "ico": "61467863"}}
+    assert by_id[parties["b"]]["zadost"] == {
+        "id": "zad-b", "provozovatel": None, "vlastnik": {"jmeno": "RADIM JANKŮ", "ico": ""}}
+    assert body["firma"]["zkratka"] == "JE & NE"
+
+
+def test_manual_ukon_has_no_zadost(client, data):
+    body = client.get(f"/doklady/novy/ukony?firma={data['jene']}").get_json()
+    assert all(u["zadost"] is None for u in body["ukony"])
+
+
+def test_party_payer_sends_zadost_id_and_strana_to_zadosti(client, parties, zadosti):
+    calls, _ = zadosti
+    response = client.post("/doklady/novy", json=_body(
+        parties, prijato_od="EKOSTYREN s.r.o.", prijato_ico="25850512", zadost_id="zad-a", strana="provozovatel"))
+    assert response.status_code == 201
+    sent = calls[0]["json"]
+    assert sent["prijato_od"] == "EKOSTYREN s.r.o." and sent["prijato_ico"] == "25850512"
+    assert sent["zadost_id"] == "zad-a" and sent["strana"] == "provozovatel"
+
+
+def test_firm_payer_sends_no_party_fields(client, parties, zadosti):
+    calls, _ = zadosti
+    assert client.post("/doklady/novy", json=_body(parties)).status_code == 201
+    assert "zadost_id" not in calls[0]["json"] and "strana" not in calls[0]["json"]
+
+
+@pytest.mark.parametrize("over", [
+    {"zadost_id": "zad-a", "strana": "kupec"},           # unknown side
+    {"zadost_id": "zad-a"},                              # side missing
+    {"strana": "vlastnik"},                              # žádost missing
+    {"zadost_id": "zad-cizi", "strana": "vlastnik"},     # not a žádost of the ticked úkony
+])
+def test_bad_party_fields_never_reach_zadosti(client, parties, zadosti, over):
+    response = client.post("/doklady/novy", json=_body(parties, **over))
+    assert response.status_code == 400 and "plátce" in response.get_json()["error"].lower()
+    assert zadosti[0] == []
+
+
+def test_zadost_of_an_unticked_ukon_is_refused(client, parties, zadosti):
+    response = client.post("/doklady/novy", json=_body(
+        parties, ukony=[parties["b"]], zadost_id="zad-a", strana="provozovatel"))
+    assert response.status_code == 400 and zadosti[0] == []

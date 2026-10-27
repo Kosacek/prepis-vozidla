@@ -96,10 +96,13 @@ def novy_ukony():
     od = (date.today() - timedelta(days=90)).isoformat()
     rows = [u for u in ukony_repo.list(conn, firma_id=firma["id"])
             if u["stav_platby"] != "zaplaceno" and u["datum"] >= od and u["id"] not in paid_by_doklad]
+    # Parties of each úkon's žádost become the payer chips (provozovatel / vlastník).
+    zadosti = doklad_issue.zadosti(conn, [u["id"] for u in rows])
     return jsonify(
-        firma={"nazev": firma["nazev"], "ico": firma["ico"] or ""},
+        firma={"nazev": firma["nazev"], "zkratka": firma["zkratka"] or firma["nazev"], "ico": firma["ico"] or ""},
         ukony=[{"id": u["id"], "datum": u["datum"], "vozidlo": u["rz"] or u["vin"] or "",
-                "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or ""}
+                "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or "",
+                "zadost": zadosti.get(u["id"])}
                for u in rows],
     )
 
