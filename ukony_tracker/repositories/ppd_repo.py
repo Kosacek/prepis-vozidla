@@ -115,6 +115,13 @@ def get_by_cislo(conn: sqlite3.Connection, cislo: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM ppd WHERE cislo=?", (cislo,)).fetchone()
 
 
+def mark_deleted(conn: sqlite3.Connection, cislo: int) -> None:
+    """Skryje doklad, který žádosti právě smazaly (jejich push řekne totéž o chvíli později)."""
+    with conn:
+        conn.execute("UPDATE ppd SET smazano=1, updated_at=? WHERE cislo=? AND smazano=0",
+                     (db.now_iso(), cislo))
+
+
 def _filters(od, do, q, include_deleted) -> tuple[str, list]:
     where, args = [], []
     if not include_deleted:

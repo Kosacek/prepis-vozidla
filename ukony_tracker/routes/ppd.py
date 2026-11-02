@@ -3,12 +3,13 @@ import calendar
 import re
 from datetime import date, timedelta
 
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 
 import config
 import db
 from repositories import firmy_repo, ppd_repo, ukony_repo
-from services import colors_service, doklad_issue, ppd_links
+from routes.ukony import _safe_back as safe_back
+from services import colors_service, doklad_delete, doklad_issue, ppd_links
 from services.ingest_service import normalize_profil
 
 bp = Blueprint("ppd", __name__)
@@ -80,9 +81,27 @@ def doklady():
         total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
         mesic=mesic, q=q, smazane=smazane, firma=firma,
         auta=ppd_links.auta, back_url=request.full_path.rstrip("?"),
-        # "Nový doklad" appears once žádosti can issue doklady (ZADOSTI_API_URL set).
-        novy_doklad=bool(config.ZADOSTI_API_URL),
+        # "Nový doklad" appears once žádosti can issue doklady (ZADOSTI_API_URL set);
+        # the same switch arms the trash, which here deletes the doklad.
+        novy_doklad=bool(config.ZADOSTI_API_URL), mazani_dokladu=bool(config.ZADOSTI_API_URL),
     )
+
+
+@bp.post("/doklady/<int:cislo>/smazat")
+def smazat(cislo):
+    """The trash on Doklady: deletes the doklad through žádosti, never an úkon."""
+    ajax = request.headers.get("X-Requested-With") == "fetch"
+    try:
+        doklad_delete.smazat(db.get_db(), cislo)
+    except doklad_delete.DeleteError as e:
+        if ajax:
+            return jsonify(ok=False, error=str(e)), e.status
+        flash(str(e), "error")
+    else:
+        if ajax:
+            return jsonify(ok=True, cislo=cislo)
+        flash(f"Doklad č. {cislo} smazán.", "success")
+    return redirect(safe_back(request.form.get("back")) or url_for("ppd.doklady"))
 
 
 @bp.get("/doklady/novy/ukony")

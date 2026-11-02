@@ -27,6 +27,11 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.5.1", date(2026, 11, 2),
+        "Koš v Dokladech maže doklad, ne úkon",
+        ("Úkony v dokladu zůstanou, jak jsou.",),
+    ),
+    Release(
         "2.5", date(2026, 10, 26),
         "Doklady ukážou, co platí",
         ("Klepni na doklad a vyjedou jeho úkony. Nezaplacený má oranžové Zaplatit, jen potvrdíš.",

@@ -146,6 +146,11 @@
       freshItem = tmp.querySelector(".ukony-item");
     }
     if (freshItem) {
+      // Doklady: the row's trash deletes its doklad, never the úkon — keep
+      // that form instead of the úkon trash the fresh row comes with.
+      var dokladDel = item.querySelector('form[action^="/doklady/"]');
+      var ukonDel = dokladDel && freshItem.querySelector('form[action$="/smazat"]');
+      if (ukonDel) ukonDel.parentNode.replaceChild(dokladDel, ukonDel);
       item.parentNode.replaceChild(freshItem, item);
       if (window.ukonyReplaceRow) window.ukonyReplaceRow(item, freshItem);
       var freshLink = freshItem.querySelector("a.recent-row");

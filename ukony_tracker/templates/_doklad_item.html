@@ -25,7 +25,8 @@
   <div class="doklad-drawer" id="doklad-{{ p.cislo }}" hidden>
     {% if uids %}
     <div class="ukony-list doklad-ukony">
-      {% for uid in uids %}{% set u = ukony.get(uid) %}{% if u %}{% include "_ukony_item.html" %}{% endif %}{% endfor %}
+      {# smazat_doklad: here the row's trash deletes this doklad, never the úkon. #}
+      {% for uid in uids %}{% set u = ukony.get(uid) %}{% if u %}{% with smazat_doklad=p %}{% include "_ukony_item.html" %}{% endwith %}{% endif %}{% endfor %}
     </div>
     {% endif %}
     {% for key in chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}

@@ -2131,6 +2131,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 .row-del:hover, .row-del:focus-visible { background: var(--flash-error-bg); color: var(--flash-error-ink); }
 .row-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row-del:disabled { opacity: .35; cursor: default; background: transparent; color: var(--muted); }
 
 @media (max-width: 760px) {
   .ukony-list .ukony-item { padding: 2px 0 6px; }

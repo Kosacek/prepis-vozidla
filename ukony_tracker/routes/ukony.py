@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import date
+from urllib.parse import urlsplit
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 import db
 from repositories import firmy_repo, typy_repo, ukony_repo
@@ -312,14 +313,31 @@ def edit_save(uid):
     return redirect(_safe_back(f.get("back")) or url_for("ukony.table"))
 
 
+def _from_doklady() -> bool:
+    """Sent from the Doklady page: its form's `back`, or the Referer."""
+    paths = (urlsplit(_safe_back(request.form.get("back")) or "").path,
+             urlsplit(request.referrer or "").path)
+    return any(p == "/doklady" or p.startswith("/doklady/") for p in paths)
+
+
 @bp.post("/ukony/<int:uid>/smazat")
 def delete(uid):
+    ajax = request.headers.get("X-Requested-With") == "fetch"
+    # On Doklady the trash deletes the doklad, never an úkon (27. 10. 2026 a
+    # trash there wiped úkon 1533). This also stops a Doklady tab still open
+    # with the old úkon-trash form.
+    if _from_doklady():
+        msg = "Na stránce Doklady koš maže jen doklad. Obnov stránku a zkus to znovu."
+        if ajax:
+            return jsonify(ok=False, error=msg), 409
+        flash(msg, "error")
+        return redirect(_safe_back(request.form.get("back")) or url_for("ppd.doklady"))
     conn = db.get_db()
     ukony_repo.delete(conn, uid)
     # AJAX branch: /ukony/vse's search box and scroll position live entirely in
     # the browser, so a full-page redirect here was wiping both on every
     # delete — the row just disappears from the DOM instead.
-    if request.headers.get("X-Requested-With") == "fetch":
+    if ajax:
         return jsonify(ok=True, id=uid)
     flash("Úkon smazán.", "success")
     return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))
