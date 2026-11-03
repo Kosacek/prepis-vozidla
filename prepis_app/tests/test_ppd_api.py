@@ -354,3 +354,102 @@ def test_nevalidni_zadost_id_nebo_strana_400(api, zmena):
     r = _post(api, {**_s_adresou("provozovatel"), **zmena})
     assert r.status_code == 400 and r.get_json()["error"]
     assert _zadny_doklad(api.data) and api.poslano == []
+
+
+# ── Smazání dokladu z evidence: POST /api/ppd/<n>/smazat ─────────────────────
+# Koš na Dokladech v evidenci (2.5.1, ukony_tracker/services/doklad_delete.py)
+# maže doklad přes žádosti — úkony nikdy. Dělá přesně totéž co DELETE
+# /api/ppd/<n> z appky: doklad zmizí z knihy, záloha i PDF zůstanou (jde ho
+# obnovit) a evidence dostane smazano=True. Klíč a brzda jako u vystavení.
+
+SMAZAT = "/api/ppd/{}/smazat"
+
+
+def _smaz(c, cislo=1, klic=KLIC):
+    headers = {} if klic is None else {"X-Api-Key": klic}
+    return c.post(SMAZAT.format(cislo), headers=headers)
+
+
+def _vystaveny(api):
+    """Doklad č. 1 vystavený přes API; push z vystavení se zapomene."""
+    assert _post(api).status_code == 201
+    api.poslano.clear()
+    return ppd.read_backup(str(api.data))[0]
+
+
+def _v_knize(api):
+    return [d["cislo"] for d in ppd.read_ppd_log(str(api.data))]
+
+
+def test_smazat_vyradi_doklad_z_knihy_a_necha_zalohu_i_pdf(api):
+    zaloha = _vystaveny(api)
+    r = _smaz(api)
+    assert r.status_code == 200 and r.get_json() == {"removed": True}
+    assert _v_knize(api) == []
+    assert [d["cislo"] for d in ppd.deleted_ppd(str(api.data))] == [1], "jde obnovit ze zálohy"
+    assert (api.data / "output" / "ppd_1.pdf").exists()
+    assert api.poslano == [ppd_push.build_record(zaloha, smazano=True)]
+
+
+def test_smazat_znovu_je_neskodne(api):
+    _vystaveny(api)
+    _smaz(api)
+    r = _smaz(api)
+    assert r.status_code == 200 and r.get_json() == {"removed": False}
+    assert len(api.poslano) == 1, "druhé smazání evidenci nic neposílá"
+
+
+def test_smazat_neexistujici_doklad(api):
+    r = _smaz(api, cislo=999)
+    assert r.status_code == 200 and r.get_json() == {"removed": False}
+    assert api.poslano == []
+
+
+@pytest.mark.parametrize("klic", [None, "", "spatny-klic", KLIC + "x", "klíc"])
+def test_smazat_spatny_klic_401_a_doklad_zustane(api, klic):
+    _vystaveny(api)
+    assert _smaz(api, klic=klic).status_code == 401
+    assert _v_knize(api) == [1] and api.poslano == []
+
+
+def test_smazat_bez_nastaveneho_klice_je_vypnuto(api, monkeypatch):
+    _vystaveny(api)
+    monkeypatch.setattr(tracker_push, "UKONY_API_KEY", "")
+    for klic in (None, "", "cokoliv"):
+        assert _smaz(api, klic=klic).status_code == 503
+    assert _v_knize(api) == [1]
+
+
+def test_smazat_a_vystaveni_maji_jednu_brzdu(api):
+    """Špatné klíče na obou cestách se sčítají; zabrzděný nesmaže ani se správným."""
+    _vystaveny(api)
+    for i in range(A._LOGIN_MAX_POKUSU):
+        (_smaz if i % 2 else _post)(api, klic="spatny")
+    assert _smaz(api, klic="spatny").status_code == 429
+    assert _smaz(api).status_code == 429
+    assert _v_knize(api) == [1]
+
+
+@pytest.mark.parametrize("cesta", [
+    "/api/ppd/1/smazat/", "/api/ppd/1/smazatx", "/api/ppd/x/smazat",
+    "/api/ppd/1/smazat/navic", "/api/ppd//smazat", "/api/ppd/1/2/smazat",
+])
+def test_brana_pousti_bez_prihlaseni_jen_presne_tuhle_cestu(api, cesta):
+    r = api.post(cesta, headers={"X-Api-Key": KLIC})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/login")
+
+
+def test_delete_z_appky_dal_chce_prihlaseni(api):
+    _vystaveny(api)
+    r = api.delete("/api/ppd/1", headers={"X-Api-Key": KLIC})
+    assert r.status_code == 302
+    assert _v_knize(api) == [1]
+
+
+def test_evidence_i_appka_mazou_stejnym_kodem(api, monkeypatch):
+    volano = []
+    monkeypatch.setattr(A, "_smaz_doklad", lambda n: volano.append(n) or True)
+    assert _smaz(api, cislo=7).get_json() == {"removed": True}
+    api.post("/login", data={"password": "heslo-jen-pro-test"})
+    assert api.delete("/api/ppd/8").get_json() == {"success": True, "removed": True}
+    assert volano == [7, 8]

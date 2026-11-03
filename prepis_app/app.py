@@ -63,7 +63,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.29.0"
+__version__ = "1.30.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1379,6 +1379,9 @@ def _kod_netrefa(ip: str) -> None:
         _kod_chyby.setdefault(ip, []).append(time.time())
 
 
+_CESTA_SMAZAT_DOKLAD = re.compile(r"/api/ppd/[0-9]+/smazat")
+
+
 @app.before_request
 def _require_login():
     if not ADMIN_PASSWORD:
@@ -1386,9 +1389,9 @@ def _require_login():
     path = _rq.path
     if path == "/login" or path == "/healthz" or path.startswith("/static"):
         return
-    # Volá ho server evidence, ne prohlížeč: místo session ho hlídá klíč
-    # integrace (viz api_ppd_vystavit).
-    if path == "/api/ppd/vystavit":
+    # Volá je server evidence, ne prohlížeč: místo session je hlídá klíč
+    # integrace (viz _over_klic_integrace).
+    if path == "/api/ppd/vystavit" or _CESTA_SMAZAT_DOKLAD.fullmatch(path):
         return
     # Sdílecí odkaz musí jít otevřít bez hesla — to je celý smysl (poslat
     # hotovou žádost mimo appku). Bezpečné jen díky tomu, že token je
@@ -2073,10 +2076,10 @@ def api_ppd_list():
     """Issued cash receipts (newest first) for the in-app Doklady browser."""
     return jsonify(ppd.read_ppd_log(DATA_DIR))
 
-@app.route("/api/ppd/<int:number>", methods=["DELETE"])
-def api_ppd_delete(number):
-    """Remove a receipt from the LIVE ledger. The append-only backup keeps its
-    copy and the PDF file is left on disk, so the receipt can be restored."""
+def _smaz_doklad(number: int) -> bool:
+    """Remove a receipt from the LIVE ledger and tell evidence (smazano=True).
+    The append-only backup keeps its copy and the PDF file is left on disk, so
+    the receipt can be restored. Repeating it is harmless (False, no push)."""
     removed = ppd.delete_ppd(DATA_DIR, number)
     if removed:
         try:
@@ -2086,20 +2089,19 @@ def api_ppd_delete(number):
                 ppd_push.push_async(ppd_push.build_record(rec, smazano=True), DATA_DIR)
         except Exception as e:
             _log.warning("PPD delete push skipped: %s", e)
-    return jsonify({"success": True, "removed": removed})
+    return removed
 
 
-@app.route("/api/ppd/vystavit", methods=["POST"])
-def api_ppd_vystavit():
-    """Evidence vystavuje doklad („Nový doklad" v /doklady) — viz ppd_api.py.
+def _over_klic_integrace(vypnuto: str):
+    """Klíč integrace místo přihlášení — pro cesty, které volá server evidence.
 
-    Klíč integrace místo přihlášení. Nenastavený klíč = cesta vypnutá, nikdy
-    otevřená. Špatný klíč počítá stejná brzda jako špatné heslo.
+    None = klíč sedí, jinak hotová chybová odpověď. Nenastavený klíč = cesta
+    vypnutá, nikdy otevřená. Špatný klíč počítá stejná brzda jako špatné heslo.
     """
     import tracker_push
     klic = tracker_push.UKONY_API_KEY
     if not klic:
-        return jsonify({"error": "Vystavování dokladů přes API není zapnuté."}), 503
+        return jsonify({"error": vypnuto}), 503
     ip = _kdo_zkousi()
     zbyva = _zbyva_zamceno(ip)
     if zbyva:
@@ -2108,6 +2110,38 @@ def api_ppd_vystavit():
     if not hmac.compare_digest(poslany, klic.encode("utf-8")):
         _zapis_spatne_heslo(ip)
         return jsonify({"error": "Špatný klíč."}), 401
+    return None
+
+
+@app.route("/api/ppd/<int:number>", methods=["DELETE"])
+def api_ppd_delete(number):
+    """Doklady browser in the app — see _smaz_doklad."""
+    return jsonify({"success": True, "removed": _smaz_doklad(number)})
+
+
+@app.route("/api/ppd/<int:number>/smazat", methods=["POST"])
+def api_ppd_smazat(number):
+    """Koš na Dokladech v evidenci (ukony_tracker/services/doklad_delete.py).
+
+    Totéž co DELETE /api/ppd/<number> z appky, jen s klíčem integrace místo
+    přihlášení. Úkony v evidenci se nedotkne — ta si doklad jen označí smazaný.
+    """
+    chyba = _over_klic_integrace("Mazání dokladů přes API není zapnuté.")
+    if chyba:
+        return chyba
+    removed = _smaz_doklad(number)
+    if removed:
+        _log.info("PPD %s smazán přes API (evidence)", number)
+    return jsonify({"removed": removed})
+
+
+@app.route("/api/ppd/vystavit", methods=["POST"])
+def api_ppd_vystavit():
+    """Evidence vystavuje doklad („Nový doklad" v /doklady) — viz ppd_api.py.
+    Klíč integrace místo přihlášení, viz _over_klic_integrace."""
+    chyba = _over_klic_integrace("Vystavování dokladů přes API není zapnuté.")
+    if chyba:
+        return chyba
     try:
         udaje = ppd_api.over(request.get_json(silent=True))
     except ppd_api.Chyba as e:
