@@ -76,8 +76,10 @@
 </div>
 
 {# Firm data for the <option data-*> attributes (decorated by doklad_new.js):
-   the payer chips fill "Adresa na doklad" from the stored firm. Rendered as
-   JSON, not attributes, so the select stays plain server HTML. #}
+   the payer chips fill "Adresa na doklad" from the stored firm and the
+   colored firm picker (firma_pick.js) takes the dot color from "color". The
+   select itself stays plain server HTML: the no-JS fallback renders exactly
+   what the tests pin, and doklad_new.js copies these onto the <option>s. #}
 <script type="application/json" id="dn-firmy-data">
-[{% for f in firmy if f.aktivni %}{"id": {{ f.id }}, "nazev": {{ f.nazev|tojson }}, "zkratka": {{ (f.zkratka or f.nazev)|tojson }}, "ico": {{ (f.ico or '')|tojson }}, "adresa": {{ (f.adresa or '')|tojson }}, "psc": {{ (f.psc or '')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]
+[{% for f in firmy if f.aktivni %}{"id": {{ f.id }}, "nazev": {{ f.nazev|tojson }}, "zkratka": {{ (f.zkratka or f.nazev)|tojson }}, "ico": {{ (f.ico or '')|tojson }}, "adresa": {{ (f.adresa or '')|tojson }}, "psc": {{ (f.psc or '')|tojson }}, "color": {{ firma_colors.get(f.zkratka, 'var(--muted)')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]
 </script>

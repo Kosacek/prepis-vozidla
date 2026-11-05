@@ -9,21 +9,115 @@
   var lastFocused = null;
   var openSerial = 0;
   var closeTimer;
-  // Techničák report parked while one of its úkony is edited on top of it:
-  // closing or saving the edit brings the very same report back (live nodes,
-  // listeners and photos intact) instead of throwing it away.
-  var scanStash = null;
+  // Techničák zůstává pod druhým overlayem: editace úkonu se otevírá NAD ním
+  // (sken se neodebírá), takže se po zavření vracíš přesně tam, kde jsi byl.
+  var stack = null;
+  var stackTimer;
 
-  function restoreScan(savedId) {
-    var stash = scanStash;
-    scanStash = null;
-    ++openSerial;
-    modalBody.replaceChildren.apply(modalBody, stash.nodes);
-    modalCard.classList.remove("modal-card--new");
-    modalCard.classList.add("modal-card--scan");
-    modalCard.scrollTop = stash.scroll;
-    document.dispatchEvent(new CustomEvent("ukon:scan-restored", { detail: { id: savedId || null } }));
-    if (stash.focus && stash.focus.isConnected) stash.focus.focus({ preventScroll: true });
+  function stackBody() {
+    return stack && stack.querySelector('#ukon-stack-body');
+  }
+
+  function closeStack() {
+    if (!stack) return;
+    var target = stack;
+    stack = null;
+    clearTimeout(stackTimer);
+    target.classList.remove('is-open');
+    stackTimer = setTimeout(function () { target.remove(); }, 220);
+    var focus = target.__returnFocus;
+    if (focus && focus.isConnected) focus.focus({ preventScroll: true });
+  }
+
+  function stackError(form, text) {
+    var box = form.querySelector('.modal-form-error');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'flash flash-error modal-form-error';
+      box.setAttribute('role', 'alert');
+      form.prepend(box);
+    }
+    box.textContent = text;
+  }
+
+  function submitStacked(wrap, event) {
+    var form = event.target.closest('form');
+    if (!form) return;
+    var m = /\/ukony\/(\d+)\/upravit/.exec(form.getAttribute('action') || '');
+    if (!m) return;
+    event.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST', body: new FormData(form),
+      headers: { 'X-Requested-With': 'fetch' }
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.d.ok) {
+          var err = new Error((res.d && res.d.error) || 'chyba');
+          err.shown = !!(res.d && res.d.error);
+          throw err;
+        }
+        swapRow(m[1], res.d);
+        closeStack();
+        // Karta skenu dostane „✓ Upraveno"; sken sám zůstává otevřený.
+        document.dispatchEvent(new CustomEvent('ukon:saved', { detail: { id: m[1] } }));
+      })
+      .catch(function (err) {
+        if (btn) btn.disabled = false;
+        if (err && err.shown) { stackError(form, err.message); return; }
+        form.submit();
+      });
+  }
+
+  function openStackedEdit(uid, returnFocus) {
+    if (stack) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'modal-stack';
+    wrap.hidden = true;
+    var card = document.createElement('div');
+    card.className = 'modal-card card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'ukon-stack-title');
+    var close = document.createElement('button');
+    close.className = 'modal-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Zavřít úpravu úkonu');
+    close.setAttribute('data-stack-close', '');
+    close.innerHTML = '&times;';
+    var body = document.createElement('div');
+    body.className = 'modal-body';
+    body.id = 'ukon-stack-body';
+    card.append(close, body);
+    wrap.append(card);
+    wrap.__returnFocus = returnFocus || document.activeElement;
+    modal.append(wrap);
+    stack = wrap;
+    var serial = ++openSerial;
+    fetch('/ukony/' + encodeURIComponent(uid) + '/upravit?modal=1',
+          { headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { if (!r.ok) throw new Error('modal ' + r.status); return r.text(); })
+      .then(function (html) {
+        if (stack !== wrap || serial !== openSerial) return;
+        body.innerHTML = html;
+        var title = body.querySelector('.card-title');
+        if (title) title.id = title.id || 'ukon-stack-title';
+        body.addEventListener('submit', function (event) { submitStacked(wrap, event); });
+        wrap.hidden = false;
+        requestAnimationFrame(function () {
+          if (stack === wrap) wrap.classList.add('is-open');
+        });
+        var first = body.querySelector('input:not([type=hidden]), select, button');
+        setTimeout(function () {
+          if (stack === wrap && first && first.isConnected) first.focus({ preventScroll: true });
+        }, 40);
+      })
+      .catch(function () {
+        if (stack === wrap) closeStack();
+        window.alert('Úkon se nepodařilo otevřít. Zkuste to znovu.');
+      });
   }
 
   function openModal(url, isNew, isScan) {
@@ -38,7 +132,7 @@
       })
       .then(function (html) {
         if (serial !== openSerial) return;
-        if (!scanStash) lastFocused = document.activeElement;
+        lastFocused = document.activeElement;
         modalBody.innerHTML = html;
         modalCard.classList.toggle("modal-card--new", !!isNew);
         modalCard.classList.toggle("modal-card--scan", !!isScan);
@@ -61,14 +155,13 @@
       })
       .catch(function () {
         if (serial !== openSerial) return;
-        if (scanStash) { restoreScan(); return; }
         if (isScan) { window.alert('Skenování se nepodařilo otevřít. Obnovte stránku a zkuste to znovu.'); return; }
         window.location.href = isNew ? '/ukony' : url.replace(/[?&]modal=1/, "");
       });
   }
 
   function closeModal(savedId) {
-    if (scanStash) { restoreScan(savedId); return; }
+    if (stack) closeStack();
     var event = new CustomEvent('ukon:modal-closing', {cancelable: true});
     if (!document.dispatchEvent(event)) return;
     ++openSerial;
@@ -84,15 +177,17 @@
     }
   }
   window.UkonModal = {close: function () { closeModal(); }, openEdit: function (uid) {
-    if (modalCard.classList.contains("modal-card--scan") && !scanStash) {
-      scanStash = { nodes: Array.prototype.slice.call(modalBody.childNodes),
-                    scroll: modalCard.scrollTop, focus: document.activeElement };
+    if (modalCard.classList.contains("modal-card--scan")) {
+      openStackedEdit(uid, document.activeElement);
+      return;
     }
     openModal('/ukony/' + encodeURIComponent(uid) + '/upravit?modal=1', false, false);
   }};
   window.addEventListener('pagehide', function () {
     ++openSerial; // A fragment arriving after navigation must not open a camera.
     clearTimeout(closeTimer);
+    clearTimeout(stackTimer);
+    stack = null;
   });
 
   document.addEventListener('click', function (e) {
@@ -207,7 +302,7 @@
         }
         // Řádek není na stránce: bez reportu techničáku stačí reload; s ním
         // se stránka obnoví až při zavření skenu (sken zmizet nesmí).
-        if (!swapRow(m[1], res.d) && !scanStash) { window.location.reload(); return; }
+        if (!swapRow(m[1], res.d)) { window.location.reload(); return; }
         // stránka s výběrem firmy si drží odpovědi v cache — po editaci ji zahoď
         document.dispatchEvent(new CustomEvent("ukon:saved", { detail: { id: m[1] } }));
         closeModal(m[1]);
@@ -301,13 +396,34 @@
 
   // Close — backdrop click, the × button, or the form's "Zpět" link.
   modal.addEventListener("click", function (e) {
+    // Overlay úpravy nad skenem: zavírá jen on, nikdy celý techničák.
+    if (stack) {
+      if (e.target === stack || e.target.closest('[data-stack-close]') ||
+          e.target.closest('[data-modal-close]')) {
+        e.preventDefault();
+        closeStack();
+        return;
+      }
+      if (stack.contains(e.target)) return;  // klik uvnitř karty úprav
+    }
     if (e.target === modal || e.target.closest("[data-modal-close]")) {
       e.preventDefault();
       closeModal();
     }
   });
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && stack) { e.preventDefault(); closeStack(); return; }
     if (e.key === "Escape" && !modal.hidden) closeModal();
+    if (e.key === 'Tab' && stack) {
+      var inStack = Array.from(stack.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href]'))
+        .filter(function (el) { return el.getClientRects().length; });
+      var sFirst = inStack[0], sLast = inStack[inStack.length - 1];
+      if (sFirst && sLast) {
+        if (e.shiftKey && document.activeElement === sFirst) { e.preventDefault(); sLast.focus(); }
+        else if (!e.shiftKey && document.activeElement === sLast) { e.preventDefault(); sFirst.focus(); }
+      }
+      return;
+    }
     if (e.key === 'Tab' && !modal.hidden && modalCard.classList.contains('modal-card--scan')) {
       var focusable = Array.from(modal.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href]'))
         .filter(function (el) { return el.getClientRects().length; });

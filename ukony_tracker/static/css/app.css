@@ -2341,3 +2341,36 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .dn-payer { min-height: 36px; padding: var(--sp-2) var(--sp-3); }
   .dn-ukony { max-height: 220px; }
 }
+
+/* ── Úprava úkonu NAD otevřeným techničákem (2.7.2) ──────────────────────────
+   Skener zůstává pod druhým overlayem; tenhle stack se otevírá nad ním a po
+   zavření/uložení se s fade-outem odebere, takže se vracíš do stejného skenu. */
+.modal-stack {
+  position: fixed; inset: 0; z-index: 1001;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-4);
+  background: rgba(0, 0, 0, .38);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity .2s ease;
+}
+.modal-stack[hidden] { display: none; }
+.modal-stack.is-open { opacity: 1; }
+.modal-stack .modal-card {
+  position: relative; width: 100%; max-width: 560px;
+  max-height: 88vh; overflow-x: hidden; overflow-y: auto;
+  padding: var(--sp-5);
+  background: var(--card); color: var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .22), 0 6px 18px rgba(0, 0, 0, .10);
+  opacity: 0; transform: translateY(10px) scale(.98);
+  transition: transform .22s cubic-bezier(.2, .8, .25, 1), opacity .22s ease;
+}
+.modal-stack.is-open .modal-card { opacity: 1; transform: none; }
+.modal-stack .modal-close { top: 8px; right: 10px; }
+@media (max-width: 760px) {
+  .modal-stack { padding: var(--sp-2); }
+  .modal-stack .modal-card { max-height: calc(100dvh - 2 * var(--sp-2)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-stack, .modal-stack .modal-card { transition: none; }
+}

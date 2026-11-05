@@ -65,11 +65,13 @@
   </section>
   {# Společná lišta firmy/typu tu záměrně není: každé auto má vlastní firmu,
      typ i poznámku. Tenhle skrytý zdroj drží jen nabídku pro selecty v kartách
-     (jedno místo pravdy pro firmy i typy, stejné jako dřív). #}
+     (jedno místo pravdy pro firmy i typy, stejné jako dřív). Barva firmy
+     (data-color z firma_colors) jde s každou option do karty, aby ji sdílený
+     FirmaPick mohl vykreslit jako barevnou tečku. #}
   <div class="orv-option-bank" hidden aria-hidden="true">
     <select id="orv-firma-options">
       <option value="">— vyber firmu —</option>
-      {% for firma in firmy %}<option value="{{ firma.id }}">{{ firma.nazev }}</option>{% endfor %}
+      {% for firma in firmy %}<option value="{{ firma.id }}" data-color="{{ firma_colors.get(firma.zkratka, 'var(--muted)') }}">{{ firma.nazev }}</option>{% endfor %}
     </select>
     <select id="orv-typ-options">
       <option value="">— vyber typ —</option>

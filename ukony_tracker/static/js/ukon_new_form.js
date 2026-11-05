@@ -170,6 +170,10 @@
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('.firma-pick__btn');
     if (btn) {
+      // Tenhle inline picker patří jen formuláři Úkonu (#firma-pick). Sdílený
+      // FirmaPick (Doklady, Techničák) si otevírání řeší sám — jinak by mu
+      // tenhle handler seznam hned zavřel a rozbil stav.
+      if (!btn.closest('#firma-pick')) return;
       var list = btn.parentElement.querySelector('.firma-pick__list');
       list.hidden = !list.hidden;
       btn.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
@@ -177,13 +181,14 @@
     }
     var item = e.target.closest('.firma-pick__item');
     if (item) {
+      if (!item.closest('#firma-pick')) return;
       var form = item.closest('#ukon-form');
       var sel = form.querySelector('#firma-select');
       sel.value = item.dataset.firma;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
-    document.querySelectorAll('.firma-pick__list').forEach(function (list) {
+    document.querySelectorAll('#firma-pick .firma-pick__list').forEach(function (list) {
       list.hidden = true;
       var b = list.parentElement.querySelector('.firma-pick__btn');
       if (b) b.setAttribute('aria-expanded', 'false');

@@ -16,11 +16,12 @@ class Element {
 function environment(stored = null) {
   const ids = new Map(), handlers = {}, requests = [], renders = [], saves = [];
   let add, reloads = 0, maxActive = 0, inFlight = 0, stops = 0, revoked = 0;
+  let lastActions = null, lastPhotos = null;
   const el = name => {
     if (!ids.has(name)) ids.set(name, new Element());
     return ids.get(name);
   };
-  const root = {querySelector: id => el(id.slice(5)), querySelectorAll: () => []};
+  const root = {querySelector: id => el(id.slice(5)), querySelectorAll: () => [], addEventListener: (name, fn) => { handlers[name] = fn; }, removeEventListener: name => { delete handlers[name]; }};
   const document = {getElementById: () => root, createElement: () => new Element(),
     addEventListener: (name, fn) => { handlers[name] = fn; },
     removeEventListener: name => { delete handlers[name]; }};
@@ -28,7 +29,8 @@ function environment(stored = null) {
     OrvLast: {save: photos => saves.push(photos.map(p => ({...p.result, upraveno: !!p.upraveno}))),
       load: () => stored, label: () => 'Dnes 9:05'},
     OrvHelpers: H, Thinking: () => ({start() {}, stop() {}}),
-    OrvReport: {render(_, photos) { renders.push(photos.map(p => p.result)); }, selected() { return []; }, updateCreateCount() {}},
+    OrvReport: {render(_, photos, actions) { renders.push(photos.map(p => p.result)); lastActions = actions; lastPhotos = photos; },
+      selected() { return []; }, reviewPhotos() { return []; }, updateCreateCount() {}},
     OrvCamera: (_, addPhoto) => {
       add = addPhoto;
       return {start() {}, stop() { stops++; }, destroy() { stops++; }};
@@ -46,6 +48,7 @@ function environment(stored = null) {
   });
   handlers['ukon:scan-shown']();
   return {el, handlers, requests, renders, saves, add: () => add({size: 100}),
+    actions: () => lastActions, photos: () => lastPhotos,
     stats: () => ({reloads, maxActive, inFlight, stops, revoked})};
 }
 const tick = () => new Promise(setImmediate);
@@ -91,10 +94,9 @@ test('failed photo can be retried without reprocessing successful photos', async
   e.requests[0]({stav: 'chyba', zprava: 'Chyba', doplneno: []});
   e.requests[1](success);
   await done;
-  const retry = e.el('results').children[0].children[1].children[2];
-  assert.equal(retry.hidden, false);
-  assert.equal(retry.disabled, false);
-  const retried = retry.handlers.click();
+  // The retry action lives on the report card now; the action calls run([photo]).
+  const photos = e.photos();
+  const retried = e.actions().onRetry(photos[0]);
   assert.equal(e.requests.length, 3);
   e.requests[2](success);
   await retried;

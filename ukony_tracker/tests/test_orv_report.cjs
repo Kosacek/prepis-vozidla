@@ -1,6 +1,9 @@
-/* Tests for the Techničák report (2.7.1): pure helpers + a fake-DOM smoke
+/* Tests for the Techničák report (2.7.2): pure helpers + a fake-DOM smoke
    test of the compact result cards. The cards follow the /ukony rows and every
-   car carries its own firm/type — there is no shared "apply to all" bar. */
+   car carries its own firm/type — there is no shared "apply to all" bar.
+   2.7.2: the photo sits top-right (body before preview in the DOM), a new car's
+   price moved from the RZ line down to the note row, the verbose note
+   placeholder is gone and the shared FirmaPick gets the firm colours. */
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -61,10 +64,23 @@ function descendants(node) {
   return out;
 }
 function classes(node) { return String(node.className || '').split(/\s+/).filter(Boolean); }
-function matches(node, selector) {
+function matchesSimple(node, selector) {
   if (selector.startsWith('#')) return node.id === selector.slice(1);
   if (selector.startsWith('.')) return classes(node).includes(selector.slice(1));
   return node.tagName === selector.toUpperCase();
+}
+// Simple selectors plus descendant chains (".orv-card-noterow .orv-card-price").
+function matches(node, selector) {
+  const parts = String(selector || '').trim().split(/\s+/);
+  if (parts.length === 1) return matchesSimple(node, parts[0]);
+  if (!matchesSimple(node, parts[parts.length - 1])) return false;
+  let index = parts.length - 2;
+  let current = node.parent;
+  while (current && index >= 0) {
+    if (matchesSimple(current, parts[index])) index--;
+    current = current.parent;
+  }
+  return index < 0;
 }
 const fakeDocument = {createElement: tag => new Node(tag)};
 globalThis.document = fakeDocument;
@@ -78,10 +94,11 @@ const FIRMS = [{id: 14, nazev: 'JE & NE', zkratka: 'JN', color: '#123456'},
   {id: 15, nazev: 'BSAuto Brno', zkratka: 'BS', color: '#654321'}];
 const DATA = {ceny: {14: {'PŘEVOD': 1300}, 15: {'NOVÉ': 950}}, firmy: FIRMS};
 
-function optionNode(value, label) {
+function optionNode(value, label, color) {
   const option = new Node('option');
   option.value = value;
   option.textContent = label;
+  if (color) option.dataset.color = color; // the fragment's data-color
   return option;
 }
 // Mirrors the fragment's fixed nodes: summary, sections and the hidden bank of
@@ -97,7 +114,7 @@ function mountRoot(data = DATA) {
   const firmaOptions = new Node('select');
   firmaOptions.id = 'orv-firma-options';
   firmaOptions.append(optionNode('', '— vyber firmu —'));
-  FIRMS.forEach(f => firmaOptions.append(optionNode(String(f.id), f.nazev)));
+  FIRMS.forEach(f => firmaOptions.append(optionNode(String(f.id), f.nazev, f.color)));
   const typOptions = new Node('select');
   typOptions.id = 'orv-typ-options';
   typOptions.append(optionNode('', '— vyber typ —'));
@@ -391,11 +408,16 @@ test('a created card shows status, bold RZ, tag, price, ORV, firm dot and small 
   const [card] = cards(root);
   assert.equal(card.dataset.state, 'created');
   assert.ok(hasClass(card, 'orv-card'));
+  // Text body first, photo second → the photo sits in the right column.
+  assert.deepEqual(card.children.map(c => c.className), ['orv-card-body', 'orv-card-preview']);
   assert.equal(card.querySelector('.orv-status').textContent, 'Založeno');
   assert.equal(card.querySelector('.orv-rz').textContent, '1AKI647');
   assert.equal(card.querySelector('.orv-typ').textContent, 'PŘEVOD');
-  assert.equal(card.querySelector('.orv-card-price').textContent.replace(/\s+/g, ' ').trim(),
+  // Written cards keep the price on the RZ line, like /ukony rows.
+  assert.ok(card.querySelector('.orv-card-id .orv-card-price'));
+  assert.equal(card.querySelector('.orv-card-id .orv-card-price').textContent.replace(/\s+/g, ' ').trim(),
     plain(kc(1300)));
+  assert.equal(card.querySelector('.orv-card-noterow'), null); // no assign fields on written cards
   assert.match(card.querySelector('.orv-orv').textContent, /ORV UBP585023/);
   assert.equal(card.querySelector('.orv-firm-name').textContent, 'JN');
   assert.equal(card.querySelector('.firma-dot').getAttribute('style'), 'background:#123456;');
@@ -424,34 +446,139 @@ test('a filled card lists only the fields that really changed, beze změny none'
     'Beze změny');
 });
 
-test('an assign card has its own firm/type selects, note and live price', () => {
+test('an assign card has its own firm/type selects, note and live price next to it', () => {
   const car = photo(1, 'bez_firmy', {rz: '1AKI647', orv_cislo: 'UBP585023', vin: 'TMBER6NW0V3099310',
     provozovatel: 'JE & NE', navrh_firma_id: 14});
   const root = render([car]);
   const [card] = unassigned(root);
   assert.equal(card.dataset.state, 'assign');
+  // The photo is top-right, the text stays left-aligned.
+  assert.deepEqual(card.children.map(c => c.className), ['orv-card-body', 'orv-card-preview']);
   assert.equal(card.querySelector('.orv-status').textContent, 'Nové auto');
   assert.equal(card.querySelector('.orv-rz').textContent, '1AKI647');
   assert.equal(card.querySelector('.orv-firm'), null); // selects replace the read firm line
+  // The price is NOT at the RZ line any more (it read like part of the plate).
+  assert.equal(card.querySelector('.orv-card-id .orv-card-price'), null);
+  assert.equal(card.querySelector('.orv-card-id .orv-card-price-k'), null);
   const selects = card.querySelectorAll('select');
   assert.equal(selects.length, 2);
   assert.equal(selects[0].value, '14'); // navrh_firma_id only pre-selects
   assert.equal(selects[1].value, '');
   assert.equal(card.querySelectorAll('input').length, 1); // poznámka
   assert.equal(card.querySelector('.orv-meta').textContent.includes('Provozovatel: JE & NE'), true);
-  assert.equal(card.querySelector('.orv-card-price').textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
-  // Choosing the type fills the live price and the create button count.
+  // Row 2: Poznámka (left) + Cena (right) in one dedicated row.
+  const noterow = card.querySelector('.orv-card-noterow');
+  assert.ok(noterow, 'note row exists');
+  const note = noterow.querySelector('.orv-card-poznamka');
+  assert.ok(note, 'note input lives in the note row');
+  assert.equal(note.placeholder, 'Poznámka');
+  assert.equal(note.maxLength, 120);
+  const priceEl = noterow.querySelector('.orv-card-price');
+  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
+  assert.equal(noterow.querySelector('.orv-card-price-k').textContent, 'Cena');
+  // Choosing the type fills the live price in the SAME node and the button count.
   car.typOverride = 'PŘEVOD';
   card.querySelectorAll('select')[1].value = 'PŘEVOD';
   R.refreshPrices(root, [car]);
-  assert.equal(card.querySelector('.orv-card-price').textContent.replace(/\s+/g, ' ').trim(),
-    plain('Cena ' + kc(1300)));
+  assert.equal(card.querySelector('.orv-card-noterow .orv-card-price'), priceEl);
+  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), plain('Cena ' + kc(1300)));
   assert.equal(card.querySelector('.orv-typ').textContent, 'PŘEVOD');
   assert.equal(root.querySelector('#orv-create-unmatched').textContent, 'Založit 1 úkon');
   // Price honest when the type has no price.
   car.firmaOverride = '15'; car.typOverride = 'PŘEVOD';
   R.refreshPrices(root, [car]);
-  assert.equal(card.querySelector('.orv-card-price').textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
+  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
+});
+
+test('the verbose "nepovinná, max. 120" note placeholder is gone', () => {
+  const report = read('static/js/orv_report.js');
+  assert.equal(/nepovinná, max\. 120/.test(report), false);
+  const [card] = unassigned(render([photo(1, 'bez_firmy', {})]));
+  assert.equal(card.querySelector('.orv-card-poznamka').placeholder, 'Poznámka');
+});
+
+test('every card kind keeps body before the preview (photo top-right)', () => {
+  const root = render([
+    photo(1, 'zalozeno', {ukon: {id: 1, firma_id: 14, firma_zkratka: 'JN', typ: 'PŘEVOD', celkem: 1300}}),
+    photo(2, 'doplneno', {ukon: {id: 2, firma_id: 14, firma_zkratka: 'JN', typ: 'PŘEVOD', celkem: 1300}}),
+    photo(3, 'uz_doplneno', {ukon: {id: 3, firma_id: 14, firma_zkratka: 'JN', typ: 'PŘEVOD', celkem: 1300}}),
+    photo(4, 'bez_firmy', {rz: '1AA1111'}),
+    photo(5, 'jiz_v_evidence', {existujici: [{id: 9}]}),
+    photo(6, 'necitelne', {zprava: 'RZ ani ORV nejsou čitelné.'}),
+    photo(7, 'chyba', {zprava: 'Spojení se přerušilo.'}),
+  ]);
+  const all = cards(root).concat(unassigned(root), issues(root));
+  assert.equal(all.length, 7);
+  all.forEach(card => {
+    assert.equal(card.children.length, 2, card.dataset.state + ' card has body+preview');
+    assert.equal(card.children[0].className, 'orv-card-body');
+    assert.equal(card.children[1].className, 'orv-card-preview');
+    assert.equal(card.children[1].tagName, 'BUTTON');
+    assert.equal(card.children[1].type, 'button');
+    assert.ok(card.children[1].dataset.preview != null); // click-to-zoom hook kept
+    // The only thing after the text column is the photo — nothing overflows.
+    assert.equal(card.querySelectorAll('img').length, 1);
+  });
+});
+
+test('bank firm colours land on the card options so FirmaPick can draw the dots', () => {
+  const root = render([photo(1, 'bez_firmy', {navrh_firma_id: 14})]);
+  const select = unassigned(root)[0].querySelector('.orv-card-firma');
+  assert.deepEqual(select.querySelectorAll('option').map(o => [o.value, o.dataset.color]),
+    [['', undefined], ['14', '#123456'], ['15', '#654321']]);
+  // The fragment's bank must carry the colour from firma_colors.
+  const template = read('templates/_orv_sken.html');
+  assert.ok(template.includes('data-color="{{ firma_colors.get(firma.zkratka, \'var(--muted)\') }}"'));
+});
+
+test('the shared FirmaPick wraps the firm select when loaded; native select otherwise', () => {
+  const calls = [];
+  globalThis.FirmaPick = {attach(select) {
+    calls.push(select);
+    select.dataset.picker = '1';
+  }};
+  try {
+    const root = render([photo(1, 'bez_firmy', {navrh_firma_id: 14}), photo(2, 'bez_firmy', {})]);
+    const selects = unassigned(root).map(card => card.querySelector('.orv-card-firma'));
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls, selects); // attached to the real card selects
+    assert.ok(calls.every(select => select.dataset.picker === '1'));
+    assert.ok(calls.every(select => select.querySelectorAll('option').length === 3));
+    assert.equal(selects[0].value, '14');
+    assert.equal(selects[1].value, '');
+  } finally {
+    delete globalThis.FirmaPick;
+  }
+  // Older page (no firma_pick.js): no crash, the native select keeps working.
+  const plain = render([photo(3, 'bez_firmy', {navrh_firma_id: 14})]);
+  const select = unassigned(plain)[0].querySelector('.orv-card-firma');
+  assert.equal(select.value, '14');
+  assert.equal('picker' in select.dataset, false);
+});
+
+test('FirmaPick errors never break card rendering', () => {
+  globalThis.FirmaPick = {attach() { throw new Error('boom'); }};
+  try {
+    const root = render([photo(1, 'bez_firmy', {})]);
+    assert.equal(unassigned(root).length, 1);
+  } finally {
+    delete globalThis.FirmaPick;
+  }
+});
+
+test('CSS puts the photo in a fixed right column, 46 px on small phones', () => {
+  const css = read('static/css/orv_report.css');
+  assert.match(css, /\.orv-card \{display:grid; grid-template-columns:minmax\(0,1fr\) 58px/);
+  assert.match(css, /\.orv-card-preview \{display:block; align-self:start; width:58px/);
+  assert.match(css, /\.orv-card-noterow \{display:flex; align-items:flex-end; gap:8px/);
+  assert.match(css, /\.orv-card-noterow \.orv-card-price \{[^}]*margin-left:auto/);
+  assert.equal(/\.orv-card-field--wide/.test(css), false); // dead rule after the note row move
+  const small = css.slice(css.indexOf('@media (max-width:560px)'),
+    css.indexOf('@media (orientation:landscape)'));
+  assert.match(small, /\.orv-card \{grid-template-columns:minmax\(0,1fr\) 46px/);
+  assert.match(small, /\.orv-card-preview \{width:46px; height:46px;\}/);
+  // 375 px: single-column fields, note row still one row with the price right.
+  assert.match(small, /\.orv-card-fields \{grid-template-columns:minmax\(0,1fr\);\}/);
 });
 
 test('a duplicate card keeps the bold warning, existing úkon and confirm checkbox — no paragraph', () => {

@@ -1,0 +1,79 @@
+{# Demo for release 2.7.2: barevná tečka u firmy + úprava úkonu jako overlay
+   nad otevřeným techničákem. CSS-only, 4s loop, app tokens only. #}
+<style>
+  .de272-demo { box-sizing: border-box; height: 176px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25;
+    overflow: hidden; position: relative; }
+  .de272-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px;
+    padding: 9px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+    box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .de272-body { display: grid; gap: 4px; min-width: 0; }
+  .de272-top { display: flex; align-items: center; gap: 6px; }
+  .de272-chip { font-size: 8.5px; font-weight: 750; border-radius: 999px; padding: 1px 7px;
+    background: var(--flash-success-bg); color: var(--flash-success-ink); }
+  .de272-rz { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .de272-tag { font-size: 8.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+    padding: 0 6px; }
+  .de272-price { margin-left: auto; font-size: 11.5px; font-weight: 800; }
+  .de272-orv { display: inline-flex; align-items: center; gap: 4px; align-self: start;
+    border-radius: 7px; padding: 2px 7px; background: var(--bg); font-size: 10px; font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+  .de272-orv i { font-style: normal; font-size: 8px; font-weight: 700; color: var(--muted); }
+  .de272-org { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--muted); }
+  .de272-org b { color: var(--ink); font-weight: 700; }
+  .de272-photo { height: 40px; border-radius: 7px; background:
+    repeating-linear-gradient(135deg, #e9ebef 0 5px, #f5f6f8 5px 10px); border: 1px solid var(--line); }
+  .de272-note { display: flex; align-items: center; gap: 5px; margin-top: 1px; }
+  .de272-note span { flex: 1 1 auto; min-width: 0; height: 14px; border: 1px solid var(--line);
+    border-radius: 4px; padding: 0 5px; font-size: 8.5px; color: var(--muted); display: flex;
+    align-items: center; overflow: hidden; white-space: nowrap; }
+  .de272-note b { font-size: 9px; font-weight: 800; white-space: nowrap; }
+  .de272-dot { width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+  .de272-edit { position: absolute; left: 26px; right: 26px; top: 34px; padding: 9px 10px;
+    border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+    box-shadow: 0 14px 34px rgba(0,0,0,.22); opacity: 0; transform: translateY(8px) scale(.98);
+    animation: de272-stack 4s ease infinite; }
+  .de272-edit-title { font-size: 10px; font-weight: 800; margin-bottom: 5px; }
+  .de272-row { display: flex; gap: 5px; margin-bottom: 4px; }
+  .de272-f { flex: 1 1 0; height: 17px; border: 1px solid var(--line); border-radius: 4px;
+    padding: 0 5px; display: flex; align-items: center; gap: 4px; font-size: 8.5px; }
+  .de272-f i { font-style: normal; font-size: 7px; font-weight: 700; color: var(--muted); }
+  .de272-ok { float: right; border-radius: 5px; padding: 2px 7px; background: var(--accent);
+    color: var(--accent-ink); font-size: 8px; font-weight: 800; }
+  @keyframes de272-stack {
+    0%, 18% { opacity: 0; transform: translateY(8px) scale(.98); }
+    30%, 78% { opacity: 1; transform: none; }
+    92%, 100% { opacity: 0; transform: translateY(8px) scale(.98); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .de272-edit { animation: none; opacity: 1; transform: none; }
+  }
+</style>
+<div class="de272-demo" aria-hidden="true">
+  <div class="de272-card">
+    <div class="de272-body">
+      <div class="de272-top">
+        <span class="de272-chip">Založeno</span>
+        <span class="de272-rz">1AES022</span>
+        <span class="de272-tag">PŘEVOD</span>
+        <span class="de272-price">1 300 Kč</span>
+      </div>
+      <span class="de272-orv"><i>ORV</i> UBP586024</span>
+      <div class="de272-org"><span class="de272-dot"></span><b>JE &amp; NE</b> · ACC</div>
+      <div class="de272-note"><span>Poznámka</span><b>Cena: 1 300 Kč</b></div>
+    </div>
+    <div class="de272-photo"></div>
+  </div>
+  <div class="de272-edit">
+    <div class="de272-edit-title">Úkon #1626</div>
+    <div class="de272-row">
+      <span class="de272-f"><i>FIRMA</i><span class="de272-dot"></span> JE &amp; NE</span>
+      <span class="de272-f"><i>TYP</i> PŘEVOD</span>
+    </div>
+    <div class="de272-row">
+      <span class="de272-f"><i>POZN.</i> ACC</span>
+      <span class="de272-f"><i>CENA</i> 1 300 Kč</span>
+    </div>
+    <span class="de272-ok">Uložit</span>
+  </div>
+</div>

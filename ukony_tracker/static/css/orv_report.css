@@ -1,10 +1,12 @@
-/* Techničák scan (2.7.1): compact result cards in the visual language of the
-   /ukony/vse rows — small photo, colour dot, type tag, bold RZ and price,
-   muted secondary facts, small actions. Loaded after app.css, so it refines
-   the .orv-* base rules there.
+/* Techničák scan (2.7.2): compact result cards in the visual language of the
+   /ukony/vse rows — small photo in the top-right, colour dot, type tag, bold
+   RZ and price, muted secondary facts, small actions. Loaded after app.css, so
+   it refines the .orv-* base rules there.
 
    Hierarchy per card (David 2026-11-05):
    status chip · RZ + type tag · ORV chip · firm line · muted facts · actions.
+   The photo lives in a fixed right column so the text column stays
+   left-aligned; on cards for a new car the price sits next to the note.
    No shared "apply firm to all" bar: every car carries its own firm/type/note. */
 
 /* -- Fields shared by the person picker and the per-car cards --------------- */
@@ -42,7 +44,8 @@
 
 /* -- Result cards: the /ukony row language, compact ------------------------ */
 .orv-results {display:grid; gap:8px; padding-bottom:12px;}
-.orv-card {display:grid; grid-template-columns:58px minmax(0,1fr); gap:10px; align-items:start;
+/* Text column first (DOM: body, then preview), photo in the fixed right column. */
+.orv-card {display:grid; grid-template-columns:minmax(0,1fr) 58px; gap:10px; align-items:start;
   min-width:0; padding:10px 12px; border:1px solid var(--line,#e5e5ea);
   border-left:3px solid var(--line,#e5e5ea); border-radius:12px; background:var(--card,#fff);}
 .orv-card[data-state="assign"] {border-left-color:var(--accent,#0071e3);}
@@ -52,12 +55,13 @@
 .orv-card[data-state="filled"] {border-left-color:var(--accent,#0071e3);}
 .orv-card[data-state="same"] {border-left-color:var(--muted,#6e6e73);}
 .orv-card[data-state="unreadable"] {border-left-color:var(--flash-error-ink,#9b1c1c);}
-.orv-card-preview {display:block; width:58px; height:58px; padding:0; overflow:hidden; border:0;
-  border-radius:9px; background:var(--bg,#f3f4f7); cursor:zoom-in;}
+.orv-card-preview {display:block; align-self:start; width:58px; height:58px; padding:0; overflow:hidden;
+  border:0; border-radius:9px; background:var(--bg,#f3f4f7); cursor:zoom-in;}
 .orv-card-preview img {display:block; width:100%; height:100%; object-fit:cover;}
 .orv-card-body {display:flex; min-width:0; flex-direction:column; gap:6px;}
 
-/* Line 1: status chip(s) on the left, price on the right. */
+/* Line 1: status chip(s) — the price lives on the RZ line (written cards) or
+   in the note row (new car), never here. */
 .orv-card-top {display:flex; min-width:0; align-items:center; justify-content:space-between; gap:8px;}
 .orv-chips {display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; min-width:0;}
 .orv-status {display:inline-flex; align-items:center; border-radius:var(--radius-pill,999px);
@@ -154,15 +158,26 @@
 .orv-message {margin:0; font-size:.8125rem; font-weight:500; line-height:1.4; overflow-wrap:anywhere;}
 
 /* -- Per-car assignment fields (assign cards only) ------------------------ */
+/* Row 1: firma + typ. */
 .orv-card-fields {display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; width:100%;}
+/* Row 2: poznámka (wide, left) + cena (right), one row even at 375 px — the
+   note shrinks (min-width:0) instead of pushing the price off the card. */
+.orv-card-noterow {display:flex; align-items:flex-end; gap:8px; width:100%; min-width:0;}
+.orv-card-noterow .orv-card-field {flex:1 1 0; min-width:0;}
+.orv-card-noterow .orv-card-price {flex:0 0 auto; margin-left:auto; padding-bottom:10px;}
 .orv-card-field {min-width:0;}
 .orv-card-label {font-size:.625rem; font-weight:650; letter-spacing:.04em; color:var(--muted,#6e6e73);
   text-transform:uppercase;}
-.orv-card-field--wide {grid-column:1 / -1;}
 .orv-assign .orv-card-field select,
 .orv-assign .orv-card-field input {width:100%; min-width:0; min-height:38px; padding:0 10px;
   border:1px solid var(--line,#e5e5ea); border-radius:9px; background:var(--card,#fff);
   color:var(--ink,#1d1d1f); font-family:inherit; font-size:.875rem;}
+/* FirmaPick (2.7.2) hides the native select via `app.css`'s
+   `.firma-pick.js > select`; the card field rule above is more specific and
+   this file loads later, so restate the hide here. Without firma_pick.js
+   nothing matches and the native select stays fully usable. */
+.orv-assign .orv-card-field .firma-pick.js > select {position:absolute; opacity:0;
+  pointer-events:none; width:100%; height:0; min-height:0; padding:0; border:0;}
 
 /* -- Candidate úkony (vice_shod / konflikt) ------------------------------- */
 .orv-kandidati {display:grid; gap:5px; width:100%; min-width:0; padding:8px 10px; border-radius:10px;
@@ -216,11 +231,14 @@
 
 /* -- Small phones (375 px and narrower) ---------------------------------- */
 @media (max-width:560px) {
-  .orv-card, .orv-result {grid-template-columns:46px minmax(0,1fr); gap:8px; padding:9px 10px;}
-  .orv-card-preview, .orv-result > img {width:46px; height:46px;}
+  .orv-card {grid-template-columns:minmax(0,1fr) 46px; gap:8px; padding:9px 10px;}
+  .orv-result {grid-template-columns:46px minmax(0,1fr); gap:8px; padding:9px 10px;}
+  .orv-card-preview {width:46px; height:46px;}
+  .orv-result > img {width:46px; height:46px;}
   .orv-card-top {flex-wrap:wrap; row-gap:4px;}
   .orv-card-price {font-size:.875rem;}
   .orv-card-fields {grid-template-columns:minmax(0,1fr);}
+  .orv-card-noterow .orv-card-price {padding-bottom:9px;}
   .orv-card-actions > .btn {flex:0 1 auto; justify-content:center;}
   .orv-assign {padding:10px;}
   .orv-section {margin:10px 0;}
@@ -233,7 +251,8 @@
   .orv-viewfinder {max-height:34vh;}
   .orv-summary,.orv-assign {padding:10px;}
   .orv-results {gap:8px;}
-  .orv-card,.orv-result {grid-template-columns:46px minmax(0,1fr);}
+  .orv-card {grid-template-columns:minmax(0,1fr) 46px;}
+  .orv-result {grid-template-columns:46px minmax(0,1fr);}
 }
 
 @media (prefers-reduced-motion:reduce) {

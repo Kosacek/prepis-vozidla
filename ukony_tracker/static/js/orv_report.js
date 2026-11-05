@@ -1,11 +1,13 @@
 /* Techničák report: what the scan read, what it wrote (and where), and the
-   one-off decisions a person still has to make (2.7.1, 2026-11-05).
+   one-off decisions a person still has to make (2.7.2, 2026-11-05).
 
-   The cards follow the /ukony rows David likes: small photo on the left, one
-   clear hierarchy — status chip, RZ + type tag, ORV chip, firm line with a
-   colour dot, muted VIN/notes line, small actions. Every car carries its own
-   firma + typ + poznámka; there is NO shared "apply to all" bar (David never
-   assigns one firm to many cars at once).
+   The cards follow the /ukony rows David likes: small photo in the TOP-RIGHT
+   (text stays left-aligned), one clear hierarchy — status chip, RZ + type tag,
+   ORV chip, firm line with a colour dot, muted VIN/notes line, small actions.
+   On the cards for a new car the price moved next to the note (it read as if it
+   belonged to the RZ line); written cards keep it on the RZ line like /ukony.
+   Every car carries its own firma + typ + poznámka; there is NO shared "apply
+   to all" bar (David never assigns one firm to many cars at once).
 
    Cards are split by what the person has to do:
    - "Ke kontrole a doplnění" (#orv-review): new cars to assign (firma, typ,
@@ -342,6 +344,15 @@
     return node;
   }
   function priceNode(value, withLabel) { return fillPrice(el('span', 'orv-card-price'), value, withLabel); }
+  // Row 2 of an assignment card: the note (wide, left) and the price (right).
+  // David 2026-11-05: the price at the RZ line was confusing — it belongs next
+  // to the note. The node keeps .orv-card-price, so refreshPrices() finds it.
+  function noteRow(ceny, chosen, note) {
+    const row = el('div', 'orv-card-noterow');
+    field(row, 'Poznámka', note);
+    row.append(priceNode(priceFor(ceny, chosen.firma_id, chosen.typ_kod), true));
+    return row;
+  }
   function statusChips(photo) {
     const result = photo.result || {};
     const state = stateOf(photo);
@@ -359,7 +370,7 @@
     top.append(statusChips(photo));
     return top;
   }
-  // RZ + type tag + (right-aligned) price — the same line order as /ukony rows.
+  // RZ + type tag (+ price only on written cards, where it matches /ukony).
   function idRow(result, typ, price) {
     const row = el('div', 'orv-card-id');
     row.append(el('b', 'orv-rz', (result && result.rz) || '—'));
@@ -402,7 +413,9 @@
     image.addEventListener('error', () => { image.hidden = true; });
     preview.append(image);
     const body = el('div', 'orv-card-body');
-    card.append(preview, body);
+    // Body first, photo second: the text column stays left-aligned and the
+    // photo sits in the fixed right column (top-right of the card).
+    card.append(body, preview);
     photo.cardEl = card;
     return {card, body};
   }
@@ -481,17 +494,35 @@
     const options = source && source.querySelectorAll ? Array.from(source.querySelectorAll('option')) : [];
     options.forEach(option => {
       if (!option.value) return;
-      select.append(optionEl(option.value, option.textContent));
+      const copy = optionEl(option.value, option.textContent);
+      // Colours come from the hidden bank (`firma_colors` in the fragment); the
+      // shared FirmaPick reads them from option.dataset.color.
+      if (option.dataset && option.dataset.color) copy.dataset.color = option.dataset.color;
+      select.append(copy);
     });
     select.value = value || '';
+  }
+  // Shared coloured firm picker (static/js/firma_pick.js, loaded before this
+  // file). Without it (older page, JS off) the native <select> keeps working —
+  // exactly like the Úkony form; never throw over a missing module.
+  function attachFirmaPick(select) {
+    const api = root.FirmaPick;
+    if (!api || typeof api.attach !== 'function') return false;
+    try {
+      api.attach(select);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   function assignmentCard(ctx, photo) {
     const result = photo.result || {};
     const {card, body} = cardShell(photo, 'assign', needsConfirm(photo) ? 'duplicate' : 'assign');
     const chosen = choiceOf(photo);
     body.append(cardTop(photo));
-    body.append(idRow(result, chosen.typ_kod || null,
-      priceNode(priceFor(ctx.ceny, chosen.firma_id, chosen.typ_kod), true)));
+    // The price is NOT on the RZ line here (David: it read like part of the
+    // plate); it goes down to the note row.
+    body.append(idRow(result, chosen.typ_kod || null));
     body.append(orvRow(result));
     const duplicate = duplicateBlock(ctx, photo);
     if (duplicate) body.append(duplicate);
@@ -515,16 +546,20 @@
     note.type = 'text';
     note.maxLength = MAX_NOTE;
     note.value = photo.poznamka || '';
-    note.placeholder = 'Poznámka k úkonu (nepovinná, max. 120)';
+    note.placeholder = 'Poznámka';
     note.setAttribute('aria-label', 'Poznámka k úkonu ' + name);
     note.addEventListener('input', () => { photo.poznamka = note.value; });
     field(fields, 'Firma', firma);
     field(fields, 'Typ', typ);
-    field(fields, 'Poznámka', note, 'orv-card-field--wide');
     body.append(fields);
+    // Row 2: Poznámka (left, wide) + Cena (right).
+    body.append(noteRow(ctx.ceny, chosen, note));
     const meta = metaNode([vinItem(result),
       result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
     if (meta) body.append(meta);
+    // Options are filled and the select is in the card → the shared coloured
+    // picker can wrap it. Without firma_pick.js the native select stays.
+    attachFirmaPick(firma);
     return card;
   }
   function issueCard(ctx, photo) {

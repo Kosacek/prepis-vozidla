@@ -229,17 +229,21 @@
     firmaData = null; ukonyById = {}; payerKey = null; payerChosen = false;
     clearTimeout(aresTimer); ++aresSerial; aresIco = '';
     requestId = newId();
+    attachFirmaPick();  // idempotent: covers firma_pick.js loading after this file
     form.reset(); list.replaceChildren(); showError('');
+    syncFirmaPick();  // form.reset() only moves the native <select>, not the picker
     panel.hidden = true; setHead([]); setPanelOpen(true);
     adresa.value = ''; vozidla.value = ''; setAresStatus('', '');
     refresh();
     var filter = document.querySelector('#doklady-filter select[name=firma]');
     if (filter && filter.value && firma.querySelector('option[value="' + filter.value + '"]')) {
-      firma.value = filter.value; loadUkony();
+      firma.value = filter.value;
+      syncFirmaPick();  // a programmatic value throws no `change`
+      loadUkony();
     }
     modal.hidden = false;
     document.body.classList.add('modal-open');
-    requestAnimationFrame(function () { modal.classList.add('is-open'); firma.focus(); });
+    requestAnimationFrame(function () { modal.classList.add('is-open'); focusFirma(); });
   }
   function close() {
     if (busy) return;
@@ -250,8 +254,9 @@
     if (issued) window.location.reload();
   }
 
-  // <option data-ico/data-nazev/data-adresa/data-psc> for the firm select,
-  // from the JSON block next to the modal. Keeps the server HTML plain.
+  // <option data-ico/data-nazev/data-adresa/data-psc/data-color> for the firm
+  // select, from the JSON block next to the modal. Keeps the server HTML plain
+  // (the no-JS fallback) and feeds both the payer chips and firma_pick.js.
   function decorateFirmOptions() {
     var box = document.getElementById('dn-firmy-data');
     if (!box) return;
@@ -266,9 +271,31 @@
       o.dataset.nazev = f.nazev || '';
       o.dataset.adresa = f.adresa || '';
       o.dataset.psc = f.psc || '';
+      o.dataset.color = f.color || '';  // dot color for the colored picker
     });
   }
   decorateFirmOptions();
+
+  // -- Colored firm picker (static/js/firma_pick.js) -----------------------
+  // The native <select> stays the value source (and the no-JS fallback);
+  // FirmaPick only renders the colored button + list and fires `change`, so
+  // loadUkony() below keeps working untouched. Without firma_pick.js nothing
+  // changes — the plain select keeps working.
+  var firmaPick = null;
+  function attachFirmaPick() {
+    if (firmaPick || !firma || !window.FirmaPick || !window.FirmaPick.attach) return firmaPick;
+    try { firmaPick = window.FirmaPick.attach(firma); } catch (_) { firmaPick = null; }
+    return firmaPick;
+  }
+  function syncFirmaPick() {
+    if (!firma || !window.FirmaPick || !window.FirmaPick.sync) return;
+    try { window.FirmaPick.sync(firma); } catch (_) {}
+  }
+  function focusFirma() {
+    var target = firmaPick && firmaPick.button ? firmaPick.button : firma;
+    if (target && target.focus) target.focus();
+  }
+  attachFirmaPick();
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-doklad-novy]')) { e.preventDefault(); open(); return; }
