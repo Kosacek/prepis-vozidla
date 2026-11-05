@@ -14,6 +14,11 @@ Každé číslo je skutečný účetní doklad, proto:
 Plátce ze žádosti (1.29.0): když evidence vystavuje doklad osobě ze žádosti,
 pošle i zadost_id + strana a adresa se vezme z hotové žádosti (adresa_platce).
 Jméno a IČO zůstanou, jak přišly — uživatel je v evidenci mohl opravit.
+
+Ruční doklad (1.31.0): evidence umí vystavit doklad i bez vozidla a s vlastní
+adresou plátce — vozidla smí chybět nebo být prázdná (PPD se vytiskne bez
+řádku SPZ/VIN) a prijato_adresa má přednost před adresou ze žádosti i z uložené
+firmy. Starší volající (neprázdná vozidla, žádná adresa) fungují beze změny.
 """
 from __future__ import annotations
 
@@ -40,6 +45,7 @@ _log = logging.getLogger("prepis.ppd_api")
 MAX_CASTKA = 10_000_000          # Kč — pojistka proti překlepu o pár nul
 MAX_VOZIDEL = 30
 MAX_PRIJATO_OD = 200
+MAX_PRIJATO_ADRESA = 200
 MAX_UCEL = 120
 MAX_VOZIDLO = 20                 # RZ má 7–8 znaků, VIN 17
 MAX_ZPRACOVAL = 60
@@ -92,8 +98,11 @@ def _castka(hodnota) -> int:
 
 
 def _vozidla(hodnota) -> list[str]:
-    if not isinstance(hodnota, list) or not hodnota:
-        raise Chyba("vozidla musí být neprázdný seznam RZ nebo VIN.")
+    # Vozidla jsou nepovinná (1.31.0): ruční doklad jde vystavit i bez auta.
+    if hodnota is None:
+        return []
+    if not isinstance(hodnota, list):
+        raise Chyba("vozidla musí být seznam RZ nebo VIN.")
     if len(hodnota) > MAX_VOZIDEL:
         raise Chyba(f"vozidla smí mít nejvýš {MAX_VOZIDEL} položek.")
     vysledek = []
@@ -123,6 +132,7 @@ def over(telo) -> dict:
     return {
         "prijato_od": _text(telo, "prijato_od", povinne=True, max_delka=MAX_PRIJATO_OD),
         "prijato_ico": prijato_ico,
+        "prijato_adresa": _text(telo, "prijato_adresa", max_delka=MAX_PRIJATO_ADRESA),
         "castka": _castka(telo.get("castka")),
         "ucel": _text(telo, "ucel", povinne=True, max_delka=MAX_UCEL),
         "vozidla": _vozidla(telo.get("vozidla")),
@@ -141,11 +151,17 @@ def _id(telo: dict, klic: str) -> str:
 
 
 def adresa_platce(data_dir: str, udaje: dict, adresa_podle_ico) -> str:
-    """Adresa na doklad: strana z hotové žádosti → uložená firma podle IČO → "".
+    """Adresa na doklad: explicitní z evidence → strana z hotové žádosti →
+    uložená firma podle IČO → "".
 
+    Explicitní prijato_adresa (1.31.0) má přednost před vším ostatním —
+    uživatel ji v „Novém dokladu" mohl přepsat (např. adresu z ARES).
     Žádost se hledá jen když přišlo zadost_id i strana. Nenalezená žádost,
     smazané nebo rozbité PDF ani žádná jiná chyba doklad nikdy neshodí.
     """
+    explicitni = udaje.get("prijato_adresa")
+    if isinstance(explicitni, str) and explicitni.strip():
+        return explicitni.strip()
     if udaje.get("zadost_id") and udaje.get("strana"):
         try:
             for soubor in hledani.soubory_zadosti(data_dir, udaje["zadost_id"]):
@@ -156,7 +172,11 @@ def adresa_platce(data_dir: str, udaje: dict, adresa_podle_ico) -> str:
             _log.warning("Adresa ze žádosti %s nejde přečíst (%s), beru firmu podle IČO",
                          udaje["zadost_id"], e)
     ico = udaje.get("prijato_ico") or ""
-    return (adresa_podle_ico(ico) if ico else "").strip()
+    try:
+        return (adresa_podle_ico(ico) if ico else "").strip()
+    except Exception as e:
+        _log.warning("Adresa uložené firmy podle IČO %s nejde přečíst (%s)", ico, e)
+        return ""
 
 
 def _najdi_vystaveny(data_dir: str, request_id: str) -> dict | None:
@@ -204,7 +224,8 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
     """Vystaví doklad (nebo vrátí už vystavený pro stejný request_id).
 
     adresa_podle_ico(ico) → adresa uložené firmy nebo "" — záloha, když adresa
-    nejde vzít ze žádosti (adresa_platce). Vrací (doklad pro evidenci, nově_vystaven).
+    nejde vzít z požadavku ani ze žádosti (adresa_platce). Vrací (doklad pro
+    evidenci, nově_vystaven).
     Push do evidence je na volajícím — až po uvolnění zámku.
     """
     def _run():
@@ -218,8 +239,12 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
         payer_address = adresa_platce(data_dir, udaje, adresa_podle_ico).upper()
         purpose = udaje["ucel"]
         vozidla = udaje["vozidla"]
-        # Jako u žádosti: SPZ přednostně, VIN jen když je to jediné auto bez značky.
-        if len(vozidla) == 1 and _VIN.match(vozidla[0]):
+        # Bez vozidla (ruční doklad): žádný řádek SPZ/VIN, do knihy, zálohy
+        # i evidence jde prázdné vozidlo. Jinak jako u žádosti: SPZ přednostně,
+        # VIN jen když je to jediné auto bez značky.
+        if not vozidla:
+            spz, vin = "", ""
+        elif len(vozidla) == 1 and _VIN.match(vozidla[0]):
             spz, vin = "", vozidla[0]
         else:
             spz, vin = ", ".join(vozidla), ""

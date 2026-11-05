@@ -6,6 +6,10 @@ přiděluje dál jen žádosti, stejně jako u dokladu k žádosti — ledger, P
 záloha i push do evidence. Každé číslo je skutečný účetní doklad, proto:
 klíč povinný (bez klíče je cesta vypnutá), opakovaný request_id nikdy
 nevystaví druhý doklad a nevalidní tělo nesmí sáhnout na číslování.
+
+Ruční doklad (1.31.0, spec 2026-11-05-doklad-ico-a-rucni-vozidla.md):
+vozidla smí chybět nebo být prázdná (PPD bez řádku SPZ/VIN) a prijato_adresa
+z evidence má přednost před adresou ze žádosti i z uložené firmy.
 """
 import os
 import threading
@@ -175,9 +179,11 @@ def test_dvojklik_naraz_vystavi_jeden_doklad(api):
     {"castka": 10_000_001}, {"castka": None},
     {"prijato_od": ""}, {"prijato_od": "   "}, {"prijato_od": 123}, {"prijato_od": "X" * 201},
     {"ucel": ""}, {"ucel": None}, {"ucel": "U" * 121},
-    {"vozidla": []}, {"vozidla": "3BR9309"}, {"vozidla": [""]}, {"vozidla": ["  "]},
+    {"vozidla": "3BR9309"}, {"vozidla": [""]}, {"vozidla": ["  "]},
     {"vozidla": [123]}, {"vozidla": ["X" * 21]}, {"vozidla": ["1AB2345"] * 31},
     {"prijato_ico": "ABC"}, {"prijato_ico": 44960263}, {"prijato_ico": "1" * 13},
+    {"prijato_adresa": 123}, {"prijato_adresa": ["Adresa"]},
+    {"prijato_adresa": "A" * 201}, {"prijato_adresa": "=1+1"},
     {"zpracoval": ["David"]}, {"zpracoval": "D" * 61},
     {"request_id": "ne povoleno!"}, {"request_id": "r" * 101}, {"request_id": 5},
     # openpyxl by text začínající „=" zapsal do knihy dokladů jako vzorec
@@ -190,7 +196,7 @@ def test_nevalidni_telo_400_a_zadne_cislo(api, zmena):
     assert _zadny_doklad(api.data) and api.poslano == []
 
 
-@pytest.mark.parametrize("vynechat", ["prijato_od", "castka", "ucel", "vozidla"])
+@pytest.mark.parametrize("vynechat", ["prijato_od", "castka", "ucel"])
 def test_chybejici_povinne_pole_400(api, vynechat):
     r = _post(api, {k: v for k, v in TELO.items() if k != vynechat})
     assert r.status_code == 400 and _zadny_doklad(api.data)
@@ -353,6 +359,81 @@ def test_chyba_pri_hledani_zadosti_doklad_neshodi(api, monkeypatch):
 def test_nevalidni_zadost_id_nebo_strana_400(api, zmena):
     r = _post(api, {**_s_adresou("provozovatel"), **zmena})
     assert r.status_code == 400 and r.get_json()["error"]
+    assert _zadny_doklad(api.data) and api.poslano == []
+
+
+# ── Adresa z evidence + prázdná vozidla (1.31.0) ────────────────────────────
+# „Nový doklad" v evidenci umí ruční doklad: uživatel přepíše adresu z ARES
+# (prijato_adresa) a nemusí vyplnit žádné vozidlo. Priorita adresy: explicitní
+# z evidence → adresa strany žádosti → adresa uložené firmy podle IČO.
+# Číslování, request_id idempotence i záloha platí beze změny.
+
+ADRESA_EXPLICITNI = "PURKYŇOVA 12, BRNO, 602 00"
+
+
+def test_explicitni_adresa_ma_prednost_pred_ulozenou_firmou(api):
+    # Na doklad se adresa píše velkými písmeny jako všechno ostatní.
+    r = _post(api, {**TELO, "prijato_adresa": "Purkyňova 12, Brno, 602 00",
+                    "request_id": "adr-exp-firma"})
+    assert r.status_code == 201, r.get_json()
+    assert _adresa_v_zaloze(api) == ADRESA_EXPLICITNI
+    text = PdfReader(str(api.data / "output" / "ppd_1.pdf")).pages[0].extract_text()
+    assert "602 00" in text, "explicitní adresa je i na vytištěném dokladu"
+
+
+def test_explicitni_adresa_ma_prednost_pred_adresou_ze_zadosti(api):
+    _ulozena_zadost(api.data)
+    r = _post(api, _s_adresou("provozovatel", prijato_adresa=ADRESA_EXPLICITNI))
+    assert r.status_code == 201, r.get_json()
+    assert _adresa_v_zaloze(api) == ADRESA_EXPLICITNI
+    text = PdfReader(str(api.data / "output" / "ppd_1.pdf")).pages[0].extract_text()
+    assert "602 00" in text and "62500" not in text
+
+
+def test_prazdna_adresa_je_jako_neposlana(api):
+    """Prázdná/whitespace adresa nesmí přebít žádost ani uloženou firmu."""
+    _ulozena_zadost(api.data)
+    r = _post(api, _s_adresou("provozovatel", prijato_adresa="   "))
+    assert r.status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_PROVOZOVATELE
+    r = _post(api, {**TELO, "prijato_adresa": "", "request_id": "adr-prazdna-firma"})
+    assert r.status_code == 201
+    assert _adresa_v_zaloze(api) == ADRESA_FIRMY
+
+
+@pytest.mark.parametrize("telo", [
+    {k: v for k, v in TELO.items() if k != "vozidla"},
+    {**TELO, "vozidla": []},
+    {**TELO, "vozidla": None},
+], ids=["vozidla-chybi", "vozidla-prazdna", "vozidla-null"])
+def test_doklad_bez_vozidla(api, telo):
+    """Ruční doklad: žádné vozidlo = prázdné vozidlo všude a žádný řádek SPZ/VIN."""
+    r = _post(api, {**telo, "request_id": "bez-auta"})
+    assert r.status_code == 201, r.get_json()
+    doklad = r.get_json()["doklad"]
+    assert doklad["vozidlo"] == ""
+    zaloha = ppd.read_backup(str(api.data))[0]
+    assert not zaloha["spz"] and not zaloha["vin"]
+    assert not ppd.read_ppd_log(str(api.data))[0]["vozidlo"]
+    assert api.poslano == [doklad]
+    text = PdfReader(str(api.data / "output" / "ppd_1.pdf")).pages[0].extract_text()
+    assert "SPZ:" not in text and "VIN:" not in text
+    api.post("/login", data={"password": "heslo-jen-pro-test"})
+    tisk = api.get("/ppd-print/1")
+    assert tisk.status_code == 200
+    html = tisk.get_data(as_text=True)
+    assert "SPZ:" not in html and "VIN:" not in html
+
+
+def test_adresa_zacatek_rovnitko_400_a_zadne_cislo(api):
+    r = _post(api, {**TELO, "prijato_adresa": '=HYPERLINK("http://x","klik")'})
+    assert r.status_code == 400 and "prijato_adresa" in r.get_json()["error"]
+    assert _zadny_doklad(api.data) and api.poslano == []
+
+
+def test_adresa_delsi_nez_200_znaku_400(api):
+    r = _post(api, {**TELO, "prijato_adresa": "A" * 201})
+    assert r.status_code == 400 and "prijato_adresa" in r.get_json()["error"]
     assert _zadny_doklad(api.data) and api.poslano == []
 
 
