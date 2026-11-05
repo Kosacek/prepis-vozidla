@@ -11,7 +11,7 @@ from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 import db
 import config
 from repositories import firmy_repo, typy_repo
-from services import orv_images, orv_scan_service, pricing_service
+from services import orv_images, orv_scan_service, pricing_service, colors_service
 from services.vehicle_fill_service import transaction
 from services.ingest_service import normalize_profil
 
@@ -49,8 +49,13 @@ def fragment():
     firmy = firmy_repo.list_all(conn, only_active=True)
     # Ceny pro kartu zakládaného auta (firma × typ); šablona je vloží jako JSON.
     ceny = {str(f["id"]): pricing_service.firm_price_map(conn, f["id"]) for f in firmy}
+    # Barvy firem = stejná paleta jako v Úkonech (tečka u firmy v kartě skenu).
+    colors = colors_service.firma_color_map(conn)
+    firma_colors = {f["zkratka"]: colors.get(f["zkratka"], "#8e8e93") for f in firmy}
+    firmy_data = [{"id": f["id"], "nazev": f["nazev"], "zkratka": f["zkratka"],
+                   "color": colors.get(f["zkratka"], "#8e8e93")} for f in firmy]
     return render_template("_orv_sken.html", firmy=firmy, typy=types, profily=config.PROFILY,
-                           ceny=ceny), \
+                           ceny=ceny, firma_colors=firma_colors, firmy_data=firmy_data), \
         200, {"Cache-Control": "no-store"}
 
 

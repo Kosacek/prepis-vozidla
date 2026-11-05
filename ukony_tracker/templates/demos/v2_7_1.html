@@ -1,0 +1,100 @@
+{# Demo for release 2.7.1 (Sken techničáku je přehlednější): a compact card in
+   the Úkony row language — status, bold RZ + type tag, prominent ORV chip,
+   firm with a colour dot, bold price. The ORV number swaps to the newly read
+   one, and the summary shows only chips with a real count. A second card has
+   its own firm (no shared "apply to all" bar). CSS-only, 4s loop; app tokens
+   only. Included by _whats_new.html. #}
+<style>
+  .de271-demo { position: relative; box-sizing: border-box; height: 206px; padding: 10px 12px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25;
+    overflow: hidden; display: grid; align-content: start; gap: 6px; }
+  .de271-chips { display: flex; gap: 5px; }
+  .de271-chip { padding: 1px 7px; border-radius: var(--radius-pill); background: var(--card);
+    border: 1px solid var(--line); color: var(--muted); font-size: 8.5px; font-weight: 700;
+    white-space: nowrap; opacity: 0; animation: de271-pop 4s ease infinite; }
+  .de271-c2 { animation-delay: .12s; }
+  .de271-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 7px; padding: 6px 8px;
+    border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px;
+    background: var(--card); opacity: 0; animation: de271-rise 4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de271-card2 { border-left-color: var(--flash-warning-ink); animation-delay: .18s; }
+  .de271-photo { height: 34px; border-radius: 6px; background: linear-gradient(135deg, var(--line), var(--bg)); }
+  .de271-body { display: grid; gap: 2px; min-width: 0; }
+  .de271-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .de271-status { padding: 0 6px; border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent-dark);
+    font-size: 8px; font-weight: 700; white-space: nowrap; }
+  .de271-status--new { background: var(--bg); color: var(--muted); }
+  .de271-price { font-size: 9.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .de271-id { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .de271-rz { font-size: 10px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; }
+  .de271-tag { padding: 0 5px; border-radius: var(--radius-pill); border: 1px solid var(--line);
+    background: var(--bg); color: var(--muted); font-size: 7.5px; font-weight: 600; white-space: nowrap; }
+  .de271-orv { justify-self: start; display: inline-flex; align-items: baseline; gap: 3px;
+    padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius-pill);
+    background: var(--bg); font-size: 8px; font-weight: 700; white-space: nowrap;
+    animation: de271-orv 4s ease infinite; }
+  .de271-orv i { font-style: normal; font-size: 6.5px; letter-spacing: .06em; color: var(--muted); }
+  .de271-orv-vals { display: inline-grid; }
+  .de271-orv-vals > b { grid-area: 1 / 1; font-weight: 800; }
+  .de271-orv-old { animation: de271-old 4s ease infinite; }
+  .de271-orv-new { animation: de271-new 4s ease infinite; }
+  .de271-firm { display: flex; align-items: center; gap: 4px; font-size: 8.5px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .de271-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .de271-dot--warn { background: var(--flash-warning-ink); }
+
+  @keyframes de271-pop {
+    0%, 2%   { opacity: 0; transform: translateY(3px); }
+    12%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de271-rise {
+    0%, 6%   { opacity: 0; transform: translateY(5px); }
+    22%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de271-orv {
+    0%, 44%   { background: var(--bg); border-color: var(--line); }
+    52%, 100% { background: var(--flash-success-bg); border-color: var(--flash-success-ink);
+      color: var(--flash-success-ink); }
+  }
+  @keyframes de271-old {
+    0%, 44%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes de271-new {
+    0%, 46%   { opacity: 0; }
+    54%, 100% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the end state — both chips, both cards, the new ORV number. */
+    .de271-chip, .de271-card, .de271-orv, .de271-orv-old, .de271-orv-new { animation: none; }
+    .de271-chip, .de271-card { opacity: 1; }
+    .de271-orv { background: var(--flash-success-bg); border-color: var(--flash-success-ink);
+      color: var(--flash-success-ink); }
+    .de271-orv-old { display: none; }
+    .de271-orv-new { opacity: 1; }
+  }
+</style>
+<div class="de271-demo" aria-hidden="true">
+  <div class="de271-chips">
+    <span class="de271-chip">✚ Založeno · 1</span>
+    <span class="de271-chip de271-c2">✚ Doplněno · 1</span>
+  </div>
+  <div class="de271-card">
+    <span class="de271-photo"></span>
+    <div class="de271-body">
+      <div class="de271-top"><span class="de271-status">Doplněno</span><span class="de271-price">1 300 Kč</span></div>
+      <div class="de271-id"><b class="de271-rz">1AKI647</b><span class="de271-tag">PŘEVOD</span></div>
+      <span class="de271-orv"><i>ORV</i><span class="de271-orv-vals"><b class="de271-orv-old">UBP585023</b><b class="de271-orv-new">UBP588302</b></span></span>
+      <span class="de271-firm"><span class="de271-dot"></span>JE &amp; NE</span>
+    </div>
+  </div>
+  <div class="de271-card de271-card2">
+    <span class="de271-photo"></span>
+    <div class="de271-body">
+      <div class="de271-top"><span class="de271-status de271-status--new">Nové auto</span></div>
+      <div class="de271-id"><b class="de271-rz">3BR9309</b></div>
+      <span class="de271-orv"><i>ORV</i><span class="de271-orv-vals"><b>UBP585612</b></span></span>
+      <span class="de271-firm"><span class="de271-dot de271-dot--warn"></span>BSAuto Brno</span>
+    </div>
+  </div>
+</div>

@@ -1,5 +1,11 @@
 /* Techničák report: what the scan read, what it wrote (and where), and the
-   one-off decisions a person still has to make.
+   one-off decisions a person still has to make (2.7.1, 2026-11-05).
+
+   The cards follow the /ukony rows David likes: small photo on the left, one
+   clear hierarchy — status chip, RZ + type tag, ORV chip, firm line with a
+   colour dot, muted VIN/notes line, small actions. Every car carries its own
+   firma + typ + poznámka; there is NO shared "apply to all" bar (David never
+   assigns one firm to many cars at once).
 
    Cards are split by what the person has to do:
    - "Ke kontrole a doplnění" (#orv-review): new cars to assign (firma, typ,
@@ -22,6 +28,16 @@
   const FIELD_LABELS = {rz: 'RZ', orv: 'ORV', vin: 'VIN'};
   const MAX_NOTE = 120;
   const KC = new Intl.NumberFormat('cs-CZ', {maximumFractionDigits: 0});
+  // Souhrn nahoře: jen štítky, které něco znamenají (David: „Založeno 0“ je
+  // šum). Pořadí drží to, co je pro člověka nejdřív — co se zapsalo, pak co
+  // ještě zbývá.
+  const SUMMARY = [
+    ['zalozeno', '✚ Založeno'],
+    ['doplneno', '✎ Doplněno'],
+    ['uz_doplneno', '✓ Beze změny'],
+    ['review', '⚠ Ke kontrole'],
+    ['necitelne', '✗ Nečitelné'],
+  ];
 
   function stateOf(photo) { return (photo && photo.result && photo.result.stav) || null; }
   function isWritten(photo) { return !!DONE[stateOf(photo)]; }
@@ -60,6 +76,13 @@
     });
     return out;
   }
+  // Only non-zero chips, in the fixed order above. Everything zero → no chips
+  // at all (the banner still names the state of the batch).
+  function summaryChips(photos) {
+    const t = totals(photos);
+    return SUMMARY.filter(([key]) => t[key] > 0)
+      .map(([key, label]) => ({key, n: t[key], text: label + ' · ' + t[key]}));
+  }
 
   function dateCs(iso) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return '';
@@ -87,7 +110,7 @@
     const p = result && result.predchozi;
     const date = p && dateCs(p.datum);
     if (!date) return null;
-    return 'Dříve ' + [date, p.firma, p.typ].filter(Boolean).join(' · ');
+    return 'Dříve ' + [date, p.firma_zkratka || p.firma, p.typ].filter(Boolean).join(' · ');
   }
 
   // -- Money -------------------------------------------------------------
@@ -107,13 +130,54 @@
     if (!chosen.firma_id || !chosen.typ_kod) return 'Cena: —';
     return 'Cena: ' + kc(priceFor(ceny, chosen.firma_id, chosen.typ_kod));
   }
-  function cenyOf(rootEl) {
+
+  // -- #orv-data JSON (prices + firm colours) ----------------------------
+  // Normalised firm map: id → {id, nazev, zkratka, color}. Accepts the array
+  // the current backend sends and, defensively, an older id-keyed object.
+  function firmsMap(data) {
+    const out = {};
+    const list = data && data.firmy;
+    if (Array.isArray(list)) {
+      list.forEach(f => {
+        if (!f || f.id == null) return;
+        out[String(f.id)] = {id: f.id, nazev: f.nazev || '',
+          zkratka: f.zkratka || f.nazev || '', color: f.color || ''};
+      });
+    } else if (list && typeof list === 'object') {
+      Object.keys(list).forEach(id => {
+        const f = list[id] || {};
+        out[String(id)] = {id, nazev: f.nazev || '',
+          zkratka: f.zkratka || f.nazev || '', color: f.color || ''};
+      });
+    }
+    return out;
+  }
+  function dataOf(rootEl) {
     const node = rootEl && rootEl.querySelector('#orv-data');
-    if (!node) return {};
+    if (!node) return {ceny: {}, firmy: {}};
     try {
       const data = JSON.parse(node.textContent || '{}');
-      return (data && data.ceny) || {};
-    } catch (_) { return {}; }
+      return {ceny: (data && data.ceny) || {}, firmy: firmsMap(data)};
+    } catch (_) { return {ceny: {}, firmy: {}}; }
+  }
+  function cenyOf(rootEl) { return dataOf(rootEl).ceny; }
+  function firmsOf(rootEl) { return dataOf(rootEl).firmy; }
+  // Firm identity for one úkon view: id → colour map first, then the payload's
+  // own zkratka/firma (older backend without firma_id must still render).
+  function firmOf(view, firms) {
+    const v = view || {};
+    let info = v.firma_id != null ? (firms || {})[String(v.firma_id)] : null;
+    if (!info && v.firma && firms) {
+      const wanted = String(v.firma);
+      Object.keys(firms).some(id => {
+        const f = firms[id];
+        if (f && (f.zkratka === wanted || f.nazev === wanted)) { info = f; return true; }
+        return false;
+      });
+    }
+    const zkratka = v.firma_zkratka || (info && info.zkratka) || v.firma || '';
+    const color = (info && info.color) || '';
+    return {zkratka: zkratka || '—', color: color || 'var(--muted)'};
   }
 
   // -- Duplicate guard ---------------------------------------------------
@@ -136,37 +200,28 @@
   }
   function existingLine(view) {
     if (!view) return '';
-    return ['#' + view.id, dateCs(view.datum), view.typ, view.firma,
+    return ['#' + view.id, dateCs(view.datum), view.typ, view.firma_zkratka || view.firma,
       PAY_LABELS[view.stav_platby] || ''].filter(Boolean).join(' · ');
   }
 
   // -- Selection & payload ----------------------------------------------
-  function batchDefaults(rootEl) {
-    const bar = rootEl && rootEl.querySelector('#orv-batch');
-    // No bar in the DOM (tests/older template) → behave as if visible.
-    if (bar && bar.hidden) return {shown: false, firma_id: '', typ_kod: ''};
-    const firma = rootEl && rootEl.querySelector('#orv-batch-firma');
-    const typ = rootEl && rootEl.querySelector('#orv-batch-typ');
-    return {shown: true, firma_id: (firma && firma.value) || '', typ_kod: (typ && typ.value) || ''};
-  }
-  function effective(photo, defaults) {
-    const fallback = defaults || {};
-    return {firma_id: photo.firmaOverride || fallback.firma_id || '',
-      typ_kod: photo.typOverride || fallback.typ_kod || ''};
+  // Each photo carries its own choice; nothing is inherited from elsewhere.
+  function choiceOf(photo) {
+    return {firma_id: (photo && photo.firmaOverride) || '',
+      typ_kod: (photo && photo.typOverride) || ''};
   }
   function noteValue(value) {
     return String(value == null ? '' : value).trim().slice(0, MAX_NOTE);
   }
-  function canCreate(photo, defaults) {
-    const chosen = effective(photo, defaults);
+  function canCreate(photo) {
+    const chosen = choiceOf(photo);
     if (!assignable(photo) || !chosen.firma_id || !chosen.typ_kod) return false;
     // A car that is already in evidence needs an explicit "přesto založit".
     return !needsConfirm(photo) || !!photo.potvrdit;
   }
-  function selected(rootEl, photos) {
-    const defaults = batchDefaults(rootEl);
-    return photos.filter(photo => canCreate(photo, defaults)).map(photo => {
-      const chosen = effective(photo, defaults);
+  function selected(photos) {
+    return photos.filter(canCreate).map(photo => {
+      const chosen = choiceOf(photo);
       return {photo, firma_id: chosen.firma_id, typ_kod: chosen.typ_kod};
     });
   }
@@ -200,29 +255,32 @@
     return blocked;
   }
   function updateCreateCount(rootEl, photos) {
-    const count = selected(rootEl, photos).length;
-    const button = rootEl.querySelector('#orv-create-unmatched');
+    const count = selected(photos).length;
+    const button = rootEl && rootEl.querySelector('#orv-create-unmatched');
     if (!button) return count;
     button.textContent = 'Založit ' + count + ' ' + czechJobs(count);
     button.disabled = count === 0;
     button.hidden = !photos.some(assignable);
     return count;
   }
-  // Live price + button count after a shed or card field changed.
+  // Live price + the type tag + button count after a card field changed.
   function refreshPrices(rootEl, photos) {
-    const defaults = batchDefaults(rootEl);
     const ceny = cenyOf(rootEl);
     photos.forEach(photo => {
       if (!assignable(photo) || !photo.cardEl) return;
-      const chosen = effective(photo, defaults);
-      // A card without its own override follows the shared bar — show the
-      // value it will actually use, never a stale one.
-      const firma = photo.cardEl.querySelector('.orv-card-firma');
-      if (firma && firma.value !== chosen.firma_id) firma.value = chosen.firma_id || '';
-      const typ = photo.cardEl.querySelector('.orv-card-typ');
-      if (typ && typ.value !== chosen.typ_kod) typ.value = chosen.typ_kod || '';
+      const chosen = choiceOf(photo);
       const price = photo.cardEl.querySelector('.orv-card-price');
-      if (price) price.textContent = priceLabel(ceny, chosen);
+      if (price) fillPrice(price, priceFor(ceny, chosen.firma_id, chosen.typ_kod), true);
+      // The type tag appears only once a type is chosen (and disappears again
+      // when the choice is cleared).
+      const idRow = photo.cardEl.querySelector('.orv-card-id');
+      const tag = idRow && idRow.querySelector('.orv-typ');
+      if (chosen.typ_kod) {
+        if (tag) tag.textContent = chosen.typ_kod;
+        else if (idRow) idRow.append(el('span', 'tag orv-typ', chosen.typ_kod));
+      } else if (tag) {
+        tag.remove();
+      }
     });
     return updateCreateCount(rootEl, photos);
   }
@@ -239,8 +297,8 @@
     opt.value = value;
     return opt;
   }
-  function field(container, labelText, control) {
-    const wrap = el('label', 'orv-card-field');
+  function field(container, labelText, control, extraCls) {
+    const wrap = el('label', 'orv-card-field' + (extraCls ? ' ' + extraCls : ''));
     wrap.append(el('span', 'orv-card-label', labelText), control);
     container.append(wrap);
     return wrap;
@@ -248,27 +306,85 @@
   function carName(result) {
     return (result && (result.rz || result.vin)) || 'bez RZ i VIN';
   }
+  function metaNode(items) {
+    const clean = (items || []).filter(Boolean);
+    if (!clean.length) return null;
+    const line = el('p', 'orv-meta');
+    clean.forEach(text => line.append(el('span', 'orv-meta-item', text)));
+    return line;
+  }
+  function vinItem(result) {
+    if (!result || !result.vin) return null;
+    return 'VIN ' + result.vin + (result.vin_zdroj ? ' · ' + vinSourceLabel(result.vin_zdroj) : '');
+  }
   function detailLine(label, before, after) {
     const line = el('div', 'orv-change');
     line.append(el('strong', '', label), el('span', 'orv-change-before', before || '—'),
       el('span', 'orv-change-arrow', '→'), el('span', 'orv-change-after', after || '—'));
     return line;
   }
-  function valuesFor(result) {
-    // Unchanged fields only add noise next to a real change.
+  // Only fields that really changed; "Beze změny" cards show no change rows at
+  // all (repeating identical values was half the clutter David complained about).
+  function changesNode(result) {
     const changes = (result && result.zmeny) || {};
-    return ['rz', 'orv', 'vin'].filter(k => changes[k] && changes[k].pred !== changes[k].po)
+    const rows = ['rz', 'orv', 'vin'].filter(k => changes[k] && changes[k].pred !== changes[k].po)
       .map(k => detailLine(FIELD_LABELS[k], changes[k].pred, changes[k].po));
+    if (!rows.length) return null;
+    const box = el('div', 'orv-changes');
+    rows.forEach(row => box.append(row));
+    return box;
   }
-  function factsNode(result, showMissing) {
-    const facts = readFactsList(result);
-    if (!showMissing && !facts.some(f => f.value)) return null;
-    const list = el('div', 'orv-facts');
-    facts.forEach(fact => {
-      if (!fact.value && !showMissing) return;
-      list.append(el('span', fact.value ? 'orv-fact' : 'orv-fact orv-fact-missing', factText(fact)));
-    });
-    return list;
+  function priceText(value) { return value == null ? '—' : kc(value); }
+  function fillPrice(node, value, withLabel) {
+    node.replaceChildren();
+    if (withLabel) node.append(el('span', 'orv-card-price-k', 'Cena'));
+    node.append(el('b', '', ' ' + priceText(value)));
+    return node;
+  }
+  function priceNode(value, withLabel) { return fillPrice(el('span', 'orv-card-price'), value, withLabel); }
+  function statusChips(photo) {
+    const result = photo.result || {};
+    const state = stateOf(photo);
+    const chips = el('span', 'orv-chips');
+    const overwritten = state === 'doplneno' && (result.prepsano || []).length;
+    chips.append(el('span', 'orv-status', overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
+    if (photo.upraveno) chips.append(el('span', 'orv-edited', '✓ Upraveno'));
+    if (photo.potvrdit && needsConfirm(photo)) {
+      chips.append(el('span', 'orv-confirmed', '✓ Potvrzeno'));
+    }
+    return chips;
+  }
+  function cardTop(photo) {
+    const top = el('div', 'orv-card-top');
+    top.append(statusChips(photo));
+    return top;
+  }
+  // RZ + type tag + (right-aligned) price — the same line order as /ukony rows.
+  function idRow(result, typ, price) {
+    const row = el('div', 'orv-card-id');
+    row.append(el('b', 'orv-rz', (result && result.rz) || '—'));
+    if (typ) row.append(el('span', 'tag orv-typ', typ));
+    if (price) row.append(price);
+    return row;
+  }
+  // The ORV number is the main thing the scan adds/changes — it gets its own
+  // chip; an unread number is the red flag that caused the duplicate.
+  function orvRow(result) {
+    const orv = result && result.orv_cislo;
+    const row = el('div', 'orv-card-orv');
+    const chip = el('span', orv ? 'orv-orv' : 'orv-orv orv-orv--missing');
+    chip.append(el('span', 'orv-orv-k', 'ORV'));
+    chip.append(el('b', '', ' ' + (orv || 'nepřečteno')));
+    row.append(chip);
+    return row;
+  }
+  function firmNode(view, firms) {
+    const identity = firmOf(view, firms);
+    const line = el('div', 'orv-firm');
+    const dot = el('span', 'firma-dot');
+    dot.setAttribute('style', 'background:' + identity.color + ';');
+    line.append(dot, el('span', 'orv-firm-name', identity.zkratka));
+    return line;
   }
   function cardShell(photo, kind, state) {
     const card = el('article', 'orv-card');
@@ -289,26 +405,6 @@
     card.append(preview, body);
     photo.cardEl = card;
     return {card, body};
-  }
-  function cardHead(photo, opts) {
-    const result = photo.result || {};
-    const state = stateOf(photo);
-    const heading = el('div', 'orv-card-head');
-    const chips = el('span', 'orv-chips');
-    const overwritten = state === 'doplneno' && (result.prepsano || []).length;
-    chips.append(el('span', 'orv-status', overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
-    if (photo.upraveno) chips.append(el('span', 'orv-edited', '✓ Upraveno'));
-    if (photo.potvrdit && needsConfirm(photo)) {
-      chips.append(el('span', 'orv-confirmed', '✓ Potvrzeno'));
-    }
-    heading.append(chips);
-    if (opts && opts.open && result.ukon && result.ukon.id) {
-      const open = el('button', 'orv-open-ukon', 'Otevřít úkon');
-      open.type = 'button';
-      open.dataset.ukon = String(result.ukon.id);
-      heading.append(open);
-    }
-    return heading;
   }
   function kandidati(result) {
     return Array.isArray(result && result.kandidati)
@@ -334,9 +430,8 @@
     const items = visibleExisting(result);
     const box = el('div', 'orv-duplicate');
     box.setAttribute('role', 'alert');
+    // Bold warning only — David: the explanatory paragraph is noise.
     box.append(el('p', 'orv-duplicate-title', '⚠ Tohle auto už v evidenci je'));
-    box.append(el('p', 'orv-duplicate-hint',
-      'Sken ho našel dřív, než by založil druhý úkon. Zkontroluj ten existující — nový založ, jen když víš proč.'));
     const list = el('ul', 'orv-existing');
     items.forEach(view => {
       const item = el('li', 'orv-existing-item');
@@ -344,7 +439,7 @@
       const meta = [view.celkem != null ? kc(view.celkem) : '',
         view.poznamka ? 'Poznámka: ' + view.poznamka : ''].filter(Boolean).join(' · ');
       if (meta) item.append(el('span', 'orv-existing-meta', meta));
-      const open = el('button', 'orv-open-existing btn', 'Otevřít existující úkon');
+      const open = el('button', 'btn orv-open-existing', 'Otevřít existující úkon');
       open.type = 'button';
       open.dataset.ukon = String(view.id);
       item.append(open);
@@ -370,20 +465,20 @@
   }
   // Re-render only the "✓ Potvrzeno" chip, so the card does not jump around.
   function renderConfirmedChip(photo) {
-    const head = photo.cardEl && photo.cardEl.querySelector('.orv-card-head');
-    if (!head) return;
-    const existing = head.querySelector('.orv-confirmed');
+    const top = photo.cardEl && photo.cardEl.querySelector('.orv-card-top');
+    if (!top) return;
+    const existing = top.querySelector('.orv-confirmed');
     if (photo.potvrdit && !existing) {
-      const chips = head.querySelector('.orv-chips');
+      const chips = top.querySelector('.orv-chips');
       if (chips) chips.append(el('span', 'orv-confirmed', '✓ Potvrzeno'));
     } else if (!photo.potvrdit && existing) {
       existing.remove();
     }
   }
-  function fillSelect(select, rootEl, templateSel, placeholder, value) {
+  function fillSelect(select, rootEl, sourceSel, placeholder, value) {
     select.append(optionEl('', placeholder));
-    const template = rootEl.querySelector(templateSel);
-    const options = template && template.querySelectorAll ? Array.from(template.querySelectorAll('option')) : [];
+    const source = rootEl && rootEl.querySelector(sourceSel);
+    const options = source && source.querySelectorAll ? Array.from(source.querySelectorAll('option')) : [];
     options.forEach(option => {
       if (!option.value) return;
       select.append(optionEl(option.value, option.textContent));
@@ -393,30 +488,25 @@
   function assignmentCard(ctx, photo) {
     const result = photo.result || {};
     const {card, body} = cardShell(photo, 'assign', needsConfirm(photo) ? 'duplicate' : 'assign');
-    body.append(cardHead(photo, {}));
-    const facts = factsNode(result, true);
-    if (facts) body.append(facts);
-    if (result.provozovatel) {
-      body.append(el('p', 'orv-owner', 'Provozovatel: ' + result.provozovatel));
-    }
-    if (result.zprava) body.append(el('p', 'orv-message', result.zprava));
+    const chosen = choiceOf(photo);
+    body.append(cardTop(photo));
+    body.append(idRow(result, chosen.typ_kod || null,
+      priceNode(priceFor(ctx.ceny, chosen.firma_id, chosen.typ_kod), true)));
+    body.append(orvRow(result));
     const duplicate = duplicateBlock(ctx, photo);
     if (duplicate) body.append(duplicate);
-    const defaults = batchDefaults(ctx.rootEl);
     const fields = el('div', 'orv-card-fields');
     const name = carName(result);
     const firma = el('select', 'orv-card-firma');
     firma.setAttribute('aria-label', 'Firma pro ' + name);
-    fillSelect(firma, ctx.rootEl, '#orv-batch-firma', '— vyber firmu —',
-      effective(photo, defaults).firma_id);
+    fillSelect(firma, ctx.rootEl, '#orv-firma-options', '— vyber firmu —', chosen.firma_id);
     firma.addEventListener('change', () => {
       photo.firmaOverride = firma.value || null;
       refreshPrices(ctx.rootEl, ctx.photos);
     });
     const typ = el('select', 'orv-card-typ');
     typ.setAttribute('aria-label', 'Typ úkonu pro ' + name);
-    fillSelect(typ, ctx.rootEl, '#orv-batch-typ', '— vyber typ —',
-      effective(photo, defaults).typ_kod);
+    fillSelect(typ, ctx.rootEl, '#orv-typ-options', '— vyber typ —', chosen.typ_kod);
     typ.addEventListener('change', () => {
       photo.typOverride = typ.value || null;
       refreshPrices(ctx.rootEl, ctx.photos);
@@ -430,40 +520,57 @@
     note.addEventListener('input', () => { photo.poznamka = note.value; });
     field(fields, 'Firma', firma);
     field(fields, 'Typ', typ);
-    field(fields, 'Poznámka', note).classList.add('orv-card-field--wide');
+    field(fields, 'Poznámka', note, 'orv-card-field--wide');
     body.append(fields);
-    body.append(el('p', 'orv-card-price',
-      priceLabel(ctx.ceny, effective(photo, defaults))));
+    const meta = metaNode([vinItem(result),
+      result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
+    if (meta) body.append(meta);
     return card;
   }
   function issueCard(ctx, photo) {
     const result = photo.result || {};
     const state = stateOf(photo) || 'chyba';
     const {card, body} = cardShell(photo, 'issue', state === 'necitelne' ? 'unreadable' : 'warn');
-    body.append(cardHead(photo, {open: true}));
-    const facts = factsNode(result, true);
-    if (facts) body.append(facts);
-    if (result.provozovatel) {
-      body.append(el('p', 'orv-owner', 'Provozovatel: ' + result.provozovatel));
+    const ukon = result.ukon;
+    body.append(cardTop(photo));
+    body.append(idRow(result, ukon && ukon.typ));
+    body.append(orvRow(result));
+    if (ukon && (ukon.firma_id != null || ukon.firma || ukon.firma_zkratka)) {
+      body.append(firmNode(ukon, ctx.firms));
     }
-    if (state === 'konflikt' && result.konflikt) {
-      const conflict = result.konflikt;
-      body.append(el('div', 'orv-conflict-label', FIELD_LABELS[conflict.pole] || 'Hodnota'),
-        el('div', 'orv-conflict', 'V evidenci: ' + (conflict.evidence || '—') +
-          ' · Na fotce: ' + (conflict.foto || '—')));
-    }
-    const before = earlier(result);
-    if (before) body.append(el('p', 'orv-earlier', before));
-    if (result.zprava) body.append(el('p', 'orv-message', result.zprava));
     const duplicate = duplicateBlock(ctx, photo);
     if (duplicate) body.append(duplicate);
+    if (state === 'konflikt' && result.konflikt) {
+      const conflict = result.konflikt;
+      const box = el('div', 'orv-conflict');
+      box.append(el('b', 'orv-conflict-label', FIELD_LABELS[conflict.pole] || 'Hodnota'),
+        el('span', '', ' V evidenci: ' + (conflict.evidence || '—') +
+          ' · Na fotce: ' + (conflict.foto || '—')));
+      body.append(box);
+    }
+    const meta = metaNode([vinItem(result), earlier(result),
+      result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
+    if (meta) body.append(meta);
     const candidates = kandidati(result);
     if (candidates.length) body.append(kandidatiNode(ctx, candidates));
+    // Konflikt má vlastní blok, duplicitu vysvětluje její nadpis a seznam
+    // úkonů, u více shod řekne vše nadpis kandidátů — zpráva by se opakovala.
+    if (!duplicate && !candidates.length && !(state === 'konflikt' && result.konflikt) &&
+        result.zprava) {
+      body.append(el('p', 'orv-message', result.zprava));
+    }
     const actions = el('div', 'orv-card-actions');
+    // Konflikt often already matched one úkon — keep the direct way in.
+    if (ukon && ukon.id) {
+      const open = el('button', 'btn orv-open-ukon orv-open-issue', 'Otevřít úkon');
+      open.type = 'button';
+      open.dataset.ukon = String(ukon.id);
+      actions.append(open);
+    }
     // A new photo is the fix for "nothing readable"; "Přečíst znovu" (same
     // photo) only helps a transient error, never an unreadable document.
     if (photo.blob && (state === 'necitelne' || state === 'chyba' || state === 'nenalezeno')) {
-      const retake = el('button', 'btn btn-primary orv-retake-btn', 'Vyfotit znovu');
+      const retake = el('button', 'btn orv-retake-btn', 'Vyfotit znovu');
       retake.type = 'button';
       retake.addEventListener('click', () => ctx.actions.onRetake && ctx.actions.onRetake(photo));
       actions.append(retake);
@@ -480,61 +587,43 @@
   function writtenCard(ctx, photo) {
     const result = photo.result || {};
     const state = stateOf(photo);
+    const ukon = result.ukon || {};
     const {card, body} = cardShell(photo, 'written',
       state === 'zalozeno' ? 'created' : state === 'doplneno' ? 'filled' : 'same');
-    body.append(cardHead(photo, {}));
-    const facts = factsNode(result, false);
-    if (facts) body.append(facts);
-    const ukon = result.ukon || {};
-    const written = [ukon.firma, ukon.typ, ukon.celkem != null ? kc(ukon.celkem) : ''].filter(Boolean);
+    const price = ukon.celkem != null && isFinite(Number(ukon.celkem)) ? Number(ukon.celkem) : null;
+    body.append(cardTop(photo));
+    body.append(idRow(result, ukon.typ || null, price == null ? null : priceNode(price, false)));
+    body.append(orvRow(result));
+    body.append(firmNode(ukon, ctx.firms));
     const note = noteValue(ukon.poznamka || photo.poznamka);
-    const line = el('p', 'orv-written-line',
-      (ukon.id ? 'Zapsáno do úkonu #' + ukon.id : 'Zapsáno') +
-      (written.length ? ' · ' + written.join(' · ') : '') +
-      (note ? ' · poznámka: ' + note : ''));
-    body.append(line);
-    const changes = valuesFor(result);
-    changes.forEach(change => body.append(change));
-    if (!changes.length && state === 'uz_doplneno') {
-      const fields = [['rz', result.rz], ['orv', result.orv_cislo]].filter(x => x[1]);
-      fields.forEach(([key, value]) => body.append(detailLine(FIELD_LABELS[key], value, value)));
+    const meta = metaNode([vinItem(result), ukon.id ? 'Úkon #' + ukon.id : null,
+      note ? 'Poznámka: ' + note : null]);
+    if (meta) body.append(meta);
+    if (state === 'doplneno') {
+      const changes = changesNode(result);
+      if (changes) body.append(changes);
     }
     if (ukon.id) {
-      const open = el('button', 'btn orv-open-ukon orv-open-written', 'Otevřít a upravit úkon');
+      const actions = el('div', 'orv-card-actions');
+      const open = el('button', 'btn btn-primary orv-open-written', 'Otevřít a upravit úkon');
       open.type = 'button';
       open.dataset.ukon = String(ukon.id);
-      body.append(open);
+      actions.append(open);
+      body.append(actions);
     }
     return card;
   }
 
   function render(rootEl, photos, actions) {
     actions = actions || {};
-    const ceny = cenyOf(rootEl);
+    const data = dataOf(rootEl);
     const review = reviewPhotos(photos);
     const written = writtenPhotos(photos);
-    const assignables = review.filter(assignable);
     // The firm on the ORV is only pre-selected; the person still confirms it.
-    assignables.forEach(photo => {
+    review.filter(assignable).forEach(photo => {
       const navrh = photo.result && photo.result.navrh_firma_id;
       if (photo.firmaOverride === undefined && navrh) photo.firmaOverride = String(navrh);
     });
-    // The shared firma+typ bar is only worth asking for 2+ cars (David:
-    // "ptá se na firmu dvakrát i u jednoho auta").
-    const bar = rootEl.querySelector('#orv-batch');
-    const showBar = assignables.length >= 2;
-    if (bar) {
-      // When the bar disappears (cars got created), keep the shared choice on
-      // the remaining cards instead of silently dropping it.
-      if (!showBar && !bar.hidden) {
-        const shared = batchDefaults(rootEl);
-        assignables.forEach(photo => {
-          if (photo.firmaOverride == null && shared.firma_id) photo.firmaOverride = shared.firma_id;
-          if (photo.typOverride == null && shared.typ_kod) photo.typOverride = shared.typ_kod;
-        });
-      }
-      bar.hidden = !showBar;
-    }
     const summary = rootEl.querySelector('#orv-summary');
     if (summary) summary.hidden = false;
     const banner = bannerState(photos);
@@ -546,12 +635,9 @@
     const counts = rootEl.querySelector('#orv-counts');
     if (counts) {
       counts.replaceChildren();
-      const t = totals(photos);
-      [[t.zalozeno, '✚ Založeno'], [t.doplneno, '✎ Doplněno'],
-        [t.uz_doplneno, '✓ Beze změny'], [t.review, '⚠ Ke kontrole'],
-        [t.necitelne, '✗ Nečitelné']].forEach(([n, label]) => {
-        counts.append(el('span', 'orv-count-chip', label + ' · ' + n));
-      });
+      const chips = summaryChips(photos);
+      chips.forEach(chip => counts.append(el('span', 'orv-count-chip', chip.text)));
+      counts.hidden = !chips.length;
     }
     const reviewSection = rootEl.querySelector('#orv-review');
     if (reviewSection) reviewSection.hidden = !review.length;
@@ -563,7 +649,7 @@
     const issues = rootEl.querySelector('#orv-issues');
     if (rows) rows.replaceChildren();
     if (issues) issues.replaceChildren();
-    const ctx = {rootEl, photos, actions, ceny, showBar};
+    const ctx = {rootEl, photos, actions, ceny: data.ceny, firms: data.firmy};
     review.forEach(photo => {
       const holder = assignable(photo) ? rows : issues;
       if (!holder) return;
@@ -578,12 +664,12 @@
     return {review: review.length, written: written.length};
   }
 
-  const api = {LABELS, PAY_LABELS, MAX_NOTE, stateOf, isWritten, needsAction, assignable,
-    reviewPhotos, writtenPhotos, group, bannerState, totals, czechCars, czechJobs,
-    dateCs, readFactsList, factText, earlier, kc, priceFor, priceLabel, cenyOf,
-    existingList, visibleExisting, needsConfirm, existingLine, kandidati, batchDefaults, effective,
-    noteValue, canCreate, selected, payload, applyCreateResults, updateCreateCount,
-    refreshPrices, render};
+  const api = {LABELS, PAY_LABELS, FIELD_LABELS, MAX_NOTE, stateOf, isWritten, needsAction,
+    assignable, reviewPhotos, writtenPhotos, group, bannerState, totals, summaryChips,
+    czechCars, czechJobs, dateCs, readFactsList, factText, earlier, kc, priceFor, priceLabel,
+    firmsMap, dataOf, cenyOf, firmsOf, firmOf, existingList, visibleExisting, needsConfirm,
+    existingLine, kandidati, choiceOf, noteValue, canCreate, selected, payload,
+    applyCreateResults, updateCreateCount, refreshPrices, render};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OrvReport = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -111,6 +111,7 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     after = dict(ukony_repo.get(conn, uid))
     assert result["stav"] == expected and result["doplneno"] == changes
     assert result["ukon"] == {"id": uid, "datum": RECENT, "firma": "BSAuto",
+                              "firma_id": before["firma_id"], "firma_zkratka": "BS",
                               "typ": "ZÁPIS", "celkem": 1300.0,
                               "stav_platby": "nezaplaceno", "poznamka": None}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
@@ -558,6 +559,17 @@ def test_fragment_passes_prices_for_active_firms(client, monkeypatch):
                                                   if t["vychozi_cena"] is not None else None))
                                        for t in seen["typy"]}}
     assert [f["id"] for f in seen["firmy"]] == [fid] and seen["typy"]
+    # Karty v Úkonech mají barevnou tečku firmy — sken musí dostat stejnou paletu.
+    assert seen["firma_colors"] == {"BS": seen["firma_colors"]["BS"]}
+    assert seen["firmy_data"] == [{"id": fid, "nazev": "BSAuto", "zkratka": "BS",
+                                   "color": seen["firmy_data"][0]["color"]}]
+
+
+def test_view_carries_firm_identity(conn, make):
+    uid = make()
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["ukon"]["id"] == uid
+    assert result["ukon"]["firma_id"] and result["ukon"]["firma_zkratka"] == "BS"
 
 
 # Big payloads are built lazily: a multi-MB bytes literal as a parametrize value

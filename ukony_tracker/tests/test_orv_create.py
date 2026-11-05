@@ -148,6 +148,15 @@ def test_confirmed_new_ukon_keeps_note_and_repeated_confirm_dedupes(conn):
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 2
 
 
+def test_created_ukon_carries_firm_identity_for_the_card(conn):
+    # The result card shows the Úkony-style firm dot + zkratka.
+    fid = _ready(conn)
+    result = scan.zalozit_pro_firmu(conn, {**PHOTO, "vin_zdroj": "foto"}, firma_id=fid, typ_kod="ORV")
+    assert result["stav"] == "zalozeno"
+    assert result["ukon"]["firma_id"] == fid
+    assert result["ukon"]["firma_zkratka"] == "BS"
+
+
 def test_same_vehicle_is_created_once_for_repeated_and_concurrent_assignments(conn):
     fid = _ready(conn)
     data = {**PHOTO, "vin_zdroj": "foto"}

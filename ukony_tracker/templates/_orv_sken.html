@@ -47,30 +47,13 @@
     <h3 id="orv-summary-title" class="orv-banner"></h3>
     <div id="orv-counts" class="orv-counts" aria-label="Souhrn výsledků"></div>
   </div>
-  {# Ceny firem a typů pro živé „Cena: X Kč“ u zakládaného auta. Chybí-li
-     v kontextu (starší server), šablona i JS počítají s prázdnou mapou. #}
-  <script type="application/json" id="orv-data">{{ {"ceny": ceny|default({}, true)}|tojson }}</script>
+  {# Ceny firem a typů pro živé „Cena: X Kč“ u zakládaného auta a barvy firem
+     pro tečku v kartě. Chybí-li v kontextu (starší server), šablona i JS
+     počítají s prázdnými mapami. #}
+  <script type="application/json" id="orv-data">{{ {"ceny": ceny|default({}, true), "firmy": firmy_data|default([], true)}|tojson }}</script>
   <section id="orv-review" class="orv-section orv-review ask-reveal" aria-labelledby="orv-review-title" hidden>
     <h3 id="orv-review-title" class="orv-section-title">Ke kontrole a doplnění</h3>
     <form id="orv-assign" class="card orv-assign">
-      <div id="orv-batch" class="orv-batch" hidden>
-        <p class="orv-batch-label">Společná firma a typ pro všechna auta</p>
-        <div class="orv-batch-fields">
-          <label>Firma
-            <select id="orv-batch-firma">
-              <option value="">—</option>
-              {% for firma in firmy %}<option value="{{ firma.id }}">{{ firma.nazev }}</option>{% endfor %}
-            </select>
-          </label>
-          <label>Typ
-            <select id="orv-batch-typ">
-              <option value="" selected>—</option>
-              {% for typ in typy %}<option value="{{ typ.kod }}">{{ typ.kod }}</option>{% endfor %}
-            </select>
-          </label>
-        </div>
-        <button id="orv-batch-use" class="btn orv-batch-use" type="button">Použít na všechna</button>
-      </div>
       <div id="orv-unassigned" class="orv-unassigned" aria-label="Nová auta k doplnění"></div>
       <div id="orv-issues" class="orv-unassigned" aria-label="Fotky, které je potřeba dořešit"></div>
       <button id="orv-create-unmatched" class="btn btn-primary orv-create-unmatched" type="submit" disabled hidden>Založit 0 úkonů</button>
@@ -80,6 +63,19 @@
     <h3 id="orv-written-title" class="orv-section-title">Zapsáno</h3>
     <div id="orv-results" class="orv-results" aria-label="Výsledky jednotlivých fotek"></div>
   </section>
+  {# Společná lišta firmy/typu tu záměrně není: každé auto má vlastní firmu,
+     typ i poznámku. Tenhle skrytý zdroj drží jen nabídku pro selecty v kartách
+     (jedno místo pravdy pro firmy i typy, stejné jako dřív). #}
+  <div class="orv-option-bank" hidden aria-hidden="true">
+    <select id="orv-firma-options">
+      <option value="">— vyber firmu —</option>
+      {% for firma in firmy %}<option value="{{ firma.id }}">{{ firma.nazev }}</option>{% endfor %}
+    </select>
+    <select id="orv-typ-options">
+      <option value="">— vyber typ —</option>
+      {% for typ in typy %}<option value="{{ typ.kod }}">{{ typ.kod }}</option>{% endfor %}
+    </select>
+  </div>
   {# Skrytý foťák pro „Vyfotit znovu“: nová fotka nahradí tu v kartě. #}
   <input id="orv-retake" class="orv-retake" type="file" accept="image/*" capture="environment" hidden aria-label="Vyfotit techničák znovu">
   <dialog id="orv-preview" class="orv-preview">

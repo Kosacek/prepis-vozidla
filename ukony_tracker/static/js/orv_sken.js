@@ -217,7 +217,6 @@
       el('results').hidden = el('summary').hidden = el('done').hidden = true;
       el('review').hidden = el('written').hidden = true;
       el('written-title').textContent = 'Zapsáno';
-      el('batch-firma').value = ''; el('batch-typ').value = '';
       el('capture').hidden = el('process').hidden = false;
       el('step').textContent = '1 · Foť'; controls(); offerLast(); camera.start();
     }
@@ -238,7 +237,7 @@
     el('assign').addEventListener('submit', async event => {
       event.preventDefault();
       if (running || dead || imported) return;
-      const chosen = REPORT.selected(root, photos);
+      const chosen = REPORT.selected(photos);
       if (!chosen.length) return;
       const button = el('create-unmatched'); button.disabled = true;
       try {
@@ -263,19 +262,6 @@
         notice(error.message || 'Úkony se nepodařilo založit.');
         if (!dead) summary(false);
       } finally { REPORT.updateCreateCount(root, photos); }
-    });
-    el('batch-firma').addEventListener('change', () => REPORT.refreshPrices(root, photos));
-    el('batch-typ').addEventListener('change', () => REPORT.refreshPrices(root, photos));
-    el('batch-use').addEventListener('click', () => {
-      if (running || dead) return;
-      // Společná volba přepíše jen to, co je v liště opravdu vybrané — prázdné
-      // pole nesmí smazat firmu/typ vybraný u jednotlivého auta.
-      const shared = REPORT.batchDefaults(root);
-      photos.filter(REPORT.assignable).forEach(photo => {
-        if (shared.firma_id) photo.firmaOverride = null;
-        if (shared.typ_kod) photo.typOverride = null;
-      });
-      REPORT.render(root, photos, actions);
     });
     // „Otevřít úkon" (stávající i zapsaný) a zvětšení fotky — delegované na
     // celou sekci, protože karty jsou v obou sekcích.

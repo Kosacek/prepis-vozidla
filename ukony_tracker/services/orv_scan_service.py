@@ -123,7 +123,10 @@ def extract(image_bytes, media_type, *, client=None, prompt=PROMPT) -> dict:
 
 
 def _view(ukon):
+    keys = ukon.keys() if hasattr(ukon, "keys") else ()
+    zkratka = ukon["firma_zkratka"] if "firma_zkratka" in keys else None
     return {"id": ukon["id"], "datum": ukon["datum"], "firma": ukon["firma"],
+            "firma_id": ukon["firma_id"], "firma_zkratka": zkratka or ukon["firma"],
             "typ": ukon["typ_kod"], "celkem": float(ukon["celkem"]),
             "stav_platby": ukon["stav_platby"], "poznamka": ukon["poznamka"]}
 
@@ -238,6 +241,7 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             poznamka=poznamka, zpracoval=zpracoval, zdroj="orv_sken", commit=False,
         )
         result["ukon"] = {"id": uid, "datum": today, "firma": firm["nazev"],
+                           "firma_id": firm["id"], "firma_zkratka": firm["zkratka"] or firm["nazev"],
                            "typ": typ_kod, "celkem": price,
                            "stav_platby": derive_stav(price, 0), "poznamka": poznamka}
         result["zmeny"] = {field: {"pred": None, "po": value}
