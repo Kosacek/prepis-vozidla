@@ -118,7 +118,8 @@ def novy_ukony():
     # Parties of each úkon's žádost become the payer chips (provozovatel / vlastník).
     zadosti = doklad_issue.zadosti(conn, [u["id"] for u in rows])
     return jsonify(
-        firma={"nazev": firma["nazev"], "zkratka": firma["zkratka"] or firma["nazev"], "ico": firma["ico"] or ""},
+        firma={"nazev": firma["nazev"], "zkratka": firma["zkratka"] or firma["nazev"],
+               "ico": firma["ico"] or "", "adresa": firma["adresa"] or "", "psc": firma["psc"] or ""},
         ukony=[{"id": u["id"], "datum": u["datum"], "vozidlo": u["rz"] or u["vin"] or "",
                 "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or "",
                 "zadost": zadosti.get(u["id"])}

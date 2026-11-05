@@ -79,7 +79,8 @@ def _body(data, **over):
 def test_picker_lists_unpaid_recent_ukony_of_the_firm_without_a_doklad(client, data):
     body = client.get(f"/doklady/novy/ukony?firma={data['jene']}").get_json()
     assert [u["id"] for u in body["ukony"]] == sorted([data["a"], data["b"]], reverse=True)
-    assert body["firma"] == {"nazev": "JE & NE, spol. s r.o.", "zkratka": "JE & NE", "ico": "44960263"}
+    assert body["firma"] == {"nazev": "JE & NE, spol. s r.o.", "zkratka": "JE & NE", "ico": "44960263",
+                             "adresa": "", "psc": ""}
     assert body["ukony"][0]["vozidlo"] in ("3BR9309", "TMBER6NW0V3099310")
 
 
@@ -102,15 +103,80 @@ def test_issue_sends_the_contract_and_links_the_chosen_ukony(client, data, zados
         assert ukony_repo.get(conn, data["a"])["stav_platby"] == "nezaplaceno"
 
 
+# --- Doklad bez úkonu, ruční vozidla a adresa plátce (2.6) ---------------------
+
+def test_doklad_without_any_ukon_or_firm_is_issued(client, data, zadosti):
+    calls, _ = zadosti
+    response = client.post("/doklady/novy", json=_body(data, firma_id=None, ukony=[]))
+    assert response.status_code == 201
+    sent = calls[0]["json"]
+    assert sent["vozidla"] == [] and "prijato_adresa" not in sent
+    with client.application.app_context():
+        conn = db.get_db()
+        assert ppd_repo.get_by_cislo(conn, 183)["castka"] == 2600
+        assert conn.execute("SELECT COUNT(*) FROM ppd_ukony").fetchone()[0] == 0
+
+
+def test_vozidla_are_derived_from_the_chosen_ukony(client, data, zadosti):
+    calls, _ = zadosti
+    assert client.post("/doklady/novy", json=_body(data, ukony=[data["a"]])).status_code == 201
+    assert calls[0]["json"]["vozidla"] == ["3BR9309"]
+
+
+def test_manual_vozidla_replace_the_derived_list(client, data, zadosti):
+    # Auto mimo evidenci: ruční seznam platí přesně, z úkonů se nic nepřidává.
+    calls, _ = zadosti
+    assert client.post("/doklady/novy", json=_body(data, vozidla=["novy"])).status_code == 201
+    assert calls[0]["json"]["vozidla"] == ["NOVY"]
+
+
+def test_manual_vozidla_are_uppercased_collapsed_and_deduped(client, data, zadosti):
+    calls, _ = zadosti
+    response = client.post("/doklady/novy", json=_body(
+        data, vozidla=["3br 9309", "novy", "NOVY", ""]))
+    assert response.status_code == 201
+    assert calls[0]["json"]["vozidla"] == ["3BR 9309", "NOVY"]
+
+
+def test_empty_manual_vozidla_issue_a_doklad_without_a_car(client, data, zadosti):
+    calls, _ = zadosti
+    assert client.post("/doklady/novy", json=_body(data, vozidla=[])).status_code == 201
+    assert calls[0]["json"]["vozidla"] == []
+
+
+def test_prijato_adresa_is_sent_when_filled(client, data, zadosti):
+    calls, _ = zadosti
+    response = client.post("/doklady/novy", json=_body(
+        data, prijato_adresa="  Veveří  102, Brno, 616 00 "))
+    assert response.status_code == 201
+    assert calls[0]["json"]["prijato_adresa"] == "Veveří 102, Brno, 616 00"
+
+
+def test_blank_prijato_adresa_is_not_sent(client, data, zadosti):
+    calls, _ = zadosti
+    assert client.post("/doklady/novy", json=_body(data, prijato_adresa="   ")).status_code == 201
+    assert "prijato_adresa" not in calls[0]["json"]
+
+
 @pytest.mark.parametrize("over,error", [
-    ({"ukony": []}, "úkon"),
+    ({"ukony": None}, "úkon"),
+    ({"ukony": list(range(1, 32))}, "úkon"),
     ({"castka": 0}, "Částka"),
     ({"castka": "2600"}, "Částka"),
     ({"prijato_od": "  "}, "Přijato od"),
     ({"firma_id": 999}, "firm"),
+    ({"firma_id": "3"}, "firm"),
     ({"request_id": ""}, "request_id"),
     ({"request_id": "x" * 70}, "request_id"),
     ({"request_id": "bad id!"}, "request_id"),
+    ({"prijato_adresa": "x" * 201}, "Adresa"),
+    ({"prijato_adresa": "=cmd"}, "Adresa"),
+    ({"prijato_adresa": 123}, "Adresa"),
+    ({"vozidla": "3BR9309"}, "Vozidla"),
+    ({"vozidla": [None]}, "Vozidlo"),
+    ({"vozidla": ["A" * 21]}, "Vozidlo"),
+    ({"vozidla": ["=X"]}, "Vozidlo"),
+    ({"vozidla": ["A"] * 31}, "vozidel"),
 ])
 def test_invalid_requests_never_reach_zadosti(client, data, zadosti, over, error):
     calls, _ = zadosti
@@ -122,6 +188,19 @@ def test_invalid_requests_never_reach_zadosti(client, data, zadosti, over, error
 def test_ukony_of_another_firm_are_refused(client, data, zadosti):
     response = client.post("/doklady/novy", json=_body(data, ukony=[data["a"], data["other"]]))
     assert response.status_code == 400 and zadosti[0] == []
+
+
+def test_ukony_without_a_firm_are_refused(client, data, zadosti):
+    # Firma je nepovinná, ale úkony bez ní nemají kam patřit.
+    response = client.post("/doklady/novy", json=_body(data, firma_id=None))
+    assert response.status_code == 400 and "firm" in response.get_json()["error"].lower()
+    assert zadosti[0] == []
+
+
+def test_ukony_of_a_foreign_firm_are_refused(client, data, zadosti):
+    response = client.post("/doklady/novy", json=_body(data, firma_id=data["other"]))
+    assert response.status_code == 400 and "firm" in response.get_json()["error"].lower()
+    assert zadosti[0] == []
 
 
 @pytest.mark.parametrize("reply,message", [

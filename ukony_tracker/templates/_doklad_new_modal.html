@@ -1,39 +1,69 @@
-{# "Nový doklad" (2.5): pick a firm, tick its unpaid úkony, and žádosti issue
-   the doklad (number + PDF). Same overlay styling as the úkon modal. #}
+{# "Nový doklad" (2.6): either a firm → tick its unpaid úkony, or an IČO →
+   ARES fills the name + address. Both paths can be combined; the doklad can
+   be issued without a firm and without úkony. Žádosti then issue it (number
+   + PDF). Same overlay styling as the úkon modal. #}
 <div class="modal-backdrop" id="doklad-modal" hidden>
   <div class="modal-card card doklad-new" role="dialog" aria-modal="true" aria-labelledby="doklad-new-title">
     <button class="modal-close" type="button" aria-label="Zavřít" data-doklad-close>&times;</button>
     <h2 id="doklad-new-title">Nový doklad</h2>
     <form id="doklad-new-form" novalidate>
       <div class="field">
-        <label for="dn-firma">Firma</label>
-        <select id="dn-firma" required>
-          <option value="">Vyber firmu</option>
+        <label for="dn-firma">Firma <span class="muted dn-optional">(nepovinné)</span></label>
+        <select id="dn-firma">
+          <option value="">— bez firmy —</option>
           {% for f in firmy if f.aktivni %}
           <option value="{{ f.id }}">{{ f.zkratka }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="dn-ukony" id="dn-ukony" aria-live="polite"></div>
+
+      {# Unpaid úkony of the chosen firm: a collapsible panel so the amount
+         and the button stay within reach. Filled by doklad_new.js. #}
+      <div class="dn-ukony-panel" id="dn-ukony-panel" hidden>
+        <button type="button" class="dn-ukony__head" id="dn-ukony-head" aria-expanded="true" aria-controls="dn-ukony">
+          <span class="dn-ukony__title" id="dn-ukony-title">Nezaplacené úkony</span>
+          <span class="dn-ukony__chev" aria-hidden="true"></span>
+        </button>
+        <div class="dn-ukony" id="dn-ukony" aria-live="polite"></div>
+      </div>
+
+      <div class="field">
+        <label for="dn-ico">IČO</label>
+        <div class="dn-ico-row">
+          <input id="dn-ico" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="44960263">
+          <button type="button" class="btn dn-ares" id="dn-ares">ARES</button>
+        </div>
+        <p class="dn-ares-status" id="dn-ares-status" role="status" aria-live="polite" hidden></p>
+      </div>
+
       <div class="field">
         <label for="dn-od">Přijato od</label>
         <input id="dn-od" maxlength="120" autocomplete="off" required>
         <div class="chips dn-payers" id="dn-payers" role="group" aria-label="Plátce"></div>
       </div>
+
+      <div class="field">
+        <label for="dn-adresa">Adresa na doklad</label>
+        <input id="dn-adresa" maxlength="200" autocomplete="off" placeholder="Ulice, město, PSČ">
+      </div>
+
+      <div class="field">
+        <label for="dn-vozidla">Vozidla (RZ / VIN)</label>
+        <input id="dn-vozidla" autocomplete="off" spellcheck="false" placeholder="3BR9309, TMBER6NW0V3099310">
+        <p class="muted small">Předvyplní se z úkonů. Napiš i RZ/VIN, které v evidenci nejsou.</p>
+      </div>
+
       <div class="form-row dn-row">
-        <div class="field">
-          <label for="dn-ico">IČO</label>
-          <input id="dn-ico" inputmode="numeric" maxlength="12" autocomplete="off">
-        </div>
         <div class="field">
           <label for="dn-castka">Částka (Kč)</label>
           <input id="dn-castka" type="number" inputmode="numeric" min="1" step="1" required>
         </div>
+        <div class="field">
+          <label for="dn-ucel">Účel</label>
+          <input id="dn-ucel" value="ZASTUPOVÁNÍ NA MMB" maxlength="80" autocomplete="off">
+        </div>
       </div>
-      <div class="field">
-        <label for="dn-ucel">Účel</label>
-        <input id="dn-ucel" value="ZASTUPOVÁNÍ NA MMB" maxlength="80" autocomplete="off">
-      </div>
+
       <p class="dn-error" id="dn-error" role="alert" hidden></p>
       <button type="submit" class="btn btn-primary dn-submit" id="dn-submit" disabled>Vystavit doklad</button>
     </form>
@@ -44,3 +74,10 @@
     </div>
   </div>
 </div>
+
+{# Firm data for the <option data-*> attributes (decorated by doklad_new.js):
+   the payer chips fill "Adresa na doklad" from the stored firm. Rendered as
+   JSON, not attributes, so the select stays plain server HTML. #}
+<script type="application/json" id="dn-firmy-data">
+[{% for f in firmy if f.aktivni %}{"id": {{ f.id }}, "nazev": {{ f.nazev|tojson }}, "zkratka": {{ (f.zkratka or f.nazev)|tojson }}, "ico": {{ (f.ico or '')|tojson }}, "adresa": {{ (f.adresa or '')|tojson }}, "psc": {{ (f.psc or '')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]
+</script>

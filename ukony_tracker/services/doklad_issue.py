@@ -17,6 +17,9 @@ from services import ppd_links
 
 UCEL = "ZASTUPOVÁNÍ NA MMB"
 MAX_UKONY = 30
+MAX_VOZIDLA = 30
+MAX_VOZIDLO = 20
+MAX_ADRESA = 200
 MAX_CASTKA = 10_000_000
 STRANY = ("provozovatel", "vlastnik")
 
@@ -30,6 +33,52 @@ class IssueError(Exception):
 def _strana(jmeno, ico) -> dict | None:
     jmeno = " ".join(str(jmeno or "").split())[:120]
     return {"jmeno": jmeno, "ico": re.sub(r"\D", "", str(ico or ""))[:12]} if jmeno else None
+
+
+def _adresa(value) -> str:
+    """Adresa na doklad: text ořezaný na jednoduché mezery, prázdná = neposílat.
+
+    Znak `=` na začátku odmítáme už tady (stejné pravidlo jako vozidla), aby
+    žádosti nevrátily 502 kvůli hodnotě, kterou jde odmítnout hned v evidenci.
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise IssueError("Adresa na doklad musí být text.")
+    text = " ".join(value.split())
+    if len(text) > MAX_ADRESA:
+        raise IssueError(f"Adresa na doklad má nejvýš {MAX_ADRESA} znaků.")
+    if text.startswith("="):
+        raise IssueError("Adresa na doklad nesmí začínat znakem =.")
+    return text
+
+
+def _vozidla_manual(value) -> list[str]:
+    """Ručně zadaná vozidla: velká písmena, bez mezer navíc, deduplikovaná.
+
+    Klíč pro deduplikaci je text bez všech mezer, takže „3BR 9309" a „3br9309"
+    jsou totéž auto. Prázdné položky (typicky ocásek z čárky v UI) tiše mizí.
+    """
+    if not isinstance(value, list):
+        raise IssueError("Vozidla musí být seznam RZ/VIN.")
+    if len(value) > MAX_VOZIDLA:
+        raise IssueError(f"Nejvýš {MAX_VOZIDLA} vozidel.")
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            raise IssueError("Vozidlo (RZ/VIN) musí být text.")
+        text = " ".join(item.split()).upper()
+        if len(text) > MAX_VOZIDLO:
+            raise IssueError(f"Vozidlo (RZ/VIN) má nejvýš {MAX_VOZIDLO} znaků.")
+        if text.startswith("="):
+            raise IssueError("Vozidlo (RZ/VIN) nesmí začínat znakem =.")
+        key = text.replace(" ", "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return out
 
 
 def zadosti(conn, ukon_ids) -> dict[int, dict]:
@@ -67,17 +116,25 @@ def _platce(conn, payload, ukon_ids) -> dict:
 
 
 def validate(conn, payload) -> dict:
-    """Checked request: firm, its úkony, payer, amount. Raises IssueError(400)."""
+    """Checked request: optional firm and its úkony, vehicles, payer, amount.
+
+    Doklad smí být i bez firmy a bez úkonu (2.6) — firma je nepovinná a vozidla
+    jdou napsat ručně. Raises IssueError(400).
+    """
     if not isinstance(payload, dict):
         raise IssueError("Pošli údaje dokladu.")
     firma_id = payload.get("firma_id")
-    firma = firmy_repo.get(conn, firma_id) if type(firma_id) is int else None
-    if not firma or not firma["aktivni"]:
-        raise IssueError("Vyber aktivní firmu.")
+    firma = None
+    if firma_id is not None:
+        firma = firmy_repo.get(conn, firma_id) if type(firma_id) is int else None
+        if not firma or not firma["aktivni"]:
+            raise IssueError("Vyber aktivní firmu.")
     ids = payload.get("ukony")
-    if (not isinstance(ids, list) or not 1 <= len(ids) <= MAX_UKONY
+    if (not isinstance(ids, list) or len(ids) > MAX_UKONY
             or any(type(i) is not int for i in ids)):
-        raise IssueError(f"Zaškrtni 1 až {MAX_UKONY} úkonů.")
+        raise IssueError(f"Zaškrtni nejvýš {MAX_UKONY} úkonů.")
+    if ids and not firma:
+        raise IssueError("Úkony musí patřit vybrané firmě.")
     ukony = ukony_repo.list_by_ids(conn, ids)
     if len(ukony) != len(set(ids)) or any(u["firma_id"] != firma_id for u in ukony.values()):
         raise IssueError("Úkony musí patřit vybrané firmě.")
@@ -87,6 +144,7 @@ def validate(conn, payload) -> dict:
     prijato_od = " ".join(str(payload.get("prijato_od") or "").split())
     if not prijato_od or len(prijato_od) > 120:
         raise IssueError("Vyplň Přijato od.")
+    prijato_adresa = _adresa(payload.get("prijato_adresa"))
     ico = re.sub(r"\s", "", str(payload.get("prijato_ico") or ""))
     if ico and not re.fullmatch(r"\d{1,12}", ico):
         raise IssueError("IČO smí mít jen číslice.")
@@ -98,8 +156,15 @@ def validate(conn, payload) -> dict:
         raise IssueError("Chybí request_id dokladu — obnov stránku a zkus to znovu.")
     platce = _platce(conn, payload, ids)
     ordered = sorted(ukony.values(), key=lambda u: (u["datum"], u["id"]))
+    # Vozidla: ruční seznam vyhrává přesně tak, jak přišel; bez klíče se odvodí
+    # z vybraných úkonů (rz nebo vin), aby starý modal fungoval beze změny.
+    if "vozidla" in payload:
+        vozidla = _vozidla_manual(payload.get("vozidla"))
+    else:
+        vozidla = [u["rz"] or u["vin"] for u in ordered if u["rz"] or u["vin"]]
     return {"firma": firma, "ukony": ordered, "castka": castka, "prijato_od": prijato_od,
-            "prijato_ico": ico, "ucel": ucel, "request_id": request_id, "platce": platce,
+            "prijato_ico": ico, "prijato_adresa": prijato_adresa, "vozidla": vozidla,
+            "ucel": ucel, "request_id": request_id, "platce": platce,
             "zpracoval": payload.get("zpracoval") if isinstance(payload.get("zpracoval"), str) else None}
 
 
@@ -109,10 +174,15 @@ def vystavit(conn, req: dict) -> dict:
         raise IssueError("Vystavení dokladů zatím není zapnuté.", 502)
     body = {"prijato_od": req["prijato_od"], "prijato_ico": req["prijato_ico"],
             "castka": req["castka"], "ucel": req["ucel"],
-            "vozidla": [u["rz"] or u["vin"] for u in req["ukony"] if u["rz"] or u["vin"]],
+            # Vozidla jdou i prázdná (doklad bez auta) a ruční seznam vyhrává.
+            "vozidla": req["vozidla"],
             "zpracoval": req["zpracoval"], "request_id": req["request_id"],
             # Payer picked from a žádost: žádosti fill in that party's address.
             **req.get("platce", {})}
+    if req.get("prijato_adresa"):
+        # Jen když je adresa vyplněná — prázdná se neposílá (žádosti by z ní
+        # jinak udělaly prázdnou adresu plátce místo adresy ze žádosti/firmy).
+        body["prijato_adresa"] = req["prijato_adresa"]
     try:
         response = requests.post(config.ZADOSTI_API_URL.rstrip("/") + "/api/ppd/vystavit", json=body,
                                  headers={"X-Api-Key": config.INTEGRATION_API_KEY}, timeout=20)

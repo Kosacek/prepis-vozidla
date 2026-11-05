@@ -2269,12 +2269,14 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 .stav-slot .btn.pay-doklad:hover { background: #fde7b0; }
 
-/* "Nový doklad" dialog (2.5) */
+/* "Nový doklad" dialog (2.5, rozšířeno 2.6: IČO/ARES, sbalitelné úkony,
+   ruční vozidla a adresa na doklad) */
 .doklad-new { max-width: 560px; }
 .doklad-new [hidden] { display: none !important; }  /* grid/flex rules below would beat [hidden] */
 .doklad-new h2 { margin: 0 0 var(--sp-4); }
 .doklad-new form { display: grid; gap: var(--sp-3); }
 .doklad-new .field { margin: 0; }
+.dn-optional { font-weight: 500; }
 .dn-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 /* Payer chips under "Přijato od": parties of the ticked úkony's žádosti + the firm. */
 .dn-payers:empty { display: none; }
@@ -2284,15 +2286,40 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 .dn-payer[aria-pressed="true"], .dn-payer[aria-pressed="true"]:hover { background: var(--accent); color: var(--accent-ink); }
 .dn-payer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dn-ukony { display: grid; }
-.dn-ukony__label { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+
+/* IČO + ARES: the lookup fills "Přijato od" and "Adresa na doklad". */
+.dn-ico-row { display: flex; align-items: stretch; gap: var(--sp-2); }
+.dn-ico-row input { flex: 1 1 0; width: auto; min-width: 0; }
+.dn-ares { flex: none; padding: 9px 16px; }
+.dn-ares-status { margin: 0; font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.dn-ares-status[data-state="ok"] { color: var(--flash-success-ink); }
+.dn-ares-status[data-state="err"] { color: var(--flash-error-ink); }
+.dn-ares-status[data-state="loading"] { color: var(--muted); font-weight: 500; }
+
+/* Collapsible "Nezaplacené úkony": the body scrolls on its own, so the amount
+   and the button stay within reach even when the firm has many úkony. */
+.dn-ukony-panel { display: grid; gap: 6px; min-width: 0; }
+.dn-ukony__head {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-width: 0;
+  padding: 9px 12px; border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--card); color: var(--ink); cursor: pointer; text-align: left;
+  font-family: inherit; font-size: 0.875rem; font-weight: 600;
+}
+.dn-ukony__head:hover { background: var(--bg); }
+.dn-ukony__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dn-ukony__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dn-ukony__chev { flex: none; margin-left: auto; width: 8px; height: 8px;
+  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg); transition: transform 0.18s ease; }
+.dn-ukony__head[aria-expanded="true"] .dn-ukony__chev { transform: rotate(-45deg); }
+.dn-ukony { display: grid; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
 .dn-ukon {
   display: grid; grid-template-columns: 20px 96px auto minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
   padding: 8px 10px; border: 1.5px solid var(--line); border-top-width: 0; cursor: pointer; font-size: 0.875rem;
 }
-.dn-ukony__label + .dn-ukon { border-top-width: 1.5px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.dn-ukon:first-child { border-top-width: 1.5px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .dn-ukon:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
-.dn-ukony__label + .dn-ukon:last-child { border-radius: var(--radius-sm); }
+.dn-ukon:first-child:last-child { border-radius: var(--radius-sm); }
 .dn-ukon:has(input:checked) { background: var(--bg); }
 .dn-ukon__auto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dn-ukon__meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2305,4 +2332,12 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .dn-ukon { grid-template-columns: 20px minmax(0, 1fr) auto; }
   .dn-ukon .tag { display: none; }
   .dn-ukon__meta { grid-column: 2 / -1; }
+}
+@media (max-width: 560px) {
+  /* Phones: one field per row and 16 px inputs (no iOS zoom). */
+  .dn-row { grid-template-columns: 1fr; }
+  .doklad-new .field input, .doklad-new .field select { min-height: 44px; font-size: 16px; }
+  .dn-ares { min-height: 44px; font-size: 16px; padding: 9px 14px; }
+  .dn-payer { min-height: 36px; padding: var(--sp-2) var(--sp-3); }
+  .dn-ukony { max-height: 220px; }
 }

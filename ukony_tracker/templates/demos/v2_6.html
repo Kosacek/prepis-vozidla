@@ -1,0 +1,92 @@
+{# Demo for release 2.6 (Nový doklad): the IČO types itself and ARES fills
+   "Přijato od" + the address; then the unpaid-úkony panel folds to its header
+   and the vehicles field fills in. CSS-only, 4s loop; app tokens only. #}
+<style>
+  .de26-demo { box-sizing: border-box; height: 186px; padding: 11px 12px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.2; overflow: hidden; }
+  .de26-card { border-radius: 11px; background: var(--card); padding: 8px 9px; display: grid; gap: 5px; }
+  .de26-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .de26-k { flex: none; width: 50px; font-size: 9px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .03em; }
+  .de26-box { flex: 1 1 auto; min-width: 0; height: 19px; display: flex; align-items: center; padding: 0 6px;
+    border: 1px solid var(--line); border-radius: 5px; font-size: 10.5px;
+    font-variant-numeric: tabular-nums; overflow: hidden; }
+  .de26-type { white-space: nowrap; clip-path: inset(0 100% 0 0); animation: de26-type 4s infinite; }
+  .de26-ares { flex: none; padding: 3px 7px; border-radius: 5px; background: var(--accent); color: var(--accent-ink);
+    font-size: 8.5px; font-weight: 700; letter-spacing: .02em; }
+  .de26-out { opacity: 0; animation: de26-out 4s infinite; }
+  .de26-out2 { animation-name: de26-out2; }
+  .de26-v { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 700; font-size: 10px; }
+  .de26-ok { flex: none; color: var(--flash-success-ink); font-weight: 700; font-size: 10px; }
+  .de26-headline { display: flex; align-items: center; gap: 6px; margin-top: 2px; padding: 5px 7px;
+    border: 1px solid var(--line); border-radius: 6px; }
+  .de26-head { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 9.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .de26-chev { flex: none; width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(-45deg); animation: de26-chev 4s infinite; }
+  .de26-list { display: grid; max-height: 40px; overflow: hidden; animation: de26-list 4s infinite; }
+  .de26-u { display: flex; align-items: center; gap: 5px; padding: 2.5px 0;
+    border-bottom: 1px solid var(--line); font-size: 9.5px; }
+  .de26-u:last-child { border-bottom: 0; }
+  .de26-u b { font-size: 10px; }
+  .de26-u .de26-kc { margin-left: auto; font-weight: 700; }
+  .de26-voz { opacity: 0; animation: de26-voz 4s infinite; }
+  @keyframes de26-type {
+    0%, 4%   { clip-path: inset(0 100% 0 0); animation-timing-function: steps(8, end); }
+    22%, 100% { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes de26-out {
+    0%, 24%  { opacity: 0; transform: translateY(2px); }
+    31%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de26-out2 {
+    0%, 29%  { opacity: 0; transform: translateY(2px); }
+    36%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de26-chev {
+    0%, 50%  { transform: rotate(-45deg); }
+    60%, 100% { transform: rotate(45deg); }
+  }
+  @keyframes de26-list {
+    0%, 50%  { max-height: 40px; opacity: 1; }
+    60%, 100% { max-height: 0; opacity: 0; }
+  }
+  @keyframes de26-voz {
+    0%, 66%  { opacity: 0; transform: translateY(2px); }
+    74%, 100% { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the demo's end state — ARES filled it, the panel is folded, vehicles written. */
+    .de26-type, .de26-out, .de26-out2, .de26-chev, .de26-list, .de26-voz { animation: none; }
+    .de26-type { clip-path: none; }
+    .de26-out, .de26-out2, .de26-voz { opacity: 1; transform: none; }
+    .de26-chev { transform: rotate(45deg); }
+    .de26-list { max-height: 0; opacity: 0; }
+  }
+</style>
+<div class="de26-demo" aria-hidden="true">
+  <div class="de26-card">
+    <div class="de26-line">
+      <span class="de26-k">IČO</span>
+      <span class="de26-box"><span class="de26-type">44960263</span></span>
+      <span class="de26-ares">ARES</span>
+    </div>
+    <div class="de26-line de26-out">
+      <span class="de26-k">Přijato od</span><span class="de26-v">JE &amp; NE, spol. s r.o.</span><span class="de26-ok">✓</span>
+    </div>
+    <div class="de26-line de26-out de26-out2">
+      <span class="de26-k">Adresa</span><span class="de26-v">Veveří 102, Brno, 616 00</span>
+    </div>
+    <div class="de26-headline">
+      <span class="de26-head">Nezaplacené úkony · 5 · 6 500 Kč</span><span class="de26-chev"></span>
+    </div>
+    <div class="de26-list">
+      <div class="de26-u"><b>3BR9196</b><span class="de26-kc">1 300 Kč</span></div>
+      <div class="de26-u"><b>2BP1720</b><span class="de26-kc">1 300 Kč</span></div>
+    </div>
+    <div class="de26-line de26-voz">
+      <span class="de26-k">Vozidla</span><span class="de26-v">3BR9309, TMBER6NW0V3099310</span>
+    </div>
+  </div>
+</div>

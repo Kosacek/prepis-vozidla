@@ -27,6 +27,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.6", date(2026, 11, 5),
+        "Doklad vyplníš z IČO",
+        ("Napiš IČO a jméno i adresa se doplní z ARES.",
+         "Úkony firmy si sbalíš, VIN nebo RZ můžeš napsat i ručně."),
+        demo="v2_6",
+    ),
+    Release(
         "2.5.1", date(2026, 11, 2),
         "Koš v Dokladech maže doklad, ne úkon",
         ("Úkony v dokladu zůstanou, jak jsou.",),

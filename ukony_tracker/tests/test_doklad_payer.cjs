@@ -99,3 +99,47 @@ test('the preselected chip survives the cap (many operators, one leasing owner)'
   assert.equal(res.chips.length, P.MAX_PARTY_CHIPS + 1);
   assert.equal(res.chips.find(c => c.key === res.selected).jmeno, RAIF.jmeno);
 });
+
+// --- 2.6: address printed under the payer + manual vehicles -----------------
+
+test('adresaText joins the address and PSČ, never twice', () => {
+  assert.equal(P.adresaText({adresa: 'Veveří 102, Brno', psc: '616 00'}), 'Veveří 102, Brno, 616 00');
+  // PSČ already at the end of the address (with or without the space)
+  assert.equal(P.adresaText({adresa: 'Veveří 102, Brno, 616 00', psc: '616 00'}), 'Veveří 102, Brno, 616 00');
+  assert.equal(P.adresaText({adresa: 'Veveří 102, Brno, 61600', psc: '616 00'}), 'Veveří 102, Brno, 61600');
+  assert.equal(P.adresaText({adresa: ' Veveří  102, Brno ', psc: ''}), 'Veveří 102, Brno');
+  assert.equal(P.adresaText({adresa: '', psc: '616 00'}), '616 00');
+  assert.equal(P.adresaText({adresa: 'Brno'}), 'Brno');
+  assert.equal(P.adresaText(null), '');
+});
+
+test('the firm chip carries the stored address, a žádost party chip carries none', () => {
+  const res = P.choices([], {...TESLA, adresa: 'Veveří 102, Brno', psc: '616 00'});
+  const firm = res.chips[res.chips.length - 1];
+  assert.equal(firm.role, 'firma');
+  assert.equal(P.adresaText(firm), 'Veveří 102, Brno, 616 00');
+  const party = P.choices([ukon(1, zadost('z1', null, {jmeno: 'Jan Novák', ico: ''}))], TESLA).chips[0];
+  assert.equal(party.zadost_id, 'z1');
+  assert.equal(P.adresaText(party), '');   // žádosti prints the address from the žádost
+});
+
+test('vozidlaFromUkony takes one unique id per úkon', () => {
+  assert.equal(P.vozidlaFromUkony([
+    {vozidlo: '3BR9309'}, {vozidlo: 'TMBER6NW0V3099310'}, {vozidlo: '3br9309'}, {vozidlo: ''},
+  ]), '3BR9309, TMBER6NW0V3099310');
+  // also accepts the {rz, vin} shape — the vehicle is the RZ, else the VIN
+  assert.equal(P.vozidlaFromUkony([{rz: '3BR9309', vin: 'X'}, {vin: 'TMBER6NW0V3099310'}]),
+    '3BR9309, TMBER6NW0V3099310');
+  assert.equal(P.vozidlaFromUkony([undefined, null]), '');
+  assert.equal(P.vozidlaFromUkony([]), '');
+  assert.equal(P.vozidlaFromUkony(null), '');
+});
+
+test('parseVozidla splits on commas, semicolons and newlines, trims and dedupes', () => {
+  assert.deepEqual(P.parseVozidla(' 3br9309 ; tmber6nw0v3099310,\n3BR9309  '),
+    ['3BR9309', 'TMBER6NW0V3099310']);
+  assert.deepEqual(P.parseVozidla('3BR 9309'), ['3BR 9309']);   // inner space collapses, doesn't vanish
+  assert.deepEqual(P.parseVozidla(';;,\n '), []);
+  assert.deepEqual(P.parseVozidla(''), []);
+  assert.deepEqual(P.parseVozidla(null), []);
+});
