@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services import orv_service, pricing_service
 from services.firma_match import match_firma, same_party
-from services.ingest_service import pridat_ukon
+from services.ingest_service import derive_stav, pridat_ukon
 from services.vehicle_fill_service import FillError, doplnit, transaction
 
 MODEL = "claude-haiku-5-5"
@@ -124,7 +124,17 @@ def extract(image_bytes, media_type, *, client=None, prompt=PROMPT) -> dict:
 
 def _view(ukon):
     return {"id": ukon["id"], "datum": ukon["datum"], "firma": ukon["firma"],
-            "typ": ukon["typ_kod"], "celkem": float(ukon["celkem"])}
+            "typ": ukon["typ_kod"], "celkem": float(ukon["celkem"]),
+            "stav_platby": ukon["stav_platby"], "poznamka": ukon["poznamka"]}
+
+
+def _czech_date(value):
+    """ISO datum → český tvar „27. 10. 2026“ pro hlášky uživateli."""
+    try:
+        day = date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value or "?"
+    return f"{day.day}. {day.month}. {day.year}"
 
 
 def _base(data):
@@ -134,7 +144,8 @@ def _base(data):
             "zmeny": {}, "zprava": "Fotku se nepodařilo zpracovat. Zkuste to znovu."}
 
 
-def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, auto_firma=False):
+def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
+                    auto_firma=False, poznamka=None, potvrdit_novy=False):
     """Check and mutate one vehicle in a single immediate transaction."""
     result = _base(data)
     values = {key: data.get(source) for key, source in (("rz", "rz"), ("orv", "orv_cislo"))
@@ -145,12 +156,19 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
         rows = [u for u in found if _same_sale(u, data, values)]
         other = [u for u in found if u not in rows]
-        if other and not rows:
-            result["predchozi"] = _view(other[0])
+        # Starší úkony téhož auta (mimo okno automatického doplnění) jsou možné
+        # duplicity: klient dostane `existujici` a bez `potvrdit_novy` se nový
+        # úkon nezaloží (2026-11-05, RZ 1AKI647: #1537 vs. #1573).
+        existujici = [_view(u) for u in other[:5]]
+        if existujici:
+            result["existujici"] = existujici
+            result["predchozi"] = existujici[0]
+            result["vyzaduje_potvrzeni"] = True
         if len(rows) > 1:
             candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
             if len(candidates) > 1:
-                result.update(stav="vice_shod", zprava="Více shod — úkon nelze jednoznačně vybrat.")
+                result.update(stav="vice_shod", zprava="Více shod — úkon nelze jednoznačně vybrat.",
+                              kandidati=[_view(u) for u in rows[:5]])
                 return result
             # Nothing awaits a value → the photo updates the newest úkon of that car.
             rows = candidates or rows[:1]
@@ -201,16 +219,27 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None, 
         if not firm or not firm["aktivni"]:
             result.update(stav="bez_firmy", zprava="Firma není aktivní.")
             return result
+        if other and potvrdit_novy is not True:
+            # Duplicita bez vědomého potvrzení: nic se nezakládá a karta zůstává
+            # v sekci k doplnění, dokud uživatel nezaškrtne „Přesto založit nový úkon“.
+            prvni = _view(other[0])
+            result.update(
+                stav="jiz_v_evidence", ukon=prvni,
+                zprava=(f"Toto auto už má úkon #{prvni['id']} "
+                        f"z {_czech_date(prvni['datum'])} ({prvni['typ']}, {prvni['firma']}). "
+                        "Potvrď „Přesto založit nový úkon“."))
+            return result
         price = pricing_service.effective_price(conn, firma_id, typ_kod)
         price = float(price) if price is not None else 0.0
         today = date.today().isoformat()
         uid = pridat_ukon(
             conn, firma_id=firma_id, datum=today, typ_kod=typ_kod, celkem=price,
             rz=data.get("rz"), vin=data.get("vin"), orv=data.get("orv_cislo"),
-            zpracoval=zpracoval, zdroj="orv_sken", commit=False,
+            poznamka=poznamka, zpracoval=zpracoval, zdroj="orv_sken", commit=False,
         )
         result["ukon"] = {"id": uid, "datum": today, "firma": firm["nazev"],
-                           "typ": typ_kod, "celkem": price}
+                           "typ": typ_kod, "celkem": price,
+                           "stav_platby": derive_stav(price, 0), "poznamka": poznamka}
         result["zmeny"] = {field: {"pred": None, "po": value}
                            for field, value in (("rz", data.get("rz")),
                                                 ("orv", data.get("orv_cislo"))) if value}
@@ -230,6 +259,8 @@ def _fill_error(conn, data, exc):
             conn, vin=data.get("vin"), rz=data.get("rz"), limit=-1)
         if len(rows) == 1:
             result["ukon"] = _view(rows[0])
+        elif len(rows) > 1:
+            result["kandidati"] = [_view(row) for row in rows[:5]]
         result["zprava"] = (f"{exc.data['error']} V evidenci: {exc.data.get('stavajici')} · "
                             f"Na fotce: {photo_value}")
     else:
@@ -237,11 +268,17 @@ def _fill_error(conn, data, exc):
     return result
 
 
-def zalozit_pro_firmu(conn, data, *, firma_id, typ_kod, zpracoval=None):
-    """Create or resolve an assigned car, retaining scan dedupe/fill behavior."""
+def zalozit_pro_firmu(conn, data, *, firma_id, typ_kod, zpracoval=None,
+                      poznamka=None, potvrdit_novy=False):
+    """Create or resolve an assigned car, retaining scan dedupe/fill behavior.
+
+    ``potvrdit_novy`` must be explicitly True to create a second úkon for a car
+    that already has an older one outside the automatic match window.
+    """
     try:
         return _fill_or_create(conn, data, firma_id=firma_id, typ_kod=typ_kod,
-                               zpracoval=zpracoval)
+                               zpracoval=zpracoval, poznamka=poznamka,
+                               potvrdit_novy=potvrdit_novy)
     except FillError as exc:
         return _fill_error(conn, data, exc)
 

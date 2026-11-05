@@ -1,87 +1,168 @@
+/* Techničák scan (2.7): assignment cards, duplicate warning, clear results.
+   Loaded after app.css, so it refines the .orv-* base rules there. */
+
+/* -- Fields shared by the batch bar and the per-car cards ------------------ */
 .orv-sken .orv-person,
-.orv-assign label {display:flex; flex-direction:column; gap:6px; font-size:.85rem; font-weight:650;}
+.orv-batch-fields label,
+.orv-assign .orv-card-field {display:flex; flex-direction:column; gap:6px; font-size:.85rem; font-weight:650;}
 .orv-sken .orv-person select,
-.orv-assign select {min-height:44px; border:1px solid var(--border,#d6d9df); border-radius:12px;
-  background:var(--surface,#fff); color:var(--text,#17191d); padding:0 12px; font:inherit;}
+.orv-batch select,
+.orv-assign .orv-card-field select,
+.orv-assign .orv-card-field input {width:100%; min-height:44px; border:1px solid var(--line,#e5e5ea); border-radius:12px;
+  background:var(--card,#fff); color:var(--ink,#1d1d1f); padding:0 12px;
+  font-family:inherit; font-size:.95rem;}
 .orv-person {min-width:120px;}
-.orv-summary {display:grid; gap:12px; margin-top:16px; padding:16px; background:var(--surface,#fff);}
+
+/* -- Summary: banner + count chips ---------------------------------------- */
+.orv-summary {display:grid; gap:12px; padding:16px; background:var(--card,#fff);}
 .orv-summary .orv-banner {margin:0; border-radius:14px; padding:14px 16px;
-  font-size:clamp(1.1rem,4vw,1.45rem); font-weight:750;}
-.orv-banner[data-tone="ok"] {background:#e7f7ee; color:#12683a;}
-.orv-banner[data-tone="warn"] {background:#fff2d8; color:#784700;}
+  font-size:clamp(1.1rem,4vw,1.45rem); font-weight:750; line-height:1.35;}
+.orv-banner[data-tone="ok"] {background:var(--flash-success-bg,#d1f5d3); color:var(--flash-success-ink,#1a6b2a);}
+.orv-banner[data-tone="warn"] {background:var(--flash-warning-bg,#fef3cd); color:var(--flash-warning-ink,#7d5a00);}
 .orv-counts {display:flex; flex-wrap:wrap; gap:8px;}
 .orv-count-chip {display:inline-flex; align-items:center; min-height:36px; border-radius:999px;
-  padding:4px 12px; background:var(--bg-subtle,#f1f2f4); font-size:.82rem; font-weight:650;}
-.orv-results {display:grid; gap:12px; margin:14px 0;}
-.orv-result {display:grid; grid-template-columns:minmax(82px,112px) minmax(0,1fr); gap:12px;
-  align-items:stretch; border:2px solid #d4d8de; border-radius:16px; background:var(--surface,#fff);
-  padding:10px; overflow:hidden;}
-.orv-result[data-state="warn"] {border-color:#d98a00;}
-.orv-result[data-state="created"] {border-color:#20834d;}
-.orv-result[data-state="filled"] {border-color:#4b71c5;}
-.orv-result[data-state="same"] {border-color:#9da5b0;}
-.orv-result[data-state="unreadable"] {border-color:#b42318;}
-.orv-result-preview {display:block; align-self:start; width:100%; aspect-ratio:1; min-height:82px; padding:0;
-  overflow:hidden; border:0; border-radius:10px; background:#eceef1; cursor:zoom-in;}
-.orv-result-preview img {display:block; width:100%; height:100%; object-fit:cover;}
-.orv-result-body {display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:8px;}
-.orv-result-heading {display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px;}
+  padding:4px 12px; background:var(--bg,#f3f4f7); font-size:.82rem; font-weight:650;}
+
+/* -- Section headings ----------------------------------------------------- */
+.orv-section {display:grid; gap:10px; margin:14px 0;}
+.orv-section[hidden] {display:none;}
+.orv-section-title {margin:0; font-size:1.05rem; font-weight:750;}
+.orv-review .orv-section-title {color:var(--flash-warning-ink,#7d5a00);}
+.orv-written .orv-section-title {color:var(--flash-success-ink,#1a6b2a);}
+
+/* -- Assignment form: shared bar + create button -------------------------- */
+.orv-assign {display:grid; gap:12px; margin:0; padding:14px;}
+.orv-batch {display:grid; gap:8px; padding:12px; border:1px solid var(--line,#e5e5ea);
+  border-radius:14px; background:var(--bg,#f3f4f7);}
+.orv-batch-label {margin:0; font-size:.85rem; font-weight:700; color:var(--muted,#6e6e73);}
+.orv-batch-fields {display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.orv-batch-use {justify-self:start; min-height:40px;}
+.orv-unassigned {display:grid; gap:10px;}
+.orv-unassigned:empty {display:none;}
+.orv-create-unmatched {min-height:52px; width:100%; font-size:1rem; font-weight:750;}
+.orv-issues-title {margin:4px 0 0; font-size:.9rem; font-weight:700; color:var(--muted,#6e6e73);}
+
+/* -- Result cards --------------------------------------------------------- */
+.orv-results {display:grid; gap:10px;}
+.orv-card {display:grid; grid-template-columns:minmax(76px,104px) minmax(0,1fr); gap:10px;
+  align-items:start; border:2px solid var(--line,#e5e5ea); border-radius:16px;
+  background:var(--card,#fff); padding:10px;}
+.orv-card[data-state="assign"] {border-color:var(--accent,#0071e3);}
+.orv-card[data-state="duplicate"] {border-color:#c2410c; box-shadow:0 0 0 3px #c2410c1f;}
+.orv-card[data-state="warn"] {border-color:#d98a00;}
+.orv-card[data-state="created"] {border-color:#20834d;}
+.orv-card[data-state="filled"] {border-color:#4b71c5;}
+.orv-card[data-state="same"] {border-color:#9da5b0;}
+.orv-card[data-state="unreadable"] {border-color:#b42318;}
+.orv-card-preview {display:block; align-self:start; width:100%; aspect-ratio:1; min-height:76px; padding:0;
+  overflow:hidden; border:0; border-radius:10px; background:var(--bg,#f3f4f7); cursor:zoom-in;}
+.orv-card-preview img {display:block; width:100%; height:100%; object-fit:cover;}
+.orv-card-body {display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:8px;}
+.orv-card-head {display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px;}
+.orv-chips {display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px;}
 .orv-status {display:inline-flex; align-items:center; min-height:30px; border-radius:999px; padding:3px 10px;
-  background:#eef0f3; color:#333b47; font-size:.78rem; font-weight:750;}
-.orv-result[data-state="warn"] .orv-status {background:#fff0ce; color:#754600;}
-.orv-result[data-state="created"] .orv-status {background:#e2f5e9; color:#12683a;}
-.orv-result[data-state="filled"] .orv-status {background:#e8efff; color:#294f9b;}
-.orv-result[data-state="unreadable"] .orv-status {background:#fde9e7; color:#9b1c13;}
+  background:#eef0f3; color:#333b47; font-size:.78rem; font-weight:750; white-space:nowrap;}
+.orv-card[data-state="assign"] .orv-status {background:#e8efff; color:#294f9b;}
+.orv-card[data-state="duplicate"] .orv-status {background:#fde9e7; color:#9b1c13;}
+.orv-card[data-state="warn"] .orv-status {background:var(--flash-warning-bg,#fef3cd); color:var(--flash-warning-ink,#7d5a00);}
+.orv-card[data-state="created"] .orv-status {background:var(--flash-success-bg,#d1f5d3); color:var(--flash-success-ink,#1a6b2a);}
+.orv-card[data-state="filled"] .orv-status {background:#e8efff; color:#294f9b;}
+.orv-card[data-state="unreadable"] .orv-status {background:var(--flash-error-bg,#fde8e8); color:var(--flash-error-ink,#9b1c1c);}
+.orv-edited {display:inline-flex; align-items:center; min-height:26px; border-radius:999px; padding:2px 9px;
+  background:var(--flash-success-bg,#d1f5d3); color:var(--flash-success-ink,#1a6b2a); font-size:.74rem; font-weight:700;}
+.orv-confirmed {display:inline-flex; align-items:center; min-height:26px; border-radius:999px; padding:2px 9px;
+  background:#e8efff; color:#294f9b; font-size:.74rem; font-weight:700;}
 .orv-open-ukon {min-height:44px; border:0; border-radius:11px; padding:0 11px; background:transparent;
-  color:var(--link,#2459a6); font:inherit; font-size:.82rem; font-weight:700; cursor:pointer;}
-.orv-retry {min-height:44px;}
+  color:var(--accent,#0071e3); font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; white-space:nowrap;}
+.orv-open-ukon:hover {background:var(--bg,#f3f4f7);}
+
+/* Read facts: also the fields the scan did NOT read (unread ORV = duplicate). */
+.orv-facts {display:flex; flex-wrap:wrap; gap:6px;}
+.orv-fact {border-radius:8px; background:var(--bg,#f3f4f7); padding:5px 7px;
+  font-size:.82rem; font-weight:650; overflow-wrap:anywhere;}
+.orv-fact-missing {background:var(--flash-error-bg,#fde8e8); color:var(--flash-error-ink,#9b1c1c);}
+.orv-owner,.orv-message,.orv-earlier {margin:0; font-size:.88rem; line-height:1.35; overflow-wrap:anywhere;}
+.orv-owner {color:var(--muted,#6e6e73);}
+.orv-message {font-weight:650;}
+.orv-earlier {font-size:.8rem; color:var(--muted,#6e6e73);}
+.orv-conflict-label {font-size:.8rem; font-weight:750;}
+.orv-conflict {padding:8px 10px; border-radius:10px; background:var(--flash-warning-bg,#fef3cd);
+  color:var(--flash-warning-ink,#7d5a00); font-size:.88rem; line-height:1.35; overflow-wrap:anywhere;}
+
+/* -- Duplicate guard ------------------------------------------------------ */
+.orv-duplicate {display:grid; gap:8px; width:100%; min-width:0; padding:12px; border:2px solid #c2410c;
+  border-radius:14px; background:#fff4e8; color:#4a2303;}
+.orv-duplicate > *, .orv-existing, .orv-existing-item {min-width:0; max-width:100%;}
+.orv-duplicate-title {margin:0; font-size:1rem; font-weight:800; overflow-wrap:anywhere;}
+.orv-duplicate-hint {margin:0; font-size:.85rem; line-height:1.4; overflow-wrap:anywhere;}
+.orv-existing {list-style:none; margin:0; padding:0; display:grid; gap:8px;}
+.orv-existing-item {display:grid; gap:6px; padding:8px 10px; border-radius:10px;
+  background:var(--card,#fff); border:1px solid #eccb94;}
+.orv-existing-line {font-size:.9rem; font-weight:700; overflow-wrap:anywhere;}
+.orv-existing-meta {font-size:.82rem; color:#6b4a12; overflow-wrap:anywhere;}
+/* .btn má white-space:nowrap — v úzké kartě se musí zalomit, jinak přeteče. */
+.orv-open-existing {justify-self:start; min-height:44px; font-weight:700; white-space:normal; max-width:100%;}
+.orv-confirm {display:flex; align-items:center; gap:10px; min-height:48px; padding:10px 12px;
+  border-radius:12px; background:var(--card,#fff); color:#7a1a12; font-weight:750; cursor:pointer; min-width:0;}
+.orv-confirm-input {flex:none; width:22px; height:22px; min-height:0 !important; margin:0; accent-color:#c2410c;}
+
+/* -- Per-car fields + live price ----------------------------------------- */
+.orv-card-fields {display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%;}
+.orv-assign .orv-card-field {min-width:0;}
+.orv-card-label {font-size:.78rem; color:var(--muted,#6e6e73); text-transform:uppercase; letter-spacing:.02em;}
+.orv-assign .orv-card-field--wide {grid-column:1 / -1;}
+.orv-card-price {margin:0; padding:6px 10px; border-radius:10px; background:var(--bg,#f3f4f7);
+  font-size:.95rem; font-weight:750; font-variant-numeric:tabular-nums;}
+
+/* -- Card actions --------------------------------------------------------- */
+.orv-card-actions {display:flex; flex-wrap:wrap; gap:8px; width:100%;}
+.orv-card-actions .btn {min-height:46px;}
+.orv-retake-btn {font-weight:750;}
+
+/* -- Written cards: what got written and where --------------------------- */
+.orv-written-line {margin:0; font-size:.92rem; font-weight:750; line-height:1.4; overflow-wrap:anywhere;}
 .orv-change {display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; max-width:100%; font-size:.9rem;}
 .orv-change strong {min-width:34px;}
 .orv-change-before {color:#767e88; overflow-wrap:anywhere;}
 .orv-change-after {font-weight:750; overflow-wrap:anywhere;}
-.orv-facts {display:flex; flex-wrap:wrap; gap:6px;}
-.orv-fact {border-radius:8px; background:var(--bg-subtle,#f1f2f4); padding:5px 7px;
-  font-size:.82rem; font-weight:650; overflow-wrap:anywhere;}
-.orv-fact-missing {background:#fde9e7; color:#9b1c13;}
 .orv-change-arrow {color:#848b95;}
-.orv-created,.orv-conflict,.orv-result-message,.orv-unmatched-owner,.orv-type-fallback {
-  font-size:.88rem; line-height:1.35; overflow-wrap:anywhere;}
-.orv-created {font-weight:750;}
-.orv-conflict-label {font-size:.8rem; font-weight:750;}
-.orv-conflict {padding:8px 10px; border-radius:10px; background:#fff2d8; color:#654000;}
-.orv-type-fallback {color:#784700;}
-.orv-assign {display:grid; gap:14px; margin:14px 0; padding:16px;}
-.orv-assign h3 {margin:0; font-size:1.12rem;}
-.orv-assign-defaults {display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-.orv-unassigned {display:grid; gap:8px;}
-.orv-unassigned-row {display:grid; grid-template-columns:minmax(0,1fr) minmax(145px,.85fr); gap:8px;
-  align-items:center; border-top:1px solid var(--border,#e0e2e6); padding-top:8px;}
-.orv-unassigned-car {min-width:0; font-weight:650; overflow-wrap:anywhere;}
-.orv-car-firma {width:100%;}
-.orv-create-unmatched {min-height:52px; width:100%; font-size:1rem; font-weight:750;}
+.orv-open-written {width:100%; min-height:48px; margin-top:2px; border:1.5px solid var(--accent,#0071e3);
+  border-radius:12px; background:var(--accent,#0071e3); color:var(--accent-ink,#fff);
+  font-size:.95rem; font-weight:750;}
+.orv-open-written:hover {background:var(--accent-dark,#0051a3); border-color:var(--accent-dark,#0051a3);}
+
+/* -- Candidate úkony (vice_shod / konflikt) ------------------------------ */
+.orv-kandidati {display:grid; gap:6px; width:100%; padding:10px; border-radius:12px;
+  background:var(--flash-warning-bg,#fef3cd); color:var(--flash-warning-ink,#7d5a00);}
+.orv-kandidati-title {margin:0; font-size:.85rem; font-weight:700;}
+.orv-kandidat {display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:6px 8px; border-radius:8px; background:var(--card,#fff); color:var(--ink,#1d1d1f);}
+.orv-kandidat-line {min-width:0; font-size:.85rem; font-weight:650; overflow-wrap:anywhere;}
+
+/* -- Legacy processing rows (photo-by-photo progress while reading) ------- */
+.orv-result {display:grid; grid-template-columns:minmax(82px,112px) minmax(0,1fr); gap:12px;
+  align-items:stretch; border:2px solid #d4d8de; border-radius:16px; background:var(--card,#fff);
+  padding:10px; overflow:hidden;}
+.orv-result[data-state="warn"] {border-color:#d98a00;}
+.orv-result[data-state="ok"] {border-color:#20834d;}
+.orv-result[data-state="error"] {border-color:#b42318;}
+.orv-result > img {display:block; align-self:start; width:100%; aspect-ratio:1; min-height:82px;
+  object-fit:cover; border-radius:10px; background:var(--bg,#f3f4f7);}
+.orv-result-body {display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:8px;}
+.orv-result-body p {margin:0; line-height:1.45; overflow-wrap:anywhere;}
+.orv-result[data-state="ok"] .orv-status {background:var(--flash-success-bg,#d1f5d3); color:var(--flash-success-ink,#1a6b2a);}
+.orv-result[data-state="warn"] .orv-status {background:var(--flash-warning-bg,#fef3cd); color:var(--flash-warning-ink,#7d5a00);}
+.orv-result[data-state="error"] .orv-status {background:var(--flash-error-bg,#fde8e8); color:var(--flash-error-ink,#9b1c1c);}
+
+/* -- Photo preview dialog ------------------------------------------------- */
 .orv-preview {position:fixed; max-width:min(96vw,900px); max-height:94dvh; margin:auto; padding:44px 10px 10px;
   border:0; border-radius:16px; background:#121417; color:white;}
 .orv-preview::backdrop {background:rgba(0,0,0,.82);}
 .orv-preview img {display:block; max-width:100%; max-height:calc(94dvh - 58px); object-fit:contain;}
 .orv-preview-close {position:absolute; top:4px; right:6px; width:44px; height:44px; border:0; border-radius:50%;
   background:#34383f; color:white; font-size:1.8rem; cursor:pointer;}
-.orv-sken .orv-sources > *, .orv-sken .orv-done > * {min-height:44px;}
-@media (max-width:520px) {
-  .orv-result {grid-template-columns:82px minmax(0,1fr); gap:9px; padding:8px;}
-  .orv-result-heading {align-items:flex-start; flex-direction:column; gap:2px;}
-  .orv-open-ukon {padding:0 4px;}
-  .orv-assign-defaults {grid-template-columns:1fr;}
-  .orv-unassigned-row {grid-template-columns:1fr; gap:5px;}
-}
-@media (orientation:landscape) and (max-height:520px) {
-  .orv-viewfinder {max-height:34vh;}
-  .orv-summary,.orv-assign {padding:10px;}
-  .orv-results {gap:8px;}
-  .orv-result {grid-template-columns:76px minmax(0,1fr);}
-}
-@media (prefers-reduced-motion:reduce) {
-  .orv-sken .ask-reveal,.orv-result {animation:none!important; transition:none!important; scroll-behavior:auto!important;}
-}
+
+/* -- Header: step label + last report ------------------------------------ */
 .orv-heading {display:flex; flex-wrap:wrap; align-items:center; column-gap:10px;}
 .orv-heading .orv-step {flex-basis:100%; margin:0;}
 .orv-last {display:inline-flex; align-items:center; gap:6px; min-height:36px; margin-left:auto; padding:0 12px;
@@ -89,8 +170,41 @@
   font:inherit; font-size:.82rem; font-weight:650; cursor:pointer;}
 .orv-last:hover {background:var(--bg,#f3f4f7);}
 .orv-last[hidden] {display:none;}
-.orv-edited {display:inline-flex; align-items:center; min-height:26px; border-radius:999px; padding:2px 9px;
-  background:#e2f5e9; color:#12683a; font-size:.74rem; font-weight:700;}
-.orv-chips {display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px;}
+.orv-retake {display:none;}
+.orv-sken .orv-sources > *, .orv-sken .orv-done > * {min-height:44px;}
 .modal-form-error {margin-bottom:12px;}
-.orv-earlier {font-size:.8rem; color:var(--muted,#6e6e73);}
+
+/* iOS Safari zooms the page when a field under 16 px gets focus (app.css
+   fixes this globally; the card selectors here are more specific). */
+@media (max-width:760px) {
+  .orv-batch select,
+  .orv-assign .orv-card-field select,
+  .orv-assign .orv-card-field input {font-size:16px;}
+}
+
+/* -- Small phones (375 px and narrower) ---------------------------------- */
+@media (max-width:520px) {
+  .orv-card, .orv-result {grid-template-columns:76px minmax(0,1fr); gap:8px; padding:8px;}
+  .orv-assign {padding:10px;}
+  .orv-card-head {align-items:flex-start; flex-direction:column; gap:4px;}
+  .orv-open-ukon {padding:0 4px;}
+  .orv-card-preview, .orv-result > img {min-height:76px;}
+  .orv-batch-fields, .orv-card-fields {grid-template-columns:1fr;}
+  .orv-card-actions > .btn {flex:1 1 100%;}
+  .orv-duplicate {padding:10px;}
+  .orv-existing-item {padding:8px;}
+  .orv-kandidat {align-items:flex-start; flex-direction:column;}
+}
+
+/* -- Short landscape (phone turned sideways) ----------------------------- */
+@media (orientation:landscape) and (max-height:520px) {
+  .orv-viewfinder {max-height:34vh;}
+  .orv-summary,.orv-assign {padding:10px;}
+  .orv-results {gap:8px;}
+  .orv-card,.orv-result {grid-template-columns:76px minmax(0,1fr);}
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .orv-sken .ask-reveal,.orv-card,.orv-result {animation:none!important; transition:none!important;
+    scroll-behavior:auto!important;}
+}

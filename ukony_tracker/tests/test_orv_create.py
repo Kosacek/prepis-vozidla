@@ -1,6 +1,6 @@
 """ORV company matching, atomic auto-create and manual assignment contract."""
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace as NS
 
 import pytest
@@ -11,6 +11,7 @@ import db
 from repositories import firma_ceny_repo, firmy_repo, typy_repo, ukony_repo
 from services import orv_scan_service as scan
 from services.firma_match import match_firma
+from services.ingest_service import pridat_ukon
 
 VIN = "TMBEK6NW7M3158470"
 PHOTO = {"typ": "orv", "rz": "8T25415", "vin": VIN, "orv_cislo": "UBE037263",
@@ -84,16 +85,67 @@ def test_no_confident_firm_returns_bez_firmy_without_insert_and_no_identifier_st
     assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == before
 
 
-def test_user_chosen_firm_and_type_create_with_price_and_no_note(conn):
+@pytest.mark.parametrize("poznamka", [None, "ACC"])
+def test_user_chosen_firm_and_type_create_with_price_and_note(conn, poznamka):
     fid = _ready(conn)
     data = {**PHOTO, "vin_zdroj": "foto"}
-    result = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV", zpracoval="David")
+    result = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV",
+                                    zpracoval="David", poznamka=poznamka)
     assert result["stav"] == "zalozeno"
     u = ukony_repo.get(conn, result["ukon"]["id"])
     assert (u["firma_id"], u["typ_kod"], u["celkem"], u["datum"]) == (
         fid, "ORV", 1300, date.today().isoformat())
     assert (u["rz"], u["vin"], u["orv"]) == (PHOTO["rz"], VIN, PHOTO["orv_cislo"])
-    assert (u["poznamka"], u["zpracoval"], u["zdroj"]) == (None, "David", "orv_sken")
+    assert (u["poznamka"], u["zpracoval"], u["zdroj"]) == (poznamka, "David", "orv_sken")
+    assert result["ukon"]["poznamka"] == poznamka
+    assert result["ukon"]["stav_platby"] == "nezaplaceno"
+
+
+def _old_ukon(conn, fid, *, days=3, poznamka=None):
+    """A complete úkon of the same car older than MATCH_WINDOW_DAYS."""
+    datum = (date.today() - timedelta(days=days)).isoformat()
+    return pridat_ukon(conn, firma_id=fid, datum=datum, typ_kod="ORV", celkem=900,
+                       rz=PHOTO["rz"], vin=VIN, orv=PHOTO["orv_cislo"], poznamka=poznamka)
+
+
+def test_existing_car_outside_window_blocks_creation_without_confirmation(conn):
+    # 2026-11-05: #1537 (27.10., PŘEVOD from žádosti) vs. #1573 (3.11., NOVÉ
+    # from the scan) — the scan treated the older úkon as "another sale".
+    fid = _ready(conn)
+    old = _old_ukon(conn, fid, poznamka="původní")
+    data = {**PHOTO, "vin_zdroj": "foto"}
+    blocked = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV")
+    assert blocked["stav"] == "jiz_v_evidence"
+    assert blocked["vyzaduje_potvrzeni"] is True
+    assert [u["id"] for u in blocked["existujici"]] == [old]
+    assert blocked["existujici"][0]["poznamka"] == "původní"
+    assert blocked["ukon"]["id"] == old and blocked["ukon"]["datum"] == (
+        date.today() - timedelta(days=3)).isoformat()
+    assert f"#{old}" in blocked["zprava"] and "Přesto založit nový úkon" in blocked["zprava"]
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+    # Repeating the unconfirmed assignment still inserts nothing.
+    again = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV")
+    assert again["stav"] == "jiz_v_evidence"
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_confirmed_new_ukon_keeps_note_and_repeated_confirm_dedupes(conn):
+    fid = _ready(conn)
+    old = _old_ukon(conn, fid)
+    data = {**PHOTO, "vin_zdroj": "foto"}
+    result = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV",
+                                    zpracoval="David", poznamka="ACC", potvrdit_novy=True)
+    assert result["stav"] == "zalozeno"
+    new_id = result["ukon"]["id"]
+    assert new_id != old and result["ukon"]["poznamka"] == "ACC"
+    assert ukony_repo.get(conn, new_id)["poznamka"] == "ACC"
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 2
+    # Today's new úkon is inside the match window → a repeated confirm fills it
+    # instead of creating a third úkon.
+    again = scan.zalozit_pro_firmu(conn, data, firma_id=fid, typ_kod="ORV",
+                                   poznamka="ACC", potvrdit_novy=True)
+    assert again["stav"] == "uz_doplneno" and again["ukon"]["id"] == new_id
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 2
 
 
 def test_same_vehicle_is_created_once_for_repeated_and_concurrent_assignments(conn):
@@ -156,3 +208,66 @@ def test_zalozit_endpoint_requires_session_when_login_is_enabled(client, monkeyp
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "secret")
     response = client.post("/ukony/orv-sken/zalozit", json={"auta": [_assigned()]})
     assert response.status_code == 302
+
+
+@pytest.mark.parametrize("item,error", [
+    ({"poznamka": "A" * 121}, "Poznámka"),
+    ({"poznamka": 5}, "Neplatná poznámka"),
+    ({"poznamka": True}, "Neplatná poznámka"),
+    ({"poznamka": "=cmd|' /C calc'!A0"}, "Poznámka"),
+    ({"poznamka": {"text": "ACC"}}, "Neplatná poznámka"),
+    ({"potvrdit_novy": "true"}, "potvrzení"),
+    ({"potvrdit_novy": 1}, "potvrzení"),
+    ({"potvrdit_novy": []}, "potvrzení"),
+])
+def test_zalozit_endpoint_validates_poznamka_and_confirmation(client, item, error):
+    response = client.post("/ukony/orv-sken/zalozit", json={"auta": [{**_assigned(), **item}]})
+    assert response.status_code == 400 and error in response.json["error"]
+    with client.application.app_context():
+        assert db.get_db().execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 0
+
+
+def test_zalozit_endpoint_saves_normalized_note(client):
+    note = "  ACC   sada  " + "x" * 108  # after collapsing still ≤120 chars
+    response = client.post("/ukony/orv-sken/zalozit",
+                           json={"auta": [{**_assigned(), "poznamka": note}], "zpracoval": "David"})
+    assert response.status_code == 200
+    result = response.json["results"][0]
+    assert result["stav"] == "zalozeno"
+    assert result["ukon"]["poznamka"] == ("ACC sada " + "x" * 108).strip()
+    with client.application.app_context():
+        u = ukony_repo.get(db.get_db(), result["ukon"]["id"])
+        assert u["poznamka"] == "ACC sada " + "x" * 108
+    # Blank and exactly 120 chars are both accepted.
+    blank = client.post("/ukony/orv-sken/zalozit", json={"auta": [{
+        **_assigned(vin="TMBBLANK000000001"), "poznamka": "   "}]})
+    assert blank.status_code == 200 and blank.json["results"][0]["ukon"]["poznamka"] is None
+    exact = client.post("/ukony/orv-sken/zalozit", json={"auta": [{
+        **_assigned(vin="TMBOTHER000000001"), "poznamka": "A" * 120, "potvrdit_novy": True}]})
+    assert exact.status_code == 200 and exact.json["results"][0]["ukon"]["poznamka"] == "A" * 120
+
+
+def test_zalozit_endpoint_refuses_duplicate_until_confirmed(client):
+    with client.application.app_context():
+        conn = db.get_db()
+        fid = firmy_repo.list_all(conn, only_active=True)[0]["id"]
+        old = _old_ukon(conn, fid)
+    car = {**_assigned(firma=fid), "poznamka": "ACC"}
+    blocked = client.post("/ukony/orv-sken/zalozit", json={"auta": [car]})
+    assert blocked.status_code == 200
+    result = blocked.json["results"][0]
+    assert result["stav"] == "jiz_v_evidence"
+    assert result["ukon"]["id"] == old and result["existujici"][0]["id"] == old
+    assert result["vyzaduje_potvrzeni"] is True
+    with client.application.app_context():
+        conn = db.get_db()
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+    confirmed = client.post("/ukony/orv-sken/zalozit",
+                            json={"auta": [{**car, "potvrdit_novy": True}]})
+    assert confirmed.status_code == 200
+    created = confirmed.json["results"][0]
+    assert created["stav"] == "zalozeno" and created["ukon"]["id"] != old
+    with client.application.app_context():
+        conn = db.get_db()
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 2
+        assert ukony_repo.get(conn, created["ukon"]["id"])["poznamka"] == "ACC"

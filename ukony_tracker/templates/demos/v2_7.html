@@ -1,0 +1,99 @@
+{# Demo for release 2.7 (Techničák víc pod kontrolou): one card per new car
+   asks firmu, typ and poznámku once and shows the price; then the duplicate
+   guard slides in — the car is already in evidence, so the person must
+   confirm "Přesto založit nový úkon" before a second úkon is created.
+   CSS-only, 4s loop; app tokens only. Included by _whats_new.html. #}
+<style>
+  .de27-demo { position: relative; box-sizing: border-box; height: 206px; padding: 11px 12px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25; overflow: hidden; }
+  .de27-card { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; padding: 8px 9px;
+    border-radius: 11px; background: var(--card); border: 2px solid var(--accent); }
+  .de27-photo { height: 42px; border-radius: 7px; background: linear-gradient(135deg, var(--line), var(--bg)); }
+  .de27-body { display: grid; gap: 4px; min-width: 0; }
+  .de27-head { display: flex; align-items: center; gap: 5px; }
+  .de27-chip { padding: 1px 7px; border-radius: 999px; font-size: 8.5px; font-weight: 700;
+    background: var(--bg); color: var(--accent); white-space: nowrap; }
+  .de27-facts { font-size: 8.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .de27-row { display: flex; gap: 5px; }
+  .de27-field { flex: 1 1 0; min-width: 0; height: 16px; padding: 0 5px; display: flex; align-items: center; gap: 4px;
+    border: 1px solid var(--line); border-radius: 4px; font-size: 9px; overflow: hidden; }
+  .de27-k { flex: none; font-style: normal; font-size: 7.5px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .02em; }
+  .de27-v { white-space: nowrap; font-weight: 700; clip-path: inset(0 100% 0 0); }
+  .de27-t1 { animation: de27-type1 4s infinite; }
+  .de27-t2 { animation: de27-type2 4s infinite; }
+  .de27-t3 { animation: de27-type3 4s infinite; }
+  .de27-price { justify-self: start; padding: 2px 7px; border-radius: 5px; background: var(--bg);
+    font-size: 9.5px; font-weight: 700; opacity: 0; animation: de27-price 4s infinite; }
+  .de27-create { justify-self: stretch; padding: 4px 0; border-radius: 6px; background: var(--accent);
+    color: var(--accent-ink); font-size: 9px; font-weight: 700; text-align: center;
+    animation: de27-tap 4s ease infinite; }
+  .de27-warn { position: absolute; left: 12px; right: 12px; bottom: 10px; display: grid; gap: 4px;
+    padding: 8px 10px; border-radius: 10px; background: var(--card);
+    border: 2px solid color-mix(in srgb, var(--muted) 45%, var(--card));
+    box-shadow: var(--shadow-sm); opacity: 0; transform: translateY(8px);
+    animation: de27-warn 4s cubic-bezier(.2, .7, .3, 1) infinite; }
+  .de27-warn-title { font-size: 9.5px; font-weight: 800; }
+  .de27-warn-line { font-size: 8.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .de27-check { display: flex; align-items: center; gap: 5px; font-size: 8.5px; font-weight: 700; }
+  .de27-box { width: 13px; height: 13px; border-radius: 3px; border: 1.5px solid var(--accent);
+    display: grid; place-items: center; font-size: 9px; line-height: 1;
+    animation: de27-check 4s ease infinite; }
+
+  @keyframes de27-type1 {
+    0%, 3%   { clip-path: inset(0 100% 0 0); animation-timing-function: steps(8, end); }
+    16%, 100% { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes de27-type2 {
+    0%, 18%  { clip-path: inset(0 100% 0 0); animation-timing-function: steps(7, end); }
+    30%, 100% { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes de27-type3 {
+    0%, 32%  { clip-path: inset(0 100% 0 0); animation-timing-function: steps(6, end); }
+    44%, 100% { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes de27-price {
+    0%, 44%  { opacity: 0; transform: translateY(2px); }
+    52%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de27-tap {
+    0%, 50%  { transform: none; }
+    54%      { transform: scale(.96); }
+    58%, 100% { transform: none; }
+  }
+  @keyframes de27-warn {
+    0%, 58%  { opacity: 0; transform: translateY(10px); }
+    70%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes de27-check {
+    0%, 74%  { background: var(--card); color: transparent; }
+    80%, 100% { background: var(--accent); color: var(--accent-ink); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion: the demo's end state — fields filled, price shown, duplicate flagged and confirmed. */
+    .de27-t1, .de27-t2, .de27-t3, .de27-price, .de27-create, .de27-warn, .de27-box { animation: none; }
+    .de27-t1, .de27-t2, .de27-t3 { clip-path: none; }
+    .de27-price, .de27-warn { opacity: 1; transform: none; }
+    .de27-box { background: var(--accent); color: var(--accent-ink); }
+  }
+</style>
+<div class="de27-demo" aria-hidden="true">
+  <div class="de27-card">
+    <span class="de27-photo"></span>
+    <div class="de27-body">
+      <div class="de27-head"><span class="de27-chip">Nové auto</span><span class="de27-facts">RZ 1AKI647 · ORV UBP585023</span></div>
+      <div class="de27-row">
+        <span class="de27-field"><em class="de27-k">Firma</em><span class="de27-v de27-t1">JE &amp; NE</span></span>
+        <span class="de27-field"><em class="de27-k">Typ</em><span class="de27-v de27-t2">NOVÉ</span></span>
+      </div>
+      <span class="de27-field"><em class="de27-k">Poznámka</em><span class="de27-v de27-t3">ACC</span></span>
+      <span class="de27-price">Cena: 1 300 Kč</span>
+      <span class="de27-create">Založit 1 úkon</span>
+    </div>
+  </div>
+  <div class="de27-warn">
+    <div class="de27-warn-title">⚠ Tohle auto už v evidenci je</div>
+    <div class="de27-warn-line">#1537 · 27. 10. 2026 · PŘEVOD · JE &amp; NE</div>
+    <div class="de27-check"><span class="de27-box">✓</span> Přesto založit nový úkon</div>
+  </div>
+</div>

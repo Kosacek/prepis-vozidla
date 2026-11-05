@@ -1,20 +1,23 @@
 (function () {
   let active;
   const H = window.OrvHelpers;
+  const REPORT = window.OrvReport;
   const ok = r => r && ['zalozeno', 'doplneno', 'uz_doplneno'].includes(r.stav);
   const LAST = window.OrvLast;
   function mount(root) {
     const el = id => root.querySelector('#orv-' + id);
     let photos = [], running = false, dead = false, closing = false, imported = false;
-    let processed = false, serial = 0;
+    let processed = false, serial = 0, retakePhoto = null;
     const thinking = window.Thinking(el('thinking'), el('verb'));
+    // The hidden retake camera must not be treated as a batch source.
+    const addInputs = () => root.querySelectorAll('input[type=file]:not(#orv-retake)');
     function notice(text) { el('note').textContent = text; el('note').hidden = !text; }
     function controls() {
       el('counter').textContent = H.photoCount(photos.length);
       el('process').textContent = H.processLabel(photos.length);
       el('process').disabled = !photos.length || running || imported;
       el('shutter').disabled = photos.length >= 30 || imported;
-      root.querySelectorAll('input[type=file]').forEach(i => { i.disabled = imported || photos.length >= 30; });
+      addInputs().forEach(i => { i.disabled = imported || photos.length >= 30; });
     }
     function addPhoto(blob) {
       if (dead || running) return;
@@ -28,6 +31,7 @@
       img.src = photo.url;
       img.alt = 'Fotka ' + photos.length;
       img.onerror = () => { img.hidden = true; };
+      photo.thumbEl = img;
       const number = document.createElement('span');
       number.textContent = photos.length;
       const remove = document.createElement('button');
@@ -44,7 +48,7 @@
       controls();
     }
     const camera = window.OrvCamera(root, addPhoto, notice);
-    root.querySelectorAll('input[type=file]').forEach(input => input.addEventListener('change', async function () {
+    root.querySelectorAll('input[type=file]:not(#orv-retake)').forEach(input => input.addEventListener('change', async function () {
       const files = Array.from(input.files || []);
       input.value = ''; // Rearm native capture, including selecting the same file.
       if (imported || running || dead) return;
@@ -65,10 +69,7 @@
         photo.chip = document.createElement('span'); photo.chip.className = 'orv-status';
         photo.text = document.createElement('p');
         const body = document.createElement('div'); body.className = 'orv-result-body';
-        photo.retry = document.createElement('button'); photo.retry.className = 'btn';
-        photo.retry.type = 'button'; photo.retry.textContent = 'Zkusit znovu';
-        photo.retry.addEventListener('click', () => run([photo]));
-        body.append(photo.chip, photo.text, photo.retry);
+        body.append(photo.chip, photo.text);
         photo.row.append(img, body); el('results').append(photo.row);
       }
       const r = photo.result;
@@ -79,17 +80,54 @@
       const u = r && r.ukon;
       const date = u && /^\d{4}-\d{2}-\d{2}$/.test(u.datum) ? u.datum.slice(8) + '.' + u.datum.slice(5, 7) + '.' : '';
       photo.text.textContent = r ? (u ? u.firma + ' · ' + date + ' — ' : '') + r.zprava : 'Fotka ' + photo.id;
-      photo.retry.hidden = !r || ok(r);
-      photo.retry.disabled = running;
     }
+    // Znovu vyfocení: nová fotka nahradí tu v kartě a hned se přečte.
+    function requestRetake(photo) {
+      if (running || dead || imported || !photo || !photo.blob) return;
+      retakePhoto = photo;
+      const input = el('retake');
+      input.value = '';
+      input.click();
+    }
+    el('retake').addEventListener('change', async function () {
+      const file = (this.files || [])[0];
+      this.value = '';
+      const photo = retakePhoto;
+      retakePhoto = null;
+      if (!file || !photo || dead || running) return;
+      imported = true; controls();
+      let blob;
+      try { blob = await window.OrvFile(file, camera); }
+      catch (_) { return; }
+      finally { imported = false; if (!dead) controls(); }
+      if (dead || !blob) return;
+      if (blob.size > 8 * 1024 * 1024) { notice('Fotka smí mít nejvýše 8 MB. Vyfoť ji znovu.'); return; }
+      if (photos.indexOf(photo) < 0) return;
+      URL.revokeObjectURL(photo.url);
+      photo.blob = blob;
+      photo.url = URL.createObjectURL(blob);
+      photo.result = null;
+      photo.upraveno = false;
+      photo.potvrdit = false;
+      if (photo.thumbEl) { photo.thumbEl.hidden = false; photo.thumbEl.src = photo.url; }
+      await run([photo]);
+    });
+    const actions = {
+      onRetry: photo => run([photo]),
+      onRetake: photo => requestRetake(photo),
+    };
     function summary(save = true) {
       photos.forEach(photo => { photo.row = null; photo.retry = null; });
-      window.OrvReport.render(root, photos, photo => run([photo]));
+      REPORT.render(root, photos, actions);
       el('capture').hidden = el('process').hidden = true;
-      el('summary').hidden = el('results').hidden = false;
-      el('done').hidden = false;
+      el('summary').hidden = false;
+      el('results').hidden = false;
+      // „Vyfotit další“ / „Zavřít“ až když není co doplnit — jinak by jedno
+      // omylem trefené tlačítko zahodilo rozdělané firmy a poznámky.
+      el('done').hidden = REPORT.reviewPhotos(photos).length > 0;
       el('last').hidden = true;
-      el('step').textContent = '3 · Hotovo';
+      el('step').textContent = REPORT.reviewPhotos(photos).length
+        ? '3 · Zkontroluj a doplň' : '4 · Hotovo';
       if (save) LAST.save(photos);
     }
     // Uložení v editaci → karta auta dostane „Upraveno" a report se uloží znovu.
@@ -108,11 +146,12 @@
       camera.stop(); notice('');
       photos.forEach(p => URL.revokeObjectURL(p.url));
       el('thumbnails').replaceChildren();
-      photos = stored.items.map((item, i) => ({id: i + 1, url: item.thumb || '', thumb: item.thumb || '', result: item.result,
-        upraveno: !!item.upraveno, blob: null}));
+      photos = stored.items.map((item, i) => ({id: i + 1, url: item.thumb || '', thumb: item.thumb || '',
+        result: item.result, upraveno: !!item.upraveno, blob: null}));
       serial = photos.length;
       summary(false);
-      el('step').textContent = LAST.label(stored.at);
+      // Uložený sken: krok zůstává akční, jen se k němu přidá, kdy byl pořízen.
+      el('step').textContent += ' · ' + LAST.label(stored.at);
     }
     function offerLast() {
       const stored = LAST.load();
@@ -150,9 +189,12 @@
       if (running || dead || imported || !queue.length) return;
       running = true; processed = true; camera.stop(); notice('');
       el('capture').hidden = el('process').hidden = el('done').hidden = el('summary').hidden = true;
-      el('assign').hidden = true;
-      el('results').hidden = false; el('step').textContent = '2 · Zpracovávám';
-      queue.forEach(p => { p.result = null; });
+      el('review').hidden = true;
+      el('written').hidden = false;
+      el('written-title').textContent = 'Průběh zpracování';
+      el('results').hidden = false;
+      el('step').textContent = '2 · Zpracovávám';
+      queue.forEach(p => { p.result = null; p.cardEl = null; });
       photos.forEach(row);
       el('progress').textContent = photos.filter(p => p.result).length + ' z ' + H.photoCount(photos.length);
       thinking.start();
@@ -170,8 +212,12 @@
     function reset() {
       if (running) return;
       photos.forEach(p => URL.revokeObjectURL(p.url)); photos = [];
+      retakePhoto = null;
       el('thumbnails').replaceChildren(); el('results').replaceChildren();
-      el('results').hidden = el('summary').hidden = el('done').hidden = el('assign').hidden = true;
+      el('results').hidden = el('summary').hidden = el('done').hidden = true;
+      el('review').hidden = el('written').hidden = true;
+      el('written-title').textContent = 'Zapsáno';
+      el('batch-firma').value = ''; el('batch-typ').value = '';
       el('capture').hidden = el('process').hidden = false;
       el('step').textContent = '1 · Foť'; controls(); offerLast(); camera.start();
     }
@@ -191,28 +237,49 @@
     });
     el('assign').addEventListener('submit', async event => {
       event.preventDefault();
-      const selected = window.OrvReport.selected(root, photos);
-      if (!selected.length) return;
+      if (running || dead || imported) return;
+      const chosen = REPORT.selected(root, photos);
+      if (!chosen.length) return;
       const button = el('create-unmatched'); button.disabled = true;
       try {
         const response = await fetch('/ukony/orv-sken/zalozit', {method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
-          body: JSON.stringify({zpracoval: person.value, auta: selected.map(x => ({
-            rz: x.photo.result.rz, vin: x.photo.result.vin, orv_cislo: x.photo.result.orv_cislo,
-            provozovatel: x.photo.result.provozovatel, vin_zdroj: x.photo.result.vin_zdroj,
-            firma_id: Number(x.firma_id), typ_kod: x.typ_kod
-          }))})});
-        const data = await response.json();
-        if (!response.ok || !Array.isArray(data.results)) throw Error(data.error || 'Úkony se nepodařilo založit.');
-        selected.forEach((x, i) => { x.photo.result = data.results[i]; });
-        summary();
+          body: JSON.stringify({zpracoval: person.value,
+            auta: chosen.map(item => REPORT.payload(item.photo, item))})});
+        if (response.redirected) throw Error('Přihlášení vypršelo. Obnovte stránku a přihlaste se.');
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(data.results)) {
+          throw Error(data.error || 'Úkony se nepodařilo založit.');
+        }
+        // Karta auta, které server i teď odmítl (duplicita), zůstává i s
+        // vyplněnými poli — nic se neztratí, jen se znovu zeptá.
+        const blocked = REPORT.applyCreateResults(chosen, data.results);
+        if (!dead) summary(true);
+        if (blocked.length) {
+          const first = blocked[0].result || {};
+          notice(first.zprava || 'Některé auto už je v evidenci — potvrď „Přesto založit nový úkon“.');
+        }
       } catch (error) {
         notice(error.message || 'Úkony se nepodařilo založit.');
-      } finally { window.OrvReport.updateCreateCount(root, photos); }
+        if (!dead) summary(false);
+      } finally { REPORT.updateCreateCount(root, photos); }
     });
-    el('batch-firma').addEventListener('change', () => window.OrvReport.updateCreateCount(root, photos));
-    el('batch-typ').addEventListener('change', () => window.OrvReport.updateCreateCount(root, photos));
-    el('results').addEventListener('click', event => {
+    el('batch-firma').addEventListener('change', () => REPORT.refreshPrices(root, photos));
+    el('batch-typ').addEventListener('change', () => REPORT.refreshPrices(root, photos));
+    el('batch-use').addEventListener('click', () => {
+      if (running || dead) return;
+      // Společná volba přepíše jen to, co je v liště opravdu vybrané — prázdné
+      // pole nesmí smazat firmu/typ vybraný u jednotlivého auta.
+      const shared = REPORT.batchDefaults(root);
+      photos.filter(REPORT.assignable).forEach(photo => {
+        if (shared.firma_id) photo.firmaOverride = null;
+        if (shared.typ_kod) photo.typOverride = null;
+      });
+      REPORT.render(root, photos, actions);
+    });
+    // „Otevřít úkon" (stávající i zapsaný) a zvětšení fotky — delegované na
+    // celou sekci, protože karty jsou v obou sekcích.
+    root.addEventListener('click', event => {
       const open = event.target.closest('[data-ukon]');
       if (open && window.UkonModal && window.UkonModal.openEdit) {
         window.UkonModal.openEdit(open.dataset.ukon);
@@ -233,6 +300,13 @@
       if (running) {
         // Finish only the (at most three) requests already sent before refresh.
         closing = true; event.preventDefault(); notice('Dokončuji rozpracované fotky…'); return;
+      }
+      // Rozdělaná kontrola (nevyplněné firmy, potvrzení duplicity) se nesmí
+      // ztratit jen proto, že uživatel trefí křížek.
+      if (processed && REPORT.reviewPhotos(photos).length &&
+          !window.confirm('Něco ještě není doplněné. Zavřít a zahodit rozdělanou kontrolu?')) {
+        if (event && event.preventDefault) event.preventDefault();
+        return;
       }
       destroy(); active = null;
       if (processed) window.location.reload();

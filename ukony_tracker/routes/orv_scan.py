@@ -11,7 +11,7 @@ from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 import db
 import config
 from repositories import firmy_repo, typy_repo
-from services import orv_images, orv_scan_service
+from services import orv_images, orv_scan_service, pricing_service
 from services.vehicle_fill_service import transaction
 from services.ingest_service import normalize_profil
 
@@ -46,9 +46,29 @@ def fragment():
     _session_id()  # Set cookie before the browser launches parallel uploads.
     conn = db.get_db()
     types = typy_repo.list_active(conn)
-    return render_template("_orv_sken.html", firmy=firmy_repo.list_all(conn, only_active=True),
-                           typy=types, profily=config.PROFILY), \
+    firmy = firmy_repo.list_all(conn, only_active=True)
+    # Ceny pro kartu zakládaného auta (firma × typ); šablona je vloží jako JSON.
+    ceny = {str(f["id"]): pricing_service.firm_price_map(conn, f["id"]) for f in firmy}
+    return render_template("_orv_sken.html", firmy=firmy, typy=types, profily=config.PROFILY,
+                           ceny=ceny), \
         200, {"Cache-Control": "no-store"}
+
+
+def _clean_poznamka(value):
+    """Optional note for the created úkon: trimmed/collapsed, ≤120 chars, never
+    a spreadsheet formula. Blank means no note."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Neplatná poznámka.")
+    note = re.sub(r"\s+", " ", value).strip()
+    if not note:
+        return None
+    if note.startswith("="):
+        raise ValueError("Poznámka nesmí začínat znakem „=“.")
+    if len(note) > 120:
+        raise ValueError("Poznámka smí mít nejvýše 120 znaků.")
+    return note
 
 
 @bp.post("/ukony/orv-sken")
@@ -102,7 +122,8 @@ def zalozit():
     prepared = []
     for item in auta:
         if not isinstance(item, dict) or set(item) - {
-                "rz", "vin", "orv_cislo", "firma_id", "typ_kod", "provozovatel", "vin_zdroj"}:
+                "rz", "vin", "orv_cislo", "firma_id", "typ_kod", "provozovatel", "vin_zdroj",
+                "poznamka", "potvrdit_novy"}:
             return jsonify(error="Neplatný záznam auta."), 400
         rz, vin, orv = item.get("rz"), item.get("vin"), item.get("orv_cislo")
         def clean(value, pattern):
@@ -118,6 +139,7 @@ def zalozit():
             rz = clean(rz, r"[A-Z0-9]{5,8}")
             vin = clean(vin, r"[A-Z0-9]{5,17}")
             orv = clean(orv, r"[A-Z]{3}[0-9]{6}")
+            poznamka = _clean_poznamka(item.get("poznamka"))
         except ValueError as exc:
             return jsonify(error=str(exc)), 400
         if not rz and not vin:
@@ -133,16 +155,20 @@ def zalozit():
         vin_zdroj = item.get("vin_zdroj")
         if vin_zdroj not in (None, "foto", "registr"):
             return jsonify(error="Neplatný zdroj VIN."), 400
+        potvrdit_novy = item.get("potvrdit_novy")
+        if potvrdit_novy is not None and not isinstance(potvrdit_novy, bool):
+            return jsonify(error="Neplatné potvrzení nového úkonu."), 400
         prepared.append(({"rz": rz, "vin": vin, "orv_cislo": orv,
                           "provozovatel": operator.strip() if operator else None,
-                          "vin_zdroj": vin_zdroj}, firm_id, typ_kod))
+                          "vin_zdroj": vin_zdroj}, firm_id, typ_kod, poznamka, potvrdit_novy))
     zpracoval = normalize_profil(payload.get("zpracoval"))
     try:
         results = []
         with transaction(conn):
-            for data, firma_id, typ_kod in prepared:
+            for data, firma_id, typ_kod, poznamka, potvrdit_novy in prepared:
                 results.append(orv_scan_service.zalozit_pro_firmu(
-                    conn, data, firma_id=firma_id, typ_kod=typ_kod, zpracoval=zpracoval))
+                    conn, data, firma_id=firma_id, typ_kod=typ_kod, zpracoval=zpracoval,
+                    poznamka=poznamka, potvrdit_novy=potvrdit_novy))
         return jsonify(results=results)
     except Exception:
         return jsonify(error="Úkony se nepodařilo založit."), 500

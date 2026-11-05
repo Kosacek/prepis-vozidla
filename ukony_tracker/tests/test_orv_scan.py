@@ -10,7 +10,7 @@ import pytest
 import app as appmod
 import config
 import db
-from repositories import firmy_repo, ukony_repo
+from repositories import firma_ceny_repo, firmy_repo, typy_repo, ukony_repo
 from services import orv_images, orv_scan_service as scan
 from services.ingest_service import pridat_ukon
 
@@ -111,7 +111,8 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     after = dict(ukony_repo.get(conn, uid))
     assert result["stav"] == expected and result["doplneno"] == changes
     assert result["ukon"] == {"id": uid, "datum": RECENT, "firma": "BSAuto",
-                              "typ": "ZÁPIS", "celkem": 1300.0}
+                              "typ": "ZÁPIS", "celkem": 1300.0,
+                              "stav_platby": "nezaplaceno", "poznamka": None}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
     overwritten = [k for k, v in fields.items() if v.strip().upper().replace(" ", "").replace("-", "")
                    != (DATA["orv_cislo"] if k == "orv" else DATA[k])]
@@ -240,6 +241,12 @@ def test_car_back_after_window_is_a_new_ukon_not_the_old_one(conn, make, filled)
     assert dict(ukony_repo.get(conn, old)) == before
     assert result["stav"] in ("zalozeno", "bez_firmy")
     assert result["predchozi"]["id"] == old and result["predchozi"]["datum"] == old_date
+    # The scan still offers the car as new, but also lists the older úkon as a
+    # possible duplicate — zalozit without potvrdit_novy then refuses to create.
+    assert result["existujici"] == [result["predchozi"]]
+    assert result["vyzaduje_potvrzeni"] is True
+    assert result["predchozi"]["stav_platby"] == "nezaplaceno"
+    assert result["predchozi"]["poznamka"] is None
 
 
 def test_window_edge_still_matches(conn, make):
@@ -432,7 +439,14 @@ def test_ambiguity_beyond_api_display_limit(conn, make):
     for _ in range(20):
         make(rz=DATA["rz"], orv=DATA["orv_cislo"])
     make()
-    assert scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())["stav"] == "vice_shod"
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
+    assert result["stav"] == "vice_shod"
+    # The client needs the rows it is choosing between — newest first, max 5.
+    assert len(result["kandidati"]) == 5
+    assert all({"id", "datum", "firma", "typ", "celkem", "stav_platby", "poznamka"}
+               <= set(k) for k in result["kandidati"])
+    assert [k["id"] for k in result["kandidati"]] == sorted(
+        [k["id"] for k in result["kandidati"]], reverse=True)
 
 
 @pytest.mark.parametrize("data,state", [
@@ -523,6 +537,27 @@ def test_fragment_button_and_shared_thinking(client):
     assert 'data-orv-sken' in page and 'Techničák' in page
     assert 'Doplnit RZ a ORV z techničáku' in page and 'js/thinking.js' in page
     assert 'js/thinking.js' in client.get('/zeptej').text
+
+
+def test_fragment_passes_prices_for_active_firms(client, monkeypatch):
+    from routes import orv_scan
+    with client.application.app_context():
+        c = db.get_db()
+        fid = firmy_repo.create(c, nazev="BSAuto", zkratka="BS")
+        typy_repo.upsert(c, "ORV", 900, 1)
+        firma_ceny_repo.set_price(c, fid, "ORV", 1300)
+    assert client.get("/ukony/orv-sken").status_code == 200  # renders with the new context
+    seen = {}
+    def spy(template, **context):
+        seen.update(context)
+        return ""
+    monkeypatch.setattr(orv_scan, "render_template", spy)
+    assert client.get("/ukony/orv-sken").status_code == 200
+    assert seen["ceny"] == {str(fid): {t["kod"]: (1300.0 if t["kod"] == "ORV" else
+                                                 (float(t["vychozi_cena"])
+                                                  if t["vychozi_cena"] is not None else None))
+                                       for t in seen["typy"]}}
+    assert [f["id"] for f in seen["firmy"]] == [fid] and seen["typy"]
 
 
 # Big payloads are built lazily: a multi-MB bytes literal as a parametrize value
