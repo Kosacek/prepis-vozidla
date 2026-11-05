@@ -40,6 +40,8 @@ services:
     # Run as root so the entrypoint can chmod the SMB-owned /data bind mount.
     user: "0:0"
     restart: unless-stopped
+    # Keep in RAM: the NAS swapped idle apps out and first loads took 1-4 s.
+    mem_swappiness: 1  # 0 is dropped by compose as "unset"
     healthcheck:
       test:
         - CMD
