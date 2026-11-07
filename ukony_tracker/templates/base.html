@@ -6,6 +6,9 @@
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=82">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/orv_report.css') }}?v=9">
+  {# Emil polish pass — motion, press/hover/focus states, touch behaviour.
+     Loaded last on purpose: it only overrides, never re-lays-out. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/emil.css') }}?v=1">
 </head>
 <body>
   <header class="topnav">

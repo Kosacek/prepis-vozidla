@@ -1,0 +1,550 @@
+/* ============================================================================
+   emil.css — Emil Kowalski polish pass for the Úkony Tracker
+   (evidence.spznaklic.cz). Loaded after app.css and orv_report.css, so every
+   rule here is an override. No layout or business styling is redefined: only
+   motion, press/hover/focus states, touch behaviour, safe areas and numeric
+   alignment. The `Before` column of REVIEW.md maps each block to the rule it
+   replaces. Tokens and the shared base come from internal-apps/emil-base.css —
+   keep them in sync with the sibling apps.
+   ========================================================================== */
+
+/* ----------------------------------------------------------------------------
+   1. Shared tokens (from emil-base.css)
+   ------------------------------------------------------------------------- */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-enter: 320ms;
+}
+
+/* ----------------------------------------------------------------------------
+   2. Touch baseline
+   app.css: nothing set tap-highlight / touch-action / user-select, so iOS
+   flashed a grey box on every tap and double-tap-to-zoom delayed buttons.
+   ------------------------------------------------------------------------- */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+a,
+[role="button"],
+input[type="submit"],
+.seg span,
+.seg a,
+.chip,
+.badge-btn,
+.row-del,
+.modal-close,
+.orv-last,
+.orv-open-ukon,
+.orv-shutter,
+.firma-pick__btn,
+.firma-pick__item,
+.dn-ukony__head,
+.dn-payer,
+.orv-confirm,
+.dn-ukon,
+.orv-file,
+.nav-ver,
+.wn-step,
+.wn-update button {
+  touch-action: manipulation;
+}
+
+button,
+[role="button"],
+input[type="submit"],
+.btn,
+.seg span,
+.seg a,
+.chip,
+.badge-btn,
+.row-del,
+.modal-close,
+.orv-last,
+.orv-open-ukon,
+.orv-shutter,
+.firma-pick__btn,
+.firma-pick__item,
+.dn-ukony__head,
+.dn-payer,
+.nav-ver,
+.wn-step,
+.wn-update button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Long-press on a control must not open the iOS share/callout menu. Links keep
+   it (VIN/RZ text stays selectable in the rows). */
+button,
+[role="button"],
+.btn,
+.seg span,
+.chip,
+.orv-shutter {
+  -webkit-touch-callout: none;
+}
+
+/* ----------------------------------------------------------------------------
+   3. Focus: one visible ring where the app defined none
+   app.css only had it on the delete button, doklad rows and the firm picker.
+   Inputs keep their accent border + ring (they set outline: none on purpose).
+   ------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------------------
+   4. Press feedback (140 ms)
+   app.css had `transform: scale(.98)` on .btn only, with no transform in its
+   transition list — so the press snapped. Everything else had no :active at
+   all. Rows are full-width links: they get a tint instead of a scale.
+   ------------------------------------------------------------------------- */
+button:active,
+[role="button"]:active,
+input[type="submit"]:active {
+  transform: scale(0.97);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.seg span:active,
+.seg a:active,
+.chip:active,
+.badge-btn:active,
+.row-del:active,
+.modal-close:active,
+.orv-last:active,
+.orv-open-ukon:active,
+.firma-pick__btn:active,
+.dn-ukony__head:active,
+.dn-payer:active,
+.nav-ver:active,
+.wn-step:active,
+.wn-update button:active {
+  transform: scale(0.97);
+}
+
+.recent-row:active,
+.doklad-row:active,
+.ukony-item:active {
+  background: var(--line);
+}
+
+/* ----------------------------------------------------------------------------
+   5. Transitions: name the properties, one curve
+   app.css animated `background` (the shorthand), `box-shadow` (paint) and used
+   the built-in `ease`. The focus ring (box-shadow) now appears instantly, the
+   way a focus state should — nothing else changes.
+   ------------------------------------------------------------------------- */
+.topnav nav a,
+.btn,
+.btn-logout,
+.badge-btn,
+.row-del,
+.modal-close,
+.seg span,
+.seg a,
+.chip,
+.dn-payer,
+.dn-ukony__head,
+.firma-pick__btn,
+.firma-pick__item,
+.orv-last,
+.orv-open-ukon,
+.orv-shutter,
+.nav-ver {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.recent-row,
+.ukony-item,
+.doklad-row,
+tbody td {
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.field input,
+.field select,
+.field textarea,
+.ukony-search,
+.recent-search,
+.ask-input,
+.filter-select,
+.filter-month,
+.month-line input[type="month"],
+.month-field input[type="month"],
+.firma-pick__btn,
+.orv-assign .orv-card-field select,
+.orv-assign .orv-card-field input,
+.orv-person select {
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+/* Disclosure chevrons rotate, so transform is the only thing to animate. */
+.doklad-chev::before,
+.dn-ukony__chev {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+#ask-results {
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+#ask-verb,
+.ask-verb {
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+body.firma-switching .recent-card {
+  transition: opacity 120ms var(--ease-out);
+}
+
+/* ----------------------------------------------------------------------------
+   6. Dashboard bars: grow with transform, not width
+   app.css: `.bar-fill { transition: width 0.3s ease; }` — width is layout, so
+   every frame of that animation forced the browser to re-layout the card. The
+   inline width stays the data source; only the paint is animated.
+   ------------------------------------------------------------------------- */
+.bar-fill {
+  transform-origin: left center;
+  transition: transform var(--dur-enter) var(--ease-out);
+  animation: emil-bar-in var(--dur-enter) var(--ease-out) both;
+}
+
+@keyframes emil-bar-in {
+  from { transform: scaleX(0.04); }
+  to   { transform: scaleX(1); }
+}
+
+/* ----------------------------------------------------------------------------
+   7. Overlays: 220 ms entrance, ease-out, scrim only fades
+   app.css used .26s / .22s with a bespoke cubic-bezier(.2, .8, .25, 1); the JS
+   close timers are 280 ms (modal) / 220 ms (stack), so both still fit.
+   ------------------------------------------------------------------------- */
+.modal-backdrop {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.modal-card {
+  transition: transform var(--dur-base) var(--ease-out),
+              opacity var(--dur-base) var(--ease-out);
+}
+
+.modal-stack {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.modal-stack .modal-card {
+  transition: transform 200ms var(--ease-out),
+              opacity 200ms var(--ease-out);
+}
+
+/* Photo preview <dialog>: it used to pop in with no transition at all. */
+.orv-preview[open] {
+  animation: emil-fade-in 160ms var(--ease-out);
+}
+
+@keyframes emil-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ----------------------------------------------------------------------------
+   8. "Zeptej se" reveal: 320 ms entrance, 40 ms stagger
+   app.css ran 550 ms (tables 450 ms) with a 110 ms stagger plus delays; on a
+   long answer the last rows started almost a second late.
+   ------------------------------------------------------------------------- */
+.ask-reveal,
+.ask-table tbody tr,
+.ask-thinking.is-in {
+  animation-name: emil-in;
+  animation-duration: var(--dur-enter);
+  animation-timing-function: var(--ease-out);
+}
+
+.ask-reveal {
+  animation-delay: calc(var(--i, 0) * 40ms + 40ms);
+}
+
+.ask-table tbody tr {
+  animation-delay: calc(var(--i, 3) * 40ms + 80ms + var(--r, 0) * 20ms);
+}
+
+.ask-thinking.is-in {
+  animation-delay: 0ms;
+}
+
+@keyframes emil-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ----------------------------------------------------------------------------
+   9. Flash messages: fade down, no movement of surrounding content
+   ------------------------------------------------------------------------- */
+.flash {
+  animation: emil-flash-in 240ms var(--ease-out) both;
+}
+
+@keyframes emil-flash-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ----------------------------------------------------------------------------
+   10. Firm picker: a popover, so it scales from its trigger
+   firma_pick.js toggles [hidden]; @starting-style animates that first frame.
+   Browsers without support simply show the list (progressive enhancement).
+   ------------------------------------------------------------------------- */
+.firma-pick__list {
+  transform-origin: top center;
+  transition: opacity var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+
+@starting-style {
+  .firma-pick__list {
+    opacity: 0;
+    transform: scale(0.98) translateY(-4px);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   11. Numbers: tabular figures
+   Money, dates and counters are read column-to-column; proportional digits
+   made the columns shimmer on every update. VINs/plates were already fixed.
+   ------------------------------------------------------------------------- */
+table,
+.badge,
+.kpi-v,
+.kpi-sub,
+.u-kc,
+.month-line,
+.recent-date,
+.recent-kc,
+.recent-pay,
+.recent-vin,
+.doklad-cislo,
+.doklad-datum,
+.doklad-kc,
+.doklad-pocet,
+.ask-row__n,
+.ask-row__kc,
+.dn-ukon__kc,
+.nav-badge,
+.orv-counter {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------------------------
+   12. Coarse pointers: 16 px fields (no iOS zoom), bigger close / delete
+   app.css only did this under max-width: 760px, so a tablet in landscape
+   still zoomed the page on every field focus.
+   ------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .field input,
+  .field select,
+  .field textarea,
+  .ukony-search,
+  .recent-search,
+  .ask-input,
+  .filter-select,
+  .filter-month,
+  .month-line input[type="month"],
+  .firma-pick__btn,
+  .firma-pick__item,
+  .orv-assign .orv-card-field select,
+  .orv-assign .orv-card-field input,
+  .orv-person select,
+  .dn-ares {
+    font-size: 16px;
+  }
+
+  .modal-close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .row-del {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   13. Touch: no sticky hover states
+   app.css declared plain :hover rules, which on a phone stay applied after the
+   tap — a row looked selected, a button looked stuck. Fine pointers keep every
+   hover exactly as designed (see REVIEW.md).
+   ------------------------------------------------------------------------- */
+@media (hover: none), (pointer: coarse) {
+  .topnav nav a:hover { background: transparent; }
+  .topnav nav a.active:hover { background: var(--accent); }
+  .topnav nav a.nav-ai.active:hover { color: var(--accent-ink); }
+
+  .btn-logout:hover { background: #fff; }
+
+  .btn:hover { background: var(--card); }
+  .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+  .btn-danger:hover { background: var(--flash-error-bg); }
+  .stav-slot .btn.pay-doklad:hover { background: var(--flash-warning-bg); }
+
+  .seg span:hover,
+  .seg a:hover { color: var(--muted); }
+  .seg span.on:hover,
+  .seg a.on:hover { color: var(--ink); }
+
+  .chip:hover { background: var(--line); color: var(--muted); }
+
+  .modal-close:hover { background: transparent; color: var(--muted); }
+  .row-del:hover { background: transparent; color: var(--muted); }
+  .badge-btn:hover { filter: none; }
+
+  .firma-pick__item:hover { background: none; }
+  .firma-pick__item.on:hover { background: var(--card); }
+
+  .dn-ukony__head:hover { background: var(--card); }
+
+  .orv-last:hover { background: var(--card); }
+  .orv-open-ukon:hover { background: transparent; }
+
+  /* The pressed payer chip must stay accent-coloured after the tap. */
+  .dn-payer[aria-pressed="true"],
+  .dn-payer[aria-pressed="true"]:hover {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .recent-row:hover,
+  .ukony-item:hover,
+  .doklad-row:hover { background: transparent; }
+
+  /* The "possible duplicate" rows are tinted on purpose — keep the tint. */
+  .recent-row--incoming:hover {
+    background: color-mix(in srgb, var(--accent) 6%, var(--card));
+  }
+
+  tbody tr:hover td { background: transparent; }
+}
+
+/* ----------------------------------------------------------------------------
+   14. Reduced motion: no movement, opacity is allowed to stay
+   The shared base already collapses durations; these rules make the intent
+   explicit and keep the modal scrim fading instead of snapping.
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .ask-reveal,
+  .ask-table tbody tr,
+  .ask-thinking.is-in,
+  .flash,
+  .orv-preview[open] {
+    animation: none !important;
+  }
+
+  .modal-backdrop {
+    transition: opacity var(--dur-base) linear !important;
+  }
+
+  .modal-card,
+  .modal-stack .modal-card {
+    transition: opacity var(--dur-base) linear !important;
+    transform: none !important;
+  }
+
+  .modal-stack {
+    transition: opacity var(--dur-base) linear !important;
+  }
+
+  .firma-pick__list,
+  #ask-results,
+  #ask-verb,
+  .ask-verb,
+  .btn,
+  .btn-logout,
+  .badge-btn,
+  .row-del,
+  .modal-close,
+  .seg span,
+  .seg a,
+  .chip,
+  .dn-payer,
+  .dn-ukony__head,
+  .firma-pick__btn,
+  .firma-pick__item,
+  .orv-last,
+  .orv-open-ukon,
+  .orv-shutter,
+  .nav-ver,
+  .recent-row,
+  .ukony-item,
+  .doklad-row,
+  tbody td,
+  .doklad-chev::before,
+  .dn-ukony__chev {
+    transition: none !important;
+  }
+
+  .btn:active,
+  button:active,
+  [role="button"]:active,
+  .seg span:active,
+  .chip:active,
+  .modal-close:active,
+  .row-del:active {
+    transform: none !important;
+  }
+
+  .recent-row:active,
+  .doklad-row:active,
+  .ukony-item:active {
+    background: transparent;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   15. Safe areas (base.html already sets viewport-fit=cover)
+   In landscape the notch/speaker cut into the nav and the content edge.
+   max() keeps the existing 20 px / 16 px spacing when the inset is 0.
+   ------------------------------------------------------------------------- */
+@supports (padding: max(0px)) {
+  .topnav-inner,
+  .container {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+  }
+
+  @media (max-width: 900px) {
+    .topnav-inner {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .container {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+  }
+}
