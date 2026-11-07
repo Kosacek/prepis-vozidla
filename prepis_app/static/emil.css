@@ -1,0 +1,317 @@
+/* ============================================================================
+   emil.css — Emil Kowalski polish overlay for zadosti.spznaklic.cz
+   ----------------------------------------------------------------------------
+   Loaded from templates/index.html AFTER the big inline <style>, so every rule
+   here wins at equal specificity. Nothing here changes layout structure or
+   behaviour — only motion, press/hover/focus states, touch behaviour, numeric
+   alignment and safe-area padding. PDF generation and business logic untouched.
+
+   Section 1 is the shared foundation (copy of internal-apps/emil-base.css);
+   sections 2+ are the app-specific overlay, built from selectors actually used
+   in templates/index.html (line numbers refer to the inline <style> block).
+   ========================================================================== */
+
+/* ── 1. Foundation (emil-base.css) ───────────────────────────────────────── */
+
+:root {
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --dur-fast: 140ms;
+    --dur-base: 220ms;
+    --dur-enter: 320ms;
+}
+
+html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+}
+
+button,
+a,
+[role="button"],
+input[type="submit"] {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+}
+
+button,
+[role="button"],
+input[type="submit"],
+.btn {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+button:active,
+[role="button"]:active,
+input[type="submit"]:active,
+.btn:active {
+    transform: scale(0.97);
+}
+
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+    input, textarea, select { font-size: 16px; }
+}
+
+/* ── 2. Motion: named transitions (was transition: all) ──────────────────── */
+
+/* .step-circle (inline L73) animated every property, incl. shadow/border. */
+.step-circle {
+    transition: background-color var(--dur-base) var(--ease-out),
+                color var(--dur-base) var(--ease-out);
+}
+
+/* .btn (L433) / .btn-lookup (L214): "all" also animated box-shadow + layout. */
+.btn,
+.btn-lookup {
+    transition: background-color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+}
+
+/* .mode-card (L336) / .profil-card (L352). */
+.mode-card,
+.profil-card {
+    transition: border-color var(--dur-fast) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+}
+
+/* .cam-otocit (L460) animated width/max-width/margin on hover = layout work on
+   every pointer move. Width now snaps; only the ink and the label fade move. */
+.cam-otocit {
+    transition: border-color var(--dur-fast) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out);
+}
+.cam-otocit-label {
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+.cam-otocit .ico {
+    transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* .ask-verb (L512) had the generic "ease" keyword. */
+.ask-verb {
+    transition: opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+}
+
+/* .hl-chip (L545) had no transition at all: hover state popped in. */
+.hl-chip {
+    transition: background-color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+}
+
+/* ── 3. Press feedback ───────────────────────────────────────────────────── */
+/* The app only had :active on .btn-download (L373, a 1px translate). */
+
+.btn-download:active,
+a.hl-row:active,
+a.firm-chip:active,
+.hl-sdilet:active {
+    transform: scale(0.97);
+}
+
+.mode-card:active,
+.profil-card:active {
+    transform: scale(0.985);
+}
+
+/* Dropdown rows are divs, so they get the base "button" treatment by hand. */
+.firm-option:active:not(.active) {
+    background: var(--accent);
+}
+
+/* ── 4. Hover only where a pointer can actually hover ────────────────────── */
+/* The inline <style> has 31 un-guarded :hover rules. On touch they latch after
+   a tap (the control stays "hovered" until you tap elsewhere). The originals
+   stay for desktop; below restores the resting look for coarse pointers. */
+
+@media (hover: none), (pointer: coarse) {
+    .btn-lookup:hover          { background: var(--accent); color: var(--primary); }
+    .btn-primary:hover         { background: var(--primary); }
+    .btn-secondary:hover       { background: var(--card); }
+    .btn-download:hover        { background: var(--primary); }
+    .btn-print:hover           { background: var(--success); }
+    .btn-ppd:hover             { background: #7c3aed; }
+    .btn-ckp:hover             { background: #0e9f6e; }
+    .btn-sm:hover              { background: #fff; }
+    .btn-sm.danger:hover       { background: #fff; }
+    .hbtn:hover                { border-color: var(--border); background: #fff; color: var(--text); }
+    .hbtn:hover .ico           { color: var(--muted); }
+    .ask-go:hover              { background: var(--primary); }
+    .ask-nova:hover            { border-color: transparent; background: none; color: var(--muted); }
+    .scan-zone:hover           { border-color: var(--border); }
+    .firm-option:hover:not(.active) { background: transparent; }
+    .firm-chip:hover           { border-color: var(--border); background: #fff; color: var(--text); }
+    .firm-chip.dok-obnovit:hover     { border-color: #b9e5d1; background: #ecfdf5; color: var(--success); }
+    .firm-chip.firm-pm-chip:hover    { border-color: #b9e5d1; background: #ecfdf5; color: var(--success); }
+    .firm-chip.firm-chip-ghost:hover { border-color: var(--border); background: transparent; color: var(--muted); }
+    .firm-pm-remove:hover      { color: inherit; background: transparent; }
+    .firm-delete:hover         { border-color: transparent; background: transparent; color: var(--muted); }
+    .mode-card:hover:not(.selected)          { border-color: var(--border); background: transparent; }
+    .mode-card:hover:not(.selected) .mode-icon { background: var(--accent); color: var(--primary); }
+    .profil-card:hover         { border-color: var(--border); background: #fff; color: var(--text); }
+    .dok-card:hover:not(:focus-within)  { border-color: var(--border); background: transparent; }
+    .firm-card:hover:not(:focus-within) { border-color: var(--border); background: transparent; }
+    .hl-chip:hover:not(.on)    { background: #fff; border-color: var(--border); }
+    a.hl-row:hover             { background: transparent; border-color: var(--border); }
+    .hl-sdilet:hover           { color: var(--muted); border-color: var(--border); background: #fff; }
+    .cam-otocit:hover          { width: 34px; border-color: transparent; background: rgba(0, 0, 0, .55); }
+    .cam-otocit:hover .cam-otocit-label { max-width: 0; margin-right: 0; opacity: 0; }
+
+    /* "Co je nového" partial loads after this file, so it needs the extra
+       element in the selector to win at equal specificity. */
+    html .wn-ok:hover          { background: var(--wn-accent, var(--primary)); }
+    html .app-ver:hover        { color: #bbb; background: none; }
+}
+
+/* Desktop-only hover that the app already gated (firm-delete) stays as is. */
+
+/* ── 5. Focus ────────────────────────────────────────────────────────────── */
+/* inline L195 / L338 / L354 / L455 switch the outline off. Inputs kept a border
+   tint as their only cue — invisible for low-vision / keyboard users. */
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* The green "length is exactly right" cue keeps its colour, ring included. */
+input.len-check.len-ok:focus-visible {
+    outline-color: #10b981;
+}
+
+.modal-close:focus-visible,
+.btn-download:focus-visible,
+.ask-go:focus-visible,
+.wn-ok:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* ── 6. Touch & mobile ───────────────────────────────────────────────────── */
+
+/* Coarse pointer: iOS zooms the page when a focused field is under 16px. The
+   inline rules set these by id/class and beat the generic input rule. */
+@media (pointer: coarse) {
+    #firmy-search,
+    #doklady-search,
+    #hledani-q,
+    input.firm-id-input {
+        font-size: 16px;
+    }
+}
+
+/* Tap targets that are divs/labels with click handlers: no grey flash, no
+   double-tap-zoom delay. */
+.mode-card,
+.profil-card,
+.scan-zone,
+.firm-option,
+.dok-card,
+.firm-card,
+.hl-row {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mode-card,
+.profil-card,
+.scan-zone,
+.firm-option {
+    touch-action: manipulation;
+}
+
+/* Keyboard-only shortcut bar ("Enter další krok / Esc zpět / Ctrl+Enter") is
+   dead text on a phone, and the app already hides the ↵ badges there for the
+   same reason. Same query as the app's own badge rule. */
+@media (hover: none) and (pointer: coarse) {
+    .kb-hints { display: none; }
+}
+
+/* Inner scrollers must not hand the gesture to the page (pull-to-refresh used
+   to reload the whole wizard mid-scroll on Android). */
+.modal-body,
+#firmy-modal-body,
+#doklady-modal-body,
+#hledani-body,
+.firm-dropdown {
+    overscroll-behavior: contain;
+}
+
+/* Mobile browsers: 100vh includes the collapsing URL bar → phantom scroll. */
+body {
+    min-height: 100svh;
+}
+
+/* ── 7. Numbers ──────────────────────────────────────────────────────────── */
+/* Kč amounts, VIN tails, dates and step numbers jump when the glyph widths
+   change; tabular figures keep the column still. */
+.summary-row,
+.summary-val,
+.hl-kc,
+.hl-when,
+.dok-castka,
+.firm-count,
+.sdilet-kod,
+.step-circle {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── 8. Safe area (viewport-fit=cover is set in index.html) ──────────────── */
+
+.nav-bar {
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.container {
+    padding-bottom: calc(var(--nav-h) + 28px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-header {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-left: calc(32px + env(safe-area-inset-left, 0px));
+    padding-right: calc(32px + env(safe-area-inset-right, 0px));
+}
+
+/* ── 9. Reduced motion ───────────────────────────────────────────────────── */
+/* Foundation already zeroes durations; movement is dropped too, opacity and
+   the state colours stay. */
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    button:active,
+    [role="button"]:active,
+    input[type="submit"]:active,
+    .btn:active,
+    .btn-download:active,
+    .mode-card:active,
+    .profil-card:active,
+    a.hl-row:active,
+    a.firm-chip:active,
+    .hl-sdilet:active {
+        transform: none;
+    }
+}

@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Přepis vozidla</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -633,6 +633,10 @@
     .subtitle { display: none; }
   }
 </style>
+<!-- Emil polish overlay: motion, press/hover/focus states, touch behaviour.
+     Loaded after the inline style on purpose so its rules win at equal
+     specificity. Scoped to this app's own selectors; no layout changes. -->
+<link rel="stylesheet" href="{{ url_for('static', filename='emil.css') }}?v={{ APP_VERSION }}">
 </head>
 <body>
 
