@@ -100,9 +100,10 @@ def make(conn):
     ({"orv": "UBE037263"}, "doplneno", ["rz"]),
     ({"rz": "5AB1234"}, "doplneno", ["orv"]),
     ({"rz": " 5ab-1234 ", "orv": " ube 037263 "}, "uz_doplneno", []),
-    ({"rz": "9ZZ9999"}, "doplneno", ["rz", "orv"]),
+    # A stored plate is never replaced by a photo: it goes to review instead.
+    ({"rz": "9ZZ9999"}, "konflikt", ["orv"]),
     ({"orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
-    ({"rz": "9ZZ9999", "orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
+    ({"rz": "9ZZ9999", "orv": "ABC123456"}, "konflikt", ["orv"]),
 ])
 def test_fill_matrix(conn, make, fields, expected, changes):
     uid = make(**fields)
@@ -115,14 +116,46 @@ def test_fill_matrix(conn, make, fields, expected, changes):
                               "typ": "ZÁPIS", "celkem": 1300.0,
                               "stav_platby": "nezaplaceno", "poznamka": None}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
-    overwritten = [k for k, v in fields.items() if v.strip().upper().replace(" ", "").replace("-", "")
-                   != (DATA["orv_cislo"] if k == "orv" else DATA[k])]
+    overwritten = [k for k, v in fields.items() if k != "rz" and v.strip().upper().replace(" ", "").replace("-", "")
+                   != DATA["orv_cislo"]]
     assert result.get("prepsano", []) == overwritten
+    if expected == "konflikt":
+        assert after["rz"] == fields["rz"]
+        assert result["konflikt"] == {"pole": "rz", "evidence": fields["rz"], "foto": DATA["rz"],
+                                      "ponechano": True}
     for key in overwritten:
         assert result["zmeny"][key]["pred"] == fields[key]
     for key in changes:
         assert after[key] == DATA["orv_cislo" if key == "orv" else key]
     assert not conn.in_transaction
+
+
+def test_photo_never_overwrites_a_plate_already_in_evidence(conn, make):
+    # 2026-11-09, úkon #1646: žádosti stored 1AKI998, the scan read 1AKT998
+    # (I misread as T) and overwrote it. The new techničák's ORV number is
+    # legitimately new after a change of owner and the registry confirmed it.
+    uid = make(rz="1AKI998", orv="UBM028561")
+    photo = {**DATA, "rz": "1AKT998", "vin": None, "orv_cislo": "UBP586755"}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo),
+                          lookup=lambda _orv: {"success": True, "vin": VIN})
+    row = ukony_repo.get(conn, uid)
+    assert row["rz"] == "1AKI998"
+    assert row["orv"] == "UBP586755"
+    assert result["stav"] == "konflikt" and result["ukon"]["id"] == uid
+    assert result["konflikt"] == {"pole": "rz", "evidence": "1AKI998", "foto": "1AKT998",
+                                  "ponechano": True}
+    assert result["doplneno"] == ["orv"] and result["prepsano"] == ["orv"]
+    assert result["zmeny"] == {"orv": {"pred": "UBM028561", "po": "UBP586755"}}
+    assert not conn.in_transaction
+
+
+def test_plate_mismatch_alone_changes_nothing(conn, make):
+    uid = make(rz="1AKI998", orv=DATA["orv_cislo"])
+    before = dict(ukony_repo.get(conn, uid))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "rz": "1AK1998"}))
+    assert dict(ukony_repo.get(conn, uid)) == before
+    assert result["stav"] == "konflikt" and result["doplneno"] == []
+    assert result["konflikt"]["evidence"] == "1AKI998" and result["konflikt"]["foto"] == "1AK1998"
 
 
 def test_vin_preference_creates_even_if_rz_belongs_to_another_vin(conn, make):
@@ -223,9 +256,11 @@ def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
     old = make(datum=(date.today() - timedelta(days=1)).isoformat(), rz="1AA1111", orv="AAA111111")
     new = make(datum=RECENT, rz="1AA1111", orv="AAA111111")
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
-    assert result["stav"] == "doplneno" and result["ukon"]["id"] == new
-    assert result["prepsano"] == ["rz", "orv"]
+    # The plate differs, so the newest úkon gets the new ORV and goes to review.
+    assert result["stav"] == "konflikt" and result["ukon"]["id"] == new
+    assert result["prepsano"] == ["orv"]
     assert ukony_repo.get(conn, new)["orv"] == DATA["orv_cislo"]
+    assert ukony_repo.get(conn, new)["rz"] == "1AA1111"
     assert ukony_repo.get(conn, old)["orv"] == "AAA111111"
 
 

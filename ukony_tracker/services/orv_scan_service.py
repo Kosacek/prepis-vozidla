@@ -9,7 +9,7 @@ from repositories import firmy_repo, typy_repo, ukony_repo
 from services import orv_service, pricing_service
 from services.firma_match import match_firma, same_party
 from services.ingest_service import derive_stav, pridat_ukon
-from services.vehicle_fill_service import FillError, doplnit, transaction
+from services.vehicle_fill_service import FillError, doplnit, normalize, transaction
 
 MODEL = "claude-haiku-5-5"
 # Which existing úkon a techničák belongs to (David 2026-10-21/23):
@@ -181,11 +181,27 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             if not values:
                 result.update(stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
                 return result
-            filled = doplnit(conn, row["id"], values, prepsat=True)
+            # A plate already in evidence came from žádosti or a person and the
+            # registry can't confirm a photo read, so the photo never replaces it
+            # (2026-11-09, #1646: 1AKI998 overwritten by the misread 1AKT998).
+            # A mismatch keeps the stored plate and goes to review; the ORV
+            # number is still written, as a new techničák brings a new one.
+            stored_rz = (row["rz"] or "").strip()
+            kept_rz = values.get("rz") if stored_rz and normalize(stored_rz) != values.get("rz") else None
+            writable = {k: v for k, v in values.items() if not (k == "rz" and kept_rz)}
+            filled = (doplnit(conn, row["id"], writable, prepsat=True) if writable
+                      else {"zmeneno": [], "prepsano": []})
             result["doplneno"] = filled["zmeneno"]
             result["prepsano"] = filled["prepsano"]
-            result["zmeny"] = {field: {"pred": row[field], "po": filled[field]} for field in values}
+            result["zmeny"] = {field: {"pred": row[field], "po": filled[field]}
+                               for field in writable}
             changed = filled["zmeneno"]
+            if kept_rz:
+                result["konflikt"] = {"pole": "rz", "evidence": stored_rz, "foto": kept_rz,
+                                      "ponechano": True}
+                result.update(stav="konflikt",
+                              zprava="RZ na fotce se liší od evidence — ponechána RZ z evidence.")
+                return result
             message = ("Přepsáno podle fotky." if filled["prepsano"] else
                        "Doplněno." if changed else "Údaje souhlasí.")
             result.update(stav="doplneno" if changed else "uz_doplneno", zprava=message)

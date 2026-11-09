@@ -580,8 +580,12 @@
       const box = el('div', 'orv-conflict');
       box.append(el('b', 'orv-conflict-label', FIELD_LABELS[conflict.pole] || 'Hodnota'),
         el('span', '', ' V evidenci: ' + (conflict.evidence || '—') +
+          (conflict.ponechano ? ' (ponecháno)' : '') +
           ' · Na fotce: ' + (conflict.foto || '—')));
       body.append(box);
+      // The plate was kept, but the new ORV may still have been written.
+      const written = changesNode(result);
+      if (written) body.append(written);
     }
     const meta = metaNode([vinItem(result), earlier(result),
       result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
