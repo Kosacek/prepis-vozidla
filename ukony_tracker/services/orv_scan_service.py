@@ -21,6 +21,25 @@ MODEL = "claude-haiku-5-5"
 #   the old úkon stays untouched and the user decides about a new one.
 MATCH_WINDOW_DAYS = 1
 AWAITING_WINDOW_DAYS = 30
+# Plates get exchanged (David 2026-11-09: 1AKI988 → 3BN4796, a whole new
+# number), so the photo may replace a stored plate. A read at most this many
+# character edits away from the stored plate is a misread and is ignored.
+MISREAD_MAX_EDITS = 2
+
+
+def _edits(a, b):
+    """Levenshtein distance: substituted, missing or extra characters."""
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        current = [i]
+        for j, cb in enumerate(b, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca != cb)))
+        previous = current
+    return previous[-1]
+
+
+def _misread_plate(stored, photo):
+    return bool(stored and photo and stored != photo and _edits(stored, photo) <= MISREAD_MAX_EDITS)
 
 
 def _new_owner(prevod):
@@ -181,14 +200,13 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             if not values:
                 result.update(stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
                 return result
-            # A plate already in evidence came from žádosti or a person and the
-            # registry can't confirm a photo read, so the photo never replaces it
-            # (2026-11-09, #1646: 1AKI998 overwritten by the misread 1AKT998).
-            # A mismatch keeps the stored plate and goes to review; the ORV
-            # number is still written, as a new techničák brings a new one.
-            stored_rz = (row["rz"] or "").strip()
-            kept_rz = values.get("rz") if stored_rz and normalize(stored_rz) != values.get("rz") else None
-            writable = {k: v for k, v in values.items() if not (k == "rz" and kept_rz)}
+            # A plate one or two characters off the stored one is a misread, never
+            # an exchange (#1646: I read as T, 1AKI998 → 1AKT998): the stored
+            # plate stays. A real exchange is a whole new number (1AKI988 →
+            # 3BN4796) and still replaces it, shown on the card as old → new.
+            stored_rz = normalize(row["rz"] or "")
+            misread = _misread_plate(stored_rz, values.get("rz"))
+            writable = {k: v for k, v in values.items() if not (k == "rz" and misread)}
             filled = (doplnit(conn, row["id"], writable, prepsat=True) if writable
                       else {"zmeneno": [], "prepsano": []})
             result["doplneno"] = filled["zmeneno"]
@@ -196,14 +214,12 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             result["zmeny"] = {field: {"pred": row[field], "po": filled[field]}
                                for field in writable}
             changed = filled["zmeneno"]
-            if kept_rz:
-                result["konflikt"] = {"pole": "rz", "evidence": stored_rz, "foto": kept_rz,
-                                      "ponechano": True}
-                result.update(stav="konflikt",
-                              zprava="RZ na fotce se liší od evidence — ponechána RZ z evidence.")
-                return result
             message = ("Přepsáno podle fotky." if filled["prepsano"] else
                        "Doplněno." if changed else "Údaje souhlasí.")
+            if misread:
+                result["rz"] = row["rz"]
+                result["rz_ponechano"] = {"evidence": row["rz"], "foto": values["rz"]}
+                message += f" RZ ponechána, na fotce přečteno {values['rz']}."
             result.update(stav="doplneno" if changed else "uz_doplneno", zprava=message)
             return result
 

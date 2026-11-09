@@ -100,10 +100,9 @@ def make(conn):
     ({"orv": "UBE037263"}, "doplneno", ["rz"]),
     ({"rz": "5AB1234"}, "doplneno", ["orv"]),
     ({"rz": " 5ab-1234 ", "orv": " ube 037263 "}, "uz_doplneno", []),
-    # A stored plate is never replaced by a photo: it goes to review instead.
-    ({"rz": "9ZZ9999"}, "konflikt", ["orv"]),
+    ({"rz": "9ZZ9999"}, "doplneno", ["rz", "orv"]),
     ({"orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
-    ({"rz": "9ZZ9999", "orv": "ABC123456"}, "konflikt", ["orv"]),
+    ({"rz": "9ZZ9999", "orv": "ABC123456"}, "doplneno", ["rz", "orv"]),
 ])
 def test_fill_matrix(conn, make, fields, expected, changes):
     uid = make(**fields)
@@ -116,13 +115,9 @@ def test_fill_matrix(conn, make, fields, expected, changes):
                               "typ": "ZÁPIS", "celkem": 1300.0,
                               "stav_platby": "nezaplaceno", "poznamka": None}
     assert all(before[k] == after[k] for k in before if k not in changes + ["updated_at"])
-    overwritten = [k for k, v in fields.items() if k != "rz" and v.strip().upper().replace(" ", "").replace("-", "")
-                   != DATA["orv_cislo"]]
+    overwritten = [k for k, v in fields.items() if v.strip().upper().replace(" ", "").replace("-", "")
+                   != (DATA["orv_cislo"] if k == "orv" else DATA[k])]
     assert result.get("prepsano", []) == overwritten
-    if expected == "konflikt":
-        assert after["rz"] == fields["rz"]
-        assert result["konflikt"] == {"pole": "rz", "evidence": fields["rz"], "foto": DATA["rz"],
-                                      "ponechano": True}
     for key in overwritten:
         assert result["zmeny"][key]["pred"] == fields[key]
     for key in changes:
@@ -130,7 +125,7 @@ def test_fill_matrix(conn, make, fields, expected, changes):
     assert not conn.in_transaction
 
 
-def test_photo_never_overwrites_a_plate_already_in_evidence(conn, make):
+def test_a_misread_plate_never_overwrites_the_stored_one(conn, make):
     # 2026-11-09, úkon #1646: žádosti stored 1AKI998, the scan read 1AKT998
     # (I misread as T) and overwrote it. The new techničák's ORV number is
     # legitimately new after a change of owner and the registry confirmed it.
@@ -139,23 +134,42 @@ def test_photo_never_overwrites_a_plate_already_in_evidence(conn, make):
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo),
                           lookup=lambda _orv: {"success": True, "vin": VIN})
     row = ukony_repo.get(conn, uid)
-    assert row["rz"] == "1AKI998"
-    assert row["orv"] == "UBP586755"
-    assert result["stav"] == "konflikt" and result["ukon"]["id"] == uid
-    assert result["konflikt"] == {"pole": "rz", "evidence": "1AKI998", "foto": "1AKT998",
-                                  "ponechano": True}
+    assert row["rz"] == "1AKI998" and row["orv"] == "UBP586755"
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert result["rz"] == "1AKI998"
+    assert result["rz_ponechano"] == {"evidence": "1AKI998", "foto": "1AKT998"}
     assert result["doplneno"] == ["orv"] and result["prepsano"] == ["orv"]
     assert result["zmeny"] == {"orv": {"pred": "UBM028561", "po": "UBP586755"}}
     assert not conn.in_transaction
 
 
-def test_plate_mismatch_alone_changes_nothing(conn, make):
+def test_a_real_plate_exchange_replaces_the_stored_plate(conn, make):
+    # David 2026-11-09: plates get exchanged, 1AKI988 → 3BN4796 is a new number.
+    uid = make(rz="1AKI988", orv="UBM028561")
+    photo = {**DATA, "rz": "3BN4796", "vin": None, "orv_cislo": "UBP586755"}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo),
+                          lookup=lambda _orv: {"success": True, "vin": VIN})
+    assert ukony_repo.get(conn, uid)["rz"] == "3BN4796"
+    assert result["stav"] == "doplneno" and result["prepsano"] == ["rz", "orv"]
+    assert result["zmeny"]["rz"] == {"pred": "1AKI988", "po": "3BN4796"}
+    assert "rz_ponechano" not in result
+
+
+@pytest.mark.parametrize("photo_rz,kept", [
+    ("1AKT998", True),    # one look-alike character (I → T)
+    ("1AK1998", True),    # I → 1
+    ("1AKT99B", True),    # two characters
+    ("1AK998", True),     # one character missing
+    ("1AKT9B8X", False),  # three edits: treated as a real change
+    ("3BN4796", False),   # a new plate
+])
+def test_misread_threshold(conn, make, photo_rz, kept):
     uid = make(rz="1AKI998", orv=DATA["orv_cislo"])
-    before = dict(ukony_repo.get(conn, uid))
-    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "rz": "1AK1998"}))
-    assert dict(ukony_repo.get(conn, uid)) == before
-    assert result["stav"] == "konflikt" and result["doplneno"] == []
-    assert result["konflikt"]["evidence"] == "1AKI998" and result["konflikt"]["foto"] == "1AK1998"
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient({**DATA, "rz": photo_rz}))
+    stored = ukony_repo.get(conn, uid)["rz"]
+    assert stored == ("1AKI998" if kept else photo_rz)
+    assert result["stav"] == ("uz_doplneno" if kept else "doplneno")
+    assert ("rz_ponechano" in result) is kept
 
 
 def test_vin_preference_creates_even_if_rz_belongs_to_another_vin(conn, make):
@@ -256,11 +270,9 @@ def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
     old = make(datum=(date.today() - timedelta(days=1)).isoformat(), rz="1AA1111", orv="AAA111111")
     new = make(datum=RECENT, rz="1AA1111", orv="AAA111111")
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
-    # The plate differs, so the newest úkon gets the new ORV and goes to review.
-    assert result["stav"] == "konflikt" and result["ukon"]["id"] == new
-    assert result["prepsano"] == ["orv"]
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == new
+    assert result["prepsano"] == ["rz", "orv"]
     assert ukony_repo.get(conn, new)["orv"] == DATA["orv_cislo"]
-    assert ukony_repo.get(conn, new)["rz"] == "1AA1111"
     assert ukony_repo.get(conn, old)["orv"] == "AAA111111"
 
 

@@ -336,6 +336,14 @@
     rows.forEach(row => box.append(row));
     return box;
   }
+  // A plate one or two characters off the stored one is a misread: the stored
+  // plate stayed, and the card says what the photo read (2026-11-09, I → T).
+  function keptPlateNode(result) {
+    const kept = result && result.rz_ponechano;
+    if (!kept) return null;
+    return el('div', 'orv-change orv-kept', 'RZ ponechána ' + (kept.evidence || '—') +
+      ' · na fotce ' + (kept.foto || '—'));
+  }
   function priceText(value) { return value == null ? '—' : kc(value); }
   function fillPrice(node, value, withLabel) {
     node.replaceChildren();
@@ -580,12 +588,8 @@
       const box = el('div', 'orv-conflict');
       box.append(el('b', 'orv-conflict-label', FIELD_LABELS[conflict.pole] || 'Hodnota'),
         el('span', '', ' V evidenci: ' + (conflict.evidence || '—') +
-          (conflict.ponechano ? ' (ponecháno)' : '') +
           ' · Na fotce: ' + (conflict.foto || '—')));
       body.append(box);
-      // The plate was kept, but the new ORV may still have been written.
-      const written = changesNode(result);
-      if (written) body.append(written);
     }
     const meta = metaNode([vinItem(result), earlier(result),
       result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
@@ -642,6 +646,8 @@
       const changes = changesNode(result);
       if (changes) body.append(changes);
     }
+    const kept = keptPlateNode(result);
+    if (kept) body.append(kept);
     if (ukon.id) {
       const actions = el('div', 'orv-card-actions');
       const open = el('button', 'btn btn-primary orv-open-written', 'Otevřít a upravit úkon');
