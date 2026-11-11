@@ -654,7 +654,9 @@ def test_happy_json_sniffs_bytes_and_logs(client, vision, monkeypatch):
     result = post(client, mime="application/octet-stream")
     assert result.status_code == 200 and result.json["stav"] == "doplneno"
     assert result.json["ukon"]["id"] == uid and result.json["doplneno"] == ["rz", "orv"]
-    assert len(logs) == 1 and logs[0][1:3] == ("doplneno", uid) and logs[0][-1] == 125
+    assert len(logs) == 1 and logs[0][1:3] == ("doplneno", uid) and logs[0][5] == 125
+    # The raw reading is logged too, so "nečitelné" can be explained later.
+    assert logs[0][6:] == ("5AB1234", "UBE037263", "UBE037263")
 
 
 def test_rate_limit_session_and_window(client, vision, monkeypatch):
@@ -686,3 +688,94 @@ def test_supported_images_converted_in_memory(fmt):
         register_heif_opener()
     data, mime = orv_images.prepare(photo(fmt))
     assert mime == "image/jpeg" and data.startswith(b'\xff\xd8\xff')
+
+
+# -- 2026-11-11: 4444PARK and 2BP1720 ----------------------------------------
+
+@pytest.mark.parametrize("raw,fixed", [
+    ("UB0056935", "UBO056935"),   # 4444PARK: series O read as zero
+    ("UBE03726O", "UBE037260"),   # number zero read as O
+    ("U8E037263", "UBE037263"),
+    ("UB037263", None),           # a missing character is never invented
+    ("UBE０３７２６３", None),
+])
+def test_orv_lookalikes_become_a_candidate_never_the_reading(raw, fixed):
+    result = scan.extract(b"p", "image/jpeg", client=FakeClient({**DATA, "orv_cislo": raw}))
+    assert result["orv_cislo"] is None
+    assert result.get("orv_oprava") == fixed
+
+
+def test_orv_with_zero_for_o_fills_once_the_registry_confirms_it(conn, make):
+    # 4444PARK: ORV UBO056935, read three times as UB0056935 and rejected as
+    # unreadable. Letters only in the series, digits only in the number, and
+    # the registry has to know the fixed number before it is used.
+    uid = make(typ_kod="NOVÉ", datum=(date.today() - timedelta(days=6)).isoformat(),
+               prevod="Jazyková škola P.A.R.K. s.r.o.")
+    read = {**DATA, "rz": "4444PARK", "vin": None, "orv_cislo": "UB0056935"}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(read),
+                          lookup=registry({"UBO056935": VIN}))
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    row = ukony_repo.get(conn, uid)
+    assert (row["rz"], row["orv"]) == ("4444PARK", "UBO056935")
+
+
+def test_unconfirmed_orv_fix_changes_nothing(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    before = dict(ukony_repo.get(conn, uid))
+    read = {**DATA, "vin": None, "orv_cislo": "UB0056935"}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(read), lookup=registry({}))
+    assert result["stav"] == "necitelne"
+    assert dict(ukony_repo.get(conn, uid)) == before
+
+
+def test_new_car_with_a_confirmed_orv_fix_read_twice_is_offered(conn):
+    read = {**DATA, "vin": None, "orv_cislo": "UB0056935"}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(read),
+                          lookup=registry({"UBO056935": VIN}))
+    assert result["stav"] == "bez_firmy"
+    assert (result["orv_cislo"], result["vin"]) == ("UBO056935", VIN)
+
+
+def _car(result):
+    return {k: result[k] for k in ("rz", "vin", "orv_cislo", "provozovatel", "vin_zdroj")}
+
+
+def test_new_owner_on_the_orv_is_another_sale_not_a_duplicate(conn, make):
+    # 2BP1720: JE & NE bought it on 7. 10. and sells it on now. The ORV names a
+    # new owner, so it is a new úkon — no "Přesto založit", and the new owner
+    # is written on it.
+    old = make(datum=(date.today() - timedelta(days=35)).isoformat(), rz="2BP1720",
+               orv="UBC162708", prevod="PLACHÝ JIŘÍ → JE & NE, spol. s r.o.")
+    before = dict(ukony_repo.get(conn, old))
+    read = {**DATA, "rz": "2BP1720", "orv_cislo": "UBP586066", "provozovatel": "ACC Automotive s.r.o."}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(read))
+    assert result["stav"] == "bez_firmy" and result["predchozi"]["id"] == old
+    assert "existujici" not in result and not result.get("vyzaduje_potvrzeni")
+    made = scan.zalozit_pro_firmu(conn, _car(result), firma_id=before["firma_id"], typ_kod="KOLA")
+    assert made["stav"] == "zalozeno"
+    assert ukony_repo.get(conn, made["ukon"]["id"])["prevod"] == \
+        "JE & NE, spol. s r.o. → ACC Automotive s.r.o."
+    assert dict(ukony_repo.get(conn, old)) == before
+
+
+@pytest.mark.parametrize("operator", ["KOLACEK JAROSLAV", None])
+def test_same_or_unread_owner_still_asks_before_a_second_ukon(conn, make, operator):
+    # 1AKI647 (5. 11.): the same sale scanned again must not double the úkon.
+    old = make(datum=(date.today() - timedelta(days=35)).isoformat(),
+               prevod="ŠKOFIN S.R.O. → JAROSLAV KOLACEK")
+    result = scan.zpracuj(conn, b"p", "image/jpeg",
+                          client=FakeClient({**DATA, "provozovatel": operator}))
+    assert result["vyzaduje_potvrzeni"] is True and result["existujici"][0]["id"] == old
+    blocked = scan.zalozit_pro_firmu(conn, _car(result), firma_id=ukony_repo.get(conn, old)["firma_id"],
+                                     typ_kod="KOLA")
+    assert blocked["stav"] == "jiz_v_evidence"
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_a_car_new_to_evidence_gets_its_owner_written(conn, make):
+    fid = ukony_repo.get(conn, make(vin="TMBAAAAAA00000009"))["firma_id"]
+    made = scan.zalozit_pro_firmu(conn, {"rz": "5AB1234", "vin": VIN, "orv_cislo": "UBE037263",
+                                         "provozovatel": "BSAuto s.r.o.", "vin_zdroj": "foto"},
+                                  firma_id=fid, typ_kod="KOLA")
+    assert made["stav"] == "zalozeno"
+    assert ukony_repo.get(conn, made["ukon"]["id"])["prevod"] == "→ BSAuto s.r.o."

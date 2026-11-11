@@ -56,6 +56,20 @@ def _same_sale(ukon, data, values):
         return False
     # Unknown owner on either side → the date alone decides.
     return same_party(_new_owner(ukon["prevod"]), data.get("provozovatel")) is not False
+
+
+def _another_sale(ukon, data):
+    """The ORV names a different new owner than that úkon's sale did."""
+    return same_party(_new_owner(ukon["prevod"]), data.get("provozovatel")) is False
+
+
+def _prevod(older, data):
+    """Owner line for an úkon created from the scan: "previous → ORV owner"."""
+    new = (data.get("provozovatel") or "").strip()
+    if not new:
+        return None
+    previous = next((_new_owner(u["prevod"]) for u in older if _new_owner(u["prevod"])), None)
+    return f"{previous} → {new}" if previous else f"→ {new}"
 tokens = ContextVar("orv_scan_tokens", default=0)
 PROMPT = """Přečti přední stranu českého Osvědčení o registraci vozidla, část I.
 Fotka může být natočená, vzhůru nohama, zkosená nebo s odleskem.
@@ -90,6 +104,21 @@ TOOL = {
 }
 PATTERNS = {"rz": r"[A-Z0-9]{5,8}", "vin": r"[A-Z0-9]{5,17}",
             "orv_cislo": r"[A-Z]{3}[0-9]{6}"}
+# The red ORV number is 3 letters + 6 digits, so a look-alike on the wrong
+# side can only be a misread (2026-11-11, 4444PARK: UBO056935 read three times
+# as UB0056935). The fixed number is only a candidate: it is used once the
+# registry knows it (_with_registry_vin), never on its own.
+SERIES_LOOKALIKES = str.maketrans("01258", "OIZSB")
+NUMBER_LOOKALIKES = str.maketrans("OQIZSB", "001258")
+# Raw ORV readings of this request, for the scan log line.
+raw_orv = ContextVar("orv_scan_raw_orv", default=())
+
+
+def _orv_candidate(value):
+    if len(value) != 9:
+        return None
+    fixed = value[:3].translate(SERIES_LOOKALIKES) + value[3:].translate(NUMBER_LOOKALIKES)
+    return fixed if fixed != value and re.fullmatch(PATTERNS["orv_cislo"], fixed) else None
 
 
 class ScanUnavailable(RuntimeError):
@@ -130,6 +159,11 @@ def extract(image_bytes, media_type, *, client=None, prompt=PROMPT) -> dict:
             value = data.get(key)
             value = re.sub(r"[\s-]", "", value).upper() if isinstance(value, str) else ""
             result[key] = value if re.fullmatch(pattern, value) else None
+            if key == "orv_cislo":
+                raw_orv.set(raw_orv.get() + (value or "-",))
+                candidate = None if result[key] else _orv_candidate(value)
+                if candidate:
+                    result["orv_oprava"] = candidate
         operator = data.get("provozovatel")
         result["provozovatel"] = re.sub(r"\s+", " ", operator).strip()[:120] if isinstance(operator, str) else None
         if not result["provozovatel"]:
@@ -178,13 +212,17 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             rz=None if data.get("vin_zdroj") == "registr" else data.get("rz"), limit=-1)
         rows = [u for u in found if _same_sale(u, data, values)]
         other = [u for u in found if u not in rows]
+        if other:
+            result["predchozi"] = _view(other[0])
         # Starší úkony téhož auta (mimo okno automatického doplnění) jsou možné
         # duplicity: klient dostane `existujici` a bez `potvrdit_novy` se nový
-        # úkon nezaloží (2026-11-05, RZ 1AKI647: #1537 vs. #1573).
-        existujici = [_view(u) for u in other[:5]]
-        if existujici:
-            result["existujici"] = existujici
-            result["predchozi"] = existujici[0]
+        # úkon nezaloží (2026-11-05, RZ 1AKI647: #1537 vs. #1573). Když ale ORV
+        # jmenuje jiného nového majitele, je to další prodej, ne duplicita
+        # (2026-11-11, 2BP1720: 7. 10. koupilo JE & NE, teď prodává dál).
+        duplicates = [u for u in other if not _another_sale(u, data)]
+        if duplicates:
+            result["existujici"] = [_view(u) for u in duplicates[:5]]
+            result["predchozi"] = result["existujici"][0]
             result["vyzaduje_potvrzeni"] = True
         if len(rows) > 1:
             candidates = [u for u in rows if any(not (u[k] or "").strip() for k in values)]
@@ -254,10 +292,10 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
         if not firm or not firm["aktivni"]:
             result.update(stav="bez_firmy", zprava="Firma není aktivní.")
             return result
-        if other and potvrdit_novy is not True:
+        if duplicates and potvrdit_novy is not True:
             # Duplicita bez vědomého potvrzení: nic se nezakládá a karta zůstává
             # v sekci k doplnění, dokud uživatel nezaškrtne „Přesto založit nový úkon“.
-            prvni = _view(other[0])
+            prvni = _view(duplicates[0])
             result.update(
                 stav="jiz_v_evidence", ukon=prvni,
                 zprava=(f"Toto auto už má úkon #{prvni['id']} "
@@ -270,7 +308,8 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
         uid = pridat_ukon(
             conn, firma_id=firma_id, datum=today, typ_kod=typ_kod, celkem=price,
             rz=data.get("rz"), vin=data.get("vin"), orv=data.get("orv_cislo"),
-            poznamka=poznamka, zpracoval=zpracoval, zdroj="orv_sken", commit=False,
+            poznamka=poznamka, prevod=_prevod(other, data), zpracoval=zpracoval,
+            zdroj="orv_sken", commit=False,
         )
         result["ukon"] = {"id": uid, "datum": today, "firma": firm["nazev"],
                            "firma_id": firm["id"], "firma_zkratka": firm["zkratka"] or firm["nazev"],
@@ -319,21 +358,37 @@ def zalozit_pro_firmu(conn, data, *, firma_id, typ_kod, zpracoval=None,
         return _fill_error(conn, data, exc)
 
 
-def _with_registry_vin(data, lookup):
-    """A front photo has no VIN: get it from the registry by the ORV number."""
-    data["vin_zdroj"] = "foto" if data.get("vin") else None
-    if data.get("vin") or not data.get("orv_cislo"):
-        return data
+def _registry_vin(orv, lookup):
     try:
         lookup_fn = lookup if lookup is not None else orv_service.lookup_vin
-        looked_up = lookup_fn(data["orv_cislo"])
+        looked_up = lookup_fn(orv)
         vin = looked_up.get("vin") if isinstance(looked_up, dict) and looked_up.get("success") else None
         vin = re.sub(r"[\s-]", "", vin).upper() if isinstance(vin, str) else ""
-        if re.fullmatch(PATTERNS["vin"], vin):
-            data["vin"] = vin
-            data["vin_zdroj"] = "registr"
+        return vin if re.fullmatch(PATTERNS["vin"], vin) else None
     except Exception:
-        pass
+        return None
+
+
+def _with_registry_vin(data, lookup):
+    """A front photo has no VIN: get it from the registry by the ORV number.
+
+    A look-alike-fixed number (orv_oprava) becomes the reading only when the
+    registry knows it, and agrees with the VIN on the photo if there is one.
+    """
+    data["vin_zdroj"] = "foto" if data.get("vin") else None
+    candidate = data.pop("orv_oprava", None)
+    if not data.get("orv_cislo") and candidate:
+        vin = _registry_vin(candidate, lookup)
+        if vin and data.get("vin") in (None, vin):
+            data["orv_cislo"] = candidate
+            if not data.get("vin"):
+                data["vin"], data["vin_zdroj"] = vin, "registr"
+        return data
+    if data.get("vin") or not data.get("orv_cislo"):
+        return data
+    vin = _registry_vin(data["orv_cislo"], lookup)
+    if vin:
+        data["vin"], data["vin_zdroj"] = vin, "registr"
     return data
 
 
@@ -358,7 +413,8 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
         tokens.set(spent + tokens.get())
     result["druhe_cteni"] = True
     first_orv = first.get("orv_cislo")
-    second_orv = again.get("orv_cislo") if again["typ"] == "orv" else None
+    # A look-alike fix counts as the reading here; the registry still decides.
+    second_orv = (again.get("orv_cislo") or again.get("orv_oprava")) if again["typ"] == "orv" else None
     if second_orv and second_orv != first_orv:
         data = _with_registry_vin({**again, "rz": again.get("rz") or first.get("rz"),
                                    "provozovatel": again.get("provozovatel") or first.get("provozovatel")},

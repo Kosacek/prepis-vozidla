@@ -661,3 +661,23 @@ test('written cards go to Zapsáno in scan order and review cards to their secti
 function hasClass(node, cls) {
   return node && String(node.className || '').split(/\s+/).includes(cls);
 }
+
+// -- 2026-11-11: a plate that disagrees with evidence is a question -------------
+// 2BP1720: Petr had typed WBP1720; the photo said 2BP1720, the stored plate was
+// kept as a "misread" and the card sat under ✓ Beze změny. Nobody saw it and
+// the car hid from search.
+test('a kept plate puts the card under Zkontroluj, never under Beze změny', () => {
+  const kept = photo(1, 'uz_doplneno', {rz_ponechano: {evidence: 'WBP1720', foto: '2BP1720'},
+    ukon: {id: 1687, celkem: 1800, typ: 'PŘEVOD', firma_id: 14}});
+  const fine = photo(2, 'uz_doplneno', {ukon: {id: 1680}});
+  assert.equal(R.needsAction(kept), true);
+  assert.deepEqual(R.reviewPhotos([kept, fine]).map(p => p.id), [1]);
+  assert.deepEqual(R.writtenPhotos([kept, fine]).map(p => p.id), [2]);
+  assert.deepEqual(R.totals([kept, fine]), {zalozeno: 0, doplneno: 0, uz_doplneno: 1, review: 1, necitelne: 0});
+  assert.equal(R.bannerState([kept, fine]).tone, 'warn');
+  const root = render([kept, fine]);
+  assert.deepEqual(issues(root).map(c => c.dataset.photo), ['1']);
+  const text = plain(allText(issues(root)[0]));
+  assert.ok(text.includes('Ke kontrole') && text.includes('WBP1720') && text.includes('2BP1720'), text);
+  assert.ok(text.includes('Otevřít a upravit úkon'), text);
+});

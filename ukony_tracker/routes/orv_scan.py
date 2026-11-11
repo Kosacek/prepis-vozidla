@@ -81,6 +81,7 @@ def scan():
     start = time.monotonic()
     result = {"stav": "chyba", "ukon": None}
     orv_scan_service.tokens.set(0)
+    orv_scan_service.raw_orv.set(())
     try:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return jsonify(error="Čtení fotek není nastavené."), 503
@@ -104,10 +105,13 @@ def scan():
     except Exception:
         return jsonify(error="Fotku se nepodařilo zpracovat. Zkuste to znovu."), 500
     finally:
-        logger.info("stav=%s ukon=%s ms=%d cteni=%d tokens=%d", result["stav"],
+        # What the reader actually saw (no names): "UB0056935" explains a
+        # "nečitelné" that a bare state never did (2026-11-11, 4444PARK).
+        logger.info("stav=%s ukon=%s ms=%d cteni=%d tokens=%d rz=%s orv=%s cteno=%s", result["stav"],
                     (result.get("ukon") or {}).get("id", "-"),
                     round((time.monotonic() - start) * 1000), 2 if result.get("druhe_cteni") else 1,
-                    orv_scan_service.tokens.get())
+                    orv_scan_service.tokens.get(), result.get("rz") or "-",
+                    result.get("orv_cislo") or "-", ",".join(orv_scan_service.raw_orv.get()) or "-")
 
 
 @bp.post("/ukony/orv-sken/zalozit")

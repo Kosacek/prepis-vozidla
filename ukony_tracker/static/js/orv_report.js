@@ -43,7 +43,12 @@
 
   function stateOf(photo) { return (photo && photo.result && photo.result.stav) || null; }
   function isWritten(photo) { return !!DONE[stateOf(photo)]; }
-  function needsAction(photo) { return !!stateOf(photo) && !isWritten(photo); }
+  // The photo's plate disagrees with evidence (kept as a misread). That is a
+  // question, not a ✓ — 2026-11-11 a typo WBP1720 hid 2BP1720 this way.
+  function plateQuestion(photo) { return !!(photo && photo.result && photo.result.rz_ponechano); }
+  function needsAction(photo) {
+    return !!stateOf(photo) && (!isWritten(photo) || plateQuestion(photo));
+  }
   function assignable(photo) { return !!ASSIGN[stateOf(photo)]; }
 
   function reviewRank(photo) {
@@ -55,7 +60,8 @@
   }
   function reviewPhotos(photos) { return sortPhotos(photos.filter(needsAction), reviewRank); }
   function writtenPhotos(photos) {
-    return sortPhotos(photos.filter(isWritten), p => DONE_ORDER[stateOf(p)] || 0);
+    return sortPhotos(photos.filter(p => isWritten(p) && !plateQuestion(p)),
+      p => DONE_ORDER[stateOf(p)] || 0);
   }
   function group(photos) { return reviewPhotos(photos).concat(writtenPhotos(photos)); }
 
@@ -72,7 +78,8 @@
     const out = {zalozeno: 0, doplneno: 0, uz_doplneno: 0, review: 0, necitelne: 0};
     photos.forEach(p => {
       const state = stateOf(p);
-      if (state === 'zalozeno' || state === 'doplneno' || state === 'uz_doplneno') out[state]++;
+      if (plateQuestion(p)) out.review++;
+      else if (state === 'zalozeno' || state === 'doplneno' || state === 'uz_doplneno') out[state]++;
       else if (state === 'necitelne') out.necitelne++;
       else if (state) out.review++;
     });
@@ -341,7 +348,7 @@
   function keptPlateNode(result) {
     const kept = result && result.rz_ponechano;
     if (!kept) return null;
-    return el('div', 'orv-change orv-kept', 'RZ ponechána ' + (kept.evidence || '—') +
+    return el('div', 'orv-change orv-kept', 'RZ v evidenci ' + (kept.evidence || '—') +
       ' · na fotce ' + (kept.foto || '—'));
   }
   function priceText(value) { return value == null ? '—' : kc(value); }
@@ -366,7 +373,8 @@
     const state = stateOf(photo);
     const chips = el('span', 'orv-chips');
     const overwritten = state === 'doplneno' && (result.prepsano || []).length;
-    chips.append(el('span', 'orv-status', overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
+    chips.append(el('span', 'orv-status', plateQuestion(photo) ? 'Ke kontrole' :
+      overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
     if (photo.upraveno) chips.append(el('span', 'orv-edited', '✓ Upraveno'));
     if (photo.potvrdit && needsConfirm(photo)) {
       chips.append(el('span', 'orv-confirmed', '✓ Potvrzeno'));
@@ -698,7 +706,9 @@
     review.forEach(photo => {
       const holder = assignable(photo) ? rows : issues;
       if (!holder) return;
-      holder.append(assignable(photo) ? assignmentCard(ctx, photo) : issueCard(ctx, photo));
+      // A plate question keeps its written card (úkon, both plates, edit button).
+      holder.append(assignable(photo) ? assignmentCard(ctx, photo) :
+        isWritten(photo) ? writtenCard(ctx, photo) : issueCard(ctx, photo));
     });
     const results = rootEl.querySelector('#orv-results');
     if (results) {

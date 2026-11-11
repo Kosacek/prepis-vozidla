@@ -27,6 +27,12 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.7.3", date(2026, 11, 11),
+        "Nový majitel na techničáku = nový úkon",
+        ("Založíš ho bez „Přesto založit“ a nový majitel se k úkonu zapíše.",
+         "Jiná SPZ než v evidenci čeká ve Zkontroluj a číslo ORV s O/0 se už přečte."),
+    ),
+    Release(
         "2.7.2", date(2026, 11, 5),
         "Firmy barevně a úprava nad techničákem",
         ("Firmu vybereš s barevnou tečkou stejně jako v Úkonech — v Dokladech i ve skenu.",
