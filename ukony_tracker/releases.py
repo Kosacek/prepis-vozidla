@@ -29,8 +29,8 @@ RELEASES: tuple[Release, ...] = (
     Release(
         "2.7.3", date(2026, 11, 11),
         "Nový majitel na techničáku = nový úkon",
-        ("Založíš ho bez „Přesto založit“ a nový majitel se k úkonu zapíše.",
-         "Jiná SPZ než v evidenci čeká ve Zkontroluj a číslo ORV s O/0 se už přečte."),
+        ("Nový majitel se k úkonu zapíše a jiná SPZ než v evidenci čeká ve Zkontroluj.",
+         "Cenu nového auta přepíšeš klepnutím — třeba elektrika bez poplatku."),
     ),
     Release(
         "2.7.2", date(2026, 11, 5),

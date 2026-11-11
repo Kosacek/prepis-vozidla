@@ -201,7 +201,7 @@ def _base(data):
 
 
 def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
-                    auto_firma=False, poznamka=None, potvrdit_novy=False):
+                    auto_firma=False, poznamka=None, potvrdit_novy=False, celkem=None):
     """Check and mutate one vehicle in a single immediate transaction."""
     result = _base(data)
     values = {key: data.get(source) for key, source in (("rz", "rz"), ("orv", "orv_cislo"))
@@ -302,7 +302,7 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
                         f"z {_czech_date(prvni['datum'])} ({prvni['typ']}, {prvni['firma']}). "
                         "Potvrď „Přesto založit nový úkon“."))
             return result
-        price = pricing_service.effective_price(conn, firma_id, typ_kod)
+        price = celkem if celkem is not None else pricing_service.effective_price(conn, firma_id, typ_kod)
         price = float(price) if price is not None else 0.0
         today = date.today().isoformat()
         uid = pridat_ukon(
@@ -344,16 +344,17 @@ def _fill_error(conn, data, exc):
 
 
 def zalozit_pro_firmu(conn, data, *, firma_id, typ_kod, zpracoval=None,
-                      poznamka=None, potvrdit_novy=False):
+                      poznamka=None, potvrdit_novy=False, celkem=None):
     """Create or resolve an assigned car, retaining scan dedupe/fill behavior.
 
     ``potvrdit_novy`` must be explicitly True to create a second úkon for a car
     that already has an older one outside the automatic match window.
+    ``celkem`` is the price typed on the card; None means the firm's price.
     """
     try:
         return _fill_or_create(conn, data, firma_id=firma_id, typ_kod=typ_kod,
                                zpracoval=zpracoval, poznamka=poznamka,
-                               potvrdit_novy=potvrdit_novy)
+                               potvrdit_novy=potvrdit_novy, celkem=celkem)
     except FillError as exc:
         return _fill_error(conn, data, exc)
 

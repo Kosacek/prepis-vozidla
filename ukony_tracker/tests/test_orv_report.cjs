@@ -464,7 +464,7 @@ test('an assign card has its own firm/type selects, note and live price next to 
   assert.equal(selects.length, 2);
   assert.equal(selects[0].value, '14'); // navrh_firma_id only pre-selects
   assert.equal(selects[1].value, '');
-  assert.equal(card.querySelectorAll('input').length, 1); // poznámka
+  assert.equal(card.querySelectorAll('input').length, 2); // poznámka + cena
   assert.equal(card.querySelector('.orv-meta').textContent.includes('Provozovatel: JE & NE'), true);
   // Row 2: Poznámka (left) + Cena (right) in one dedicated row.
   const noterow = card.querySelector('.orv-card-noterow');
@@ -474,20 +474,22 @@ test('an assign card has its own firm/type selects, note and live price next to 
   assert.equal(note.placeholder, 'Poznámka');
   assert.equal(note.maxLength, 120);
   const priceEl = noterow.querySelector('.orv-card-price');
-  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
+  const cena = noterow.querySelector('.orv-card-cena');
   assert.equal(noterow.querySelector('.orv-card-price-k').textContent, 'Cena');
-  // Choosing the type fills the live price in the SAME node and the button count.
+  assert.equal(cena.value, '');
+  assert.equal(cena.placeholder, '—');
+  // Choosing the type fills the live price in the SAME input and the button count.
   car.typOverride = 'PŘEVOD';
   card.querySelectorAll('select')[1].value = 'PŘEVOD';
   R.refreshPrices(root, [car]);
   assert.equal(card.querySelector('.orv-card-noterow .orv-card-price'), priceEl);
-  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), plain('Cena ' + kc(1300)));
+  assert.equal(cena.value, '1300');
   assert.equal(card.querySelector('.orv-typ').textContent, 'PŘEVOD');
   assert.equal(root.querySelector('#orv-create-unmatched').textContent, 'Založit 1 úkon');
   // Price honest when the type has no price.
   car.firmaOverride = '15'; car.typOverride = 'PŘEVOD';
   R.refreshPrices(root, [car]);
-  assert.equal(priceEl.textContent.replace(/\s+/g, ' ').trim(), 'Cena —');
+  assert.equal(cena.value, '');
 });
 
 test('the verbose "nepovinná, max. 120" note placeholder is gone', () => {
@@ -680,4 +682,51 @@ test('a kept plate puts the card under Zkontroluj, never under Beze změny', () 
   const text = plain(allText(issues(root)[0]));
   assert.ok(text.includes('Ke kontrole') && text.includes('WBP1720') && text.includes('2BP1720'), text);
   assert.ok(text.includes('Otevřít a upravit úkon'), text);
+});
+
+// -- David 2026-11-11: type the price of a new car on its card -------------------
+// (an electric car skips the office fee). A filled car keeps its price; that is
+// changed through "Otevřít a upravit úkon".
+test('a typed price goes with the new car, a blank one leaves the firm price', () => {
+  const car = photo(1, 'bez_firmy', {rz: 'EL502HK', vin: 'LRW3E7FS9VC005684'});
+  const chosen = {firma_id: '14', typ_kod: 'PŘEVOD'};
+  car.firmaOverride = '14'; car.typOverride = 'PŘEVOD';
+  assert.equal('celkem' in R.payload(car, chosen), false);
+  car.cenaOverride = '800';
+  assert.equal(R.payload(car, chosen).celkem, 800);
+  car.cenaOverride = '1 300 Kč';
+  assert.equal(R.payload(car, chosen).celkem, 1300);
+  car.cenaOverride = '  ';
+  assert.equal('celkem' in R.payload(car, chosen), false);
+  car.cenaOverride = 'abc';
+  assert.equal(R.canCreate(car), false);
+  car.cenaOverride = '-5';
+  assert.equal(R.canCreate(car), false);
+  car.cenaOverride = '850';
+  assert.equal(R.canCreate(car), true);
+});
+
+test('a typed price survives a firm or type change; clearing it brings the firm price back', () => {
+  const car = photo(1, 'bez_firmy', {rz: 'EL502HK'});
+  car.firmaOverride = '14'; car.typOverride = 'PŘEVOD';
+  const root = render([car]);
+  const [card] = unassigned(root);
+  const cena = card.querySelector('.orv-card-cena');
+  assert.equal(cena.value, '1300');
+  cena.value = '800';
+  (cena.handlers.input || []).forEach(fn => fn({target: cena}));
+  assert.equal(car.cenaOverride, '800');
+  car.typOverride = 'NOVÉ';
+  R.refreshPrices(root, [car]);
+  assert.equal(cena.value, '800');
+  cena.value = '';
+  (cena.handlers.input || []).forEach(fn => fn({target: cena}));
+  R.refreshPrices(root, [car]);
+  assert.equal(car.cenaOverride, null);
+  assert.equal(cena.value, '');  // JE & NE has no NOVÉ price in the test ceník
+});
+
+test('written cards keep a plain price, no input', () => {
+  const root = render([photo(1, 'doplneno', {ukon: {id: 5, celkem: 1300, typ: 'PŘEVOD', firma_id: 14}})]);
+  assert.equal(cards(root)[0].querySelector('.orv-card-cena'), null);
 });

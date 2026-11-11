@@ -165,6 +165,14 @@
 .orv-card-noterow {display:flex; align-items:flex-end; gap:8px; width:100%; min-width:0;}
 .orv-card-noterow .orv-card-field {flex:1 1 0; min-width:0;}
 .orv-card-noterow .orv-card-price {flex:0 0 auto; margin-left:auto; padding-bottom:10px;}
+/* Editable price of a new car: reads like the price, a tap types over it. */
+.orv-card-price--edit {padding-bottom:4px;}
+.orv-card-noterow .orv-card-price--edit {padding-bottom:4px;}
+.orv-card-cena {width:7ch; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm,8px);
+  background:var(--card); color:inherit; font:inherit; font-weight:750; text-align:right;
+  font-variant-numeric:tabular-nums;}
+.orv-card-cena:focus-visible {outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent);}
+.orv-card-price-u {font-size:.8125rem; font-weight:650; color:var(--muted,#6e6e73);}
 .orv-card-field {min-width:0;}
 .orv-card-label {font-size:.625rem; font-weight:650; letter-spacing:.04em; color:var(--muted,#6e6e73);
   text-transform:uppercase;}

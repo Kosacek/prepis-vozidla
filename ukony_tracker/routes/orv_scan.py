@@ -1,5 +1,6 @@
 """Session-authenticated ORV fragment and one-photo endpoint."""
 import logging
+import math
 import os
 import re
 import time
@@ -132,7 +133,7 @@ def zalozit():
     for item in auta:
         if not isinstance(item, dict) or set(item) - {
                 "rz", "vin", "orv_cislo", "firma_id", "typ_kod", "provozovatel", "vin_zdroj",
-                "poznamka", "potvrdit_novy"}:
+                "poznamka", "potvrdit_novy", "celkem"}:
             return jsonify(error="Neplatný záznam auta."), 400
         rz, vin, orv = item.get("rz"), item.get("vin"), item.get("orv_cislo")
         def clean(value, pattern):
@@ -167,17 +168,24 @@ def zalozit():
         potvrdit_novy = item.get("potvrdit_novy")
         if potvrdit_novy is not None and not isinstance(potvrdit_novy, bool):
             return jsonify(error="Neplatné potvrzení nového úkonu."), 400
+        # Price typed on the card (David 2026-11-11: an electric car skips the
+        # office fee); missing = the firm's price for that type.
+        celkem = item.get("celkem")
+        if celkem is not None and (isinstance(celkem, bool) or not isinstance(celkem, (int, float))
+                                   or not math.isfinite(celkem) or not 0 <= celkem <= 1_000_000):
+            return jsonify(error="Neplatná cena."), 400
         prepared.append(({"rz": rz, "vin": vin, "orv_cislo": orv,
                           "provozovatel": operator.strip() if operator else None,
-                          "vin_zdroj": vin_zdroj}, firm_id, typ_kod, poznamka, potvrdit_novy))
+                          "vin_zdroj": vin_zdroj}, firm_id, typ_kod, poznamka, potvrdit_novy,
+                         None if celkem is None else float(celkem)))
     zpracoval = normalize_profil(payload.get("zpracoval"))
     try:
         results = []
         with transaction(conn):
-            for data, firma_id, typ_kod, poznamka, potvrdit_novy in prepared:
+            for data, firma_id, typ_kod, poznamka, potvrdit_novy, celkem in prepared:
                 results.append(orv_scan_service.zalozit_pro_firmu(
                     conn, data, firma_id=firma_id, typ_kod=typ_kod, zpracoval=zpracoval,
-                    poznamka=poznamka, potvrdit_novy=potvrdit_novy))
+                    poznamka=poznamka, potvrdit_novy=potvrdit_novy, celkem=celkem))
         return jsonify(results=results)
     except Exception:
         return jsonify(error="Úkony se nepodařilo založit."), 500

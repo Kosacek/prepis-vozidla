@@ -280,3 +280,21 @@ def test_zalozit_endpoint_refuses_duplicate_until_confirmed(client):
         conn = db.get_db()
         assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 2
         assert ukony_repo.get(conn, created["ukon"]["id"])["poznamka"] == "ACC"
+
+
+# David 2026-11-11: a new car's price can be typed on its scan card (an
+# electric car skips the office fee); without it the firm's price is used.
+def test_zalozit_endpoint_uses_the_typed_price(client):
+    response = client.post("/ukony/orv-sken/zalozit", json={"auta": [{**_assigned(), "celkem": 800}]})
+    assert response.status_code == 200 and response.json["results"][0]["stav"] == "zalozeno"
+    assert response.json["results"][0]["ukon"]["celkem"] == 800
+    with client.application.app_context():
+        assert db.get_db().execute("SELECT celkem FROM ukony").fetchone()[0] == 800
+
+
+@pytest.mark.parametrize("celkem", ["800", -1, True, 1_000_001, float("nan")])
+def test_zalozit_endpoint_rejects_a_bad_price(client, celkem):
+    response = client.post("/ukony/orv-sken/zalozit", json={"auta": [{**_assigned(), "celkem": celkem}]})
+    assert response.status_code == 400 and "cena" in response.json["error"].lower()
+    with client.application.app_context():
+        assert db.get_db().execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 0

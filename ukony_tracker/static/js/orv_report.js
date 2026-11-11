@@ -29,6 +29,7 @@
   const PAY_LABELS = {zaplaceno: 'Zaplaceno', castecne: 'Částečně', nezaplaceno: 'Nezaplaceno'};
   const FIELD_LABELS = {rz: 'RZ', orv: 'ORV', vin: 'VIN'};
   const MAX_NOTE = 120;
+  const MAX_PRICE = 1000000;
   const KC = new Intl.NumberFormat('cs-CZ', {maximumFractionDigits: 0});
   // Souhrn nahoře: jen štítky, které něco znamenají (David: „Založeno 0“ je
   // šum). Pořadí drží to, co je pro člověka nejdřív — co se zapsalo, pak co
@@ -222,9 +223,19 @@
   function noteValue(value) {
     return String(value == null ? '' : value).trim().slice(0, MAX_NOTE);
   }
+  // Price typed on a new car's card (David 2026-11-11: an electric car skips
+  // the office fee). null = the firm's price; NaN = not a price, no Založit.
+  function typedPrice(photo) {
+    const raw = photo && photo.cenaOverride;
+    if (raw == null || !String(raw).trim()) return null;
+    const text = String(raw).replace(/\s+|kč/gi, '').replace(',', '.');
+    const n = /^\d+(\.\d{1,2})?$/.test(text) ? Number(text) : NaN;
+    return n <= MAX_PRICE ? n : NaN;
+  }
   function canCreate(photo) {
     const chosen = choiceOf(photo);
     if (!assignable(photo) || !chosen.firma_id || !chosen.typ_kod) return false;
+    if (Number.isNaN(typedPrice(photo))) return false;
     // A car that is already in evidence needs an explicit "přesto založit".
     return !needsConfirm(photo) || !!photo.potvrdit;
   }
@@ -245,6 +256,8 @@
     };
     const note = noteValue(photo.poznamka);
     if (note) out.poznamka = note;
+    const price = typedPrice(photo);
+    if (price != null) out.celkem = price;
     return out;
   }
   // The create endpoint answers per sent car. A car can still come back as
@@ -278,8 +291,9 @@
     photos.forEach(photo => {
       if (!assignable(photo) || !photo.cardEl) return;
       const chosen = choiceOf(photo);
-      const price = photo.cardEl.querySelector('.orv-card-price');
-      if (price) fillPrice(price, priceFor(ceny, chosen.firma_id, chosen.typ_kod), true);
+      // A typed price stays put; otherwise the input follows firm + type.
+      const cena = photo.cardEl.querySelector('.orv-card-cena');
+      if (cena && photo.cenaOverride == null) cena.value = defaultPriceText(ceny, chosen);
       // The type tag appears only once a type is chosen (and disappears again
       // when the choice is cleared).
       const idRow = photo.cardEl.querySelector('.orv-card-id');
@@ -362,10 +376,31 @@
   // Row 2 of an assignment card: the note (wide, left) and the price (right).
   // David 2026-11-05: the price at the RZ line was confusing — it belongs next
   // to the note. The node keeps .orv-card-price, so refreshPrices() finds it.
-  function noteRow(ceny, chosen, note) {
+  function defaultPriceText(ceny, chosen) {
+    const price = priceFor(ceny, chosen.firma_id, chosen.typ_kod);
+    return price == null ? '' : String(price);
+  }
+  // A new car's price is a tap-to-type field (David 2026-11-11); filled cars
+  // keep the plain price and change through "Otevřít a upravit úkon".
+  function priceInput(ctx, photo, chosen) {
+    const wrap = el('label', 'orv-card-price orv-card-price--edit');
+    const input = el('input', 'orv-card-cena');
+    input.type = 'text';
+    input.setAttribute('inputmode', 'decimal');
+    input.placeholder = '—';
+    input.setAttribute('aria-label', 'Cena úkonu ' + carName(photo.result || {}));
+    input.value = photo.cenaOverride != null ? photo.cenaOverride : defaultPriceText(ctx.ceny, chosen);
+    input.addEventListener('input', () => {
+      photo.cenaOverride = input.value.trim() ? input.value : null;
+      updateCreateCount(ctx.rootEl, ctx.photos);
+    });
+    wrap.append(el('span', 'orv-card-price-k', 'Cena'), input, el('span', 'orv-card-price-u', 'Kč'));
+    return wrap;
+  }
+  function noteRow(ctx, photo, chosen, note) {
     const row = el('div', 'orv-card-noterow');
     field(row, 'Poznámka', note);
-    row.append(priceNode(priceFor(ceny, chosen.firma_id, chosen.typ_kod), true));
+    row.append(priceInput(ctx, photo, chosen));
     return row;
   }
   function statusChips(photo) {
@@ -569,7 +604,7 @@
     field(fields, 'Typ', typ);
     body.append(fields);
     // Row 2: Poznámka (left, wide) + Cena (right).
-    body.append(noteRow(ctx.ceny, chosen, note));
+    body.append(noteRow(ctx, photo, chosen, note));
     const meta = metaNode([vinItem(result),
       result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
     if (meta) body.append(meta);
@@ -723,7 +758,7 @@
     assignable, reviewPhotos, writtenPhotos, group, bannerState, totals, summaryChips,
     czechCars, czechJobs, dateCs, readFactsList, factText, earlier, kc, priceFor, priceLabel,
     firmsMap, dataOf, cenyOf, firmsOf, firmOf, existingList, visibleExisting, needsConfirm,
-    existingLine, kandidati, choiceOf, noteValue, canCreate, selected, payload,
+    existingLine, kandidati, choiceOf, noteValue, typedPrice, canCreate, selected, payload,
     applyCreateResults, updateCreateCount, refreshPrices, render};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OrvReport = api;
