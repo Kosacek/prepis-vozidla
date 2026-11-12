@@ -63,7 +63,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.31.1"
+__version__ = "1.31.2"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1379,7 +1379,7 @@ def _kod_netrefa(ip: str) -> None:
         _kod_chyby.setdefault(ip, []).append(time.time())
 
 
-_CESTA_SMAZAT_DOKLAD = re.compile(r"/api/ppd/[0-9]+/smazat")
+_CESTA_SMAZAT_DOKLAD = re.compile(r"/api/ppd/[0-9]+/(smazat|sdilet)")
 
 
 @app.before_request
@@ -2133,6 +2133,26 @@ def api_ppd_smazat(number):
     if removed:
         _log.info("PPD %s smazán přes API (evidence)", number)
     return jsonify({"removed": removed})
+
+
+@app.route("/api/ppd/<int:number>/sdilet", methods=["POST"])
+def api_ppd_sdilet(number):
+    """„Sdílet kódem" v doklad draweru evidence (ukony_tracker/services/doklad_share.py).
+
+    Klíč integrace místo přihlášení. Vrací {"sdilet": "/4821", "plati_dni": 30};
+    veřejný odkaz otevře doklad bez hesla. Idempotentní: doklad, který už má
+    živý kód, dostane ten samý. Doklad bez PDF (neexistuje) → 404 s JSON chybou
+    (evidence jinak hlásí, že to žádosti neumí)."""
+    chyba = _over_klic_integrace("Sdílení dokladů přes API není zapnuté.")
+    if chyba:
+        return chyba
+    nazev = f"ppd_{number}.pdf"
+    if not os.path.isfile(os.path.join(DATA_DIR, "output", nazev)):
+        return jsonify({"error": f"Doklad č. {number} tu není."}), 404
+    kod = sdileni.zivy_kod_souboru(DATA_DIR, nazev) or sdileni.vytvor_kod(DATA_DIR, [
+        {"file": nazev, "kde": sdileni.KDE_OUTPUT,
+         "popis": f"Příjmový pokladní doklad č. {number}"}])
+    return jsonify({"sdilet": f"/{kod}", "plati_dni": sdileni.TTL_DNI})
 
 
 @app.route("/api/ppd/vystavit", methods=["POST"])

@@ -219,6 +219,28 @@ def pripoj_k_baliku(data_dir: str, k_souboru: str, polozka: dict) -> str | None:
         return None
 
 
+def zivy_kod_souboru(data_dir: str, soubor: str, kde: str = KDE_OUTPUT) -> str | None:
+    """Kód živého (nevypršelého) balíku, ve kterém už `soubor` leží, jinak None.
+
+    Opakované „Sdílet kódem" u téhož dokladu tak vrátí pořád ten samý kód.
+    Od konce a platí poslední zápis kódu (jako v najdi). Nikdy nevyhazuje."""
+    try:
+        videne: set[str] = set()
+        for d in reversed(_nacti(data_dir)):
+            token = str(d.get("token"))
+            if token in videne:
+                continue
+            videne.add(token)
+            if not _nevyprsel(d):
+                continue
+            polozky = _polozky(d.get("soubory") or d.get("file") or [])
+            if any(p["file"] == soubor and p["kde"] == kde for p in polozky):
+                return token
+    except Exception:
+        pass
+    return None
+
+
 def najdi(data_dir: str, token: str) -> list[dict] | None:
     """Balík pro platný (nevypršelý) kód, jinak None.
 

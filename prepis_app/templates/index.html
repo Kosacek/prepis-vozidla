@@ -171,6 +171,15 @@
   .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   .ev-toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
   .ev-toggle input { width: 20px; height: 20px; accent-color: var(--primary); flex-shrink: 0; }
+  /* Barva firmy z evidence (pole `barva` z /api/evidence-meta) — tečka vlevo ve
+     výběru + barevný název každé firmy v nabídce. Select zůstává nativní, takže
+     ovládání z klávesnice se nemění. */
+  .ev-firma-wrap { position: relative; }
+  .ev-firma-wrap select { padding-left: 38px; }
+  .ev-dot { position: absolute; left: 15px; top: 50%; width: 12px; height: 12px; margin-top: -6px;
+            border-radius: 50%; background: transparent; border: 1.5px dashed var(--border);
+            pointer-events: none; transition: background .15s, border-color .15s; }
+  .ev-dot.on { border: 0; }
   .ev-toggle span { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
   #ppd-card > p, #evidence-status { font-size: 13.5px; }
   #summary-card .card-title { font-size: 19px; }
@@ -1260,7 +1269,10 @@
           <div id="evidence-fields" class="form-grid">
             <div class="field">
               <label>Firma</label>
-              <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
+              <div class="ev-firma-wrap">
+                <span id="evidence_firma_dot" class="ev-dot" aria-hidden="true"></span>
+                <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
+              </div>
             </div>
             <div class="field">
               <label>Typ úkonu</label>
@@ -3329,6 +3341,23 @@ function buildSummary() {
 const _MODE_TO_TYP = { prevod: 'PŘEVOD', zapis: 'NOVÉ', zmena: '', '3rz': '3RZ', vyvoz: 'VÝVOZ' };
 const _digits = s => String(s || '').replace(/\D/g, '');
 
+// Barva firmy přichází z evidence (`barva`); nikdy si ji nevymýšlíme sami.
+// Přijmeme jen #hex, ať se do stylu nedostane nic jiného.
+function evidenceBarva(f) {
+  const b = f && typeof f.barva === 'string' ? f.barva.trim() : '';
+  return /^#[0-9a-fA-F]{3,8}$/.test(b) ? b : '';
+}
+
+function evidenceFirmaDot() {
+  const dot = document.getElementById('evidence_firma_dot');
+  const sel = document.getElementById('evidence_firma');
+  if (!dot || !sel) return;
+  const f = _evidenceMeta && _evidenceMeta.firmy.find(x => String(x.id) === sel.value);
+  const barva = f ? evidenceBarva(f) : '';
+  dot.style.background = barva;
+  dot.classList.toggle('on', !!barva);
+}
+
 async function loadEvidenceMeta() {
   if (_evidenceMeta) return _evidenceMeta;
   try {
@@ -3356,6 +3385,8 @@ async function prepareEvidence() {
     meta.firmy.forEach(f => {
       const o = document.createElement('option');
       o.value = f.id; o.textContent = f.nazev + (f.ico ? ` (${f.ico})` : '');
+      const barva = evidenceBarva(f);
+      if (barva) { o.style.color = barva; o.style.fontWeight = '600'; }
       firmaSel.appendChild(o);
     });
     meta.typy.forEach(t => {
@@ -3429,6 +3460,7 @@ function elZkontroluj() {
 
 function evidencePriceUpdate() {
   if (!_evidenceMeta) return;
+  evidenceFirmaDot();
   const fid = v('evidence_firma');
   const typ = v('evidence_typ');
   const cena = document.getElementById('evidence_cena');
