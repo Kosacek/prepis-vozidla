@@ -35,7 +35,7 @@ def build_record(row: dict, *, zadost_id: str = "", smazano: bool = False) -> di
     def text(value):
         return str(value if value is not None else "").strip()
 
-    return {
+    record = {
         "cislo": int(row.get("cislo", row.get("number"))),
         "datum": text(row.get("datum", row.get("date"))),
         "prijato_od": text(row.get("prijato_od", row.get("payer"))),
@@ -47,6 +47,12 @@ def build_record(row: dict, *, zadost_id: str = "", smazano: bool = False) -> di
         "zadost_id": zadost_id or "",
         "smazano": bool(smazano),
     }
+    # Faktura (1.33.0): jen faktura nese druh + splatnost — PPD tělo zůstává
+    # beze změny a evidence (ppd_repo) tak starému druhu nic nepřepíše.
+    if row.get("druh") == "faktura":
+        record["druh"] = "faktura"
+        record["splatnost"] = text(row.get("splatnost"))
+    return record
 
 
 def _failed_path(data_dir: str) -> str:

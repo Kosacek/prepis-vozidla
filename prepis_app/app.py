@@ -66,7 +66,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.32.0"
+__version__ = "1.33.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1409,7 +1409,7 @@ def _require_login():
 @app.route("/")
 def index():
     from flask import make_response
-    resp = make_response(render_template("index.html"))
+    resp = make_response(render_template("index.html", faktura_dostupna=faktura.dostupna()))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -1596,6 +1596,70 @@ def resolve_payer_full(data: dict) -> tuple:
     return name, ico, address
 
 
+PLATBY = ("hotove", "prevodem")   # hotově = PPD, převodem = faktura (QR Platba)
+PPD_UCEL = "Zastupování na MMB"   # fixed — ALSETA represents the client at Magistrát města Brna
+
+
+def _ppd_castka(data: dict) -> int:
+    """Částka dokladu z formuláře; 0 = žádný doklad."""
+    amount_raw = str(data.get("ppd_castka") or "").strip()
+    try:
+        return int(float(amount_raw)) if amount_raw else 0
+    except ValueError:
+        return 0
+
+
+def _adresa_firmy_podle_ico(ico: str) -> str:
+    firma = next((f for f in read_firmy() if str(f.get("ico") or "").strip() == ico), None)
+    return (firma or {}).get("adresa") or ""
+
+
+def _vystav_fakturu_k_zadosti(data: dict, amount: int, rz_full: str, vin: str,
+                              payer: str, payer_ico: str, payer_address: str) -> dict:
+    """„Převodem": místo PPD se vystaví faktura ze stejné řady a stejnou cestou
+    jako přes /api/ppd/vystavit (ppd_api.vystav). Vrací doklad (druh, cislo,
+    splatnost …); chyby nechává propadnout volajícímu."""
+    vozidla = [v.strip() for v in rz_full.split(",") if v.strip()] or ([vin] if vin else [])
+    udaje = ppd_api.over({
+        "druh": "faktura", "prijato_od": payer, "prijato_ico": payer_ico,
+        "prijato_adresa": payer_address, "castka": amount, "ucel": PPD_UCEL,
+        "vozidla": vozidla, "zpracoval": str(data.get("profil") or "")[:ppd_api.MAX_ZPRACOVAL],
+    })
+    doklad, _novy = ppd_api.vystav(DATA_DIR, udaje, _adresa_firmy_podle_ico)
+    return doklad
+
+
+def _doklad_prevodem(result: dict, sdilene: list, data: dict, amount: int, rz_full: str,
+                     vin: str, payer: str, payer_ico: str, payer_address: str) -> None:
+    """Faktura místo PPD do výsledku /api/generate. Selhání faktury žádost
+    neshodí; uživatel dostane `doklad_chyba` a doklad si vystaví znovu."""
+    try:
+        doklad = _vystav_fakturu_k_zadosti(data, amount, rz_full, vin,
+                                           payer, payer_ico, payer_address)
+    except (ppd_api.Chyba, ppd_api.FakturaNedostupna) as e:
+        _log.warning("Faktura k žádosti odmítnuta: %s", e)
+        result["doklad_chyba"] = ("Fakturu nejde vystavit: " + str(e)
+                                  if isinstance(e, ppd_api.Chyba) else
+                                  "Fakturu převodem teď nejde vystavit (chybí číslo účtu).")
+        return
+    except Exception as e:
+        _log.warning("Faktura k žádosti selhala: %s", e)
+        result["doklad_chyba"] = "Fakturu se nepodařilo vystavit."
+        return
+    number = doklad["cislo"]
+    result["ppd"] = f"/download/faktura_{number}.pdf"
+    result["ppd_print"] = f"/faktura-print/{number}"
+    result["doklad_druh"] = "faktura"
+    result["doklad_cislo"] = number
+    sdilene.append({"file": f"faktura_{number}.pdf", "kde": sdileni.KDE_OUTPUT,
+                    "popis": f"Faktura č. {number}", "druh": sdileni.DRUH_FAKTURA})
+    try:
+        import ppd_push
+        ppd_push.push_async(ppd_push.build_record(doklad, zadost_id=data["zadost_id"]), DATA_DIR)
+    except Exception as e:
+        _log.warning("Faktura push skipped: %s", e)
+
+
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
     raw = request.json or {}
@@ -1607,6 +1671,16 @@ def api_generate():
 
     if mode not in {"prevod", "zapis", "zmena", "3rz", "vyvoz"}:
         return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
+
+    # Doklad převodem (faktura) jen s platným FAKTURA_IBAN — odmítnout dřív,
+    # než se vytvoří cokoli (žádný doklad ani žádost bez čísla účtu).
+    platba = str(data.get("ppd_platba") or "hotove").strip().lower()
+    if platba not in PLATBY:
+        return jsonify({"success": False, "error": "Neznámý způsob platby."}), 400
+    if platba == "prevodem" and _ppd_castka(data) > 0 and not faktura.dostupna():
+        return jsonify({"success": False,
+                        "error": "Fakturu převodem teď nejde vystavit (chybí číslo účtu). "
+                                 "Vyber Hotově."}), 400
 
     oznac_praci()
     out_dir = os.path.join(DATA_DIR, "output")
@@ -1699,11 +1773,7 @@ def api_generate():
 
     # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
     try:
-        amount_raw = str(data.get("ppd_castka") or "").strip()
-        try:
-            amount = int(float(amount_raw)) if amount_raw else 0
-        except ValueError:
-            amount = 0
+        amount = _ppd_castka(data)
         if amount > 0:
             rz = data.get("registracni_znacka", "")
             vin = data.get("vin", "")
@@ -1712,7 +1782,7 @@ def api_generate():
             # řetězec; prázdné položky (rozklikl a nevyplnil) se zahodí.
             extra_spz = [s.strip() for s in (data.get("ppd_extra_spz") or "").split(",")]
             rz_full = ", ".join(p for p in [rz.strip()] + extra_spz if p)
-            purpose = "Zastupování na MMB"  # fixed — ALSETA represents the client at Magistrát města Brna
+            purpose = PPD_UCEL
             # Explicit payer (from the field) keeps only its explicit IČO (set
             # when a saved firm / ARES result was picked; empty for a hand-typed
             # name or private person). Only when the field is empty do we fall
@@ -1728,46 +1798,50 @@ def api_generate():
             # (and the app's live-uppercase inputs). Issuer/účel are fixed → left.
             payer = payer.upper()
             payer_address = payer_address.upper()
-            today = datetime.now().strftime("%d.%m.%Y")
-            number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
-                "date": today, "payer": payer, "payer_ico": payer_ico,
-                "amount": amount, "purpose": purpose, "vehicle": rz_full or vin,
-            })
-            ppd_bytes = ppd.build_ppd_pdf({
-                "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
-                "payer_address": payer_address, "spz": rz_full, "vin": vin,
-                "amount": amount, "purpose": purpose,
-            })
-            # Name the PDF by receipt number (numbers never repeat) so the
-            # Doklady browser can link to it deterministically.
-            ppd_name = f"ppd_{number}.pdf"
-            with open(os.path.join(out_dir, ppd_name), "wb") as f:
-                f.write(ppd_bytes)
-            result["ppd"] = f"/download/{ppd_name}"
-            result["ppd_print"] = f"/ppd-print/{number}"   # A5-preset print page
-            sdilene.append({"file": ppd_name, "kde": sdileni.KDE_OUTPUT,
-                            "popis": f"Příjmový pokladní doklad č. {number}"})
-            # Append-only backup — the write-only safety net. A row is written
-            # here for every receipt and is NEVER removed, so an accidental
-            # delete in the dashboard stays recoverable.
-            ppd.append_backup(DATA_DIR, {
-                "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
-                "date": today, "payer": payer, "payer_ico": payer_ico,
-                "payer_address": payer_address, "amount": amount, "purpose": purpose,
-                # rz_full, ne rz: tisková stránka se staví ze zálohy, a s holou
-                # hlavní SPZ zmizela auta z „+ Přidat vozidlo" (doklad č. 174).
-                "spz": rz_full, "vin": vin,
-            })
-            # Every receipt goes to evidence, independently of evidence_log.
-            try:
-                import ppd_push
-                ppd_push.push_async(ppd_push.build_record({
-                    "cislo": number, "date": today, "payer": payer,
-                    "payer_ico": payer_ico, "amount": amount, "purpose": purpose,
-                    "vehicle": rz_full or vin,
-                }, zadost_id=data["zadost_id"]), DATA_DIR)
-            except Exception as e:
-                _log.warning("PPD push skipped: %s", e)
+            if platba == "prevodem":
+                _doklad_prevodem(result, sdilene, data, amount, rz_full, vin,
+                                 payer, payer_ico, payer_address)
+            else:
+                today = datetime.now().strftime("%d.%m.%Y")
+                number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
+                    "date": today, "payer": payer, "payer_ico": payer_ico,
+                    "amount": amount, "purpose": purpose, "vehicle": rz_full or vin,
+                })
+                ppd_bytes = ppd.build_ppd_pdf({
+                    "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
+                    "payer_address": payer_address, "spz": rz_full, "vin": vin,
+                    "amount": amount, "purpose": purpose,
+                })
+                # Name the PDF by receipt number (numbers never repeat) so the
+                # Doklady browser can link to it deterministically.
+                ppd_name = f"ppd_{number}.pdf"
+                with open(os.path.join(out_dir, ppd_name), "wb") as f:
+                    f.write(ppd_bytes)
+                result["ppd"] = f"/download/{ppd_name}"
+                result["ppd_print"] = f"/ppd-print/{number}"   # A5-preset print page
+                sdilene.append({"file": ppd_name, "kde": sdileni.KDE_OUTPUT,
+                                "popis": f"Příjmový pokladní doklad č. {number}"})
+                # Append-only backup — the write-only safety net. A row is written
+                # here for every receipt and is NEVER removed, so an accidental
+                # delete in the dashboard stays recoverable.
+                ppd.append_backup(DATA_DIR, {
+                    "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
+                    "date": today, "payer": payer, "payer_ico": payer_ico,
+                    "payer_address": payer_address, "amount": amount, "purpose": purpose,
+                    # rz_full, ne rz: tisková stránka se staví ze zálohy, a s holou
+                    # hlavní SPZ zmizela auta z „+ Přidat vozidlo" (doklad č. 174).
+                    "spz": rz_full, "vin": vin,
+                })
+                # Every receipt goes to evidence, independently of evidence_log.
+                try:
+                    import ppd_push
+                    ppd_push.push_async(ppd_push.build_record({
+                        "cislo": number, "date": today, "payer": payer,
+                        "payer_ico": payer_ico, "amount": amount, "purpose": purpose,
+                        "vehicle": rz_full or vin,
+                    }, zadost_id=data["zadost_id"]), DATA_DIR)
+                except Exception as e:
+                    _log.warning("PPD push skipped: %s", e)
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 

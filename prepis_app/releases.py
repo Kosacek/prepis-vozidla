@@ -27,6 +27,10 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.33.0", date(2026, 11, 13), "Doklad převodem i z žádosti",
+            ("U dokladu přepneš Hotově / Převodem, šipkami i z klávesnice.",
+             "Převodem se vystaví faktura s QR platbou a jde rovnou do evidence."),
+            demo="v1_33_0"),
     Release("1.27.0", date(2026, 10, 26), "Zaseknutá kamera se vzpamatuje",
             ("Zamrzlý obraz se obnoví sám a po přepojení USB kamera naskočí "
              "bez klikání.",

@@ -300,6 +300,7 @@
   const TAHAK = [
     ['Typ úkonu', [['1', '–', '6'], 'vybrat typ'], [['Enter'], 'vyfotit ORV a dál'], [['Shift', '+', 'Enter'], 'dál bez skenu']],
     ['Vyplňování', [['Enter'], 'vzít návrh / další krok'], [['↓', '↑'], 'jiný návrh'], [['Esc'], 'zpět']],
+    ['Doklad', [['←', '→'], 'hotově / převodem']],
     ['Tisk', [['Ctrl', '+', 'Enter'], 'vygenerovat a otevřít vše'], [['Ctrl', '+', 'P'], 'tisk'], [['Ctrl', '+', 'W'], 'další dokument']],
     ['Hotovo', [['Enter'], 'nová žádost']],
   ];

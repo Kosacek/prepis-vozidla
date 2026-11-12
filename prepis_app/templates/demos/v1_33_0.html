@@ -1,0 +1,49 @@
+{# Demo for release 1.33.0 (Doklad převodem i z žádosti): a miniature
+   Hotově / Převodem switch; the highlight slides to Převodem, an arrow key
+   taps and the doklad chip flips from PPD to Faktura. CSS-only, 5s loop;
+   app tokens only. #}
+<style>
+  .dz1330-demo {
+    box-sizing: border-box; height: 140px; padding: 14px; margin-bottom: 16px; border-radius: 12px;
+    background: var(--wn-bg); overflow: hidden; display: grid; align-content: center; justify-items: center; gap: 14px;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1330-seg {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 10px;
+    background: var(--wn-line); width: 190px;
+  }
+  .dz1330-seg b { position: relative; z-index: 1; padding: 7px 0; text-align: center; font-weight: 700; color: var(--wn-muted); }
+  .dz1330-seg b:first-of-type { animation: dz1330-a 5s ease-in-out infinite; }
+  .dz1330-seg b:last-of-type  { animation: dz1330-b 5s ease-in-out infinite; }
+  .dz1330-pill {
+    position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 8px;
+    background: var(--wn-card); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); animation: dz1330-pill 5s ease-in-out infinite;
+  }
+  .dz1330-row { display: flex; align-items: center; gap: 8px; }
+  kbd {
+    padding: 3px 7px; border-radius: 5px; background: var(--wn-card); box-shadow: 0 1px 0 var(--wn-line);
+    font: 700 11px/1 inherit; animation: dz1330-key 5s ease-in-out infinite;
+  }
+  .dz1330-chip { position: relative; width: 70px; height: 22px; }
+  .dz1330-chip span {
+    position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px;
+    font-weight: 800; color: #fff;
+  }
+  .dz1330-ppd { background: #7c3aed; animation: dz1330-a 5s ease-in-out infinite; }
+  .dz1330-fa  { background: var(--primary, #2563eb); animation: dz1330-b 5s ease-in-out infinite; }
+  @keyframes dz1330-pill { 0%, 35% { transform: none; } 50%, 90% { transform: translateX(100%); } 100% { transform: none; } }
+  @keyframes dz1330-a { 0%, 38% { opacity: 1; } 48%, 90% { opacity: .35; } 100% { opacity: 1; } }
+  @keyframes dz1330-b { 0%, 38% { opacity: .35; } 48%, 90% { opacity: 1; } 100% { opacity: .35; } }
+  @keyframes dz1330-key { 0%, 30%, 45%, 100% { transform: none; } 36% { transform: translateY(2px); } }
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: Převodem selected, chip says Faktura. */
+    .dz1330-demo * { animation: none !important; }
+    .dz1330-pill { transform: translateX(100%); }
+    .dz1330-seg b:first-of-type, .dz1330-ppd { opacity: .35; }
+    .dz1330-seg b:last-of-type, .dz1330-fa { opacity: 1; }
+  }
+</style>
+<div class="dz1330-demo" aria-hidden="true">
+  <div class="dz1330-seg"><span class="dz1330-pill"></span><b>Hotově</b><b>Převodem</b></div>
+  <div class="dz1330-row"><kbd>→</kbd><div class="dz1330-chip"><span class="dz1330-ppd">PPD</span><span class="dz1330-fa">Faktura</span></div></div>
+</div>
