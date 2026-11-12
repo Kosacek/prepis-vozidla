@@ -30,6 +30,8 @@ import threading
 from datetime import datetime
 
 import hledani
+import faktura
+import faktura_pdf
 import ppd
 import ppd_push
 import prefill
@@ -53,6 +55,7 @@ MAX_REQUEST_ID = 100
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
 _VIN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 STRANY = ("provozovatel", "vlastnik")
+DRUHY = ("ppd", "faktura")        # druh dokladu; chybějící = ppd (zpětná kompatibilita)
 
 VYSTAVENE = "ppd_api_vystavene.jsonl"   # request_id → doklad (idempotence + audit)
 _ZAMEK = "ppd_api.lock"
@@ -129,7 +132,11 @@ def over(telo) -> dict:
     strana = _text(telo, "strana", max_delka=20).lower()
     if strana and strana not in STRANY:
         raise Chyba("strana smí být jen " + " nebo ".join(STRANY) + ".")
+    druh = _text(telo, "druh", max_delka=20).lower() or "ppd"
+    if druh not in DRUHY:
+        raise Chyba("druh smí být jen " + " nebo ".join(DRUHY) + ".")
     return {
+        "druh": druh,
         "prijato_od": _text(telo, "prijato_od", povinne=True, max_delka=MAX_PRIJATO_OD),
         "prijato_ico": prijato_ico,
         "prijato_adresa": _text(telo, "prijato_adresa", max_delka=MAX_PRIJATO_ADRESA),
@@ -220,6 +227,34 @@ def _pod_zamkem(data_dir: str, fn):
                 lock_fd.close()
 
 
+def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
+    """Faktura převodem: vlastní číselná řada (YYYYNNNN), ledger + záloha, PDF
+    faktura_<n>.pdf. Do evidence se nepushuje (kontrakt pozná jen PPD)."""
+    payer = udaje["prijato_od"].upper()
+    address = adresa_platce(data_dir, udaje, adresa_podle_ico).upper()
+    vozidla = udaje["vozidla"]
+    number = faktura.issue_faktura(data_dir, {
+        "payer": payer, "payer_ico": udaje["prijato_ico"], "payer_address": address,
+        "amount": udaje["castka"], "purpose": udaje["ucel"], "vozidla": vozidla})
+    rec = faktura.get_faktura(data_dir, number) or {}
+    doklad = {
+        "druh": "faktura", "cislo": number, "datum": rec.get("datum", ""),
+        "splatnost": rec.get("splatnost", ""), "prijato_od": payer,
+        "prijato_ico": udaje["prijato_ico"], "castka": udaje["castka"],
+        "ucel": udaje["ucel"], "vozidlo": ", ".join(vozidla),
+        "variabilni_symbol": str(number),
+    }
+    _zapis_vystaveny(data_dir, udaje, doklad)
+    try:
+        out_dir = os.path.join(data_dir, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, f"faktura_{number}.pdf"), "wb") as f:
+            f.write(faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec)))
+    except Exception as e:
+        _log.warning("Faktura %s: PDF se nepovedlo (%s), doklad platí, tisk jde ze zálohy", number, e)
+    return doklad
+
+
 def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
     """Vystaví doklad (nebo vrátí už vystavený pro stejný request_id).
 
@@ -232,6 +267,8 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
         hotovy = _najdi_vystaveny(data_dir, udaje["request_id"])
         if hotovy:
             return hotovy, False
+        if udaje.get("druh") == "faktura":
+            return _vystav_fakturu(data_dir, udaje, adresa_podle_ico), True
         dnes = datetime.now().strftime("%d.%m.%Y")
         # Plátce velkými písmeny jako u dokladu k žádosti; účel tak, jak přišel.
         payer = udaje["prijato_od"].upper()

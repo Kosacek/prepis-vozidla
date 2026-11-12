@@ -36,6 +36,9 @@ COPY app.py ./app.py
 COPY tracker_push.py ./tracker_push.py
 COPY ppd_push.py ./ppd_push.py
 COPY ppd.py ./ppd.py
+COPY faktura.py ./faktura.py
+COPY faktura_pdf.py ./faktura_pdf.py
+COPY spayd.py ./spayd.py
 COPY ppd_api.py ./ppd_api.py
 COPY scripts/ppd_do_evidence.py ./scripts/ppd_do_evidence.py
 COPY hledani.py ./hledani.py

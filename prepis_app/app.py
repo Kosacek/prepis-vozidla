@@ -20,6 +20,9 @@ from datetime import time as _time_of_day
 from pypdf import PdfReader, PdfWriter
 import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
+import faktura  # Faktura převodem + QR Platba — see faktura.py
+import faktura_pdf
+import segno
 import ppd_api  # POST /api/ppd/vystavit — evidence vystavuje doklady — see ppd_api.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import nahled  # PNG náhledy stránek pro sdílenou stránku
@@ -2172,15 +2175,35 @@ def api_ppd_vystavit():
         return (firma or {}).get("adresa") or ""
 
     doklad, novy = ppd_api.vystav(DATA_DIR, udaje, adresa_podle_ico)
-    if novy:
+    druh = doklad.get("druh", "ppd")
+    if novy and druh == "ppd":
         try:
             import ppd_push
             ppd_push.push_async(doklad, DATA_DIR)
         except Exception as e:
             _log.warning("PPD push skipped: %s", e)
         _log.info("PPD %s vystaven přes API (%s)", doklad["cislo"], udaje["zpracoval"] or "?")
-    return (jsonify({"doklad": doklad, "print_url": f"/ppd-print/{doklad['cislo']}"}),
+    tisk = "faktura-print" if druh == "faktura" else "ppd-print"
+    return (jsonify({"doklad": doklad, "druh": druh, "cislo": doklad["cislo"],
+                     "print_url": f"/{tisk}/{doklad['cislo']}"}),
             201 if novy else 200)
+
+
+@app.route("/faktura-print/<int:number>")
+def faktura_print(number):
+    """Tisková A5 stránka faktury (data ze zálohy, QR Platba jako inline SVG)."""
+    rec = faktura.get_faktura(DATA_DIR, number)
+    if rec is None:
+        return Response("Faktura nenalezena.", status=404, mimetype="text/plain")
+    pdf_rec = faktura.pdf_record(rec)
+    cfg = faktura.settings()
+    payload = faktura_pdf.spayd_for(pdf_rec, cfg)
+    qr_svg = segno.make(payload, error="m").svg_inline(scale=3, border=1) if payload else ""
+    from flask import make_response
+    resp = make_response(render_template("faktura_print.html", r=pdf_rec, cfg=cfg, qr_svg=qr_svg,
+                                         placeholder=faktura.PLACEHOLDER))
+    resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
 
 
 @app.route("/ppd-print/<int:number>")

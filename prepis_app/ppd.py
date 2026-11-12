@@ -252,6 +252,7 @@ def read_ppd_log(data_dir: str) -> list:
                 "castka":  r[3] if len(r) > 3 else "",
                 "ucel":    r[4] if len(r) > 4 else "",
                 "vozidlo": r[5] if len(r) > 5 else "",
+                "druh":    "ppd",
             })
     finally:
         wb.close()  # read_only mode leaks the file handle until closed
@@ -328,6 +329,7 @@ def read_backup(data_dir: str) -> list:
                 "ucel":       r[7] if len(r) > 7 else "",
                 "spz":        r[8] if len(r) > 8 else "",
                 "vin":        r[9] if len(r) > 9 else "",
+                "druh":       "ppd",
             })
     finally:
         wb.close()  # read_only mode leaks the file handle until closed
