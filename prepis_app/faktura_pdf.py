@@ -22,7 +22,8 @@ import ppd
 import spayd
 
 LEFT = 18 * mm
-QR_SIZE = 30 * mm
+QR_SIZE = 36 * mm
+MONO = "Courier-Bold"          # built-in, every glyph sits on the baseline (J, Q…)
 MAX_VEHICLE_LINES = 5
 QR_LABEL = "QR Platba"
 QR_MISSING = "QR po doplnění IBAN"
@@ -173,14 +174,24 @@ def _items(c, font, record, y, width) -> float:
     y -= 4.6 * mm
     vozidla = record.get("vozidla") or []
     shown = vozidla[:MAX_VEHICLE_LINES - 1] if len(vozidla) > MAX_VEHICLE_LINES else vozidla
-    c.setFont(font, 8.5)
     for v in shown:
-        c.drawString(LEFT + 3 * mm, y, ("VIN " if len(v) == 17 else "SPZ ") + v)
-        y -= 4 * mm
+        c.setFont(font, 7.5)
+        c.setFillColor(GREY)
+        c.drawString(LEFT + 3 * mm, y, "VIN" if len(v) == 17 else "SPZ")
+        c.setFillColor(black)
+        c.setFont(MONO, 9.5)
+        c.drawString(LEFT + 10 * mm, y, _ascii(v))
+        y -= 4.2 * mm
+    c.setFont(font, 8.5)
     if len(shown) < len(vozidla):
         c.drawString(LEFT + 3 * mm, y, f"… a dalších {len(vozidla) - len(shown)} vozidel")
         y -= 4 * mm
     return y
+
+
+def _ascii(text: str) -> str:
+    """Courier is a Latin-1 base font; VIN/SPZ are plain A-Z0-9 anyway."""
+    return str(text).encode("ascii", "replace").decode("ascii")
 
 
 def _money(amount) -> str:
