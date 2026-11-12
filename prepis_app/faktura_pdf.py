@@ -7,12 +7,14 @@ IBAN the QR is replaced by a grey box — a QR is never built from a fake accoun
 from __future__ import annotations
 
 import io
+import re
 
 import segno
 from reportlab.lib.colors import Color, black, lightgrey
 from reportlab.lib.pagesizes import A5
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
 import faktura
@@ -78,23 +80,75 @@ def _wrapped(c, font, size, text, x, y, width, leading) -> float:
     return y
 
 
-def _party(c, font, x, y, width, label, lines) -> None:
+GREY = Color(0.35, 0.35, 0.35)
+NBSP = " "
+_ONE_LETTER = re.compile(r"(?<!\S)([AaIiKkOoSsUuVvZz]) ")
+
+
+def _glue_prepositions(text: str) -> str:
+    """Czech typography: a one-letter word never ends a line (u Krajského, v Brně)."""
+    return _ONE_LETTER.sub(lambda m: m.group(1) + NBSP, text)
+
+
+def _split(text: str, font: str, size: float, width: float) -> list:
+    """Greedy wrap on plain spaces only, so NBSP keeps words together."""
+    lines, cur = [], ""
+    for word in _glue_prepositions(str(text)).split(" "):
+        trial = f"{cur} {word}" if cur else word
+        if cur and stringWidth(trial.replace(NBSP, " "), font, size) > width:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return [ln.replace(NBSP, " ") for ln in lines]
+
+
+def _party(c, font, x, y, width, label, lines, notes=()) -> None:
+    """Name (10 pt), address/IČO (8 pt), then small grey legal notes (6.5 pt)."""
     c.setFont(font, 8)
-    c.setFillColor(Color(0.35, 0.35, 0.35))
+    c.setFillColor(GREY)
     c.drawString(x, y, label)
     c.setFillColor(black)
     y -= 5 * mm
     for i, text in enumerate(lines):
-        y = _wrapped(c, font, 10 if i == 0 else 8.5, text, x, y, width, 4.2 * mm)
+        size = 10 if i == 0 else 8
+        c.setFont(font, size)
+        for ln in _split(text, font, size, width):
+            c.drawString(x, y, ln)
+            y -= (4.4 if i == 0 else 3.8) * mm
+    c.setFillColor(GREY)
+    c.setFont(font, 6.5)
+    for text in notes:
+        for ln in _split(text, font, 6.5, width):
+            c.drawString(x, y, ln)
+            y -= 3 * mm
+    c.setFillColor(black)
 
 
 def _supplier_lines(cfg: dict) -> list:
     adresa = cfg["adresa"] or f"Sídlo: {faktura.PLACEHOLDER}"
     ulice, _, mesto = adresa.rpartition(",")
     adresa_lines = [ulice.strip(), mesto.strip()] if ulice else [adresa]
-    return [cfg["name"], *adresa_lines,
-            f"IČO: {cfg['ico']}", "Není plátce DPH",
-            "Zapsána v OR: " + (cfg["spisova_znacka"] or faktura.PLACEHOLDER)]
+    return [cfg["name"], *adresa_lines, f"IČO: {cfg['ico']}"]
+
+
+def _supplier_notes(cfg: dict) -> list:
+    return ["Není plátce DPH.",
+            "Zapsána v obchodním rejstříku, sp." + NBSP + "zn." + NBSP
+            + _glue_mark(cfg["spisova_znacka"] or faktura.PLACEHOLDER) + "."]
+
+
+def _glue_mark(znacka: str) -> str:
+    """'C 106352 vedená…' -> keep the 'C 106352' part on one line."""
+    return re.sub(r"^(\S{1,3}) (\d)", lambda m: m.group(1) + NBSP + m.group(2), znacka)
+
+
+def _iban_display(iban: str) -> str:
+    """CZ6508000000192000145399 -> 'CZ65 0800 0000 1920 0014 5399'."""
+    raw = "".join(str(iban).split()).upper()
+    return " ".join(raw[i:i + 4] for i in range(0, len(raw), 4))
 
 
 def _customer_lines(record: dict) -> list:
@@ -139,7 +193,8 @@ def _money(amount) -> str:
 
 
 def _payment(c, font, record, cfg, payload, H, width) -> None:
-    """Bottom block: QR Platba on the left, total (right-aligned) on the right."""
+    """Bottom block: QR Platba left, total top-right, bank details beside the QR
+    so anyone who can't scan can type the payment in by hand."""
     top = H - 136 * mm
     right = LEFT + width
     if payload:
@@ -147,25 +202,39 @@ def _payment(c, font, record, cfg, payload, H, width) -> None:
     else:
         _draw_qr_missing(c, LEFT, top, QR_SIZE, font)
     c.setFont(font, 8)
-    c.setFillColor(Color(0.35, 0.35, 0.35))
+    c.setFillColor(GREY)
     c.drawCentredString(LEFT + QR_SIZE / 2, top - QR_SIZE - 4 * mm, QR_LABEL)
 
-    c.drawRightString(right, top - 4 * mm, "Celkem k úhradě")
+    c.drawRightString(right, top - 3 * mm, "Celkem k úhradě")
+    amount = _money(record.get("amount", 0))
     c.setFillColor(black)
-    c.setFont(font, 19)
     c.saveState()
     c.setLineWidth(0.7)
-    t = c.beginText(right - c.stringWidth(_money(record.get("amount", 0)), font, 19), top - 12 * mm)
+    t = c.beginText(right - c.stringWidth(amount, font, 19), top - 11 * mm)
     t.setFont(font, 19)
     t.setTextRenderMode(2)          # fill + stroke = faux bold (one TTF only)
-    t.textOut(_money(record.get("amount", 0)))
+    t.textOut(amount)
     c.drawText(t)
     c.restoreState()
-    c.setFont(font, 8)
-    c.setFillColor(Color(0.35, 0.35, 0.35))
-    c.drawRightString(right, top - 19 * mm, f"VS {record.get('number', '')}")
-    c.drawRightString(right, top - 23.5 * mm, f"Splatnost {record.get('due', '')}")
-    c.setFillColor(black)
+    _bank_details(c, font, record, cfg, LEFT + QR_SIZE + 5 * mm, top - 17 * mm)
+
+
+def _bank_details(c, font, record, cfg, x, y) -> None:
+    if cfg["iban"]:
+        rows = [("Číslo účtu", cfg["ucet"] or _iban_display(cfg["iban"])),
+                ("IBAN", _iban_display(cfg["iban"]))]
+    else:
+        rows = [("Číslo účtu", IBAN_MISSING)]
+    rows += [("Variabilní symbol", record.get("number", "")),
+             ("Splatnost", record.get("due", ""))]
+    for label, value in rows:
+        c.setFont(font, 6.5)
+        c.setFillColor(GREY)
+        c.drawString(x, y, label)
+        c.setFont(font, 8.5)
+        c.setFillColor(black)
+        c.drawString(x + 25 * mm, y, str(value))
+        y -= 4.2 * mm
 
 
 def _watermark(c, font, W, H) -> None:
@@ -200,7 +269,8 @@ def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
     c.drawCentredString(W / 2, H - 31 * mm, f"č. {record.get('number', '')}")
 
     col = width / 2 - 2 * mm
-    _party(c, font, LEFT, H - 41 * mm, col, "Dodavatel", _supplier_lines(cfg))
+    _party(c, font, LEFT, H - 41 * mm, col, "Dodavatel", _supplier_lines(cfg),
+           _supplier_notes(cfg))
     _party(c, font, LEFT + width / 2 + 2 * mm, H - 41 * mm, col, "Odběratel", _customer_lines(record))
 
     c.setFont(font, 8.5)
@@ -212,12 +282,7 @@ def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
         y = H - (84 + 5.5 * (i // 2)) * mm
         c.drawString(x, y, f"{label} {value}")
 
-    ucet = (cfg["ucet"] or cfg["iban"]) if cfg["iban"] else IBAN_MISSING
-    c.drawString(LEFT, H - 95 * mm, f"Číslo účtu: {ucet}")
-    if cfg["iban"] and cfg["ucet"]:
-        c.drawString(LEFT + width / 2 + 2 * mm, H - 95 * mm, f"IBAN: {cfg['iban']}")
-
-    _items(c, font, record, H - 103 * mm, width)
+    _items(c, font, record, H - 98 * mm, width)
     _payment(c, font, record, cfg, spayd_for(record, cfg), H, width)
 
     if sample:

@@ -192,3 +192,17 @@ def test_api_faktura_idempotent_and_bad_druh(api):
         "vozidla": ["3BR9309"], "druh": "faktura", "request_id": "r-faktura"})
     assert again.status_code == 200 and again.get_json()["cislo"] == a["cislo"]
     assert _post(api, druh="proforma").status_code == 400
+
+
+def test_one_letter_words_never_end_a_line():
+    import faktura_pdf
+    font = faktura_pdf.ppd._ensure_font()
+    for width in range(60, 200, 5):
+        for ln in faktura_pdf._split("spisová značka C 106352 vedená u Krajského soudu v Brně",
+                                     font, 6.5, width):
+            assert not ln.endswith((" u", " v")), ln
+
+
+def test_iban_display_groups_of_four():
+    import faktura_pdf
+    assert faktura_pdf._iban_display("CZ6508000000192000145399") == "CZ65 0800 0000 1920 0014 5399"
