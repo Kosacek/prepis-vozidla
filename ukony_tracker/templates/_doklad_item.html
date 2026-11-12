@@ -1,38 +1,49 @@
-{# One doklad (PPD) on /doklady: fixed slots like the Úkony rows; a tap opens a
-   drawer with the úkony it pays (services/ppd_links.py), drawn with the same
-   _ukony_item.html as the Úkony page. Desktop: one grid line. Phone (≤760px):
-   č. ……… částka / ● firma · datum · plátce / auta / N úkonů ▾. #}
-{% set uids = links.by_doklad.get(p.cislo, []) %}
-{% set chybi = links.missing.get(p.cislo, []) %}
-{% set f = firmy_by_id.get(links.firma.get(p.cislo)) %}
-{% set cars = auta(p.vozidlo) %}
-{% set ns = namespace(kc=0, hledat='') %}
-{% for uid in uids %}{% set u = ukony.get(uid) %}{% if u %}{% set ns.kc = ns.kc + u.celkem %}{% set ns.hledat = ns.hledat ~ ' ' ~ (u.rz or '') ~ ' ' ~ (u.vin or '') %}{% endif %}{% endfor %}
-<div class="doklad-item{{ ' is-smazany' if p.smazano }}" data-cislo="{{ p.cislo }}" data-kc="{{ p.castka }}"
-     data-search="{{ (p.cislo ~ ' ' ~ (p.prijato_od or '') ~ ' ' ~ (p.prijato_ico or '') ~ ' ' ~ (p.vozidlo or '') ~ ' ' ~ (f.zkratka if f else '') ~ ns.hledat) | lower }}">
-  <button type="button" class="doklad-row" aria-expanded="false" aria-controls="doklad-{{ p.cislo }}">
-    <b class="doklad-cislo">č. {{ p.cislo }}</b>
-    <span class="doklad-meta">
-      <span class="doklad-datum muted">{{ p.datum[8:10] }}.{{ p.datum[5:7] }}.{{ p.datum[0:4] }}</span>
-      <span class="doklad-firma">{% if f %}<span class="firma-dot" style="background: {{ firma_colors.get(f.zkratka, 'var(--muted)') }};"></span>{{ f.zkratka }}{% else %}<span class="muted">—</span>{% endif %}</span>
-      <span class="doklad-od" title="{{ p.prijato_od or '' }}">{{ p.prijato_od or '—' }}{% if p.smazano %} <span class="tag">smazaný</span>{% endif %}</span>
-    </span>
-    <span class="doklad-auta">{% for shown, key in cars[:2] %}<span class="auto-chip{{ ' is-chybi' if key in chybi }}">{{ shown }}</span>{% endfor %}{% if cars|length > 2 %}<span class="auto-chip more">+{{ cars|length - 2 }}</span>{% endif %}</span>
-    <span class="doklad-kc"><b>{{ p.castka|kc }} Kč</b></span>
-    <span class="doklad-pocet{{ ' is-zadny' if not uids }}">{% if uids %}{{ uids|length }} {{ 'úkon' if uids|length == 1 else ('úkony' if uids|length < 5 else 'úkonů') }}{% else %}bez úkonu{% endif %}</span>
-    <span class="doklad-chev" aria-hidden="true"></span>
-  </button>
+{# One doklad (PPD) on /doklady, drawn from services/doklady_view.Radek (2.8).
+   Desktop: one aligned line — firma | č. + datum | auto (SPZ / VIN) |
+   přijato od | částka | úkony ▸ | sdílet. Phone (≤760px):
+   ● firma ……… částka / SPZ · VIN / přijato od / č. · datum ……… úkony ▾,
+   share icon on the right. A tap opens the drawer with the úkony it pays
+   (services/ppd_links.py), drawn with the same _ukony_item.html as Úkony. #}
+<div class="doklad-item{{ ' is-smazany' if p.smazano }}" data-cislo="{{ p.cislo }}" data-vs="{{ p.vs }}" data-kc="{{ p.castka }}" data-search="{{ p.hledat }}">
+  <div class="doklad-head">
+    <button type="button" class="doklad-row" aria-expanded="false" aria-controls="doklad-{{ p.cislo }}">
+      <span class="doklad-firma">
+        {%- if p.firma %}<span class="doklad-firma-chip" style="--firma: {{ p.firma.color }};"><span class="firma-dot"></span>{{ p.firma.zkratka }}</span>
+        {%- else %}<span class="doklad-firma-chip is-none">bez firmy</span>{% endif -%}
+      </span>
+      <span class="doklad-id"><b class="doklad-cislo">č. {{ p.cislo }}</b><span class="doklad-datum">{{ p.datum }}</span></span>
+      <span class="doklad-auta"{% if p.auta|length > 1 %} title="{% for a in p.auta %}{{ a.spz or a.vin }}{{ ', ' if not loop.last }}{% endfor %}"{% endif %}>
+        {%- for a in p.auta[:1] %}
+        <span class="doklad-auto{{ ' is-chybi' if a.chybi }}">
+          {%- if a.spz %}<b class="doklad-spz">{{ a.spz }}</b>{% endif -%}
+          {%- if a.vin %}<span class="doklad-vin{{ ' is-only' if not a.spz }}">{{ a.vin }}</span>{% endif -%}
+          {%- if p.auta|length > 1 %}<span class="auto-chip more">+{{ p.auta|length - 1 }}</span>{% endif -%}
+        </span>
+        {%- else %}<span class="doklad-vin is-only muted">bez auta</span>{% endfor -%}
+      </span>
+      <span class="doklad-od" title="{{ p.prijato_od }}">{{ p.prijato_od or '—' }}{% if p.smazano %} <span class="tag">smazaný</span>{% endif %}</span>
+      <span class="doklad-kc"><b>{{ p.castka|kc }} Kč</b></span>
+      <span class="doklad-pocet is-{{ p.platba.stav }}" title="{{ p.platba.title }}">{{ p.platba.label }}</span>
+      <span class="doklad-chev" aria-hidden="true"></span>
+    </button>
+    {% if not p.smazano %}
+    <button type="button" class="doklad-share" data-doklad-share="{{ p.cislo }}"
+            aria-label="Tisk nebo sdílení dokladu č. {{ p.cislo }}" title="Tisk / Sdílet kódem">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+    </button>
+    {% endif %}
+  </div>
   <div class="doklad-drawer" id="doklad-{{ p.cislo }}" hidden>
-    {% if uids %}
+    {% if p.uids %}
     <div class="ukony-list doklad-ukony">
       {# smazat_doklad: here the row's trash deletes this doklad, never the úkon. #}
-      {% for uid in uids %}{% set u = ukony.get(uid) %}{% if u %}{% with smazat_doklad=p %}{% include "_ukony_item.html" %}{% endwith %}{% endif %}{% endfor %}
+      {% for uid in p.uids %}{% set u = ukony.get(uid) %}{% if u %}{% with smazat_doklad=p %}{% include "_ukony_item.html" %}{% endwith %}{% endif %}{% endfor %}
     </div>
     {% endif %}
-    {% for key in chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}
-    {% if uids %}
-    <div class="doklad-souhrn">Úkony celkem {{ ns.kc|kc }} Kč · doklad {{ p.castka|kc }} Kč{% if ns.kc|round|int == p.castka %} <span class="doklad-sedi">✓</span>{% endif %}</div>
-    {% elif not chybi %}
+    {% for key in p.chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}
+    {% if p.uids %}
+    <div class="doklad-souhrn">Úkony celkem {{ p.ukony_kc|kc }} Kč · doklad {{ p.castka|kc }} Kč{% if p.ukony_kc == p.castka %} <span class="doklad-sedi">✓</span>{% endif %}</div>
+    {% elif not p.chybi %}
     <div class="doklad-souhrn">Doklad neuvádí auto.</div>
     {% endif %}
   </div>

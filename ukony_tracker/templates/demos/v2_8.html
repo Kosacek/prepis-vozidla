@@ -1,0 +1,71 @@
+{# Demo for release 2.8: a doklad row (firma chip, SPZ + VIN), its úkony
+   chip turns green once paid, a tap on the share icon brings up Tisk /
+   Sdílet kódem. CSS-only, 4s loop, app tokens only. #}
+<style>
+  .de28-demo { box-sizing: border-box; height: 176px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25;
+    overflow: hidden; position: relative; }
+  .de28-row { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: center; gap: 6px;
+    padding: 9px 8px 9px 11px; border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+    box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .de28-body { display: grid; gap: 4px; min-width: 0; }
+  .de28-top { display: flex; align-items: center; justify-content: space-between; }
+  .de28-firma { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px 1px 5px;
+    border-radius: 999px; font-size: 9.5px; font-weight: 700;
+    background: color-mix(in srgb, #34c759 15%, var(--card)); border: 1px solid color-mix(in srgb, #34c759 38%, var(--card)); }
+  .de28-dot { width: 6px; height: 6px; border-radius: 50%; background: #34c759; }
+  .de28-kc { font-size: 12px; font-weight: 800; }
+  .de28-car { display: flex; align-items: baseline; gap: 6px; }
+  .de28-spz { font-size: 12.5px; font-weight: 800; letter-spacing: .02em; }
+  .de28-vin { font-size: 9px; color: var(--muted); letter-spacing: .03em; }
+  .de28-od { font-size: 9.5px; }
+  .de28-foot { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 9px; }
+  .de28-foot b { color: var(--ink); }
+  .de28-chip { position: relative; display: inline-grid; font-size: 8.5px; font-weight: 700; }
+  .de28-chip > span { grid-area: 1 / 1; border-radius: 999px; padding: 1px 7px; border: 1px solid transparent; }
+  .de28-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a !important;
+    animation: de28-out 4s ease infinite; }
+  .de28-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); opacity: 0;
+    animation: de28-in 4s ease infinite; }
+  .de28-share { position: relative; display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 50%; color: var(--accent); }
+  .de28-share::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: var(--accent); opacity: 0; animation: de28-tap 4s ease infinite; }
+  .de28-sheet { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 12px 10px;
+    border-radius: 14px 14px 0 0; background: var(--card); box-shadow: 0 -10px 30px rgba(0,0,0,.18);
+    transform: translateY(105%); animation: de28-sheet 4s ease infinite; }
+  .de28-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .de28-choice { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 4px;
+    border-radius: 8px; border: 1px solid var(--line); font-size: 9.5px; font-weight: 700; }
+  .de28-choice svg { color: var(--accent); }
+  @keyframes de28-out { 0%, 22% { opacity: 1; } 32%, 100% { opacity: 0; } }
+  @keyframes de28-in { 0%, 22% { opacity: 0; } 32%, 100% { opacity: 1; } }
+  @keyframes de28-tap { 0%, 38% { opacity: 0; transform: scale(.6); } 44% { opacity: .18; transform: scale(1.15); }
+    52%, 100% { opacity: 0; transform: scale(1.3); } }
+  @keyframes de28-sheet { 0%, 46% { transform: translateY(105%); } 56%, 86% { transform: none; }
+    96%, 100% { transform: translateY(105%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .de28-unpaid { animation: none; opacity: 0; }
+    .de28-paid { animation: none; opacity: 1; }
+    .de28-share::after { animation: none; }
+    .de28-sheet { animation: none; transform: none; }
+  }
+</style>
+<div class="de28-demo" aria-hidden="true">
+  <div class="de28-row">
+    <div class="de28-body">
+      <div class="de28-top"><span class="de28-firma"><span class="de28-dot"></span>JE &amp; NE</span><span class="de28-kc">1 300 Kč</span></div>
+      <div class="de28-car"><span class="de28-spz">4AE1234</span><span class="de28-vin">TMBJJ7NE5J0123456</span></div>
+      <div class="de28-od">JAZYKOVÁ ŠKOLA P.A.R.K.</div>
+      <div class="de28-foot"><span><b>č. 215</b> · 12.11.2026</span>
+        <span class="de28-chip"><span class="de28-unpaid">1 úkon</span><span class="de28-paid">✓ 1 úkon</span></span></div>
+    </div>
+    <span class="de28-share"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>
+  </div>
+  <div class="de28-sheet">
+    <div class="de28-choices">
+      <span class="de28-choice"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3h10v6M7 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>Tisk</span>
+      <span class="de28-choice"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>Sdílet kódem</span>
+    </div>
+  </div>
+</div>

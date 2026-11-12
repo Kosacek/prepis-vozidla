@@ -1,4 +1,4 @@
-// Doklady (2.5): a doklad opens like an FAQ entry to show the úkony it pays;
+// Doklady (2.5, 2.8): a doklad opens like an FAQ entry to show the úkony it pays;
 // the search box filters live like on Úkony, firma/měsíc/smazané reload the page.
 (function () {
   var list = document.querySelector('.doklady-list');
@@ -18,6 +18,12 @@
   form.querySelectorAll('select, input[type="month"]').forEach(function (el) {
     el.addEventListener('change', function () { form.submit(); });
   });
+  // The firm filter gets the same coloured picker as everywhere else (2.8,
+  // company-colour rule); the native select stays the value source.
+  var firmaFilter = document.getElementById('doklady-firma');
+  if (firmaFilter && window.FirmaPick && window.FirmaPick.attach) {
+    try { window.FirmaPick.attach(firmaFilter); } catch (_) {}
+  }
 
   var input = document.getElementById('doklady-search');
   var countEl = document.getElementById('doklady-count');

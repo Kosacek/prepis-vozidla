@@ -1,4 +1,5 @@
 """PPD: idempotentní příjem ze zadosti, párování úkonů a přehled dokladů."""
+import re
 import sqlite3
 from datetime import date, timedelta
 
@@ -337,7 +338,8 @@ def test_doklady_renders_link_and_hides_deleted_by_default(client):
     body = response.get_data(as_text=True)
     assert '<a href="/doklady">Doklady</a>' in body
     assert 'data-cislo="101"' in body and 'data-cislo="102"' not in body
-    assert "14.06.2026" in body and "JAN ŽIŽKA" in body and "1AB 2345" in body
+    # 2.8: a linked car is shown as evidence has it (the úkon's RZ), not as the doklad wrote it.
+    assert "14.06.2026" in body and "JAN ŽIŽKA" in body and '<b class="doklad-spz">1AB2345</b>' in body
     assert f'href="/ukony/{uid}/upravit?back=' in body
     assert '<span id="doklady-count">1</span>' in body
     assert '<span id="doklady-sum">1\u00a0300</span>' in body
@@ -428,10 +430,12 @@ def test_doklad_row_opens_a_drawer_with_its_ukony(client):
     assert "Úkony celkem 6 500 Kč · doklad 6 500 Kč" in body
 
 
-def test_doklad_row_shows_two_cars_and_a_count(client):
+def test_doklad_row_shows_the_first_car_and_a_count_of_the_rest(client):
+    # 2.8: one car (SPZ + VIN) per row keeps the columns aligned; "+5" covers the rest.
     _jene_doklad_179(client)
     row = client.get("/doklady").get_data(as_text=True).split('data-cislo="179"')[1].split("</button>")[0]
-    assert row.count('class="auto-chip"') == 2 and '+4</span>' in row
+    assert row.count('class="doklad-spz"') == 1 and '<b class="doklad-spz">3BR9196</b>' in row
+    assert '+5</span>' in row
     assert "JE &amp; NE" in row and "08.10.2026" in row
 
 
@@ -442,7 +446,7 @@ def test_firm_filter_uses_the_firm_of_the_ukony_or_the_payer(client):
     assert '<span id="doklady-count">1</span>' in body
     body = client.get(f"/doklady?firma={other}").get_data(as_text=True)
     assert 'data-cislo="180"' in body and 'data-cislo="179"' not in body
-    assert f'<option value="{other}" selected>' in body
+    assert re.search(rf'<option value="{other}" data-color="#[0-9a-f]{{6}}" selected>', body)
 
 
 def test_live_search_covers_firm_and_ukony_cars(client):

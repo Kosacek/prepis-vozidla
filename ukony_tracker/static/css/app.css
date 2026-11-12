@@ -2163,21 +2163,25 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .ukony-list .stav-slot .badge-btn { border: 1px solid transparent; }
 }
 
-/* ── Doklady (2.5) ─────────────────────────────────────────────────────────
-   Same fixed slots as the Úkony rows so nothing jumps: č. | datum | firma |
-   přijato od | auta | částka | úkony | ▸. A tap opens the drawer with the
-   úkony the doklad pays (same _ukony_item.html as Úkony). */
+/* ── Doklady (2.5, přestavěno 2.8) ──────────────────────────────────────────
+   David 12. 11. 2026: firm obvious at a glance, VIN next to the SPZ, paid
+   state on the úkony chip, one share icon. Aligned columns on desktop:
+   firma | č. + datum | auto (SPZ / VIN) | přijato od | částka | úkony ▸, and
+   the share icon outside the toggle button (no nested buttons). A tap opens
+   the drawer with the úkony the doklad pays (same _ukony_item.html as Úkony). */
 .doklady-list { display: grid; }
 .doklad-item { border-bottom: 1px solid var(--line); }
 .doklad-item:last-child { border-bottom: none; }
 .doklad-item[hidden] { display: none; }
+.doklad-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; }
 .doklad-row {
   display: grid;
-  grid-template-columns: 62px 92px 112px minmax(0, 1fr) 236px 96px 90px 14px;
+  grid-template-columns: 132px 92px minmax(150px, 200px) minmax(0, 1fr) 96px 112px 14px;
   gap: var(--sp-3);
   align-items: center;
   width: 100%;
-  padding: 11px var(--sp-3);
+  min-width: 0;
+  padding: 9px var(--sp-3);
   background: none;
   border: 0;
   border-radius: var(--radius-sm);
@@ -2188,57 +2192,150 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 .doklad-row:hover { background: var(--bg); }
 .doklad-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.doklad-meta { display: contents; }
+
+/* Firm chip: the firm's evidence colour as a tinted pill (company-colour rule). */
+.doklad-firma { min-width: 0; display: flex; }
+.doklad-firma-chip {
+  --firma: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
+  padding: 3px 10px 3px 8px; border-radius: var(--radius-pill);
+  font-size: 0.8125rem; font-weight: 650; line-height: 1.3; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; color: var(--ink);
+  background: color-mix(in srgb, var(--firma) 15%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--firma) 38%, var(--card));
+}
+.doklad-firma-chip .firma-dot { background: var(--firma); }
+.doklad-firma-chip.is-none { color: var(--muted); font-weight: 500; border-style: dashed; background: var(--card); }
+
+.doklad-id { display: grid; min-width: 0; line-height: 1.25; }
 .doklad-cislo { white-space: nowrap; }
-.doklad-datum { font-size: 0.8125rem; white-space: nowrap; }
-.doklad-firma { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
-.doklad-od { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doklad-auta { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
+.doklad-datum { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+.doklad-auta { min-width: 0; }
+.doklad-auto { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: baseline;
+  column-gap: 6px; min-width: 0; line-height: 1.25; }
+.doklad-spz { font-size: 0.9375rem; font-weight: 750; letter-spacing: 0.02em; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.doklad-vin { grid-column: 1 / -1; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.03em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.doklad-vin.is-only { grid-column: 1; font-size: 0.8125rem; font-weight: 650; color: var(--ink); }
+.doklad-auto .auto-chip.more { grid-row: 1; align-self: center; }
+.doklad-auto.is-chybi .doklad-spz,
+.doklad-auto.is-chybi .doklad-vin { color: #9b1c13; }
 .auto-chip {
   font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em; white-space: nowrap;
   border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; background: var(--card);
   font-variant-numeric: tabular-nums;
 }
 .auto-chip.more { color: var(--muted); }
-.auto-chip.is-chybi { border-color: #f3b4ad; background: #fde9e7; color: #9b1c13; }
+
+.doklad-od { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doklad-kc { text-align: right; white-space: nowrap; }
+
+/* Úkony chip = paid state at a glance (2.8): green all paid, half for a
+   partial payment, the same orange as "Zaplatit" while unpaid. */
 .doklad-pocet {
   justify-self: end; white-space: nowrap; font-size: 0.75rem; font-weight: 650;
-  border-radius: var(--radius-pill); padding: 2px 9px;
-  background: var(--flash-info-bg); color: var(--flash-info-ink);
+  border-radius: var(--radius-pill); padding: 2px 9px; border: 1px solid transparent;
 }
-.doklad-pocet.is-zadny { background: var(--bg); color: var(--muted); }
+.doklad-pocet.is-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.doklad-pocet.is-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a; }
+.doklad-pocet.is-partial {
+  color: #4a4a00; border-color: #c9c56b;
+  background: linear-gradient(90deg, var(--flash-success-bg) 0 50%, var(--flash-warning-bg) 50% 100%);
+}
+.doklad-pocet.is-none { background: var(--bg); color: var(--muted); }
+
 .doklad-chev::before {
   content: ""; display: block; width: 7px; height: 7px;
   border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
   transform: rotate(-45deg); transition: transform .15s ease;
 }
 .doklad-row[aria-expanded="true"] .doklad-chev::before { transform: rotate(45deg); }
-.doklad-item.is-open > .doklad-row { background: var(--bg); }
+.doklad-item.is-open .doklad-row { background: var(--bg); }
 .doklad-item.is-smazany .doklad-cislo { text-decoration: line-through; color: var(--muted); }
+
+.doklad-share {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; margin-right: 4px;
+  border: 0; border-radius: 50%; background: none; color: var(--accent); cursor: pointer;
+}
+.doklad-share:hover { background: var(--bg); }
+.doklad-share:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .doklad-drawer { margin: 2px var(--sp-3) var(--sp-3); padding-left: var(--sp-3); border-left: 3px solid var(--accent); }
 .doklad-chybi { color: #9b1c13; font-size: 0.85rem; font-weight: 600; padding: 8px var(--sp-3); }
 .doklad-souhrn { color: var(--muted); font-size: 0.8125rem; padding: 6px var(--sp-3) 2px; }
 .doklad-sedi { color: var(--flash-success-ink); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .doklad-chev::before { transition: none; } }
 
+@media (max-width: 1100px) {
+  .doklad-row { grid-template-columns: 118px 84px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 14px; gap: 10px; }
+}
+
 @media (max-width: 760px) {
+  .doklad-head { gap: 0; }
   .doklad-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "cislo kc" "meta meta" "auta auta" "pocet chev";
-    gap: 6px var(--sp-3);
-    padding: 12px var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) auto 12px;
+    grid-template-areas: "firma kc kc" "auta auta auta" "od od od" "id pocet chev";
+    gap: 5px 8px;
+    padding: 12px 4px 12px var(--sp-3);
   }
-  .doklad-cislo { grid-area: cislo; font-size: 1.05rem; }
-  .doklad-kc { grid-area: kc; font-size: 1.05rem; }
-  .doklad-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: 0.8125rem; color: var(--muted); min-width: 0; }
-  .doklad-meta .doklad-firma { order: -1; color: var(--ink); font-weight: 600; }
-  .doklad-meta .doklad-datum::before, .doklad-meta .doklad-od::before { content: "· "; }
-  .doklad-meta .doklad-od { white-space: normal; }
-  .doklad-auta { grid-area: auta; flex-wrap: wrap; }
-  .doklad-pocet { grid-area: pocet; justify-self: start; }
-  .doklad-chev { grid-area: chev; justify-self: end; padding-right: 4px; }
+  .doklad-firma { grid-area: firma; }
+  .doklad-kc { grid-area: kc; font-size: 1.05rem; align-self: center; }
+  .doklad-auta { grid-area: auta; }
+  .doklad-auto { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 8px; }
+  .doklad-auto .doklad-vin { grid-column: auto; font-size: 0.8125rem; }
+  .doklad-auto .doklad-vin.is-only { font-size: 0.9375rem; font-weight: 750; letter-spacing: 0.02em; }
+  .doklad-auto .auto-chip.more { grid-row: auto; }
+  .doklad-od { grid-area: od; font-size: 0.875rem; }
+  .doklad-id { grid-area: id; display: flex; align-items: baseline; gap: 6px; font-size: 0.8125rem; color: var(--muted); }
+  .doklad-id .doklad-cislo { color: var(--ink); font-weight: 650; }
+  .doklad-id .doklad-datum::before { content: "· "; }
+  .doklad-pocet { grid-area: pocet; }
+  .doklad-chev { grid-area: chev; justify-self: end; }
+  .doklad-share { width: 44px; height: 44px; margin-right: 0; }
   .doklad-drawer { margin: 0 var(--sp-2) var(--sp-3); padding-left: var(--sp-2); }
+}
+
+/* Doklady firm filter (2.8): the coloured picker, sized like its neighbours. */
+.filter-bar .firma-pick { min-width: 10.5rem; }
+.filter-bar .firma-pick__btn { padding: 6px 10px; gap: 7px; font-size: 0.875rem; font-weight: 400; }
+.filter-bar .firma-pick__list { min-width: 12rem; }
+@media (max-width: 760px) {
+  /* Phone: the firm gets the full row (its name never truncates), měsíc and
+     platné share the next one — no empty cell. */
+  #doklady-filter .filter-bar__fields > .firma-pick { grid-column: 1 / -1; min-width: 0; }
+  .filter-bar .firma-pick__btn { min-height: 40px; font-size: 16px; }
+}
+
+/* Tisk / Sdílet kódem sheet (2.8): two big choices, then the code. */
+.doklad-share-card { max-width: 400px; padding: var(--sp-5); }
+.doklad-share-card [hidden] { display: none !important; }
+.doklad-share-card h2 { margin: 0 32px 2px 0; font-size: 1.15rem; }
+.ds-sub { margin: 0 0 var(--sp-4); color: var(--muted); font-size: 0.875rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-choices { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.ds-choice {
+  display: grid; justify-items: center; gap: 4px; padding: var(--sp-4) var(--sp-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card);
+  color: var(--ink); font: inherit; text-decoration: none; cursor: pointer;
+}
+.ds-choice svg { color: var(--accent); }
+.ds-choice:hover { background: var(--bg); }
+.ds-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ds-choice[aria-busy="true"] { opacity: .6; cursor: progress; }
+.ds-choice__label { font-weight: 700; }
+.ds-choice__hint { font-size: 0.75rem; color: var(--muted); }
+.ds-result { display: grid; gap: var(--sp-2); text-align: center; }
+.ds-url { font-size: 1.25rem; font-weight: 750; letter-spacing: 0.01em; word-break: break-all;
+  padding: var(--sp-3); border-radius: var(--radius-sm); background: var(--bg); font-variant-numeric: tabular-nums; }
+.ds-stav { margin: 0; color: var(--muted); font-size: 0.8125rem; }
+.ds-send { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.ds-error { margin: var(--sp-3) 0 0; color: var(--flash-error-ink); font-size: 0.875rem; font-weight: 600; }
+@media (max-width: 760px) {
+  #doklad-share { align-items: flex-end; padding: 0; }
+  .doklad-share-card { max-width: none; border-radius: var(--radius) var(--radius) 0 0;
+    padding: var(--sp-5) var(--sp-4) max(var(--sp-5), env(safe-area-inset-bottom)); }
 }
 
 /* ── Month filter (_month_field.html) ──────────────────────────────────────
@@ -2324,6 +2421,23 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .dn-ukon__auto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dn-ukon__meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dn-ukon__kc { white-space: nowrap; }
+/* 2.8: paid úkony without a doklad, folded under the unpaid ones. */
+.dn-ukon:has(+ .dn-paid) { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.dn-ukon:first-child:has(+ .dn-paid) { border-radius: var(--radius-sm); }
+.dn-paid { display: grid; gap: 6px; margin-top: 6px; }
+.dn-paid:first-child { margin-top: 0; }
+.dn-paid__toggle {
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 8px 12px;
+  border: 1.5px dashed var(--line); border-radius: var(--radius-sm); background: none;
+  color: var(--muted); font-family: inherit; font-size: 0.8125rem; font-weight: 600; text-align: left; cursor: pointer;
+}
+.dn-paid__toggle:hover { background: var(--bg); color: var(--ink); }
+.dn-paid__toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dn-paid__toggle[aria-expanded="true"] .dn-ukony__chev { transform: rotate(-45deg); }
+.dn-paid__rows { display: grid; }
+.dn-ukon.is-paid .dn-ukon__kc { color: var(--flash-success-ink); }
+.dn-ukon.is-paid .dn-ukon__kc::before { content: "✓ "; }
+.dn-payer .firma-dot { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .dn-error { margin: 0; color: var(--flash-error-ink); background: var(--flash-error-bg); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 0.875rem; }
 .dn-submit { width: 100%; justify-content: center; text-align: center; }
 .dn-done { display: grid; gap: var(--sp-3); }
@@ -2331,7 +2445,8 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 @media (max-width: 760px) {
   .dn-ukon { grid-template-columns: 20px minmax(0, 1fr) auto; }
   .dn-ukon .tag { display: none; }
-  .dn-ukon__meta { grid-column: 2 / -1; }
+  .dn-ukon__meta { grid-column: 2 / -1; grid-row: 2; }
+  .dn-ukon__kc { grid-column: 3; grid-row: 1; }  /* price beside the SPZ, not on a third line */
 }
 @media (max-width: 560px) {
   /* Phones: one field per row and 16 px inputs (no iOS zoom). */

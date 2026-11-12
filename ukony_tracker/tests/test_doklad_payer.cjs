@@ -143,3 +143,20 @@ test('parseVozidla splits on commas, semicolons and newlines, trims and dedupes'
   assert.deepEqual(P.parseVozidla(''), []);
   assert.deepEqual(P.parseVozidla(null), []);
 });
+
+// 2.8: David picked JE & NE, the payer chip was "Jazyková škola P.A.R.K." (IČO
+// 25589571) and "Adresa na doklad" stayed empty until he clicked ARES.
+test('aresIco: a payer with a full IČO and no address is looked up in ARES', () => {
+  const chip = {role: 'vlastnik', jmeno: 'Jazyková škola P.A.R.K. s.r.o.', ico: '25589571', zadost_id: 'z1'};
+  assert.equal(P.aresIco(chip, '', false), '25589571');
+  assert.equal(P.aresIco({...chip, ico: '255 895 71'}, '  ', false), '25589571');
+});
+
+test('aresIco: never over a typed or filled address, never without a full IČO', () => {
+  const chip = {role: 'firma', jmeno: 'Lexus', ico: '25589571'};
+  assert.equal(P.aresIco(chip, 'Branka 506/36, Brno', false), '');
+  assert.equal(P.aresIco(chip, '', true), '');
+  assert.equal(P.aresIco({...chip, ico: ''}, '', false), '');
+  assert.equal(P.aresIco({...chip, ico: '1234'}, '', false), '');
+  assert.equal(P.aresIco(null, '', false), '');
+});

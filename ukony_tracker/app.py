@@ -87,7 +87,8 @@ def create_app():
         # Otázka pro „Zeptej se" je POST jen kvůli historii konverzace v těle —
         # nic nezapisuje, a záloha při každé otázce by vytlačila skutečné
         # zálohy z rotace posledních 30.
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.endpoint != "ask.kolo":
+        # Totéž sdílecí kód dokladu (ppd.sdilet, 2.8): jen se ptá žádostí, nic nezapisuje.
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.endpoint not in ("ask.kolo", "ppd.sdilet"):
             db.backup_db()
 
     @app.context_processor

@@ -126,8 +126,19 @@
     return {zadost_id: chip.zadost_id, strana: chip.strana};
   }
 
+  // 2.8: the IČO to look up in ARES for "Adresa na doklad" — only while
+  // nobody typed one, the field is empty and the payer has a full 8-digit IČO.
+  // (A person without an IČO keeps the empty field: žádosti print the address
+  // from the žádost.)
+  function aresIco(chip, adresaValue, typed) {
+    if (!chip || typed || squash(adresaValue)) return '';
+    var d = digits(chip.ico);
+    return d.length === 8 ? d : '';
+  }
+
   var api = {choices: choices, fields: fields, names: names, MAX_PARTY_CHIPS: MAX_PARTY_CHIPS,
-    adresaText: adresaText, vozidlaFromUkony: vozidlaFromUkony, parseVozidla: parseVozidla};
+    adresaText: adresaText, vozidlaFromUkony: vozidlaFromUkony, parseVozidla: parseVozidla,
+    aresIco: aresIco};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.DokladPayer = api;
 })(typeof window !== 'undefined' ? window : globalThis);

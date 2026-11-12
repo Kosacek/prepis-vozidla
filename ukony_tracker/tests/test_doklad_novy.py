@@ -76,9 +76,12 @@ def _body(data, **over):
             "request_id": "6f1c2a1e-6b1d-4c55-9a3e-2f0a9d1b7c44", **over}
 
 
-def test_picker_lists_unpaid_recent_ukony_of_the_firm_without_a_doklad(client, data):
+def test_picker_lists_recent_ukony_of_the_firm_without_a_doklad_unpaid_first(client, data):
     body = client.get(f"/doklady/novy/ukony?firma={data['jene']}").get_json()
-    assert [u["id"] for u in body["ukony"]] == sorted([data["a"], data["b"]], reverse=True)
+    # 2.8: paid úkony without a doklad come too (David had to un-pay one to
+    # issue its doklad), after the unpaid ones and flagged.
+    assert [u["id"] for u in body["ukony"]] == sorted([data["a"], data["b"]], reverse=True) + [data["paid"]]
+    assert [u["zaplaceno"] for u in body["ukony"]] == [False, False, True]
     assert body["firma"] == {"nazev": "JE & NE, spol. s r.o.", "zkratka": "JE & NE", "ico": "44960263",
                              "adresa": "", "psc": ""}
     assert body["ukony"][0]["vozidlo"] in ("3BR9309", "TMBER6NW0V3099310")
@@ -104,6 +107,16 @@ def test_issue_sends_the_contract_and_links_the_chosen_ukony(client, data, zados
 
 
 # --- Doklad bez úkonu, ruční vozidla a adresa plátce (2.6) ---------------------
+
+def test_paid_ukon_gets_its_doklad_and_stays_paid(client, data, zadosti):
+    # 2.8: David had to un-pay the Jazyková škola úkon to issue its doklad.
+    response = client.post("/doklady/novy", json=_body(data, ukony=[data["paid"]], castka=1300))
+    assert response.status_code == 201
+    with client.application.app_context():
+        conn = db.get_db()
+        assert ppd_links.compute(conn).by_doklad[183] == [data["paid"]]
+        assert ukony_repo.get(conn, data["paid"])["stav_platby"] == "zaplaceno"
+
 
 def test_doklad_without_any_ukon_or_firm_is_issued(client, data, zadosti):
     calls, _ = zadosti

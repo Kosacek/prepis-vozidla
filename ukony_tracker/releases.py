@@ -27,6 +27,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.8", date(2026, 11, 12),
+        "Doklad vytiskneš nebo pošleš kódem",
+        ("Ikonou sdílení u dokladu zvolíš Tisk nebo Sdílet kódem — bez odbočky do žádostí.",
+         "Řádek ukáže firmu, SPZ i VIN a zezelená, když jsou úkony zaplacené."),
+        demo="v2_8",
+    ),
+    Release(
         "2.7.3", date(2026, 11, 11),
         "Nový majitel na techničáku = nový úkon",
         ("Nový majitel se k úkonu zapíše a jiná SPZ než v evidenci čeká ve Zkontroluj.",

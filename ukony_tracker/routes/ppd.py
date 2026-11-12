@@ -9,7 +9,7 @@ import config
 import db
 from repositories import firmy_repo, ppd_repo, ukony_repo
 from routes.ukony import _safe_back as safe_back
-from services import colors_service, doklad_delete, doklad_issue, ppd_links
+from services import colors_service, doklad_delete, doklad_issue, doklad_share, doklady_view, ppd_links
 from services.ingest_service import normalize_profil
 
 bp = Blueprint("ppd", __name__)
@@ -74,13 +74,14 @@ def doklady():
             if firma is None or links.firma.get(r["cislo"]) == firma]
     ukony = ukony_repo.list_by_ids(conn, (uid for r in rows for uid in links.by_doklad.get(r["cislo"], [])))
     firmy = firmy_repo.list_all(conn)
+    firmy_by_id = {f["id"]: f for f in firmy}
+    firma_colors = colors_service.firma_color_map(conn)
     return render_template(
-        "doklady.html", doklady=rows, links=links, ukony=ukony,
-        firmy=firmy, firmy_by_id={f["id"]: f for f in firmy},
-        firma_colors=colors_service.firma_color_map(conn),
+        "doklady.html", doklady=doklady_view.radky(rows, links, ukony, firmy_by_id, firma_colors),
+        ukony=ukony, firmy=firmy, firma_colors=firma_colors,
         total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
         mesic=mesic, q=q, smazane=smazane, firma=firma,
-        auta=ppd_links.auta, back_url=request.full_path.rstrip("?"),
+        tisk_base=doklad_share.tisk_base(), back_url=request.full_path.rstrip("?"),
         # "Nový doklad" appears once žádosti can issue doklady (ZADOSTI_API_URL set);
         # the same switch arms the trash, which here deletes the doklad.
         novy_doklad=bool(config.ZADOSTI_API_URL), mazani_dokladu=bool(config.ZADOSTI_API_URL),
@@ -106,15 +107,19 @@ def smazat(cislo):
 
 @bp.get("/doklady/novy/ukony")
 def novy_ukony():
-    """Unpaid úkony of a firm from the last 90 days that no doklad pays yet."""
+    """Úkony of a firm from the last 90 days that no doklad pays yet: unpaid
+    first, then the paid ones (flagged) — 2.8, David had to un-pay an úkon to
+    issue its doklad."""
     conn = db.get_db()
     firma = firmy_repo.get(conn, request.args.get("firma", type=int) or 0)
     if not firma:
         return jsonify(error="Vyber firmu."), 400
     paid_by_doklad = ppd_links.for_request().by_ukon
     od = (date.today() - timedelta(days=90)).isoformat()
-    rows = [u for u in ukony_repo.list(conn, firma_id=firma["id"])
-            if u["stav_platby"] != "zaplaceno" and u["datum"] >= od and u["id"] not in paid_by_doklad]
+    recent = [u for u in ukony_repo.list(conn, firma_id=firma["id"])
+              if u["datum"] >= od and u["id"] not in paid_by_doklad]
+    rows = ([u for u in recent if u["stav_platby"] != "zaplaceno"]
+            + [u for u in recent if u["stav_platby"] == "zaplaceno"])
     # Parties of each úkon's žádost become the payer chips (provozovatel / vlastník).
     zadosti = doklad_issue.zadosti(conn, [u["id"] for u in rows])
     return jsonify(
@@ -122,7 +127,7 @@ def novy_ukony():
                "ico": firma["ico"] or "", "adresa": firma["adresa"] or "", "psc": firma["psc"] or ""},
         ukony=[{"id": u["id"], "datum": u["datum"], "vozidlo": u["rz"] or u["vin"] or "",
                 "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or "",
-                "zadost": zadosti.get(u["id"])}
+                "zaplaceno": u["stav_platby"] == "zaplaceno", "zadost": zadosti.get(u["id"])}
                for u in rows],
     )
 
@@ -136,3 +141,12 @@ def novy():
         return jsonify(doklad_issue.vystavit(conn, req)), 201
     except doklad_issue.IssueError as e:
         return jsonify(error=str(e)), e.status
+
+
+@bp.post("/doklady/<int:cislo>/sdilet")
+def sdilet(cislo):
+    """Sdílet kódem: a share code for the doklad's PDF, made by žádosti."""
+    try:
+        return jsonify(ok=True, **doklad_share.sdilet(db.get_db(), cislo))
+    except doklad_share.ShareError as e:
+        return jsonify(ok=False, error=str(e)), e.status

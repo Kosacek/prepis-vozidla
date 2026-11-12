@@ -32,6 +32,7 @@
   // payer chip (address / vehicles). ARES and a chip click count as edits.
   var vozidlaTyped = false, adresaTyped = false;
   var aresTimer = null, aresSerial = 0, aresIco = '';
+  var aresCache = {}, autoSerial = 0, autoLoading = false;
   // One id per doklad, kept across retries so žádosti never issue it twice.
   var requestId = '';
   function newId() {
@@ -58,9 +59,43 @@
   }
   // A party chip means "print the address from the žádost" (žádosti holds it),
   // a firm chip carries the stored firm address. Manual typing always wins.
+  // 2.8: a payer with an IČO and no known address gets it from ARES on its
+  // own (David had to click ARES for Jazyková škola P.A.R.K.).
   function applyChipAdresa(chip) {
     adresa.value = chip && !chip.zadost_id ? DokladPayer.adresaText(chip) : '';
+    adresa.placeholder = chip && chip.zadost_id ? 'Doplní se ze žádosti' : 'Ulice, město, PSČ';
     adresaTyped = false;
+    autoAdresa(chip);
+  }
+  function aresFetch(d) {
+    if (aresCache[d]) return Promise.resolve(aresCache[d]);
+    return fetch('/firmy/ares?ico=' + encodeURIComponent(d), {headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        if (!body || !body.ok) return null;
+        aresCache[d] = body;
+        return body;
+      });
+  }
+  function autoAdresa(chip) {
+    var my = ++autoSerial;  // any newer payer / typed address wins over this lookup
+    var d = DokladPayer.aresIco(chip, adresa.value, adresaTyped);
+    if (autoLoading) setAresStatus('', '');  // an older lookup's spinner never outlives it
+    if (!d) return;
+    if (!aresCache[d]) { setAresStatus('loading', 'Hledám adresu v ARES…'); autoLoading = true; }
+    aresFetch(d).then(function (body) {
+      if (my !== autoSerial || adresaTyped || adresa.value.trim()) return;
+      autoLoading = false;
+      if (!body) { setAresStatus('err', '✗ Adresa v ARES nenalezena'); return; }
+      adresa.value = DokladPayer.adresaText(body);
+      setAresStatus('ok', '✓ Adresa z ARES');
+    }).catch(function () {
+      if (my === autoSerial) setAresStatus('err', '✗ ARES nedostupné');
+    });
+  }
+  function firmaColor() {
+    var opt = firma.selectedIndex >= 0 ? firma.options[firma.selectedIndex] : null;
+    return opt && opt.dataset.color ? opt.dataset.color : '';
   }
   function renderPayers(boxes) {
     payers.replaceChildren();
@@ -75,7 +110,13 @@
     var on = activeChip();
     var pressed = DokladPayer.names(on, od.value) ? on : null;
     chips.forEach(function (c) {
-      var b = el('button', 'chip dn-payer', c.label);
+      var b = el('button', 'chip dn-payer');
+      if (c.role === 'firma' && firmaColor()) {  // firm colour everywhere (company-colour rule)
+        var dot = el('span', 'firma-dot');
+        dot.style.background = firmaColor();
+        b.append(dot);
+      }
+      b.append(c.label);
       b.type = 'button'; b.title = c.jmeno + (c.ico ? ' · IČO ' + c.ico : '');
       b.setAttribute('aria-pressed', String(c === pressed));
       b.addEventListener('click', function () {
@@ -101,9 +142,39 @@
   function showError(msg) { errorEl.textContent = msg || ''; errorEl.hidden = !msg; }
 
   // -- Collapsible "Nezaplacené úkony" panel --------------------------------
+  // The head counts the unpaid úkony; the paid ones without a doklad (2.8)
+  // wait folded under them behind "Zaplacené bez dokladu".
   function setHead(ukony) {
-    var total = (ukony || []).reduce(function (s, u) { return s + (parseInt(u.celkem, 10) || 0); }, 0);
-    headTitle.textContent = 'Nezaplacené úkony · ' + (ukony || []).length + ' · ' + kc(total);
+    var unpaid = (ukony || []).filter(function (u) { return !u.zaplaceno; });
+    var total = unpaid.reduce(function (s, u) { return s + (parseInt(u.celkem, 10) || 0); }, 0);
+    headTitle.textContent = 'Nezaplacené úkony · ' + unpaid.length + ' · ' + kc(total);
+  }
+  function ukonRow(u) {
+    var row = el('label', 'dn-ukon' + (u.zaplaceno ? ' is-paid' : ''));
+    var box = el('input'); box.type = 'checkbox'; box.value = u.id; box.dataset.kc = u.celkem;
+    var d = u.datum.slice(8, 10) + '.' + u.datum.slice(5, 7) + '.';
+    row.append(box, el('b', 'dn-ukon__auto', u.vozidlo || '—'), el('span', 'tag', u.typ),
+      el('span', 'dn-ukon__meta muted', d + (u.poznamka ? ' · ' + u.poznamka : '')),
+      el('b', 'dn-ukon__kc', kc(u.celkem)));
+    if (u.zaplaceno) row.title = 'Úkon je už zaplacený';
+    return row;
+  }
+  function paidSection(paid) {
+    var wrap = el('div', 'dn-paid');
+    var toggle = el('button', 'dn-paid__toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.append(el('span', null, 'Zaplacené bez dokladu · ' + paid.length), el('span', 'dn-ukony__chev'));
+    var rows = el('div', 'dn-paid__rows');
+    rows.hidden = true;
+    paid.forEach(function (u) { rows.append(ukonRow(u)); });
+    toggle.addEventListener('click', function () {
+      var open = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(open));
+      rows.hidden = !open;  // ticks survive folding
+    });
+    wrap.append(toggle, rows);
+    return wrap;
   }
   function setPanelOpen(open) {
     head.setAttribute('aria-expanded', String(open));
@@ -113,6 +184,7 @@
 
   // -- ARES lookup ----------------------------------------------------------
   function setAresStatus(state, text) {
+    autoLoading = false;  // whoever writes the status now owns it
     aresStatus.textContent = text || '';
     if (state) aresStatus.dataset.state = state; else delete aresStatus.dataset.state;
     aresStatus.hidden = !text;
@@ -194,24 +266,21 @@
           firmaData.adresa = firmaData.adresa || opt.dataset.adresa || '';
           firmaData.psc = firmaData.psc || opt.dataset.psc || '';
         }
-        setHead(data.ukony || []);
+        var all = data.ukony || [];
+        var unpaid = all.filter(function (u) { return !u.zaplaceno; });
+        var paid = all.filter(function (u) { return u.zaplaceno; });
+        setHead(all);
         // A short list stays open; a long one starts folded to its header (the
         // count and total stay visible), so the amount and the button stay in
         // reach. The user opens it with one tap and the ticks survive folding.
-        setPanelOpen((data.ukony || []).length <= 4);
-        if (!data.ukony || !data.ukony.length) {
-          list.append(el('p', 'muted small', 'Firma nemá nezaplacené úkony bez dokladu z posledních 90 dní.'));
-        } else {
-          data.ukony.forEach(function (u) {
-            var row = el('label', 'dn-ukon');
-            var box = el('input'); box.type = 'checkbox'; box.value = u.id; box.dataset.kc = u.celkem;
-            var d = u.datum.slice(8, 10) + '.' + u.datum.slice(5, 7) + '.';
-            row.append(box, el('b', 'dn-ukon__auto', u.vozidlo || '—'), el('span', 'tag', u.typ),
-              el('span', 'dn-ukon__meta muted', d + (u.poznamka ? ' · ' + u.poznamka : '')),
-              el('b', 'dn-ukon__kc', kc(u.celkem)));
-            list.append(row);
-          });
+        setPanelOpen(unpaid.length <= 4);
+        if (!all.length) {
+          list.append(el('p', 'muted small', 'Firma nemá úkony bez dokladu z posledních 90 dní.'));
+        } else if (!unpaid.length) {
+          list.append(el('p', 'muted small', 'Žádné nezaplacené úkony bez dokladu.'));
         }
+        unpaid.forEach(function (u) { list.append(ukonRow(u)); });
+        if (paid.length) list.append(paidSection(paid));
         refresh();
       })
       .catch(function () {
@@ -234,6 +303,7 @@
     syncFirmaPick();  // form.reset() only moves the native <select>, not the picker
     panel.hidden = true; setHead([]); setPanelOpen(true);
     adresa.value = ''; vozidla.value = ''; setAresStatus('', '');
+    adresa.placeholder = 'Ulice, město, PSČ'; ++autoSerial;
     refresh();
     var filter = document.querySelector('#doklady-filter select[name=firma]');
     if (filter && filter.value && firma.querySelector('option[value="' + filter.value + '"]')) {
@@ -309,7 +379,10 @@
   ico.addEventListener('input', function () { payerChosen = true; scheduleAres(); refresh(); });
   ico.addEventListener('blur', function () { lookupAres(false); });
   aresBtn.addEventListener('click', function () { lookupAres(true); });
-  adresa.addEventListener('input', function () { adresaTyped = true; });
+  adresa.addEventListener('input', function () {
+    adresaTyped = true; ++autoSerial;
+    if (autoLoading) setAresStatus('', '');
+  });
   // Typed vehicles win over the ones derived from the úkony.
   vozidla.addEventListener('input', function () { vozidlaTyped = true; });
   castka.addEventListener('input', function () { castkaTyped = castka.value !== ''; refresh(); });

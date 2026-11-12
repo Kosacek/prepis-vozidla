@@ -1,0 +1,32 @@
+{# Tisk / Sdílet kódem for one doklad (2.8), opened by the share icon on a
+   row (static/js/doklad_share.js). Tisk = žádosti's A5 print page; Sdílet
+   kódem = a code from žádosti (services/doklad_share.py), shown and copied
+   the same way žádosti do it. #}
+<div class="modal-backdrop" id="doklad-share" hidden data-tisk-base="{{ tisk_base }}">
+  <div class="modal-card card doklad-share-card" role="dialog" aria-modal="true" aria-labelledby="ds-title">
+    <button class="modal-close" type="button" aria-label="Zavřít" data-share-close>&times;</button>
+    <h2 id="ds-title">Doklad č. <span data-share-cislo></span></h2>
+    <p class="ds-sub" data-share-sub></p>
+    <div class="ds-choices" data-share-choices>
+      <a class="ds-choice" data-share-tisk href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6M7 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+        <span class="ds-choice__label">Tisk</span>
+        <span class="ds-choice__hint">A5 · PDF</span>
+      </a>
+      <button type="button" class="ds-choice" data-share-kod>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>
+        <span class="ds-choice__label">Sdílet kódem</span>
+        <span class="ds-choice__hint">odkaz na 30 dní</span>
+      </button>
+    </div>
+    <div class="ds-result" data-share-result hidden>
+      <div class="ds-url" data-share-url></div>
+      <p class="ds-stav" data-share-stav role="status" aria-live="polite"></p>
+      <button type="button" class="btn btn-primary ds-send" data-share-send>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+        Odeslat
+      </button>
+    </div>
+    <p class="ds-error" data-share-error role="alert" hidden></p>
+  </div>
+</div>

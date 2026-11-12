@@ -18,10 +18,10 @@
     <input type="search" name="q" value="{{ q }}" id="doklady-search" class="ukony-search" autocomplete="off"
            aria-label="Hledat doklady" placeholder="Hledat — číslo, přijato od, RZ, VIN, firma…">
     <div class="filter-bar__fields">
-      <select name="firma" class="filter-select" aria-label="Firma">
+      <select name="firma" class="filter-select" id="doklady-firma" aria-label="Firma">
         <option value="">Všechny firmy</option>
         {% for f in firmy %}
-          <option value="{{ f.id }}" {{ 'selected' if firma == f.id }}>{{ f.zkratka }}</option>
+          <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, 'var(--muted)') }}" {{ 'selected' if firma == f.id }}>{{ f.zkratka }}</option>
         {% endfor %}
       </select>
       {% with month_name="mesic", month_value=mesic %}{% include "_month_field.html" %}{% endwith %}
@@ -49,10 +49,12 @@
 </div>
 
 {% include "_ukon_modal.html" %}
+{% include "_doklad_share.html" %}
 {% if novy_doklad %}{% include "_doklad_new_modal.html" %}{% endif %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=13"></script>
-<script src="{{ url_for('static', filename='js/doklady.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/firma_pick.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/doklad_payer.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/doklady.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/doklad_share.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/doklad_payer.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=6"></script>
 {% endblock %}
