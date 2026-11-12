@@ -90,6 +90,20 @@ def test_evidence_meta(client):
     assert body["ceny"][str(fid)]["PŘEVOD"] == 1300              # firm's effective price
 
 
+def test_evidence_meta_firms_carry_their_evidence_colour(client):
+    # Company-colour rule (2026-11-12): žádosti's firm picker shows the SAME
+    # colour as evidence's dots, so it takes it from here, never its own palette.
+    with client.application.app_context():
+        from repositories import firmy_repo
+        from services import colors_service
+        conn = db.get_db()
+        firmy_repo.create(conn, nazev="JE & NE, spol. s r.o.", zkratka="JE & NE", ico="44960263")
+        colors = colors_service.firma_color_map(conn)
+    firmy = client.get("/api/evidence-meta").get_json()["firmy"]
+    assert len(firmy) == 2
+    assert all(f["barva"] == colors[f["zkratka"]] for f in firmy)
+
+
 # ── API key auth ──────────────────────────────────────────────────────────────
 
 def test_api_open_when_no_key_configured(client):

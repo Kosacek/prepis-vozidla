@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import db
 from repositories import firmy_repo, typy_repo, ukony_repo
 from services.ingest_service import pridat_ukon, UnknownFirmaError, ValidationError
-from services import prichozi_service, pricing_service, vehicle_fill_service
+from services import colors_service, prichozi_service, pricing_service, vehicle_fill_service
 
 bp = Blueprint("api", __name__)
 
@@ -14,9 +14,13 @@ def evidence_meta():
     protected by the same X-Api-Key as the rest of /api/*."""
     conn = db.get_db()
     active = firmy_repo.list_all(conn, only_active=True)
+    # "barva" = the firm's evidence colour (same map as the dashboard dots), so
+    # žádosti's firm picker matches evidence exactly (company-colour rule).
+    colors = colors_service.firma_color_map(conn)
     return jsonify({
         "firmy": [
-            {"id": f["id"], "nazev": f["nazev"], "ico": f["ico"] or "", "zkratka": f["zkratka"]}
+            {"id": f["id"], "nazev": f["nazev"], "ico": f["ico"] or "", "zkratka": f["zkratka"],
+             "barva": colors.get(f["zkratka"], "")}
             for f in active
         ],
         "typy": [
