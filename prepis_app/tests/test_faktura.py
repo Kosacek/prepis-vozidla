@@ -110,6 +110,37 @@ def test_pdf_builds_with_and_without_iban(monkeypatch):
     assert faktura_pdf.spayd_for(PDF_REC, faktura.settings()) is None
 
 
+def _pdf_strings(pdf: bytes) -> str:
+    try:
+        import pypdfium2 as pdfium
+        page = pdfium.PdfDocument(pdf)[0]
+        return page.get_textpage().get_text_range()
+    except ImportError:
+        import fitz
+        return fitz.open(stream=pdf, filetype="pdf")[0].get_text()
+
+
+def test_pdf_text_no_vystavil_ares_defaults_total_once(monkeypatch):
+    monkeypatch.delenv("ISSUER_ADRESA", raising=False)
+    monkeypatch.delenv("ISSUER_SPISOVA_ZNACKA", raising=False)
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+    rec = dict(PDF_REC, amount=1500)
+    text = " ".join(_pdf_strings(faktura_pdf.build_faktura_pdf(rec)).split())
+    assert "Vystavil" not in text
+    assert "Cacovická 1592/30a, Husovice" in text and "614 00 Brno" in text
+    assert "C 106352 vedená u Krajského soudu v Brně" in text
+    assert text.count("Celkem k úhradě") == 1
+    assert text.count("1 500,00") == 2          # item row + the total
+    assert text.count("QR Platba") == 1
+
+
+def test_issuer_env_overrides_ares_defaults(monkeypatch):
+    monkeypatch.setenv("ISSUER_ADRESA", "Jinde 1, Brno")
+    monkeypatch.setenv("ISSUER_SPISOVA_ZNACKA", "C 1")
+    cfg = faktura.settings()
+    assert cfg["adresa"] == "Jinde 1, Brno" and cfg["spisova_znacka"] == "C 1"
+
+
 # ── API ─────────────────────────────────────────────────────────────────────
 @pytest.fixture
 def api(monkeypatch, tmp_path):

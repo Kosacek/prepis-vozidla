@@ -89,10 +89,12 @@ def _party(c, font, x, y, width, label, lines) -> None:
 
 
 def _supplier_lines(cfg: dict) -> list:
-    lines = [cfg["name"], cfg["adresa"] or f"Sídlo: {faktura.PLACEHOLDER}",
-             f"IČO: {cfg['ico']}", "Není plátce DPH",
-             "Zapsána v obchodním rejstříku: " + (cfg["spisova_znacka"] or faktura.PLACEHOLDER)]
-    return lines
+    adresa = cfg["adresa"] or f"Sídlo: {faktura.PLACEHOLDER}"
+    ulice, _, mesto = adresa.rpartition(",")
+    adresa_lines = [ulice.strip(), mesto.strip()] if ulice else [adresa]
+    return [cfg["name"], *adresa_lines,
+            f"IČO: {cfg['ico']}", "Není plátce DPH",
+            "Zapsána v OR: " + (cfg["spisova_znacka"] or faktura.PLACEHOLDER)]
 
 
 def _customer_lines(record: dict) -> list:
@@ -113,7 +115,7 @@ def _items(c, font, record, y, width) -> float:
     y -= 6 * mm
     c.setFont(font, 9.5)
     c.drawString(LEFT, y, str(record.get("purpose") or "Zastupování na MMB")[:60])
-    c.drawRightString(LEFT + width, y, f"{record.get('amount', 0)} Kč")
+    c.drawRightString(LEFT + width, y, _money(record.get('amount', 0)))
     y -= 4.6 * mm
     vozidla = record.get("vozidla") or []
     shown = vozidla[:MAX_VEHICLE_LINES - 1] if len(vozidla) > MAX_VEHICLE_LINES else vozidla
@@ -127,33 +129,43 @@ def _items(c, font, record, y, width) -> float:
     return y
 
 
+def _money(amount) -> str:
+    """1500 -> '1 500,00 Kč' (Czech grouping, two decimals)."""
+    try:
+        txt = f"{float(amount):,.2f}"
+    except (TypeError, ValueError):
+        return f"{amount} Kč"
+    return txt.replace(",", " ").replace(".", ",") + " Kč"
+
+
 def _payment(c, font, record, cfg, payload, H, width) -> None:
+    """Bottom block: QR Platba on the left, total (right-aligned) on the right."""
     top = H - 136 * mm
-    c.setFont(font, 8)
-    c.drawString(LEFT, top, "Platební údaje")
-    qx = LEFT + width - QR_SIZE
-    c.drawString(qx, top, QR_LABEL)
+    right = LEFT + width
     if payload:
-        _draw_qr(c, payload, qx, top - 2 * mm, QR_SIZE)
+        _draw_qr(c, payload, LEFT, top, QR_SIZE)
     else:
-        _draw_qr_missing(c, qx, top - 2 * mm, QR_SIZE, font)
-    ucet = (cfg["ucet"] or cfg["iban"]) if cfg["iban"] else IBAN_MISSING
-    y = top - 6 * mm
-    for label, value in (("Číslo účtu:", ucet), ("Variabilní symbol:", record.get("number", "")),
-                         ("Splatnost:", record.get("due", ""))):
-        c.setFont(font, 8)
-        c.drawString(LEFT, y, label)
-        c.setFont(font, 10)
-        c.drawString(LEFT + 30 * mm, y, str(value))
-        y -= 5 * mm
-    if cfg["iban"] and cfg["ucet"]:
-        c.setFont(font, 7.5)
-        c.drawString(LEFT, y + 1 * mm, f"IBAN: {cfg['iban']}")
-        y -= 2.5 * mm
-    c.setFont(font, 9)
-    c.drawString(LEFT, y - 3 * mm, "Celkem k úhradě:")
-    c.setFont(font, 15)
-    c.drawString(LEFT, y - 10 * mm, f"{record.get('amount', 0)} Kč")
+        _draw_qr_missing(c, LEFT, top, QR_SIZE, font)
+    c.setFont(font, 8)
+    c.setFillColor(Color(0.35, 0.35, 0.35))
+    c.drawCentredString(LEFT + QR_SIZE / 2, top - QR_SIZE - 4 * mm, QR_LABEL)
+
+    c.drawRightString(right, top - 4 * mm, "Celkem k úhradě")
+    c.setFillColor(black)
+    c.setFont(font, 19)
+    c.saveState()
+    c.setLineWidth(0.7)
+    t = c.beginText(right - c.stringWidth(_money(record.get("amount", 0)), font, 19), top - 12 * mm)
+    t.setFont(font, 19)
+    t.setTextRenderMode(2)          # fill + stroke = faux bold (one TTF only)
+    t.textOut(_money(record.get("amount", 0)))
+    c.drawText(t)
+    c.restoreState()
+    c.setFont(font, 8)
+    c.setFillColor(Color(0.35, 0.35, 0.35))
+    c.drawRightString(right, top - 19 * mm, f"VS {record.get('number', '')}")
+    c.drawRightString(right, top - 23.5 * mm, f"Splatnost {record.get('due', '')}")
+    c.setFillColor(black)
 
 
 def _watermark(c, font, W, H) -> None:
@@ -200,17 +212,18 @@ def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
         y = H - (84 + 5.5 * (i // 2)) * mm
         c.drawString(x, y, f"{label} {value}")
 
-    _items(c, font, record, H - 100 * mm, width)
+    ucet = (cfg["ucet"] or cfg["iban"]) if cfg["iban"] else IBAN_MISSING
+    c.drawString(LEFT, H - 95 * mm, f"Číslo účtu: {ucet}")
+    if cfg["iban"] and cfg["ucet"]:
+        c.drawString(LEFT + width / 2 + 2 * mm, H - 95 * mm, f"IBAN: {cfg['iban']}")
+
+    _items(c, font, record, H - 103 * mm, width)
     _payment(c, font, record, cfg, spayd_for(record, cfg), H, width)
 
-    sy = 26 * mm
-    c.setLineWidth(0.5)
-    c.line(W - LEFT - 55 * mm, sy, W - LEFT, sy)
-    c.setFont(font, 8)
-    c.drawString(W - LEFT - 55 * mm, sy - 4.5 * mm, "Vystavil")
     if sample:
+        c.setFont(font, 8)
         c.setFillColor(Color(0.5, 0.5, 0.5))
-        c.drawString(LEFT, sy - 4.5 * mm, "VZOR – není platný doklad")
+        c.drawString(LEFT, 17 * mm, "VZOR – není platný doklad")
         c.setFillColor(black)
     c.showPage()
     c.save()

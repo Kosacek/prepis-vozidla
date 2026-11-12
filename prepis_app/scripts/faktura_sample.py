@@ -23,7 +23,6 @@ RECORD = {
 
 def main(out_dir: str) -> None:
     os.makedirs(out_dir, exist_ok=True)
-    os.environ.setdefault("ISSUER_ADRESA", "")
     os.environ["FAKTURA_IBAN"] = DUMMY_IBAN
     os.environ["FAKTURA_UCET"] = "192000145399/0800"
     _write(out_dir, "faktura_sample.pdf")

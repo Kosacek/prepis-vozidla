@@ -29,6 +29,10 @@ _HEADER = ["Číslo", "Datum", "Splatnost", "Odběratel", "Částka (Kč)", "Ú�
 _BACKUP_HEADER = ["Číslo", "Vystaveno", "Datum", "Splatnost", "Odběratel", "IČO",
                   "Adresa", "Částka (Kč)", "Účel", "Vozidla"]
 
+# Public registry data (ARES), overridable by env ISSUER_ADRESA / ISSUER_SPISOVA_ZNACKA.
+DEFAULT_ISSUER_ADRESA = "Cacovická 1592/30a, Husovice, 614 00 Brno"
+DEFAULT_ISSUER_SPISOVA_ZNACKA = "C 106352 vedená u Krajského soudu v Brně"
+
 
 def settings() -> dict:
     """Issuer/payment settings from the environment (read per call)."""
@@ -39,8 +43,9 @@ def settings() -> dict:
     return {
         "name": ISSUER_NAME,
         "ico": ISSUER_ICO,
-        "adresa": os.environ.get("ISSUER_ADRESA", "").strip(),
-        "spisova_znacka": os.environ.get("ISSUER_SPISOVA_ZNACKA", "").strip(),
+        "adresa": os.environ.get("ISSUER_ADRESA", "").strip() or DEFAULT_ISSUER_ADRESA,
+        "spisova_znacka": (os.environ.get("ISSUER_SPISOVA_ZNACKA", "").strip()
+                           or DEFAULT_ISSUER_SPISOVA_ZNACKA),
         "iban": os.environ.get("FAKTURA_IBAN", "").strip(),
         "ucet": os.environ.get("FAKTURA_UCET", "").strip(),
         "splatnost_dni": max(0, dni),
