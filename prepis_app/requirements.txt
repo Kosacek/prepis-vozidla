@@ -9,3 +9,4 @@ Pillow>=10.0
 reportlab>=4.0
 num2words>=0.5
 gunicorn>=21.2
+segno>=1.6
