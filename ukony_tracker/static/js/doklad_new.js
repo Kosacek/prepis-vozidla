@@ -26,6 +26,8 @@
   var errorEl = document.getElementById('dn-error');
   var submit = document.getElementById('dn-submit');
   var done = document.getElementById('dn-done');
+  var platbaBox = document.getElementById('dn-platba');  // absent unless žádosti can issue a faktura
+  var prevodem = false;
   var castkaTyped = false, busy = false, issued = false, serial = 0, lastFocused = null;
   var firmaData = null, ukonyById = {}, chips = [], payerKey = null, payerChosen = false;
   // Until the user edits them, these follow the ticked úkony (amount) and the
@@ -137,7 +139,37 @@
       vozidla.value = DokladPayer.vozidlaFromUkony(boxes.map(function (b) { return ukonyById[b.value]; }));
     }
     submit.disabled = busy || !od.value.trim() || !(parseInt(castka.value, 10) > 0);
-    submit.textContent = boxes.length ? 'Vystavit doklad · ' + kc(parseInt(castka.value, 10) || 0) : 'Vystavit doklad';
+    var what = prevodem ? 'Vystavit fakturu' : 'Vystavit doklad';
+    submit.textContent = boxes.length ? what + ' · ' + kc(parseInt(castka.value, 10) || 0) : what;
+  }
+  // -- Hotově / Převodem ----------------------------------------------------
+  function setPlatba(value) {
+    prevodem = value === 'prevodem';
+    Array.prototype.forEach.call(platbaBox.children, function (o) {
+      var on = o.getAttribute('data-platba') === value;
+      o.classList.toggle('on', on);
+      o.setAttribute('aria-checked', String(on));
+      o.tabIndex = on ? 0 : -1;
+    });
+    refresh();
+  }
+  if (platbaBox) {
+    platbaBox.addEventListener('click', function (e) {
+      var o = e.target.closest('[data-platba]');
+      if (o && !busy) setPlatba(o.getAttribute('data-platba'));
+    });
+    platbaBox.addEventListener('keydown', function (e) {
+      var o = e.target.closest('[data-platba]');
+      if (!o || busy) return;
+      var key = e.key, v = o.getAttribute('data-platba');
+      if (key === ' ' || key === 'Enter') { e.preventDefault(); setPlatba(v); return; }
+      if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') {
+        e.preventDefault();
+        var next = v === 'hotove' ? 'prevodem' : 'hotove';
+        setPlatba(next);
+        platbaBox.querySelector('[data-platba="' + next + '"]').focus();
+      }
+    });
   }
   function showError(msg) { errorEl.textContent = msg || ''; errorEl.hidden = !msg; }
 
@@ -306,6 +338,7 @@
     requestId = newId();
     attachFirmaPick();  // idempotent: covers firma_pick.js loading after this file
     form.reset(); list.replaceChildren(); showError('');
+    if (platbaBox) setPlatba('hotove');
     syncFirmaPick();  // form.reset() only moves the native <select>, not the picker
     panel.hidden = true; setHead([]); setPanelOpen(true);
     adresa.value = ''; vozidla.value = ''; setAresStatus('', '');
@@ -409,6 +442,7 @@
       vozidla: DokladPayer.parseVozidla(vozidla.value)
     }, DokladPayer.fields(activeChip(), od.value));
     if (!payload.prijato_adresa) delete payload.prijato_adresa;  // empty = don't send
+    if (prevodem) payload.druh = 'faktura';  // Hotově sends nothing: the PPD flow is unchanged
     fetch('/doklady/novy', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
@@ -416,9 +450,15 @@
     }).then(function (r) { return r.json().then(function (d) { return {ok: r.ok, d: d}; }); })
       .then(function (res) {
         busy = false;
-        if (!res.ok) { showError(res.d.error || 'Doklad se nepodařilo vystavit.'); refresh(); return; }
+        if (!res.ok) {
+          showError(res.d.error || (prevodem ? 'Fakturu se nepodařilo vystavit.' : 'Doklad se nepodařilo vystavit.'));
+          refresh(); return;
+        }
         issued = true;
-        document.getElementById('dn-done-title').textContent = '✓ Doklad č. ' + res.d.cislo + ' je vystavený';
+        document.getElementById('dn-done-title').textContent = prevodem
+          ? '✓ Faktura č. ' + res.d.cislo + ' je vystavená'
+          : '✓ Doklad č. ' + res.d.cislo + ' je vystavený';
+        document.getElementById('dn-print').textContent = prevodem ? 'Tisk faktury' : 'Tisk A5';
         document.getElementById('dn-print').href = res.d.print_url;
         form.hidden = true; done.hidden = false;
       })

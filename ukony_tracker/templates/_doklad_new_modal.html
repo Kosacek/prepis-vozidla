@@ -64,6 +64,17 @@
         </div>
       </div>
 
+      {% if faktura_moznost %}
+      {# Shown only when žádosti can issue a faktura (services/doklad_moznosti.py). #}
+      <div class="field dn-platba-field">
+        <label id="dn-platba-label">Platba</label>
+        <div class="seg dn-platba" id="dn-platba" role="radiogroup" aria-labelledby="dn-platba-label">
+          <span role="radio" tabindex="0" aria-checked="true" class="on" data-platba="hotove">Hotově</span>
+          <span role="radio" tabindex="-1" aria-checked="false" data-platba="prevodem">Převodem</span>
+        </div>
+      </div>
+      {% endif %}
+
       <p class="dn-error" id="dn-error" role="alert" hidden></p>
       <button type="submit" class="btn btn-primary dn-submit" id="dn-submit" disabled>Vystavit doklad</button>
     </form>

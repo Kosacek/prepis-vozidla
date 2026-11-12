@@ -7,6 +7,7 @@ from datetime import datetime
 import db
 
 _MAX_INT = 2**63 - 1  # Rozsah INTEGER v SQLite.
+DRUHY = ("ppd", "faktura")
 _TEXT_FIELDS = ("prijato_od", "prijato_ico", "ucel", "vozidlo", "zadost_id")
 
 
@@ -41,7 +42,29 @@ def _normalize(record: dict) -> dict:
     if type(smazano) is not bool:
         raise ValueError("Pole smazano musí být boolean.")
     values["smazano"] = int(smazano)
+    # Faktura: jen když je klíč v záznamu, aby push bez nich nepřepsal druh.
+    if "druh" in record:
+        druh = record["druh"]
+        if druh is None:
+            druh = "ppd"
+        if druh not in DRUHY:
+            raise ValueError("Druh dokladu musí být ppd nebo faktura.")
+        values["druh"] = druh
+    if "splatnost" in record:
+        splatnost = record["splatnost"]
+        values["splatnost"] = _iso_date(splatnost, "Splatnost") if splatnost not in (None, "") else None
     return values
+
+
+def _iso_date(value, label: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} musí být platné datum DD.MM.YYYY nebo YYYY-MM-DD.")
+    for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value.strip(), fmt).date().isoformat()
+        except ValueError:
+            pass
+    raise ValueError(f"{label} musí být platné datum DD.MM.YYYY nebo YYYY-MM-DD.")
 
 
 def _vehicle_key(value: str | None) -> str:

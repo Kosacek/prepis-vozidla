@@ -6,12 +6,14 @@
   var sheet = document.getElementById('doklad-share');
   if (!sheet) return;
   var base = sheet.getAttribute('data-tisk-base') || '';
+  var baseFaktura = sheet.getAttribute('data-tisk-base-faktura') || '';
+  var druhEl = sheet.querySelector('[data-share-druh]');
   var q = function (sel) { return sheet.querySelector(sel); };
   var cisloEl = q('[data-share-cislo]'), subEl = q('[data-share-sub]');
   var choices = q('[data-share-choices]'), tisk = q('[data-share-tisk]'), kodBtn = q('[data-share-kod]');
   var result = q('[data-share-result]'), urlEl = q('[data-share-url]'), stav = q('[data-share-stav]');
   var errorEl = q('[data-share-error]');
-  var cislo = null, link = '', busy = false, serial = 0, lastFocused = null, hideTimer = null;
+  var cislo = null, druh = 'ppd', link = '', busy = false, serial = 0, lastFocused = null, hideTimer = null;
 
   function showError(msg) { errorEl.textContent = msg || ''; errorEl.hidden = !msg; }
   function text(item, sel) {
@@ -22,12 +24,14 @@
   function open(btn) {
     var item = btn.closest('.doklad-item');
     cislo = btn.getAttribute('data-doklad-share');
+    druh = btn.getAttribute('data-druh') === 'faktura' ? 'faktura' : 'ppd';
+    if (druhEl) druhEl.textContent = druh === 'faktura' ? 'Faktura' : 'Doklad';
     lastFocused = btn;
     ++serial; busy = false; link = '';
     cisloEl.textContent = cislo;
     subEl.textContent = [text(item, '.doklad-firma-chip'), text(item, '.doklad-kc'), text(item, '.doklad-od')]
       .filter(Boolean).join(' · ');
-    tisk.href = base + encodeURIComponent(cislo);
+    tisk.href = (druh === 'faktura' ? baseFaktura : base) + encodeURIComponent(cislo);
     choices.hidden = false; result.hidden = true; showError('');
     kodBtn.disabled = false; kodBtn.removeAttribute('aria-busy');
     clearTimeout(hideTimer);  // reopened within the close animation: stay open

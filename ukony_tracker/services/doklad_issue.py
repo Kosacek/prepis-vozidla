@@ -4,6 +4,9 @@
 PDF, so evidence only asks: POST /api/ppd/vystavit (spec 2026-10-26). The
 returned doklad is stored at once and linked to exactly the chosen úkony.
 Payment is NOT set here — the úkony get the orange "Zaplatit" instead.
+A faktura (druh "faktura", payment by bank transfer) is the same call with
+"druh" in the body; its úkony stay unpaid until services/faktura_platby.py
+settles it.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ MAX_VOZIDLO = 20
 MAX_ADRESA = 200
 MAX_CASTKA = 10_000_000
 STRANY = ("provozovatel", "vlastnik")
+DRUHY = ("ppd", "faktura")
 
 
 class IssueError(Exception):
@@ -155,6 +159,9 @@ def validate(conn, payload) -> dict:
     if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,64}", request_id):
         raise IssueError("Chybí request_id dokladu — obnov stránku a zkus to znovu.")
     platce = _platce(conn, payload, ids)
+    druh = payload.get("druh") or "ppd"
+    if druh not in DRUHY:
+        raise IssueError("Druh dokladu musí být ppd nebo faktura.")
     ordered = sorted(ukony.values(), key=lambda u: (u["datum"], u["id"]))
     # Vozidla: ruční seznam vyhrává přesně tak, jak přišel; bez klíče se odvodí
     # z vybraných úkonů (rz nebo vin), aby starý modal fungoval beze změny.
@@ -164,7 +171,7 @@ def validate(conn, payload) -> dict:
         vozidla = [u["rz"] or u["vin"] for u in ordered if u["rz"] or u["vin"]]
     return {"firma": firma, "ukony": ordered, "castka": castka, "prijato_od": prijato_od,
             "prijato_ico": ico, "prijato_adresa": prijato_adresa, "vozidla": vozidla,
-            "ucel": ucel, "request_id": request_id, "platce": platce,
+            "ucel": ucel, "request_id": request_id, "platce": platce, "druh": druh,
             "zpracoval": payload.get("zpracoval") if isinstance(payload.get("zpracoval"), str) else None}
 
 
@@ -179,6 +186,9 @@ def vystavit(conn, req: dict) -> dict:
             "zpracoval": req["zpracoval"], "request_id": req["request_id"],
             # Payer picked from a žádost: žádosti fill in that party's address.
             **req.get("platce", {})}
+    faktura = req.get("druh") == "faktura"
+    if faktura:
+        body["druh"] = "faktura"  # PPD requests stay byte-for-byte what they were
     if req.get("prijato_adresa"):
         # Jen když je adresa vyplněná — prázdná se neposílá (žádosti by z ní
         # jinak udělaly prázdnou adresu plátce místo adresy ze žádosti/firmy).
@@ -188,19 +198,28 @@ def vystavit(conn, req: dict) -> dict:
                                  headers={"X-Api-Key": config.INTEGRATION_API_KEY}, timeout=20)
     except requests.RequestException as exc:
         raise IssueError("Žádosti neodpovídají, doklad se nevystavil. Zkus to za chvíli.", 502) from exc
-    if response.status_code == 404:
-        raise IssueError("Vystavení dokladů zatím není zapnuté.", 502)
     try:
         data = response.json()
     except ValueError:
         data = {}
+    if faktura and response.status_code == 409 and isinstance(data, dict)             and data.get("error") == "faktura_nedostupna":
+        raise IssueError("Faktura zatím není k dispozici. Vystav doklad hotově.", 409)
+    if response.status_code == 404:
+        raise IssueError("Vystavení dokladů zatím není zapnuté.", 502)
     if response.status_code == 400 and isinstance(data, dict) and data.get("error"):
         raise IssueError(str(data["error"]), 502)
     doklad = data.get("doklad") if isinstance(data, dict) else None
     # 201 = new doklad, 200 = the one already issued for this request_id.
     if response.status_code not in (200, 201) or not isinstance(doklad, dict):
         raise IssueError("Doklad se nepodařilo vystavit.", 502)
+    if faktura:
+        # Whatever žádosti echo, this row is a faktura with its due date.
+        doklad = {**doklad, "druh": "faktura", "splatnost": doklad.get("splatnost") or data.get("splatnost")}
     row, _ = ppd_repo.upsert(conn, doklad)
     ppd_links.set_explicit(conn, row["cislo"], [u["id"] for u in req["ukony"]])
-    print_url = str(data.get("print_url") or f"/ppd-print/{row['cislo']}")
-    return {"cislo": row["cislo"], "print_url": config.ZADOSTI_PUBLIC_URL.rstrip("/") + print_url}
+    default_print = f"/faktura-print/{row['cislo']}" if faktura else f"/ppd-print/{row['cislo']}"
+    print_url = str(data.get("print_url") or default_print)
+    out = {"cislo": row["cislo"], "print_url": config.ZADOSTI_PUBLIC_URL.rstrip("/") + print_url}
+    if faktura:
+        out["druh"] = "faktura"
+    return out

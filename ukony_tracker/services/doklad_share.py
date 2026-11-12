@@ -32,9 +32,10 @@ class ShareError(Exception):
         self.status = status
 
 
-def tisk_base() -> str:
+def tisk_base(druh: str = "ppd") -> str:
     """Prefix of the print link; the page appends the doklad number."""
-    return config.ZADOSTI_PUBLIC_URL.rstrip("/") + "/ppd-print/"
+    page = "faktura-print" if druh == "faktura" else "ppd-print"
+    return f"{config.ZADOSTI_PUBLIC_URL.rstrip('/')}/{page}/"
 
 
 def sdilet(conn, cislo: int) -> dict:
@@ -46,11 +47,13 @@ def sdilet(conn, cislo: int) -> dict:
         raise ShareError(f"Doklad č. {cislo} tu není.", 404)
     if doklad["smazano"]:
         raise ShareError(f"Doklad č. {cislo} je smazaný.", 409)
+    # A faktura is shared the same way; žádosti are told which kind it is.
+    extra = {"json": {"druh": "faktura"}} if doklad["druh"] == "faktura" else {}
     try:
         # No redirects: without the endpoint the login gate answers 302 → a 200 login page.
         response = requests.post(f"{config.ZADOSTI_API_URL.rstrip('/')}/api/ppd/{cislo}/sdilet",
                                  headers={"X-Api-Key": config.INTEGRATION_API_KEY},
-                                 timeout=15, allow_redirects=False)
+                                 timeout=15, allow_redirects=False, **extra)
     except requests.RequestException as exc:
         log.warning("Doklad %s: žádosti unreachable for a share code: %s", cislo, exc)
         raise ShareError("Žádosti neodpovídají, kód se nevytvořil. Zkus to za chvíli.") from exc

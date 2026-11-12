@@ -4,14 +4,14 @@
    ● firma ……… částka / SPZ · VIN / přijato od / č. · datum ……… úkony ▾,
    share icon on the right. A tap opens the drawer with the úkony it pays
    (services/ppd_links.py), drawn with the same _ukony_item.html as Úkony. #}
-<div class="doklad-item{{ ' is-smazany' if p.smazano }}" data-cislo="{{ p.cislo }}" data-vs="{{ p.vs }}" data-kc="{{ p.castka }}" data-search="{{ p.hledat }}">
+<div class="doklad-item{{ ' is-smazany' if p.smazano }}" data-cislo="{{ p.cislo }}" data-vs="{{ p.vs }}" data-kc="{{ p.castka }}" data-search="{{ p.hledat }}" data-druh="{{ p.druh }}">
   <div class="doklad-head">
     <button type="button" class="doklad-row" aria-expanded="false" aria-controls="doklad-{{ p.cislo }}">
       <span class="doklad-firma">
         {%- if p.firma %}<span class="doklad-firma-chip" style="--firma: {{ p.firma.color }};"><span class="firma-dot"></span>{{ p.firma.zkratka }}</span>
         {%- else %}<span class="doklad-firma-chip is-none">bez firmy</span>{% endif -%}
       </span>
-      <span class="doklad-id"><b class="doklad-cislo">č. {{ p.cislo }}</b><span class="doklad-datum">{{ p.datum }}</span></span>
+      <span class="doklad-id"><span class="doklad-cislo-line"><b class="doklad-cislo">č. {{ p.cislo }}</b>{% if p.druh == 'faktura' %}<span class="tag doklad-druh" title="Faktura · platba převodem{% if p.splatnost %} · splatnost {{ p.splatnost }}{% endif %}">Faktura</span>{% endif %}</span><span class="doklad-datum">{{ p.datum }}{% if p.po_splatnosti %} <span class="doklad-po" title="Splatnost {{ p.splatnost }}">po splatnosti</span>{% endif %}</span></span>
       <span class="doklad-auta"{% if p.auta|length > 1 %} title="{% for a in p.auta %}{{ a.spz or a.vin }}{{ ', ' if not loop.last }}{% endfor %}"{% endif %}>
         {%- for a in p.auta[:1] %}
         <span class="doklad-auto{{ ' is-chybi' if a.chybi }}">
@@ -27,8 +27,8 @@
       <span class="doklad-chev" aria-hidden="true"></span>
     </button>
     {% if not p.smazano %}
-    <button type="button" class="doklad-share" data-doklad-share="{{ p.cislo }}"
-            aria-label="Tisk nebo sdílení dokladu č. {{ p.cislo }}" title="Tisk / Sdílet kódem">
+    <button type="button" class="doklad-share" data-doklad-share="{{ p.cislo }}" data-druh="{{ p.druh }}"
+            aria-label="Tisk nebo sdílení {{ 'faktury' if p.druh == 'faktura' else 'dokladu' }} č. {{ p.cislo }}" title="Tisk / Sdílet kódem">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
     </button>
     {% endif %}

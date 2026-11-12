@@ -106,6 +106,9 @@ CREATE TABLE IF NOT EXISTS ppd (
   zadost_id TEXT,
   ukon_id INTEGER NULL,
   smazano INTEGER NOT NULL DEFAULT 0,
+  druh TEXT NOT NULL DEFAULT 'ppd',
+  splatnost TEXT,
+  zaplaceno_dne TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -164,6 +167,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
             " ON CONFLICT(kod) DO NOTHING",
             (kod, poradi),
         )
+    # Faktura převodem (žádosti, druh "faktura"): druh dokladu, datum splatnosti
+    # (ISO) a den, kdy přišla platba. Staré doklady jsou PPD (hotově).
+    _ensure_column(conn, "ppd", "druh", "druh TEXT NOT NULL DEFAULT 'ppd'")
+    _ensure_column(conn, "ppd", "splatnost", "splatnost TEXT")
+    _ensure_column(conn, "ppd", "zaplaceno_dne", "zaplaceno_dne TEXT")
     conn.commit()
 
 

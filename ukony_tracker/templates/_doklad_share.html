@@ -2,10 +2,10 @@
    row (static/js/doklad_share.js). Tisk = žádosti's A5 print page; Sdílet
    kódem = a code from žádosti (services/doklad_share.py), shown and copied
    the same way žádosti do it. #}
-<div class="modal-backdrop" id="doklad-share" hidden data-tisk-base="{{ tisk_base }}">
+<div class="modal-backdrop" id="doklad-share" hidden data-tisk-base="{{ tisk_base }}" data-tisk-base-faktura="{{ tisk_base_faktura }}">
   <div class="modal-card card doklad-share-card" role="dialog" aria-modal="true" aria-labelledby="ds-title">
     <button class="modal-close" type="button" aria-label="Zavřít" data-share-close>&times;</button>
-    <h2 id="ds-title">Doklad č. <span data-share-cislo></span></h2>
+    <h2 id="ds-title"><span data-share-druh>Doklad</span> č. <span data-share-cislo></span></h2>
     <p class="ds-sub" data-share-sub></p>
     <div class="ds-choices" data-share-choices>
       <a class="ds-choice" data-share-tisk href="#" target="_blank" rel="noopener">
