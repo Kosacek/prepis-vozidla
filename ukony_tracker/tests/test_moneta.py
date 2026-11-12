@@ -252,3 +252,37 @@ def test_unrelated_credit_is_ignored_but_faktura_like_vs_is_listed():
     assert moneta_job._stav(preklep, None, moneta_job.NO_MATCH) == "nesparovano"
     assert moneta_job._stav(najem, None, "částka nesedí (přišlo 1, faktura 2)") == "nesparovano"
     assert moneta_job._stav(najem, 20260001, "") == "sparovano"
+
+
+MONETA_REAL_SHAPE = {  # anonymised copy of a real MONETA v4 transaction (2026-11-12)
+    "amount": {"currency": "CZK", "value": 1300},
+    "bankTransactionCode": {"proprietary": {"code": "10000107000", "issuer": "CNB"}},
+    "bookingDate": {"date": "2026-11-12"},
+    "creditDebitIndicator": "CRDT",
+    "enteredDate": {"date": None},
+    "entryDetails": {"transactionDetails": {
+        "references": {"clearingSystemReference": "PAYMENT_ORDER_DOMESTIC",
+                       "endToEndIdentification": "0020260001",
+                       "transactionDescription": "OKAMŽITÁ ÚHRADA "},
+        "relatedParties": {
+            "creditorAccount": {"identification": {"other": {"identification": "1/0600"}}},
+            "debtor": {"name": "NOVAK JAN"},
+            "debtorAccount": {"identification": {"other": {"identification": "0 123/0300"}}}},
+        "remittanceInformation": {"structured": {"creditorReferenceInformation": {"reference": "VS:0020260001"}},
+                                  "unstructured": "VIN TMBJJ7NE5J0123456"}}},
+    "entryReference": "0000000001:20261112:00006:261112IPA00004G7UQT",
+    "reversalIndicator": False, "status": "BOOK", "valueDate": {"date": "2026-11-12"},
+}
+
+
+def test_parse_real_moneta_shape():
+    import copy
+    from decimal import Decimal
+    from services.moneta_client import _parse_transaction
+    p = _parse_transaction(MONETA_REAL_SHAPE)
+    assert p.vs == "20260001" and p.castka == Decimal("1300") and p.datum == "2026-11-12"
+    assert p.zprava == "VIN TMBJJ7NE5J0123456" and "NOVAK JAN" in p.protiucet
+    assert p.id.startswith("0000000001:20261112")
+    debit = copy.deepcopy(MONETA_REAL_SHAPE); debit["creditDebitIndicator"] = "DBIT"
+    reversed_ = copy.deepcopy(MONETA_REAL_SHAPE); reversed_["reversalIndicator"] = True
+    assert _parse_transaction(debit) is None and _parse_transaction(reversed_) is None

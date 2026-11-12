@@ -104,6 +104,7 @@ def _vs(raw: dict) -> str:
         ("remittanceInformation", "structured", "creditorReferenceInformation", "reference"),
         ("remittanceInformation", "variableSymbol"),
         ("creditorReference",), ("endToEndId",),
+        ("references", "endToEndIdentification"),
     )
     digits = "".join(ch for ch in _text(v) if ch.isdigit())
     return digits.lstrip("0")
@@ -124,8 +125,11 @@ def _counterparty(raw: dict) -> str:
         ("debtorAccount", "iban"), ("debtorAccount", "number"), ("debtorAccount", "bban"),
         ("counterParty", "accountNumber"), ("counterparty", "accountNumber"),
         ("counterPartyAccount",),
+        ("relatedParties", "debtorAccount", "identification", "other", "identification"),
+        ("relatedParties", "debtorAccount", "identification", "iban"),
     ))
-    name = _text(_first(raw, ("debtorName",), ("debtor", "name"), ("counterParty", "name")))
+    name = _text(_first(raw, ("debtorName",), ("debtor", "name"), ("counterParty", "name"),
+                        ("relatedParties", "debtor", "name")))
     return " ".join(p for p in (name, acct) if p)
 
 
@@ -150,7 +154,13 @@ def _parse_transaction(raw: dict) -> Platba | None:
                             ("transactionDate",)))
     if datum is None:
         return None
-    vs, zprava, protiucet = _vs(raw), _message(raw), _counterparty(raw)
+    if raw.get("reversalIndicator") is True or _text(raw.get("status") or "BOOK").upper() != "BOOK":
+        return None
+    # MONETA (ČOBS v7, verified 2026-11-12) nests the details here; VS comes as
+    # "VS:0000898843" in remittanceInformation.structured.creditorReferenceInformation.reference.
+    details = _dig(raw, "entryDetails", "transactionDetails")
+    flat = {**raw, **details} if isinstance(details, dict) else raw
+    vs, zprava, protiucet = _vs(flat), _message(flat), _counterparty(flat)
     tx_id = _text(_first(raw, ("entryReference",), ("transactionId",), ("id",), ("entryId",)))
     if not tx_id:  # no id in the payload: stable fingerprint
         tx_id = "h:" + hashlib.sha1(f"{datum}|{value}|{vs}|{protiucet}|{zprava}".encode()).hexdigest()[:20]
