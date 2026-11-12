@@ -23,7 +23,7 @@ import spayd
 
 LEFT = 18 * mm
 QR_SIZE = 36 * mm
-MONO = "Courier-Bold"          # built-in, every glyph sits on the baseline (J, Q…)
+PLATE_FONT = "Helvetica-Bold"   # built-in; capitals (J, Q…) all sit on the baseline
 MAX_VEHICLE_LINES = 5
 QR_LABEL = "QR Platba"
 QR_MISSING = "QR po doplnění IBAN"
@@ -179,8 +179,11 @@ def _items(c, font, record, y, width) -> float:
         c.setFillColor(GREY)
         c.drawString(LEFT + 3 * mm, y, "VIN" if len(v) == 17 else "SPZ")
         c.setFillColor(black)
-        c.setFont(MONO, 9.5)
-        c.drawString(LEFT + 10 * mm, y, _ascii(v))
+        t = c.beginText(LEFT + 10 * mm, y)
+        t.setFont(PLATE_FONT, 9)
+        t.setCharSpace(0.7)             # light tracking keeps VIN characters apart
+        t.textOut(_ascii(v))
+        c.drawText(t)
         y -= 4.2 * mm
     c.setFont(font, 8.5)
     if len(shown) < len(vozidla):
@@ -190,7 +193,7 @@ def _items(c, font, record, y, width) -> float:
 
 
 def _ascii(text: str) -> str:
-    """Courier is a Latin-1 base font; VIN/SPZ are plain A-Z0-9 anyway."""
+    """Helvetica is a Latin-1 base font; VIN/SPZ are plain A-Z0-9 anyway."""
     return str(text).encode("ascii", "replace").decode("ascii")
 
 
