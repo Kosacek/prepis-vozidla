@@ -148,6 +148,7 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setattr(A, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(tracker_push, "UKONY_API_KEY", KLIC)
     monkeypatch.setattr(A, "read_firmy", lambda: [])
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
     poslano = []
     monkeypatch.setattr(ppd_push, "push_async", lambda rec, d: poslano.append(rec))
     A._login_pokusy.clear()

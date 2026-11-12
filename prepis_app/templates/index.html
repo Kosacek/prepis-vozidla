@@ -2923,13 +2923,16 @@ function _dokCastka(v) {
 
 function _dokladKarta(d, smazany) {
   const c = esc(String(d.cislo));
-  const sub = [d.datum, d.ucel, d.vozidlo].filter(Boolean).map(x => esc(String(x))).join(' · ');
+  const fa = d.druh === 'faktura';
+  const tisk = fa ? 'faktura-print' : 'ppd-print';
+  const soubor = (fa ? 'faktura_' : 'ppd_') + c + '.pdf';
+  const sub = [d.datum, fa && d.splatnost ? 'splatnost ' + d.splatnost : '', d.ucel, d.vozidlo].filter(Boolean).map(x => esc(String(x))).join(' · ');
   const akce = smazany
-    ? `<a class="firm-chip" href="/download/ppd_${c}.pdf" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
+    ? `<a class="firm-chip" href="/download/${soubor}" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
        <button type="button" class="firm-chip dok-obnovit" onclick="restoreDoklad('${c}')" title="Obnovit doklad"><svg class="ico" aria-hidden="true"><use href="#i-undo"></use></svg>Obnovit</button>`
-    : `<a class="firm-chip" href="/ppd-print/${c}" target="_blank" rel="noopener" title="Vytisknout na A5"><svg class="ico" aria-hidden="true"><use href="#i-printer"></use></svg>Tisk</a>
-       <a class="firm-chip" href="/download/ppd_${c}.pdf" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
-       <button type="button" class="firm-chip" data-soubor="ppd_${c}.pdf" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico" aria-hidden="true"><use href="#i-share"></use></svg>Sdílet</button>`;
+    : `<a class="firm-chip" href="/${tisk}/${c}" target="_blank" rel="noopener" title="Vytisknout na A5"><svg class="ico" aria-hidden="true"><use href="#i-printer"></use></svg>Tisk</a>
+       <a class="firm-chip" href="/download/${soubor}" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
+       <button type="button" class="firm-chip" data-soubor="${soubor}" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico" aria-hidden="true"><use href="#i-share"></use></svg>Sdílet</button>`;
   return `<div class="dok-card${smazany ? ' smazany' : ''}">
       <div class="dok-num" aria-label="Doklad číslo ${c}"><small>Č.</small>${c}</div>
       <div class="firm-info">
@@ -2938,7 +2941,7 @@ function _dokladKarta(d, smazany) {
         <div class="firm-chips">${akce}</div>
       </div>
       <div class="dok-castka">${_kcFmt(d.castka)}</div>
-      ${smazany ? '<span></span>' : `<button type="button" class="firm-delete" onclick="deleteDoklad('${c}')" title="Smazat doklad" aria-label="Smazat doklad"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
+      ${smazany || fa ? '<span></span>' : `<button type="button" class="firm-delete" onclick="deleteDoklad('${c}')" title="Smazat doklad" aria-label="Smazat doklad"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
     </div>`;
 }
 

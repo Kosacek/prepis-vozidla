@@ -66,6 +66,10 @@ class Chyba(ValueError):
     """Nevalidní požadavek → 400 s touhle zprávou."""
 
 
+class FakturaNedostupna(Exception):
+    """Faktura se nedá vystavit (chybí FAKTURA_IBAN) → 409, nic se nečísluje."""
+
+
 def _text(telo: dict, klic: str, *, povinne: bool = False, max_delka: int) -> str:
     hodnota = telo.get(klic)
     if hodnota is None:
@@ -242,7 +246,7 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
         "splatnost": rec.get("splatnost", ""), "prijato_od": payer,
         "prijato_ico": udaje["prijato_ico"], "castka": udaje["castka"],
         "ucel": udaje["ucel"], "vozidlo": ", ".join(vozidla),
-        "variabilni_symbol": str(number),
+        "variabilni_symbol": str(number), "amount": udaje["castka"],
     }
     _zapis_vystaveny(data_dir, udaje, doklad)
     try:
@@ -268,6 +272,9 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
         if hotovy:
             return hotovy, False
         if udaje.get("druh") == "faktura":
+            # Dřív než se sáhne na číselnou řadu (issue_faktura).
+            if not faktura.dostupna():
+                raise FakturaNedostupna()
             return _vystav_fakturu(data_dir, udaje, adresa_podle_ico), True
         dnes = datetime.now().strftime("%d.%m.%Y")
         # Plátce velkými písmeny jako u dokladu k žádosti; účel tak, jak přišel.

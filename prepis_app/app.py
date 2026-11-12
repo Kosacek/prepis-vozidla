@@ -1394,7 +1394,7 @@ def _require_login():
         return
     # Volá je server evidence, ne prohlížeč: místo session je hlídá klíč
     # integrace (viz _over_klic_integrace).
-    if path == "/api/ppd/vystavit" or _CESTA_SMAZAT_DOKLAD.fullmatch(path):
+    if path in ("/api/ppd/vystavit", "/api/ppd/moznosti") or _CESTA_SMAZAT_DOKLAD.fullmatch(path):
         return
     # Sdílecí odkaz musí jít otevřít bez hesla — to je celý smysl (poslat
     # hotovou žádost mimo appku). Bezpečné jen díky tomu, že token je
@@ -2076,8 +2076,15 @@ def api_ppd_slovy():
 
 @app.route("/api/ppd-list", methods=["GET"])
 def api_ppd_list():
-    """Issued cash receipts (newest first) for the in-app Doklady browser."""
-    return jsonify(ppd.read_ppd_log(DATA_DIR))
+    """Issued receipts and faktury (newest first) for the in-app Doklady browser
+    and evidence. Every row has druh ("ppd"/"faktura"); faktura rows also carry
+    splatnost (dd.mm.yyyy) and prijato_od (= odběratel), so one renderer fits both."""
+    rows = ppd.read_ppd_log(DATA_DIR)
+    for f in faktura.read_faktura_log(DATA_DIR):
+        rows.append({**f, "prijato_od": f.get("odberatel", "")})
+    rows.sort(key=lambda r: (r["druh"] == "faktura",
+                             r["cislo"] if isinstance(r["cislo"], int) else 0), reverse=True)
+    return jsonify(rows)
 
 def _smaz_doklad(number: int) -> bool:
     """Remove a receipt from the LIVE ledger and tell evidence (smazano=True).
@@ -2138,6 +2145,25 @@ def api_ppd_smazat(number):
     return jsonify({"removed": removed})
 
 
+def _zajisti_pdf_faktury(number: int) -> bool:
+    """PDF faktury leží v output/; chybí-li (PDF se při vystavení nepovedlo),
+    postaví se znovu ze zálohy. False = taková faktura neexistuje."""
+    cesta = faktura.pdf_path(DATA_DIR, number)
+    if os.path.isfile(cesta):
+        return True
+    rec = faktura.get_faktura(DATA_DIR, number)
+    if rec is None:
+        return False
+    try:
+        os.makedirs(os.path.dirname(cesta), exist_ok=True)
+        with open(cesta, "wb") as f:
+            f.write(faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec)))
+    except Exception as e:
+        _log.warning("Faktura %s: PDF se nepovedlo postavit (%s)", number, e)
+        return False
+    return True
+
+
 @app.route("/api/ppd/<int:number>/sdilet", methods=["POST"])
 def api_ppd_sdilet(number):
     """„Sdílet kódem" v doklad draweru evidence (ukony_tracker/services/doklad_share.py).
@@ -2149,13 +2175,32 @@ def api_ppd_sdilet(number):
     chyba = _over_klic_integrace("Sdílení dokladů přes API není zapnuté.")
     if chyba:
         return chyba
-    nazev = f"ppd_{number}.pdf"
-    if not os.path.isfile(os.path.join(DATA_DIR, "output", nazev)):
-        return jsonify({"error": f"Doklad č. {number} tu není."}), 404
+    druh = (request.get_json(silent=True) or {}).get("druh") or sdileni.DRUH_PPD
+    if druh not in ppd_api.DRUHY:
+        return jsonify({"error": "druh smí být jen " + " nebo ".join(ppd_api.DRUHY) + "."}), 400
+    if druh == sdileni.DRUH_FAKTURA:
+        nazev = f"faktura_{number}.pdf"
+        if not _zajisti_pdf_faktury(number):
+            return jsonify({"error": f"Faktura č. {number} tu není."}), 404
+        popis = f"Faktura č. {number}"
+    else:
+        nazev = f"ppd_{number}.pdf"
+        if not os.path.isfile(os.path.join(DATA_DIR, "output", nazev)):
+            return jsonify({"error": f"Doklad č. {number} tu není."}), 404
+        popis = f"Příjmový pokladní doklad č. {number}"
     kod = sdileni.zivy_kod_souboru(DATA_DIR, nazev) or sdileni.vytvor_kod(DATA_DIR, [
-        {"file": nazev, "kde": sdileni.KDE_OUTPUT,
-         "popis": f"Příjmový pokladní doklad č. {number}"}])
+        {"file": nazev, "kde": sdileni.KDE_OUTPUT, "popis": popis, "druh": druh}])
     return jsonify({"sdilet": f"/{kod}", "plati_dni": sdileni.TTL_DNI})
+
+
+@app.route("/api/ppd/moznosti", methods=["GET"])
+def api_ppd_moznosti():
+    """Co umí žádosti vystavit: {"faktura": bool, "splatnost_dni": int}.
+    Faktura jen s platným FAKTURA_IBAN. Klíč integrace jako u vystavit."""
+    chyba = _over_klic_integrace("Doklady přes API nejsou zapnuté.")
+    if chyba:
+        return chyba
+    return jsonify(faktura.moznosti())
 
 
 @app.route("/api/ppd/vystavit", methods=["POST"])
@@ -2174,7 +2219,10 @@ def api_ppd_vystavit():
         firma = next((f for f in read_firmy() if str(f.get("ico") or "").strip() == ico), None)
         return (firma or {}).get("adresa") or ""
 
-    doklad, novy = ppd_api.vystav(DATA_DIR, udaje, adresa_podle_ico)
+    try:
+        doklad, novy = ppd_api.vystav(DATA_DIR, udaje, adresa_podle_ico)
+    except ppd_api.FakturaNedostupna:
+        return jsonify({"error": "faktura_nedostupna"}), 409
     druh = doklad.get("druh", "ppd")
     if novy and druh == "ppd":
         try:
@@ -2184,9 +2232,12 @@ def api_ppd_vystavit():
             _log.warning("PPD push skipped: %s", e)
         _log.info("PPD %s vystaven přes API (%s)", doklad["cislo"], udaje["zpracoval"] or "?")
     tisk = "faktura-print" if druh == "faktura" else "ppd-print"
-    return (jsonify({"doklad": doklad, "druh": druh, "cislo": doklad["cislo"],
-                     "print_url": f"/{tisk}/{doklad['cislo']}"}),
-            201 if novy else 200)
+    telo = {"doklad": doklad, "druh": druh, "cislo": doklad["cislo"],
+            "print_url": f"/{tisk}/{doklad['cislo']}"}
+    if druh == "faktura":
+        telo["splatnost"] = doklad.get("splatnost", "")
+        telo["amount"] = doklad.get("amount", doklad.get("castka"))
+    return jsonify(telo), 201 if novy else 200
 
 
 @app.route("/faktura-print/<int:number>")

@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta
 
 import openpyxl
 
+import spayd
 from ppd import ISSUER_ICO, ISSUER_NAME, _HAVE_FCNTL, _atomic_save
 
 if _HAVE_FCNTL:
@@ -50,6 +51,24 @@ def settings() -> dict:
         "ucet": os.environ.get("FAKTURA_UCET", "").strip(),
         "splatnost_dni": max(0, dni),
     }
+
+
+def dostupna() -> bool:
+    """Faktura se smí vystavit jen s platným FAKTURA_IBAN (bez něj by neměla QR Platbu)."""
+    try:
+        spayd.normalize_iban(settings()["iban"])
+    except ValueError:
+        return False
+    return True
+
+
+def moznosti() -> dict:
+    """Co umí tahle instance vystavit — odpověď GET /api/ppd/moznosti."""
+    return {"faktura": dostupna(), "splatnost_dni": settings()["splatnost_dni"]}
+
+
+def pdf_path(data_dir: str, number: int) -> str:
+    return os.path.join(data_dir, "output", f"faktura_{number}.pdf")
 
 
 def fmt_date(d: date) -> str:

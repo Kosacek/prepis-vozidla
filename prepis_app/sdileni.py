@@ -47,6 +47,8 @@ KOD_MAX = 9999
 # output/, plné moci mají vlastní složku a přežívají jednotlivá generování.
 KDE_OUTPUT = "output"
 KDE_PLNE_MOCE = "plne_moce"
+DRUH_PPD = "ppd"
+DRUH_FAKTURA = "faktura"
 
 
 _POPISY = {
@@ -62,6 +64,9 @@ _POPISY = {
 def popis_souboru(nazev: str) -> str:
     """Lidský popisek dokumentu podle jména souboru — pro rozcestník u
     dokumentů sdílených dodatečně (z historie, z Dokladů, plná moc)."""
+    m = re.match(r"faktura_(\d+)\.pdf$", nazev)
+    if m:
+        return f"Faktura č. {m.group(1)}"
     m = re.match(r"ppd_(\d+)\.pdf$", nazev)
     if m:
         return f"Příjmový pokladní doklad č. {m.group(1)}"
@@ -76,10 +81,12 @@ def _polozka(x) -> dict:
     """Jedna položka balíku. Holý string = soubor v output/ bez popisku —
     tak vypadají i staré záznamy zapsané, než balíky existovaly."""
     if isinstance(x, str):
-        return {"file": x, "kde": KDE_OUTPUT, "popis": ""}
+        return {"file": x, "kde": KDE_OUTPUT, "popis": "", "druh": DRUH_PPD}
     return {"file": x.get("file", ""),
             "kde": x.get("kde", KDE_OUTPUT),
-            "popis": x.get("popis", "")}
+            "popis": x.get("popis", ""),
+            # druh dokumentu (ppd/faktura/...); staré záznamy ho nemají = ppd.
+            "druh": x.get("druh") or DRUH_PPD}
 
 
 def _polozky(soubory) -> list[dict]:
