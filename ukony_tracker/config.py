@@ -42,3 +42,14 @@ STAV_CASTECNE = "castecne"
 # Who filled out / added a car (attribution). Chosen per-device in zadosti and
 # pushed through; also selectable on the tracker's own entry/edit forms.
 PROFILY = ["David", "Roman", "Petr"]
+
+# MONETA Money Bank (AISP) — automatic settling of fakturas from incoming
+# payments (services/moneta_*.py). No token = feature fully off. The token is
+# bound to one account and lasts 3 months (auto-extended); never commit it.
+MONETA_API_TOKEN = os.environ.get("MONETA_API_TOKEN", "").strip()
+MONETA_ACCOUNT_ID = os.environ.get("MONETA_ACCOUNT_ID", "").strip()
+MONETA_API_BASE = (os.environ.get("MONETA_API_BASE") or "https://api.moneta.cz").rstrip("/")
+try:
+    MONETA_POLL_MIN = max(1, int(os.environ.get("MONETA_POLL_MIN") or 15))
+except ValueError:
+    MONETA_POLL_MIN = 15

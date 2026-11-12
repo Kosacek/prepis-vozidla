@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Platby k ručnímu spárování{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Platby z banky</h1>
+  <div class="muted"><a href="{{ url_for('ppd.doklady') }}">← Doklady</a></div>
+</div>
+<div class="card">
+  {% for p in platby %}
+  <div class="recent-row" style="display:block;">
+    <b>{{ p.castka|kc }} Kč</b>
+    <span class="muted"> · {{ p.datum[8:10] }}.{{ p.datum[5:7] }}.{{ p.datum[0:4] }}{% if p.vs %} · VS {{ p.vs }}{% endif %}{% if p.protiucet %} · {{ p.protiucet }}{% endif %}</span>
+    {% if p.zprava %}<div class="small">{{ p.zprava }}</div>{% endif %}
+    <div class="small muted">{{ p.duvod }}</div>
+  </div>
+  {% else %}
+  <p class="center muted" style="padding: var(--sp-6);">Nic k spárování.</p>
+  {% endfor %}
+</div>
+{% endblock %}

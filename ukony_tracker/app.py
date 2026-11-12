@@ -1,5 +1,6 @@
 import hmac
 import os
+import sys
 import threading
 
 from flask import Flask, jsonify
@@ -19,6 +20,14 @@ def _warm_imports():
         except Exception:
             pass  # the request that needs it will report the problem
     threading.Thread(target=load, name="warm-imports", daemon=True).start()
+
+
+def _start_moneta():
+    """Bank polling thread: only with MONETA_API_TOKEN, never under pytest."""
+    if os.environ.get("MONETA_DISABLE_THREAD") or "pytest" in sys.modules:
+        return
+    from services import moneta_job
+    moneta_job.start_background()
 
 
 def create_app():
@@ -123,6 +132,8 @@ def create_app():
     app.register_blueprint(prichozi_bp)
     from routes.ppd import bp as ppd_bp
     app.register_blueprint(ppd_bp)
+    from routes.moneta import bp as moneta_bp
+    app.register_blueprint(moneta_bp)
     from routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
     from routes.ask import bp as ask_bp
@@ -137,6 +148,8 @@ def create_app():
     from releases import CURRENT_VERSION, RELEASES
     app.jinja_env.globals["RELEASES"] = RELEASES
     app.jinja_env.globals["CURRENT_VERSION"] = CURRENT_VERSION
+
+    _start_moneta()
 
     @app.get("/health")
     def health():

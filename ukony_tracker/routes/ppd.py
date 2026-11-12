@@ -9,7 +9,7 @@ import config
 import db
 from repositories import firmy_repo, ppd_repo, ukony_repo
 from routes.ukony import _safe_back as safe_back
-from services import colors_service, doklad_delete, doklad_issue, doklad_moznosti, doklad_share, doklady_view, ppd_links
+from services import colors_service, doklad_delete, doklad_issue, doklad_moznosti, doklad_share, doklady_view, moneta_job, ppd_links
 from services.ingest_service import normalize_profil
 
 bp = Blueprint("ppd", __name__)
@@ -81,7 +81,7 @@ def doklady():
         "doklady.html", doklady=radky,
         ukony=ukony, firmy=firmy, firma_colors=firma_colors,
         total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
-        mesic=mesic, q=q, smazane=smazane, firma=firma,
+        mesic=mesic, q=q, smazane=smazane, firma=firma, banka=moneta_job.status_view(conn),
         tisk_base=doklad_share.tisk_base(), tisk_base_faktura=doklad_share.tisk_base("faktura"),
         # Hotově / Převodem choice in Nový doklad: only when žádosti can issue a faktura.
         faktura_moznost=bool(config.ZADOSTI_API_URL) and doklad_moznosti.faktura_dostupna(),

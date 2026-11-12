@@ -119,6 +119,21 @@ CREATE TABLE IF NOT EXISTS ppd_ukony (
   ukon_id INTEGER NOT NULL,
   PRIMARY KEY (ppd_cislo, ukon_id)
 );
+-- Příchozí platby z MONETA (services/moneta_job.py); tx_id deduplikuje každou transakci.
+CREATE TABLE IF NOT EXISTS moneta_platby (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tx_id TEXT UNIQUE NOT NULL,
+  datum TEXT,
+  castka REAL NOT NULL,
+  vs TEXT,
+  zprava TEXT,
+  protiucet TEXT,
+  faktura_cislo INTEGER,
+  stav TEXT NOT NULL CHECK (stav IN ('sparovano','nesparovano','ignorovano')),
+  duvod TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS moneta_stav (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS orv_scan_rate (sid TEXT NOT NULL, stamp REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_orv_scan_rate ON orv_scan_rate(sid, stamp);
 """

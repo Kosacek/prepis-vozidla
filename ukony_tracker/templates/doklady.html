@@ -35,6 +35,13 @@
       <span id="doklady-count">{{ total.pocet }}</span> dokladů ·
       <span id="doklady-sum">{{ total.castka|kc }}</span> Kč
     </div>
+    {% if banka %}
+    <div class="muted" style="margin-top: var(--sp-2); font-size: 0.875rem;">
+      {% if banka.auth_failed %}<span style="color: var(--flash-error-ink);">Banka: token vypršel – vytvoř nový v internetovém bankovnictví</span>
+      {% elif banka.cas %}Banka: zkontrolováno {{ banka.cas }}{% else %}Banka: zatím nezkontrolováno{% endif %}
+      {% if banka.pocet %} · <a href="{{ url_for('moneta.platby') }}">{{ banka.pocet }} plateb k ručnímu spárování</a>{% endif %}
+    </div>
+    {% endif %}
   </form>
 </div>
 
