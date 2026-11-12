@@ -88,7 +88,9 @@ def compute(conn) -> Links:
     for row in conn.execute("SELECT ppd_cislo, ukon_id FROM ppd_ukony"):
         if row["ukon_id"] in ukony:
             explicit.setdefault(row["ppd_cislo"], []).append(row["ukon_id"])
-    from_zadost = {row["zadost_id"]: row["created_ukon_id"] for row in conn.execute(
+    # Case-insensitive: žádosti send the doklad's zadost_id upper-case, the
+    # žádost push lower-case (12. 11. 2026: 0 of 29 matched exactly).
+    from_zadost = {row["zadost_id"].lower(): row["created_ukon_id"] for row in conn.execute(
         "SELECT zadost_id, created_ukon_id FROM prichozi"
         " WHERE zadost_id IS NOT NULL AND created_ukon_id IS NOT NULL")}
     firma_by_ico = {_digits(f["ico"]): f["id"] for f in conn.execute(
@@ -108,7 +110,7 @@ def compute(conn) -> Links:
             linked = set(explicit[d["cislo"]])
         else:
             linked = set()
-            uid = from_zadost.get(d["zadost_id"] or "")
+            uid = from_zadost.get((d["zadost_id"] or "").lower())
             if uid in ukony:
                 linked.add(uid)
             day = date.fromisoformat(d["datum"])

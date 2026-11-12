@@ -113,6 +113,21 @@ def test_an_already_deleted_doklad_shows_no_trash(client, data):
     assert not UKON_DELETE.search(html)
 
 
+@pytest.mark.parametrize("vozidlo", ["AAAAAAAAAA", ""])
+def test_a_doklad_without_ukony_still_has_its_trash(client, data, vozidlo):
+    # 12. 11. 2026: doklad č. 219 (vozidlo "AAAAAAAAAA", issued by mistake)
+    # matched no úkon, so its drawer had no úkon row to carry the trash and
+    # David could not delete it.
+    with client.application.app_context():
+        ppd_repo.upsert(db.get_db(), {"cislo": 219, "datum": TODAY, "castka": 1300,
+                                      "vozidlo": vozidlo, "prijato_od": "AAAAAA"})
+    html = client.get("/doklady").get_data(as_text=True)
+    assert html.count('action="/doklady/219/smazat"') == 1
+    assert "Smazat doklad č. 219?" in html
+    assert html.count('action="/doklady/183/smazat"') == 2  # linked doklady unchanged
+    assert not UKON_DELETE.search(html)
+
+
 def test_ukony_page_trash_still_deletes_ukony(client, data):
     html = client.get("/ukony/vse").get_data(as_text=True)
     assert f'action="/ukony/{data["a"]}/smazat"' in html

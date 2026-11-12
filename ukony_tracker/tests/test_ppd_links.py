@@ -101,6 +101,18 @@ def test_zadost_id_links_the_ukon_created_from_that_zadost(conn, jene):
     assert ppd_links.compute(conn).by_doklad[300] == [uid]
 
 
+def test_zadost_id_link_ignores_letter_case(conn, jene):
+    # Real data (12. 11. 2026): žádosti send the doklad's zadost_id upper-case,
+    # the žádost push arrives lower-case — 0 of 29 matched exactly.
+    uid = ukon(conn, jene, datum="2026-06-01", rz="4AB4444")
+    conn.execute("INSERT INTO prichozi(zadost_id, received_at, mode, status, created_ukon_id,"
+                 " created_at, updated_at) VALUES('e75e6314-4c12-279fe111', 'x', 'prevod', 'auto',"
+                 " ?, 'x', 'x')", (uid,))
+    conn.commit()
+    doklad(conn, 301, "", zadost_id="E75E6314-4C12-279FE111")
+    assert ppd_links.compute(conn).by_doklad[301] == [uid]
+
+
 def test_deleted_doklad_links_nothing(conn, jene):
     uid = ukon(conn, jene, rz="1AB2345")
     doklad(conn, 1, "1AB2345", smazano=True)

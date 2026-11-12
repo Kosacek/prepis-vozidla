@@ -40,11 +40,27 @@
       {% for uid in p.uids %}{% set u = ukony.get(uid) %}{% if u %}{% with smazat_doklad=p %}{% include "_ukony_item.html" %}{% endwith %}{% endif %}{% endfor %}
     </div>
     {% endif %}
-    {% for key in p.chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}
     {% if p.uids %}
+    {% for key in p.chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}
     <div class="doklad-souhrn">Úkony celkem {{ p.ukony_kc|kc }} Kč · doklad {{ p.castka|kc }} Kč{% if p.ukony_kc == p.castka %} <span class="doklad-sedi">✓</span>{% endif %}</div>
-    {% elif not p.chybi %}
-    <div class="doklad-souhrn">Doklad neuvádí auto.</div>
+    {% else %}
+    {# No úkon row to carry the trash (č. 219, 12. 11. 2026: a doklad issued by
+       mistake matched nothing and could not be deleted) — it sits here. #}
+    <div class="doklad-bez-ukonu">
+      <div class="doklad-bez-ukonu__text">
+        {% for key in p.chybi %}<div class="doklad-chybi">{{ key }} — úkon nenalezen</div>{% endfor %}
+        {% if not p.chybi %}<div class="doklad-souhrn">Doklad neuvádí auto.</div>{% endif %}
+      </div>
+      {% if not p.smazano %}
+      <form method="post" action="/doklady/{{ p.cislo }}/smazat"
+            onsubmit="return confirm('Smazat doklad č. {{ p.cislo }}?')">
+        <input type="hidden" name="back" value="{{ back_url }}">
+        <button type="submit" class="row-del" title="Smazat doklad" aria-label="Smazat doklad č. {{ p.cislo }}"{{ ' disabled' if not mazani_dokladu }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>
+        </button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
 </div>

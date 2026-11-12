@@ -2191,6 +2191,14 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   cursor: pointer;
 }
 .doklad-row:hover { background: var(--bg); }
+/* Same clickable cue as an Úkony row (an <a>, underlined by a:hover): the
+   texts underline, the two pills stay clean. Mouse only — no sticky
+   underline after a tap. */
+@media (hover: hover) {
+  .doklad-row:hover :is(.doklad-cislo, .doklad-datum, .doklad-spz, .doklad-vin, .doklad-od, .doklad-kc) {
+    text-decoration: underline;
+  }
+}
 .doklad-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Firm chip: the firm's evidence colour as a tinted pill (company-colour rule). */
@@ -2234,11 +2242,17 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 
 /* Úkony chip = paid state at a glance (2.8): green all paid, half for a
    partial payment, the same orange as "Zaplatit" while unpaid. */
+/* Every variant is the same box (2.8.1: the orange "1 úkon" was narrower than
+   the green "✓ 1 úkon" and the ✓ / ◐ glyphs changed the height): fixed
+   height, one min-width, label centred, a border on all of them. */
 .doklad-pocet {
-  justify-self: end; white-space: nowrap; font-size: 0.75rem; font-weight: 650;
-  border-radius: var(--radius-pill); padding: 2px 9px; border: 1px solid transparent;
+  justify-self: end; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 1.625rem; min-width: 6.5rem; padding: 0 10px;
+  white-space: nowrap; font-size: 0.75rem; font-weight: 650; line-height: 1;
+  border-radius: var(--radius-pill); border: 1px solid var(--line);
 }
-.doklad-pocet.is-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); }
+.doklad-pocet.is-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); border-color: #8fd49a; }
 .doklad-pocet.is-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a; }
 .doklad-pocet.is-partial {
   color: #4a4a00; border-color: #c9c56b;
@@ -2266,6 +2280,10 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-chybi { color: #9b1c13; font-size: 0.85rem; font-weight: 600; padding: 8px var(--sp-3); }
 .doklad-souhrn { color: var(--muted); font-size: 0.8125rem; padding: 6px var(--sp-3) 2px; }
 .doklad-sedi { color: var(--flash-success-ink); font-weight: 700; }
+/* A doklad without úkony: the message, its trash on the right. */
+.doklad-bez-ukonu { display: flex; align-items: center; gap: var(--sp-2); }
+.doklad-bez-ukonu__text { flex: 1 1 auto; min-width: 0; }
+.doklad-bez-ukonu form { flex: 0 0 auto; margin: 0; }
 @media (prefers-reduced-motion: reduce) { .doklad-chev::before { transition: none; } }
 
 @media (max-width: 1100px) {
