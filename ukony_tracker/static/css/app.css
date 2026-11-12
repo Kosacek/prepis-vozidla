@@ -2242,17 +2242,15 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 
 /* Úkony chip = paid state at a glance (2.8): green all paid, half for a
    partial payment, the same orange as "Zaplatit" while unpaid. */
-/* Every variant is the same box (2.8.1: the orange "1 úkon" was narrower than
-   the green "✓ 1 úkon" and the ✓ / ◐ glyphs changed the height): fixed
-   height, one min-width, label centred, a border on all of them. */
+/* Size = the green "✓ 1 úkon" pill as it was in 2.8 (David likes it); the
+   other variants only get its width, so they sit in the same footprint. */
 .doklad-pocet {
-  justify-self: end; box-sizing: border-box;
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 1.625rem; min-width: 6.5rem; padding: 0 10px;
-  white-space: nowrap; font-size: 0.75rem; font-weight: 650; line-height: 1;
-  border-radius: var(--radius-pill); border: 1px solid var(--line);
+  justify-self: end; white-space: nowrap; font-size: 0.75rem; font-weight: 650;
+  border-radius: var(--radius-pill); padding: 2px 9px; border: 1px solid transparent;
+  display: inline-block; box-sizing: border-box; text-align: center;
+  min-width: 4.5rem; /* = green "✓ 1 úkon" natural width (71 px) */
 }
-.doklad-pocet.is-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); border-color: #8fd49a; }
+.doklad-pocet.is-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); }
 .doklad-pocet.is-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a; }
 .doklad-pocet.is-partial {
   color: #4a4a00; border-color: #c9c56b;
@@ -2386,7 +2384,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 
 /* "Nový doklad" dialog (2.5, rozšířeno 2.6: IČO/ARES, sbalitelné úkony,
    ruční vozidla a adresa na doklad) */
-.doklad-new { max-width: 560px; }
+.doklad-new { max-width: 880px; }  /* 2.8.2: room for the full VIN, owner and note */
 .doklad-new [hidden] { display: none !important; }  /* grid/flex rules below would beat [hidden] */
 .doklad-new h2 { margin: 0 0 var(--sp-4); }
 .doklad-new form { display: grid; gap: var(--sp-3); }
@@ -2429,7 +2427,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .dn-ukony__head[aria-expanded="true"] .dn-ukony__chev { transform: rotate(-45deg); }
 .dn-ukony { display: grid; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
 .dn-ukon {
-  display: grid; grid-template-columns: 20px 96px auto minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
+  display: grid; grid-template-columns: 20px 10.5rem auto minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
   padding: 8px 10px; border: 1.5px solid var(--line); border-top-width: 0; cursor: pointer; font-size: 0.875rem;
 }
 .dn-ukon:first-child { border-top-width: 1.5px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
@@ -2437,7 +2435,9 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .dn-ukon:first-child:last-child { border-radius: var(--radius-sm); }
 .dn-ukon:has(input:checked) { background: var(--bg); }
 .dn-ukon__auto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dn-ukon__meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dn-ukon__sub { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; }
+.dn-ukon__vin { flex: 0 0 auto; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 0.8125rem; letter-spacing: .01em; }
+.dn-ukon__meta { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dn-ukon__kc { white-space: nowrap; }
 /* 2.8: paid úkony without a doklad, folded under the unpaid ones. */
 .dn-ukon:has(+ .dn-paid) { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
@@ -2462,9 +2462,11 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .dn-done__title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--flash-success-ink); }
 @media (max-width: 760px) {
   .dn-ukon { grid-template-columns: 20px minmax(0, 1fr) auto; }
-  .dn-ukon .tag { display: none; }
-  .dn-ukon__meta { grid-column: 2 / -1; grid-row: 2; }
-  .dn-ukon__kc { grid-column: 3; grid-row: 1; }  /* price beside the SPZ, not on a third line */
+  /* Phone: SPZ · typ · Kč on line 1, full VIN · date · who · note on line 2. */
+  .dn-ukon { grid-template-columns: 20px auto minmax(0, 1fr) auto; row-gap: 2px; }
+  .dn-ukon .tag { justify-self: start; }
+  .dn-ukon__sub { grid-column: 2 / -1; grid-row: 2; }
+  .dn-ukon__kc { grid-column: 4; grid-row: 1; }  /* price beside the SPZ, not on a third line */
 }
 @media (max-width: 560px) {
   /* Phones: one field per row and 16 px inputs (no iOS zoom). */

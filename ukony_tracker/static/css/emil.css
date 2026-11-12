@@ -548,3 +548,24 @@ table,
     }
   }
 }
+
+/* Version button "v2.8 ⓘ" — moved here from _whats_new.html (2.8.2): that
+   <style> sits at the end of <body>, so on reload the top bar painted it as a
+   raw HTML button first. Last stylesheet in <head> = same cascade order. */
+/* "v2.0 ⓘ" sits just before "Odhlásit" and takes over its auto margin. */
+.nav-ver {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none;
+  font: 500 .8125rem var(--font); color: var(--muted); cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background-color .14s cubic-bezier(.23, 1, .32, 1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav-ver:hover { background: var(--line); }
+}
+.nav-ver:active { transform: scale(.97); }
+.nav-ver svg { display: block; }
+.nav-ver + .logout-form { margin-left: var(--sp-2); }
+
+

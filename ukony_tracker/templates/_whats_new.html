@@ -16,22 +16,6 @@
    lift, --radius, --accent, --bg, the "Zeptej se" sparkle. Light only,
    like the rest of the app. Included by base.html for logged-in pages. #}
 <style>
-  /* "v2.0 ⓘ" sits just before "Odhlásit" and takes over its auto margin. */
-  .nav-ver {
-    margin-left: auto; flex-shrink: 0;
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none;
-    font: 500 .8125rem var(--font); color: var(--muted); cursor: pointer;
-    font-variant-numeric: tabular-nums;
-    transition: background-color .14s cubic-bezier(.23, 1, .32, 1);
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .nav-ver:hover { background: var(--line); }
-  }
-  .nav-ver:active { transform: scale(.97); }
-  .nav-ver svg { display: block; }
-  .nav-ver + .logout-form { margin-left: var(--sp-2); }
-
   .wn-overlay {
     position: fixed; inset: 0; z-index: 1050;
     display: flex; align-items: center; justify-content: center; padding: var(--sp-4);

@@ -126,6 +126,7 @@ def novy_ukony():
         firma={"nazev": firma["nazev"], "zkratka": firma["zkratka"] or firma["nazev"],
                "ico": firma["ico"] or "", "adresa": firma["adresa"] or "", "psc": firma["psc"] or ""},
         ukony=[{"id": u["id"], "datum": u["datum"], "vozidlo": u["rz"] or u["vin"] or "",
+                "rz": u["rz"] or "", "vin": u["vin"] or "",
                 "typ": u["typ_kod"], "celkem": round(u["celkem"] or 0), "poznamka": u["poznamka"] or "",
                 "zaplaceno": u["stav_platby"] == "zaplaceno", "zadost": zadosti.get(u["id"])}
                for u in rows],

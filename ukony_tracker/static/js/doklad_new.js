@@ -153,9 +153,15 @@
     var row = el('label', 'dn-ukon' + (u.zaplaceno ? ' is-paid' : ''));
     var box = el('input'); box.type = 'checkbox'; box.value = u.id; box.dataset.kc = u.celkem;
     var d = u.datum.slice(8, 10) + '.' + u.datum.slice(5, 7) + '.';
+    // 2.8.2: full VIN + who the úkon is for, so rows are told apart at a glance.
+    var z = u.zadost || {};
+    var kdo = ((z.vlastnik || z.provozovatel) || {}).jmeno || '';
+    var sub = el('span', 'dn-ukon__sub');
+    if (u.rz && u.vin) sub.append(el('span', 'dn-ukon__vin', u.vin));
+    sub.append(el('span', 'dn-ukon__meta muted',
+      [d, kdo, u.poznamka].filter(Boolean).join(' · ')));
     row.append(box, el('b', 'dn-ukon__auto', u.vozidlo || '—'), el('span', 'tag', u.typ),
-      el('span', 'dn-ukon__meta muted', d + (u.poznamka ? ' · ' + u.poznamka : '')),
-      el('b', 'dn-ukon__kc', kc(u.celkem)));
+      sub, el('b', 'dn-ukon__kc', kc(u.celkem)));
     if (u.zaplaceno) row.title = 'Úkon je už zaplacený';
     return row;
   }
