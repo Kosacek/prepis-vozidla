@@ -22,7 +22,7 @@ import ppd
 import spayd
 
 LEFT = 18 * mm
-QR_SIZE = 32 * mm
+QR_SIZE = 30 * mm
 MAX_VEHICLE_LINES = 5
 QR_LABEL = "QR Platba"
 QR_MISSING = "QR po doplnění IBAN"
@@ -193,9 +193,9 @@ def _money(amount) -> str:
 
 
 def _payment(c, font, record, cfg, payload, H, width) -> None:
-    """Bottom block: QR Platba left, total top-right, bank details beside the QR
-    so anyone who can't scan can type the payment in by hand."""
-    top = H - 136 * mm
+    """Bottom block: QR Platba left with the bank details under it (for anyone
+    who can't scan), total top-right."""
+    top = H - 131 * mm
     right = LEFT + width
     if payload:
         _draw_qr(c, payload, LEFT, top, QR_SIZE)
@@ -205,18 +205,18 @@ def _payment(c, font, record, cfg, payload, H, width) -> None:
     c.setFillColor(GREY)
     c.drawCentredString(LEFT + QR_SIZE / 2, top - QR_SIZE - 4 * mm, QR_LABEL)
 
-    c.drawRightString(right, top - 3 * mm, "Celkem k úhradě")
+    c.drawRightString(right, top + 3 * mm, "Celkem k úhradě")
     amount = _money(record.get("amount", 0))
     c.setFillColor(black)
     c.saveState()
     c.setLineWidth(0.7)
-    t = c.beginText(right - c.stringWidth(amount, font, 19), top - 11 * mm)
+    t = c.beginText(right - c.stringWidth(amount, font, 19), top - 5 * mm)
     t.setFont(font, 19)
     t.setTextRenderMode(2)          # fill + stroke = faux bold (one TTF only)
     t.textOut(amount)
     c.drawText(t)
     c.restoreState()
-    _bank_details(c, font, record, cfg, LEFT + QR_SIZE + 5 * mm, top - 17 * mm)
+    _bank_details(c, font, record, cfg, LEFT, top - QR_SIZE - 9.5 * mm)
 
 
 def _bank_details(c, font, record, cfg, x, y) -> None:
@@ -225,8 +225,7 @@ def _bank_details(c, font, record, cfg, x, y) -> None:
                 ("IBAN", _iban_display(cfg["iban"]))]
     else:
         rows = [("Číslo účtu", IBAN_MISSING)]
-    rows += [("Variabilní symbol", record.get("number", "")),
-             ("Splatnost", record.get("due", ""))]
+    rows += [("Variabilní symbol", record.get("number", ""))]
     for label, value in rows:
         c.setFont(font, 6.5)
         c.setFillColor(GREY)
