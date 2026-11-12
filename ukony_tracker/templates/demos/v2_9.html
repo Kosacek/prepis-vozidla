@@ -1,0 +1,71 @@
+{# Demo for release 2.9: the Hotově / Převodem toggle slides to Převodem, a
+   doklad row with the "Faktura" tag and a yellow "čeká na platbu" chip
+   appears, then the chip flips to green once the payment arrives.
+   CSS-only, 4.5s loop, app tokens only. #}
+<style>
+  .de29-demo { box-sizing: border-box; height: 176px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25;
+    overflow: hidden; display: grid; align-content: start; gap: 12px; }
+  .de29-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .de29-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .de29-seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--line);
+    border-radius: var(--radius-sm); padding: 3px; font-size: 10.5px; font-weight: 500; color: var(--muted); }
+  .de29-seg > span { grid-row: 1; position: relative; z-index: 1; padding: 4px 13px; text-align: center; white-space: nowrap; }
+  .de29-pill { position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
+    border-radius: 8px; background: var(--card); box-shadow: var(--shadow-sm);
+    animation: de29-slide 4.5s ease infinite; }
+  .de29-on { grid-column: 1; color: var(--ink); animation: de29-ink-in 4.5s ease infinite; }
+  .de29-off { grid-column: 2; color: var(--ink); animation: de29-ink-out 4.5s ease infinite; }
+  .de29-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px;
+    padding: 9px 11px; border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+    box-shadow: 0 2px 8px rgba(0,0,0,.05); opacity: 0; transform: translateY(8px);
+    animation: de29-row 4.5s ease infinite; }
+  .de29-body { display: grid; gap: 4px; min-width: 0; }
+  .de29-num { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11.5px; }
+  .de29-tag { font-size: 8.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 6px; padding: 0 5px; background: var(--bg); }
+  .de29-car { display: flex; align-items: baseline; gap: 6px; }
+  .de29-spz { font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+  .de29-vin { font-size: 9px; color: var(--muted); letter-spacing: .03em; }
+  .de29-od { font-size: 9.5px; color: var(--muted); }
+  .de29-side { display: grid; justify-items: end; gap: 5px; }
+  .de29-kc { font-size: 12px; font-weight: 800; }
+  .de29-chip { display: inline-grid; font-size: 8.5px; font-weight: 700; }
+  .de29-chip > span { grid-area: 1 / 1; text-align: center; border-radius: 999px; padding: 1px 8px;
+    border: 1px solid transparent; white-space: nowrap; }
+  .de29-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a !important;
+    animation: de29-out 4.5s ease infinite; }
+  .de29-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); opacity: 0;
+    animation: de29-in 4.5s ease infinite; }
+  @keyframes de29-slide { 0%, 14% { transform: none; } 28%, 100% { transform: translateX(100%); } }
+  @keyframes de29-ink-in { 0%, 14% { color: var(--ink); } 28%, 100% { color: var(--muted); } }
+  @keyframes de29-ink-out { 0%, 14% { color: var(--muted); } 28%, 100% { color: var(--ink); } }
+  @keyframes de29-row { 0%, 34% { opacity: 0; transform: translateY(8px); } 46%, 100% { opacity: 1; transform: none; } }
+  @keyframes de29-out { 0%, 68% { opacity: 1; } 76%, 100% { opacity: 0; } }
+  @keyframes de29-in { 0%, 68% { opacity: 0; } 76%, 100% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .de29-pill { animation: none; transform: translateX(100%); }
+    .de29-on { animation: none; color: var(--muted); }
+    .de29-off { animation: none; color: var(--ink); }
+    .de29-row { animation: none; opacity: 1; transform: none; }
+    .de29-unpaid { animation: none; opacity: 0; }
+    .de29-paid { animation: none; opacity: 1; }
+  }
+</style>
+<div class="de29-demo" aria-hidden="true">
+  <div class="de29-field">
+    <span class="de29-label">Platba</span>
+    <div class="de29-seg"><i class="de29-pill"></i><span class="de29-on">Hotově</span><span class="de29-off">Převodem</span></div>
+  </div>
+  <div class="de29-row">
+    <div class="de29-body">
+      <div class="de29-num">č. 20260001<span class="de29-tag">Faktura</span></div>
+      <div class="de29-car"><span class="de29-spz">4AE1234</span><span class="de29-vin">TMBJJ7NE5J0123456</span></div>
+      <div class="de29-od">JAZYKOVÁ ŠKOLA P.A.R.K.</div>
+    </div>
+    <div class="de29-side">
+      <span class="de29-kc">1 300 Kč</span>
+      <span class="de29-chip"><span class="de29-unpaid">čeká na platbu</span><span class="de29-paid">✓ 1 úkon</span></span>
+    </div>
+  </div>
+</div>
