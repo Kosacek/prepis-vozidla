@@ -76,7 +76,8 @@ def doklady():
     firmy = firmy_repo.list_all(conn)
     firmy_by_id = {f["id"]: f for f in firmy}
     firma_colors = colors_service.firma_color_map(conn)
-    radky = doklady_view.radky(rows, links, ukony, firmy_by_id, firma_colors)
+    radky = doklady_view.radky(rows, links, ukony, firmy_by_id, firma_colors,
+                               banka=doklady_view.banka_platby(conn))
     return render_template(
         "doklady.html", doklady=radky,
         ukony=ukony, firmy=firmy, firma_colors=firma_colors,

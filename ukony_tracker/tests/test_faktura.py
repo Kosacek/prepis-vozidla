@@ -283,7 +283,8 @@ def test_list_rows_carry_druh_splatnost_and_the_unpaid_label(client, data, zados
     client.post("/doklady/novy", json=_body(data, druh="faktura"))
     row = _row(client, 20260001, dnes=date(2026, 11, 20))
     assert (row.druh, row.splatnost, row.po_splatnosti) == ("faktura", "01.12.2026", False)
-    assert (row.platba.stav, row.platba.label) == ("unpaid", "čeká na platbu")
+    assert (row.platba.stav, row.platba.label) == ("unpaid", "2 úkony")
+    assert row.platba.title == "Faktura čeká na platbu · 2 úkony"
     assert "faktura" in row.hledat.split()
 
 
@@ -371,3 +372,78 @@ def test_migration_adds_columns_to_an_old_ppd_table(tmp_path):
     db.init_schema(conn)  # idempotent
     row = conn.execute("SELECT druh, splatnost, zaplaceno_dne FROM ppd").fetchone()
     assert tuple(row) == ("ppd", None, None)
+
+
+# -- How a paid faktura was paid (2.9.3) --------------------------------------------
+
+def _banka(client, cislo, datum="2026-11-13", stav="sparovano"):
+    with client.application.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute(
+                "INSERT INTO moneta_platby(tx_id, datum, castka, vs, faktura_cislo, stav, created_at)"
+                " VALUES(?,?,?,?,?,?,?)", (f"tx{cislo}{stav}", datum, 1300.0, str(cislo), cislo, stav, "2026-11-13T10:00:00"))
+
+
+def _row_banka(client, cislo):
+    with client.application.app_context():
+        conn = db.get_db()
+        links = ppd_links.compute(conn)
+        rows = ppd_repo.list(conn, limit=None)
+        ukony = ukony_repo.list_by_ids(conn, (u for r in rows for u in links.by_doklad.get(r["cislo"], [])))
+        firmy = {f["id"]: f for f in firmy_repo.list_all(conn)}
+        return next(r for r in doklady_view.radky(rows, links, ukony, firmy, {}, banka=doklady_view.banka_platby(conn))
+                    if r.cislo == cislo)
+
+
+def _paid_faktura(client, data, zadosti):
+    zadosti["vystavit"] = _faktura_reply(splatnost="01.12.2026")
+    client.post("/doklady/novy", json=_body(data, druh="faktura"))
+    with client.application.app_context():
+        faktura_platby.oznac_fakturu_zaplacenou(20260001, "2026-11-13", conn=db.get_db())
+
+
+def test_bank_matched_faktura_says_so(client, data, zadosti):
+    _paid_faktura(client, data, zadosti)
+    _banka(client, 20260001)
+    p = _row_banka(client, 20260001).platba
+    assert (p.stav, p.zpusob) == ("paid", "auto")
+    assert p.title == "Zaplaceno převodem 13. 11. · spárováno automaticky"
+    assert p.radek == "Zaplaceno převodem 13. 11. 2026 · automaticky"
+    assert not p.label.startswith("✓")  # the bank icon replaces the tick
+    html = client.get("/doklady").get_data(as_text=True)
+    assert 'doklad-pocet__ico' in html and "has-ico" in html and "Zaplaceno převodem 13. 11. 2026 · automaticky" in html
+
+
+def test_hand_marked_faktura_has_no_icon(client, data, zadosti):
+    _paid_faktura(client, data, zadosti)
+    _banka(client, 20260001, stav="nesparovano")  # an unmatched row proves nothing
+    p = _row_banka(client, 20260001).platba
+    assert (p.stav, p.zpusob, p.title, p.radek) == ("paid", "rucne", "Označeno ručně", "Označeno ručně")
+    html = client.get("/doklady").get_data(as_text=True)
+    assert 'doklad-pocet__ico' not in html and "Označeno ručně" in html
+
+
+def test_cash_ppd_and_unpaid_faktura_are_unchanged(client, data, zadosti):
+    with client.application.app_context():
+        ppd_repo.upsert(db.get_db(), {"cislo": 190, "datum": TODAY.isoformat(), "castka": 1300,
+                                      "vozidlo": "3BR9309", "prijato_od": "X"})
+    p = _row_banka(client, 190).platba
+    assert (p.zpusob, p.radek, p.title) == ("", "", "Čeká na zaplacení")
+    zadosti["vystavit"] = _faktura_reply(splatnost="01.12.2026")
+    client.post("/doklady/novy", json=_body(data, druh="faktura"))
+    u = _row_banka(client, 20260001).platba
+    assert (u.stav, u.zpusob, u.radek) == ("unpaid", "", "")
+
+
+def test_bank_info_is_one_query_for_the_whole_list(client, data, zadosti):
+    _paid_faktura(client, data, zadosti)
+    _banka(client, 20260001)
+    statements = []
+    with client.application.app_context():
+        conn = db.get_db()
+        conn.set_trace_callback(statements.append)
+        banka = doklady_view.banka_platby(conn)
+        conn.set_trace_callback(None)
+    assert banka == {20260001: "2026-11-13"}
+    assert len([q for q in statements if "moneta_platby" in q]) == 1

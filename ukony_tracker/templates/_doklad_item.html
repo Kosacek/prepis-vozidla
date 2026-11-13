@@ -23,7 +23,7 @@
       </span>
       <span class="doklad-od" title="{{ p.prijato_od }}">{{ p.prijato_od or '—' }}{% if p.smazano %} <span class="tag">smazaný</span>{% endif %}</span>
       <span class="doklad-kc"><b>{{ p.castka|kc }} Kč</b></span>
-      <span class="doklad-pocet is-{{ p.platba.stav }}" title="{{ p.platba.title }}">{{ p.platba.label }}</span>
+      <span class="doklad-pocet is-{{ p.platba.stav }}{{ ' has-ico' if p.platba.zpusob == 'auto' }}" title="{{ p.platba.title }}">{% if p.platba.zpusob == 'auto' %}<svg class="doklad-pocet__ico" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>{% endif %}{{ p.platba.label }}</span>
       <span class="doklad-chev" aria-hidden="true"></span>
     </button>
     {% if not p.smazano %}
@@ -34,6 +34,7 @@
     {% endif %}
   </div>
   <div class="doklad-drawer" id="doklad-{{ p.cislo }}" hidden>
+    {% if p.platba.radek %}<div class="doklad-zpusob">{{ p.platba.radek }}</div>{% endif %}
     {% if p.uids %}
     <div class="ukony-list doklad-ukony">
       {# smazat_doklad: here the row's trash deletes this doklad, never the úkon. #}

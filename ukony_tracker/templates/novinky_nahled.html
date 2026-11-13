@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Náhled: Co umí Evidence{% endblock %}
+{# Preview of the popup + sheet for screenshots (route /novinky-nahled, only
+   with NOVINKY_NAHLED=1). The base page includes _novinky.html with the
+   preview context: no storage key, so it opens every time. #}
+{% block content %}
+<h1>Náhled novinek</h1>
+<p class="muted">Klepnutím na verzi nahoře otevřeš přehled přímo.</p>
+{% endblock %}

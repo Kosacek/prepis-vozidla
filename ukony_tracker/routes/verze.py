@@ -3,7 +3,7 @@
 Every page is stamped with the build that drew it (the APP_BUILD template
 global) and polls this route; when the two differ, the server was updated
 underneath an open page and it shows the "Nová verze aplikace · Obnovit"
-bar (templates/_whats_new.html). Behind the normal login gate — it is not
+bar (templates/_update_bar.html). Behind the normal login gate — it is not
 under /api/, which is the key-authenticated server-to-server surface.
 """
 import hashlib

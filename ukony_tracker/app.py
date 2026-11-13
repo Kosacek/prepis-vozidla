@@ -140,14 +140,32 @@ def create_app():
     app.register_blueprint(ask_bp)
     from routes.verze import bp as verze_bp, build_id
     app.register_blueprint(verze_bp)
-    # Stamped into every page (templates/_whats_new.html) so an open page
+    # Stamped into every page (templates/_update_bar.html) so an open page
     # can tell when the server has been updated underneath it.
     app.jinja_env.globals["APP_BUILD"] = build_id()
     from services.ppd_links import ukon_doklady
     app.jinja_env.globals["ukon_doklady"] = ukon_doklady  # orange "Zaplatit" in _stav_slot.html
+    import novinky
     from releases import CURRENT_VERSION, RELEASES
     app.jinja_env.globals["RELEASES"] = RELEASES
     app.jinja_env.globals["CURRENT_VERSION"] = CURRENT_VERSION
+    # "Co umí Evidence" (templates/_novinky.html): popup = newest release,
+    # sheet = only what is still true.
+    app.jinja_env.globals.update(
+        NOVA=RELEASES[0], NOVINKY_SEKCE=novinky.sekce(CURRENT_VERSION),
+        NOVINKY_START="auto", NOVINKY_KEY="evidence_whatsnew_" + CURRENT_VERSION)
+
+    @app.get("/novinky-nahled")
+    def novinky_nahled():
+        """Screenshot preview of "Co umí Evidence". 404 unless NOVINKY_NAHLED=1.
+        ?faze=2 = sheet only (still), ?pauza=1 = card held, default = card,
+        then the sheet after 3.5 s. Behind the normal login gate."""
+        from flask import abort, render_template, request
+        if os.environ.get("NOVINKY_NAHLED") != "1":
+            abort(404)
+        faze = request.args.get("faze")
+        start = "sheet-still" if faze == "2" else ("hold" if request.args.get("pauza") else "auto")
+        return render_template("novinky_nahled.html", NOVINKY_START=start, NOVINKY_KEY=None)
 
     _start_moneta()
 

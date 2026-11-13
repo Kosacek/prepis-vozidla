@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Úkony Tracker{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=88">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=90">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/orv_report.css') }}?v=10">
   {# Emil polish pass — motion, press/hover/focus states, touch behaviour.
      Loaded last on purpose: it only overrides, never re-lays-out. #}
@@ -40,7 +40,7 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
-  {% if authed %}{% include "_whats_new.html" %}{% endif %}
+  {% if authed %}{% include "_update_bar.html" %}{% include "_novinky.html" %}{% endif %}
   <script>
   // Shared ORV → VIN autofill (dataovozidlech.cz via /orv-lookup). Form-relative
   // (uses `this` + name="vin"/.orv-status in the same form) so it works on the

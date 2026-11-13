@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
-ARG CACHEBUST=2026-11-13-jeden-kod
-COPY app.py config.py db.py releases.py ./
+ARG CACHEBUST=2026-11-13-novinky
+COPY app.py config.py db.py releases.py novinky.py ./
 COPY repositories ./repositories
 COPY services ./services
 COPY routes ./routes

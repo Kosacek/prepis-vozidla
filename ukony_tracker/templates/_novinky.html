@@ -1,0 +1,209 @@
+{# "Co umí Evidence": the "what's new" of the app.
+
+   Phase 1: the newest release pops up as a centered card (like the old popup).
+   Phase 2: after ~3.5 s or on any tap/key the card slides up and fades,
+   revealing a full-page sheet with only what the app can do now, in a few
+   sections (novinky.py). "Verze X ⓘ" ([data-releases-open]) opens the sheet
+   directly. prefers-reduced-motion: the sheet directly, no slide.
+
+   Included by base.html for logged-in pages. Needs: NOVA (newest Release), NOVINKY_SEKCE (novinky.sekce()),
+   NOVINKY_START ("auto" | "hold" | "sheet"), NOVINKY_KEY (localStorage key,
+   None = preview, always opens). Logic: static/novinky.js.
+   Same tokens as the app (--card, --primary, --text, --muted, --border, --bg);
+   demos read the --wn-* aliases, so those are defined here too. #}
+<style>
+  .nv {
+    --wn-card: var(--card); --wn-ink: var(--ink); --wn-muted: var(--muted);
+    --wn-line: var(--line); --wn-accent: var(--accent); --wn-accent-dark: var(--accent-dark);
+    --wn-soft: color-mix(in srgb, var(--accent) 12%, transparent); --wn-bg: var(--bg);
+    --nv-ease: cubic-bezier(.2, .8, .25, 1);
+    position: fixed; inset: 0; z-index: 1060; visibility: hidden;
+    font-family: var(--font); color: var(--wn-ink);
+  }
+  .nv[hidden] { display: none; }
+  .nv.is-open { visibility: visible; }
+
+  /* -- Phase 1: the card ------------------------------------------------ */
+  .nv-intro {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(0, 0, 0, .45);
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .nv.is-open .nv-intro { opacity: 1; }
+  .nv.is-sheet .nv-intro { opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .45s ease, visibility 0s .5s; }
+  .nv.nv-direct .nv-intro { display: none; }
+
+  .nv-card {
+    position: relative; overflow: hidden; width: 100%; max-width: 380px; border-radius: var(--radius);
+    padding: 18px 22px 24px; background: var(--wn-card);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .18), 0 2px 10px rgba(0, 0, 0, .06);
+    opacity: 0; transform: translateY(10px) scale(.97);
+    transition: transform .26s var(--nv-ease), opacity .26s ease;
+  }
+  .nv.is-open .nv-card { opacity: 1; transform: none; }
+  .nv.is-sheet .nv-card {
+    opacity: 0; transform: translateY(-72px) scale(.96);
+    transition: transform .5s cubic-bezier(.5, 0, .75, 0), opacity .42s ease;
+  }
+  .nv-card:focus { outline: none; }
+  .nv-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    font-size: 12px; font-weight: 600; color: var(--wn-muted); font-variant-numeric: tabular-nums;
+  }
+  .nv-new {
+    margin-left: auto; padding: 2px 9px; border-radius: 999px;
+    background: var(--wn-soft); color: var(--wn-accent); font-size: 11px; font-weight: 700;
+  }
+  .nv-card h3 { margin: 0 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .nv-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .nv-points li { display: flex; gap: 10px; font-size: 15px; line-height: 1.4; color: var(--wn-muted); }
+  .nv-points li::before {
+    content: ''; flex: none; width: 6px; height: 6px; margin-top: 8px;
+    border-radius: 50%; background: var(--wn-accent);
+  }
+  /* Timer: a thin line that fills while phase 1 waits. No text. */
+  .nv-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
+    background: var(--wn-accent); opacity: .85; transform: scaleX(0); transform-origin: 0 50%; }
+  .nv.is-open:not(.is-sheet):not(.nv-hold) .nv-timer {
+    animation: nv-fill var(--nv-delay, 3.5s) linear forwards; }
+  @keyframes nv-fill { to { transform: scaleX(1); } }
+
+  /* -- Phase 2: the sheet ----------------------------------------------- */
+  .nv-sheet {
+    position: absolute; inset: 0; display: flex; justify-content: center;
+    background: rgba(0, 0, 0, .45);
+    opacity: 0; pointer-events: none; transition: opacity .45s ease .1s;
+  }
+  .nv.is-sheet .nv-sheet { opacity: 1; pointer-events: auto; }
+  .nv.nv-locked .nv-sheet { pointer-events: none; }
+  .nv-panel {
+    display: flex; flex-direction: column; width: 100%; max-width: 720px; min-height: 0;
+    background: var(--wn-bg);
+    transform: translateY(28px); transition: transform .55s var(--nv-ease) .1s;
+  }
+  .nv.is-sheet .nv-panel { transform: none; }
+  .nv-panel:focus { outline: none; }
+  .nv-top {
+    flex: none; display: flex; align-items: baseline; gap: 10px;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 8px;
+  }
+  .nv-top h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .nv-top span { font-size: 13px; font-weight: 600; color: var(--wn-muted); font-variant-numeric: tabular-nums; }
+  .nv-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px;
+    -webkit-overflow-scrolling: touch; }
+  .nv-sec { margin: 0; padding: 0; }
+  .nv-sec h4 {
+    position: sticky; top: 0; z-index: 2; margin: 0 -16px; padding: 14px 16px 8px;
+    background: var(--wn-bg); font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--wn-muted);
+  }
+  .nv-list { display: grid; gap: 10px; }
+
+  .nv-fe {
+    --s: .5;
+    display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 14px;
+    background: var(--wn-card); border: 1px solid var(--wn-line);
+  }
+  .nv-fe.is-new { border-color: var(--wn-accent); box-shadow: 0 0 0 3px var(--wn-soft); }
+  .nv-demo {
+    flex: none; position: relative; overflow: hidden; border-radius: 10px;
+    width: calc(300px * var(--s));
+  }
+  .nv-demo-in { width: 300px; zoom: var(--s); pointer-events: none; }
+  .nv-demo-in > div { margin-bottom: 0 !important; }
+  .nv-tile {
+    flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--wn-bg);
+    width: calc(300px * var(--s)); height: calc(110px * var(--s));
+    font-size: 20px; font-weight: 800; color: var(--wn-accent);
+  }
+  .nv-txt { min-width: 0; display: grid; gap: 3px; align-content: center; }
+  .nv-txt b { font-size: 15px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+  .nv-txt p { margin: 0; font-size: 13px; line-height: 1.35; color: var(--wn-muted); }
+  .nv-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; min-height: 16px;
+    font-size: 11px; color: var(--wn-muted); opacity: .8; font-variant-numeric: tabular-nums; }
+  .nv-fe .nv-new { margin-left: 0; opacity: 1; }
+
+  .nv-bar {
+    flex: none; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to bottom, transparent, var(--wn-bg) 28%);
+    margin-top: -18px; position: relative; z-index: 3;
+  }
+  .nv-ok {
+    width: 100%; padding: 13px 20px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+    background: var(--wn-accent); color: var(--accent-ink); font: inherit; font-size: 16px; font-weight: 600;
+  }
+  .nv-ok:hover { background: var(--wn-accent-dark); }
+
+  @media (min-width: 640px) {
+    .nv-fe { --s: .6; padding: 12px; gap: 16px; }
+    .nv-txt b { font-size: 16px; }
+    .nv-txt p { font-size: 14px; }
+  }
+  @media (min-width: 740px) {
+    .nv-panel { margin: 24px 0; border-radius: 18px; overflow: hidden;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, .25); }
+    .nv-top { padding-top: 22px; }
+    .nv-top, .nv-body { padding-left: 24px; padding-right: 24px; }
+    .nv-sec h4 { margin: 0 -24px; padding: 16px 24px 8px; }
+    .nv-bar { padding: 12px 24px 20px; }
+  }
+  /* Still mode (?faze=2 for screenshots): no transitions at all. */
+  .nv.nv-still, .nv.nv-still * { transition: none !important; animation-duration: 0s !important; }
+  .nv.nv-still .nv-demo-in * { animation-duration: revert !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nv, .nv * { transition: none !important; }
+    .nv-timer { animation: none !important; }
+  }
+</style>
+
+<div class="nv" id="nv" hidden data-start="{{ NOVINKY_START }}"
+     {% if NOVINKY_KEY %}data-key="{{ NOVINKY_KEY }}"{% endif %}>
+  <div class="nv-sheet" id="nvSheet">
+    <div class="nv-panel" role="dialog" aria-modal="true" aria-labelledby="nvTitle" tabindex="-1">
+      <div class="nv-top"><h2 id="nvTitle">Co umí Evidence</h2><span>v{{ NOVA.version }}</span></div>
+      <div class="nv-body">
+        {% for s in NOVINKY_SEKCE %}
+        <section class="nv-sec" data-oblast="{{ s.key }}">
+          <h4>{{ s.nazev }}</h4>
+          <div class="nv-list">
+            {% for k in s.karty %}
+            <article class="nv-fe{{ ' is-new' if k.nova }}" data-version="{{ k.version }}">
+              {% if k.demo %}
+              <div class="nv-demo" aria-hidden="true"><div class="nv-demo-in">{% include "demos/" ~ k.demo ~ ".html" %}</div></div>
+              {% else %}
+              <div class="nv-tile" aria-hidden="true">{{ k.od }}</div>
+              {% endif %}
+              <div class="nv-txt">
+                <b>{{ k.nazev }}</b>
+                <p>{{ k.radek }}</p>
+                <div class="nv-meta">od {{ k.od }}{% if k.nova %}<span class="nv-new">Nové</span>{% endif %}</div>
+              </div>
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+      <div class="nv-bar"><button type="button" class="nv-ok">Rozumím</button></div>
+    </div>
+  </div>
+
+  <div class="nv-intro" id="nvIntro">
+    <div class="nv-card" role="dialog" aria-label="Novinka" tabindex="-1">
+      <div class="nv-head">
+        <span>Verze {{ NOVA.version }}</span><span>·</span>
+        <span>{{ NOVA.date.day }}. {{ NOVA.date.month }}. {{ NOVA.date.year }}</span>
+        <span class="nv-new">Nejnovější</span>
+      </div>
+      {% if NOVA.demo %}{% include "demos/" ~ NOVA.demo ~ ".html" %}{% endif %}
+      <h3>{{ NOVA.title }}</h3>
+      <ul class="nv-points">
+        {% for point in NOVA.points %}<li><span>{{ point }}</span></li>{% endfor %}
+      </ul>
+      <div class="nv-timer"></div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/novinky.js') }}?v=1"></script>

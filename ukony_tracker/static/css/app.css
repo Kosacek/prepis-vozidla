@@ -2257,6 +2257,11 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   background: linear-gradient(90deg, var(--flash-success-bg) 0 50%, var(--flash-warning-bg) 50% 100%);
 }
 .doklad-pocet.is-none { background: var(--bg); color: var(--muted); }
+/* Paid by the bank (2.9.3): a 11px bank icon inside the SAME footprint. The
+   icon takes room from the side padding, never from the chip: min-width holds. */
+.doklad-pocet.has-ico { display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding-inline: 4px; }
+.doklad-pocet__ico { flex: none; width: 11px; height: 11px; opacity: .75; }
+.doklad-zpusob { color: var(--muted); font-size: 0.8125rem; padding: 6px var(--sp-3) 2px; }
 
 /* Faktura (převodem): a small tag next to the number, and "po splatnosti" under
    it while unpaid past the due date. Only lists that hold a faktura get the

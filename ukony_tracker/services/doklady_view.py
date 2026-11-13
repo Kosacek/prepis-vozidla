@@ -7,7 +7,7 @@ are paid. The row is computed here, so _doklad_item.html only draws it.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 
 from services import ppd_links
@@ -27,6 +27,8 @@ class Platba:
     stav: str   # "paid" | "partial" | "unpaid" | "none"
     label: str
     title: str
+    zpusob: str = ""   # paid faktura only: "auto" (bank matched) | "rucne" (marked by hand)
+    radek: str = ""    # muted line in the drawer, e.g. "Zaplaceno převodem 13. 11. 2026 · automaticky"
 
 
 @dataclass(frozen=True)
@@ -70,11 +72,36 @@ def platba(ukony: list, druh: str = "ppd") -> Platba:
         return Platba("paid", "✓ " + pocet(n), "Zaplaceno")
     if not paid and not any((u["zaplaceno_kc"] or 0) > 0 for u in ukony):
         if druh == "faktura":
-            return Platba("unpaid", "čeká na platbu", f"Faktura čeká na platbu · {pocet(n)}")
+            return Platba("unpaid", pocet(n), f"Faktura čeká na platbu · {pocet(n)}")
         return Platba("unpaid", pocet(n), "Čeká na zaplacení")
     if n > 1 and paid:
         return Platba("partial", f"◐ {paid}/{n} zapl.", f"Zaplaceno {paid} z {n}")
     return Platba("partial", "◐ částečně", "Částečně zaplaceno")
+
+
+def banka_platby(conn) -> dict[int, str]:
+    """{faktura_cislo: ISO date} of invoices the bank matched automatically
+    (moneta_platby.stav='sparovano'). ONE query for the whole list; the latest
+    payment date wins when an invoice was paid in parts."""
+    rows = conn.execute(
+        "SELECT faktura_cislo, MAX(datum) AS datum FROM moneta_platby"
+        " WHERE stav='sparovano' AND faktura_cislo IS NOT NULL GROUP BY faktura_cislo")
+    return {r["faktura_cislo"]: (r["datum"] or "")[:10] for r in rows}
+
+
+def _zpusob(pay: Platba, banka: Mapping[int, str] | None, cislo: int) -> Platba:
+    """Paid faktura: say how it was paid. PPDs (cash) and unpaid ones: unchanged."""
+    if pay.stav != "paid":
+        return pay
+    if cislo in (banka or {}):
+        iso = banka[cislo]
+        kratce = f"{int(iso[8:10])}. {int(iso[5:7])}." if len(iso) >= 10 else ""
+        cele = f"{kratce} {iso[0:4]}".strip() if kratce else ""
+        return replace(
+            pay, zpusob="auto", label=pay.label.removeprefix("✓ "),  # bank icon replaces the tick
+            title="Zaplaceno převodem" + (f" {kratce}" if kratce else "") + " · spárováno automaticky",
+            radek="Zaplaceno převodem" + (f" {cele}" if cele else "") + " · automaticky")
+    return replace(pay, zpusob="rucne", title="Označeno ručně", radek="Označeno ručně")
 
 
 def auta(vozidlo: str | None, ukony: list, chybi: Iterable[str]) -> tuple[Auto, ...]:
@@ -108,7 +135,8 @@ def _dmy(iso: str) -> str:
 
 
 def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, object],
-          firma_colors: Mapping[str, str], dnes: date | None = None) -> Radek:
+          firma_colors: Mapping[str, str], dnes: date | None = None,
+          banka: Mapping[int, str] | None = None) -> Radek:
     cislo = doklad["cislo"]
     druh = _col(doklad, "druh", "ppd")
     splatnost_iso = _col(doklad, "splatnost", "") if druh == "faktura" else ""
@@ -119,6 +147,8 @@ def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, 
     firma = {"zkratka": f["zkratka"], "color": firma_colors.get(f["zkratka"], "var(--muted)")} if f else None
     cars = auta(doklad["vozidlo"], linked, chybi)
     pay = platba(linked, druh)
+    if druh == "faktura":
+        pay = _zpusob(pay, banka, cislo)
     # Past its due date and not paid (a doklad marked paid by hand has no worry left).
     po = bool(splatnost_iso and splatnost_iso < (dnes or date.today()).isoformat()
               and pay.stav in ("unpaid", "partial", "none") and not _col(doklad, "zaplaceno_dne"))
@@ -136,5 +166,6 @@ def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, 
     )
 
 
-def radky(doklady, links, ukony, firmy_by_id, firma_colors, dnes: date | None = None) -> list[Radek]:
-    return [radek(d, links, ukony, firmy_by_id, firma_colors, dnes) for d in doklady]
+def radky(doklady, links, ukony, firmy_by_id, firma_colors, dnes: date | None = None,
+          banka: Mapping[int, str] | None = None) -> list[Radek]:
+    return [radek(d, links, ukony, firmy_by_id, firma_colors, dnes, banka) for d in doklady]
