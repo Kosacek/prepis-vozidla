@@ -1,0 +1,84 @@
+{# "Verze ⓘ" label styling + the "Nová verze aplikace · Obnovit" bar.
+
+   The bar: the page polls /verze (app.py); when the server runs a different
+   build than the one that drew this page, a small inverted pill offers a
+   reload, so an update reaches pages that were left open. The "what's new"
+   card and sheet live in _novinky.html. #}
+<style>
+  .wn-update {
+    --wn-ink: var(--text, #1a1d23); --wn-accent: var(--primary, #1a56db);
+  }
+
+  /* "v1.21.0 ⓘ" in the bottom bar. */
+  .app-ver {
+    position: absolute; left: 24px; display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 8px; border: 0; border-radius: 8px; background: none; cursor: pointer;
+    font: 400 16px inherit; font-family: inherit; color: #bbb;
+    font-variant-numeric: tabular-nums;
+  }
+  .app-ver:hover { color: var(--muted, #6b7280); background: var(--bg, #f0f2f5); }
+  .app-ver svg { display: block; }
+  @media (max-width: 600px) { .app-ver { left: 8px; font-size: 14px; } }
+
+  /* -- "Nová verze" bar ----------------------------------------------- */
+  .wn-update {
+    position: fixed; left: 50%; z-index: 700;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    transform: translate(-50%, calc(-100% - 40px));
+    transition: transform .42s cubic-bezier(.2, .7, .3, 1);
+    display: flex; align-items: center; gap: 12px; white-space: nowrap;
+    padding: 6px 6px 6px 16px; border-radius: 999px;
+    background: var(--wn-ink); color: #fff;
+    font-size: 14px; font-weight: 600; line-height: 1.2;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+  .wn-update[hidden] { display: none; }
+  .wn-update.show { transform: translate(-50%, 0); }
+  .wn-update button {
+    border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    background: var(--wn-accent); color: #fff; font: inherit; font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) { .wn-update { transition: none; } }
+</style>
+
+<div class="wn-update" id="wnUpdate" role="status" aria-live="polite" hidden>
+  Nová verze aplikace
+  <button type="button" onclick="location.reload()">Obnovit</button>
+</div>
+
+<script>
+(function () {
+  // -- "Nová verze aplikace" bar ---------------------------------------------
+  var pageBuild = {{ APP_BUILD | tojson }};
+  var POLL_MS = 60000;
+  var timer = null, polling = false;
+
+  function showBar() {
+    var bar = document.getElementById('wnUpdate');
+    if (!bar || !bar.hidden) return;
+    bar.hidden = false;
+    void bar.offsetWidth;  // render off-screen first, then slide in
+    bar.classList.add('show');
+  }
+  function schedule() {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(poll, POLL_MS);
+  }
+  function poll() {
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    if (polling) return;
+    // Hidden (locked phone, background tab): keep the clock, spend nothing.
+    if (document.hidden) { schedule(); return; }
+    polling = true;
+    fetch('/verze', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })  // logged out -> HTML, ignored
+      .then(function (d) { if (d && d.build && d.build !== pageBuild) showBar(); })
+      .catch(function () {})
+      .then(function () { polling = false; schedule(); });
+  }
+  // Back from the lock screen or another app: check at once.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  schedule();
+})();
+</script>

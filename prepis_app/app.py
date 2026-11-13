@@ -66,7 +66,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.35.0"
+__version__ = "1.35.1"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2618,7 +2618,7 @@ def sdilena_zadost(token):
     """Původní dlouhý tvar odkazu — drží při životě, co už je rozeslané."""
     return _posli_sdilenou(token, stranka=False)
 
-# ── Version history + "Nová verze" bar (templates/_whats_new.html) ──────────
+# ── Version history + "Nová verze" bar (templates/_aktualizace.html, _novinky.html) ──────────
 from releases import CURRENT_RELEASE as _CURRENT_RELEASE, RELEASES as _RELEASES
 
 
@@ -2641,8 +2641,13 @@ def _build_id() -> str:
     return digest.hexdigest()
 
 
+import novinky as _novinky
+
 app.jinja_env.globals.update(
     RELEASES=_RELEASES, CURRENT_RELEASE=_CURRENT_RELEASE,
+    # "Co umí Žádosti": card (newest release) + sheet (only current features).
+    NOVA=_RELEASES[0], NOVINKY_SEKCE=_novinky.sekce(_CURRENT_RELEASE),
+    NOVINKY_START="auto", NOVINKY_KEY=f"zadosti_whatsnew_{_CURRENT_RELEASE}",
     APP_VERSION=__version__, APP_BUILD=_build_id(),
 )
 
@@ -2653,6 +2658,22 @@ def verze():
     # Every poll must reach the server, or a page would never see an update.
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+# ── Náhled "Co umí Žádosti" (jen s NOVINKY_NAHLED=1) ─────
+@app.route("/novinky-nahled")
+def novinky_nahled():
+    """Screenshot-able preview of the redesigned what's-new. 404 unless
+    NOVINKY_NAHLED=1. ?faze=2 sheet only, ?faze=1&pauza=1 card
+    held, default = card then sheet after 3.5 s."""
+    if os.environ.get("NOVINKY_NAHLED") != "1":
+        from flask import abort
+        abort(404)
+    faze = request.args.get("faze")
+    start = "sheet-still" if faze == "2" else ("hold" if request.args.get("pauza") else "auto")
+    return render_template("novinky_nahled.html", NOVA=_RELEASES[0],
+                           NOVINKY_SEKCE=_novinky.sekce(_CURRENT_RELEASE),
+                           NOVINKY_START=start, NOVINKY_KEY=None)
 
 
 # ── Update endpoints ─────────────────────────────────────────────────────────

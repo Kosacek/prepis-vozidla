@@ -1,5 +1,6 @@
-"""Version history ("v1.21.0 ⓘ" in the bottom bar) + the "Nová verze" bar."""
+"""„Co je nového“ (card + sheet „Co umí Žádosti“) + the „Nová verze“ bar."""
 from app import __version__
+import novinky
 from releases import CURRENT_RELEASE, RELEASES
 
 
@@ -19,13 +20,59 @@ def test_releases_are_newest_first_and_well_formed():
     assert _v(CURRENT_RELEASE) <= _v(__version__)
 
 
-def test_bottom_bar_version_opens_the_whole_history(client):
+def test_bottom_bar_version_opens_the_sheet(client):
     html = client.get("/").get_data(as_text=True)
     assert f"v{__version__}" in html and "data-releases-open" in html
+    # The old version browser is gone; the new card + sheet are in.
+    assert "Starší" not in html and "Novější" not in html
+    assert "Co umí Žádosti" in html
+    assert f'data-key="zadosti_whatsnew_{CURRENT_RELEASE}"' in html
+    assert 'data-start="auto"' in html
+
+
+def test_superseded_and_obsolete_releases_never_appear(client):
+    html = client.get("/").get_data(as_text=True)
+    shown = {k["version"] for s in novinky.sekce(CURRENT_RELEASE) for k in s["karty"]}
+    nahrazene = {v for r in RELEASES for v in r.nahrazuje}
+    hidden = nahrazene | {r.version for r in RELEASES if r.zastarale}
+    assert hidden and not (hidden & shown)
+    for v in hidden:
+        assert f'data-version="{v}"' not in html
+
+
+def test_newest_release_is_the_one_popped(client):
+    html = client.get("/").get_data(as_text=True)
+    assert RELEASES[0].version == CURRENT_RELEASE == __version__
+    card = html[html.index('class="nv-intro"'):]
+    assert f"Verze {CURRENT_RELEASE}" in card.split("nv-timer")[0]
+    assert RELEASES[0].title in card.split("nv-timer")[0]
+
+
+def test_sheet_lists_every_current_release_exactly_once(client):
+    html = client.get("/").get_data(as_text=True)
+    current = [r.version for r in novinky.aktualni()]
+    assert current and current[0] == CURRENT_RELEASE
+    for v in current:
+        assert html.count(f'data-version="{v}"') == 1
+    assert html.count('class="nv-fe') == len(current)
+    # The two un-hidden ones are back, worded for fakturas.
+    assert "1.10.0" in current and "1.3.0" in current
+    assert "pokladní doklad" not in "".join(
+        r.radek or "" for r in RELEASES if r.version in ("1.10.0", "1.3.0"))
+
+
+def test_every_release_has_a_classification():
     for r in RELEASES:
-        assert r.title in html
-    assert "Starší" in html and "Novější" in html
-    assert f"zadosti_whatsnew_{CURRENT_RELEASE}" in html
+        assert r.oblast or r.zastarale or r.version in {v for x in RELEASES for v in x.nahrazuje}, r.version
+        if r.oblast:
+            assert r.oblast in dict(novinky.SEKCE)
+
+
+def test_preview_route_only_behind_env_flag(client, monkeypatch):
+    monkeypatch.delenv("NOVINKY_NAHLED", raising=False)
+    assert client.get("/novinky-nahled").status_code == 404
+    monkeypatch.setenv("NOVINKY_NAHLED", "1")
+    assert client.get("/novinky-nahled").status_code == 200
 
 
 def test_build_endpoint_and_page_stamp_agree(client):

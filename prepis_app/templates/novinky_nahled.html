@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Náhled: Co umí Žádosti</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f0f2f5; --card: #ffffff; --primary: #1a56db; --primary-dark: #1341b0;
+    --accent: #e8f0fe; --border: #dde1e7; --text: #1a1d23; --muted: #6b7280;
+    --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; color: var(--text); min-height: 100vh; }
+  .app-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 20px; box-shadow: var(--shadow); }
+  .app-header .logo { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .stub { max-width: 640px; margin: 24px auto; padding: 0 16px; display: grid; gap: 14px; }
+  .stub div { height: 120px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
+  .app-ver { display: inline-flex; align-items: center; gap: 6px; margin: 16px; padding: 6px 8px; border: 0;
+    border-radius: 8px; background: none; cursor: pointer; font: 400 16px inherit; font-family: inherit; color: #bbb; }
+  .app-ver:hover { color: var(--muted); background: var(--bg); }
+</style>
+</head>
+<body>
+<div class="app-header"><div class="logo">Přepis vozidla</div></div>
+<div class="stub"><div></div><div></div><div></div></div>
+<button type="button" class="app-ver" data-releases-open aria-label="Verze {{ NOVA.version }}">v{{ NOVA.version }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.4" r=".6" fill="currentColor"/></svg></button>
+{% include "_novinky.html" %}
+</body>
+</html>

@@ -1494,7 +1494,7 @@
 <!-- Fixed nav bar -->
 <div class="nav-bar">
   <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">Zpět</button>
-  {# Version + its history (templates/_whats_new.html). #}
+  {# Version + its history (templates/_novinky.html). #}
   <button type="button" id="app-version-bar" class="app-ver" data-releases-open aria-label="Verze {{ APP_VERSION }} – co je nového">v{{ APP_VERSION }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.4" r=".6" fill="currentColor"/></svg></button>
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat</button>
 </div>
@@ -4468,6 +4468,7 @@ tryAutoOpenCamera();
   if (!window.getProfil()) window.openProfilModal();  // prompt on first open
 })();
 </script>
-{% include "_whats_new.html" %}
+{% include "_aktualizace.html" %}
+{% include "_novinky.html" %}
 </body>
 </html>
