@@ -171,26 +171,36 @@
   .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   .ev-toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
   .ev-toggle input { width: 20px; height: 20px; accent-color: var(--primary); flex-shrink: 0; }
-  /* Barva firmy z evidence (pole `barva` z /api/evidence-meta) — tečka vlevo ve
-     výběru + barevný název každé firmy v nabídce. Select zůstává nativní, takže
-     ovládání z klávesnice se nemění. */
-  .ev-firma-wrap { position: relative; }
-  .ev-firma-wrap select { padding-left: 38px; }
-  .ev-dot { position: absolute; left: 15px; top: 50%; width: 12px; height: 12px; margin-top: -6px;
-            border-radius: 50%; background: transparent; border: 1.5px dashed var(--border);
-            pointer-events: none; transition: background .15s, border-color .15s; }
-  .ev-dot.on { border: 0; }
+  /* Výběr firmy jako v evidenci: barevná tečka (`barva` z /api/evidence-meta) před
+     názvem, název normální barvou textu. Skrytý <select> drží hodnotu;
+     static/firma_pick.js nad ním dělá tlačítko + seznam. */
+  .firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .firma-pick { position: relative; }
+  .firma-pick.js > select { position: absolute; opacity: 0; pointer-events: none; height: 0; padding: 0; border: 0; }
+  .firma-pick__btn {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 12px 15px;
+    border: 1.5px solid var(--border); border-radius: 8px; background: #fafbfc; color: var(--text);
+    font: inherit; font-size: 16px; text-align: left; cursor: pointer; transition: border-color .15s;
+  }
+  .firma-pick__btn:focus-visible { outline: none; border-color: var(--primary); background: #fff; }
+  .firma-pick__btn:disabled { cursor: default; }
+  .firma-pick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .firma-pick__chev { flex: 0 0 auto; width: 9px; height: 9px; margin-right: 2px;
+    border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg) translate(-2px, -2px); }
+  .firma-pick__list { position: absolute; z-index: 60; top: calc(100% + 5px); left: 0; right: 0;
+    max-height: 290px; overflow-y: auto; background: #fafbfc; border: 1.5px solid var(--border);
+    border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,.14); }
+  .firma-pick.up .firma-pick__list { top: auto; bottom: calc(100% + 5px); }
+  .firma-pick__list[hidden] { display: none; }
+  .firma-pick__item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 12px;
+    border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: none; color: var(--text);
+    font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+  .firma-pick__item:last-child { border-bottom: 0; }
+  .firma-pick__item:hover, .firma-pick__item:focus-visible { background: var(--card); outline: none; }
+  .firma-pick__item.on { font-weight: 700; background: var(--card); }
   .ev-toggle span { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
   #ppd-card > p, #evidence-status { font-size: 13.5px; }
-  /* Hotově / Převodem — nativní radia (šipky + Tab zadarmo), jen přestylovaná. */
-  .platba-seg { display: inline-flex; margin-top: 14px; padding: 3px; gap: 2px; border: 1px solid var(--border);
-                border-radius: 10px; background: #f3f4f6; }
-  .platba-seg label { position: relative; cursor: pointer; }
-  .platba-seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-  .platba-seg span { display: block; padding: 7px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 700;
-                     color: var(--muted); transition: background .15s, color .15s; }
-  .platba-seg input:checked + span { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  .platba-seg input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
   #summary-card .card-title { font-size: 19px; }
   @media (max-width: 820px) {
     .gen-layout { flex-direction: column; }
@@ -1236,7 +1246,7 @@
     <div class="gen-layout">
       <div class="gen-main">
         <div class="card" id="ppd-card">
-          <div class="card-title" id="ppd-card-title">Doklad (PPD)</div>
+          <div class="card-title" id="ppd-card-title">Faktura</div>
           <div class="form-grid">
             <div class="field">
               <label>Částka za vyřízení (Kč)</label>
@@ -1252,12 +1262,6 @@
               </div>
             </div>
           </div>
-          {% if faktura_dostupna %}
-          <div class="platba-seg" role="radiogroup" aria-label="Platba" id="ppd-platba">
-            <label><input type="radio" name="ppd_platba" value="hotove" checked onchange="ppdPlatbaZmena()"><span>Hotově</span></label>
-            <label><input type="radio" name="ppd_platba" value="prevodem" onchange="ppdPlatbaZmena()"><span>Převodem</span></label>
-          </div>
-          {% endif %}
           <!-- Jeden PPD občas kryje víc aut najednou. Rozbalení ukáže přesně
                to, co bude na dokladu (v gen-side je jen souhrn žádosti, ne
                dokladu), a tady se dá přidat další SPZ bez odchodu z kroku. -->
@@ -1284,8 +1288,7 @@
           <div id="evidence-fields" class="form-grid">
             <div class="field">
               <label>Firma</label>
-              <div class="ev-firma-wrap">
-                <span id="evidence_firma_dot" class="ev-dot" aria-hidden="true"></span>
+              <div class="firma-pick">
                 <select id="evidence_firma" onchange="evidencePriceUpdate()"><option value="">— vyber firmu —</option></select>
               </div>
             </div>
@@ -1711,6 +1714,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter') {
     if (e.target.classList.contains('btn-lookup') || e.target.classList.contains('type-btn')) return;
+    if (e.target.classList.contains('firma-pick__btn') || e.target.classList.contains('firma-pick__item')) return;   // výběr firmy si Enter řeší sám
     if (hotovo) {
       // Všechno vytištěné, zpátky v appce (Ctrl+W) → Enter = nová žádost.
       // Zaměřené tlačítko (Kopírovat odkaz…) ale dál dělá to svoje.
@@ -2229,16 +2233,6 @@ let _ppdPreviewSeq = 0;
 function ppdNahledScheduled() {
   if (_ppdPreviewTimer) clearTimeout(_ppdPreviewTimer);
   _ppdPreviewTimer = setTimeout(ppdNahledUpdate, 250);
-}
-
-// Hotově (PPD) / Převodem (faktura). Bez přepínače (faktura není k dispozici) vždy hotově.
-function ppdPlatba() {
-  const r = document.querySelector('input[name="ppd_platba"]:checked');
-  return r ? r.value : 'hotove';
-}
-function ppdPlatbaZmena() {
-  const t = document.getElementById('ppd-card-title');
-  if (t) t.textContent = ppdPlatba() === 'prevodem' ? 'Doklad (faktura)' : 'Doklad (PPD)';
 }
 
 function ppdExtraSpzList() {
@@ -2959,7 +2953,7 @@ function _dokladKarta(d, smazany) {
        <a class="firm-chip" href="/download/${soubor}" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
        <button type="button" class="firm-chip" data-soubor="${soubor}" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico" aria-hidden="true"><use href="#i-share"></use></svg>Sdílet</button>`;
   return `<div class="dok-card${smazany ? ' smazany' : ''}">
-      <div class="dok-num" aria-label="Doklad číslo ${c}"><small>Č.</small>${c}</div>
+      <div class="dok-num" aria-label="Doklad číslo ${c}"${fa ? ` title="Faktura č. ${c} (VS)"` : ''}><small>Č.</small>${fa ? c.slice(-4) : c}</div>
       <div class="firm-info">
         <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${esc(String(d.prijato_od || '—'))}</div>
         <div class="firm-card-sub" title="${sub}">${sub}</div>
@@ -3376,16 +3370,6 @@ function evidenceBarva(f) {
   return /^#[0-9a-fA-F]{3,8}$/.test(b) ? b : '';
 }
 
-function evidenceFirmaDot() {
-  const dot = document.getElementById('evidence_firma_dot');
-  const sel = document.getElementById('evidence_firma');
-  if (!dot || !sel) return;
-  const f = _evidenceMeta && _evidenceMeta.firmy.find(x => String(x.id) === sel.value);
-  const barva = f ? evidenceBarva(f) : '';
-  dot.style.background = barva;
-  dot.classList.toggle('on', !!barva);
-}
-
 async function loadEvidenceMeta() {
   if (_evidenceMeta) return _evidenceMeta;
   try {
@@ -3414,9 +3398,10 @@ async function prepareEvidence() {
       const o = document.createElement('option');
       o.value = f.id; o.textContent = f.nazev + (f.ico ? ` (${f.ico})` : '');
       const barva = evidenceBarva(f);
-      if (barva) { o.style.color = barva; o.style.fontWeight = '600'; }
+      if (barva) o.dataset.color = barva;
       firmaSel.appendChild(o);
     });
+    if (window.FirmaPick) FirmaPick.attach(firmaSel);
     meta.typy.forEach(t => {
       const o = document.createElement('option');
       o.value = t.kod; o.textContent = t.kod;
@@ -3488,7 +3473,7 @@ function elZkontroluj() {
 
 function evidencePriceUpdate() {
   if (!_evidenceMeta) return;
-  evidenceFirmaDot();
+  if (window.FirmaPick) FirmaPick.sync(document.getElementById('evidence_firma'));
   const fid = v('evidence_firma');
   const typ = v('evidence_typ');
   const cena = document.getElementById('evidence_cena');
@@ -3508,6 +3493,7 @@ function toggleEvidence() {
   ['evidence_firma', 'evidence_typ', 'evidence_cena', 'evidence_zaplaceno'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = !on;
   });
+  if (window.FirmaPick) FirmaPick.sync(document.getElementById('evidence_firma'));
 }
 
 // ── Generate PDFs ─────────────────────────────────────────────────────────────
@@ -3570,7 +3556,6 @@ async function generatePDFs() {
     ppd_prijato_ico:     v('ppd_prijato_ico'),
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
     ppd_extra_spz:       ppdExtraSpzList().join(', '),
-    ppd_platba:          ppdPlatba(),
     profil:              (window.getProfil ? window.getProfil() : ''),
     // Evidence úkonu (evidence.spznaklic.cz) — stable id + the explicit choice.
     zadost_id:           '',            // filled in below from the identity fields
@@ -4451,6 +4436,7 @@ setTimeout(() => { const c = document.querySelector('.mode-card.selected'); if (
 // the camera straight away — previously it only opened on Back-navigation.
 tryAutoOpenCamera();
 </script>
+<script src="/static/firma_pick.js?v={{ APP_VERSION }}"></script>
 <script src="/static/klavesnice.js?v={{ APP_VERSION }}"></script>
 <script>
 // ── Kdo vyplňuje (profil) ─────────────────────────────────────────────────────

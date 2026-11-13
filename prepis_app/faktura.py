@@ -1,7 +1,8 @@
 """Faktura (invoice, bank transfer) — own number series + storage + settings.
 
-Numbers are YYYYNNNN (e.g. 20260001): numeric, <= 10 digits, so the number is
-the variable symbol. Separate from the PPD series. Mirrors ppd.py: one lock
+Numbers are YYYYKKKK (8 digits, numeric, so the number is the variable symbol).
+KKKK is NOT a running counter: see kod_z_poradi / poradi, so the number does not
+reveal how many fakturas were issued. Separate from the PPD series. Mirrors ppd.py: one lock
 covers allocation + ledger row + append-only backup row, and the high-water
 mark is taken over ledger AND backup so a number is never reused.
 PDF drawing lives in faktura_pdf.py, the QR string in spayd.py.
@@ -83,6 +84,38 @@ def number_prefix(year: int) -> int:
     return year * 10000
 
 
+# Number scrambling. The internal sequence s = 1, 2, 3 ... (per year, counted
+# from the ledger) is mapped through a fixed bijection onto the codes 1000..9999:
+#     kod = 1000 + (s * CISLO_A + CISLO_B) % 9000
+# CISLO_A is coprime to 9000 (= 2^3 * 3^2 * 5^3), so the map is one-to-one on
+# any 9000 consecutive values of s. The number is YYYY * 10000 + kod.
+# poradi(cislo) inverts it (modular inverse of CISLO_A) to recover s, i.e. the
+# real internal order. Changing A or B would change numbers already issued.
+CISLO_A = 7393
+CISLO_B = 2718
+_MOD = 9000
+_A_INV = pow(CISLO_A, -1, _MOD)
+
+
+def kod_z_poradi(s: int) -> int:
+    """Internal sequence s -> 4-digit code 1000..9999."""
+    return 1000 + (s * CISLO_A + CISLO_B) % _MOD
+
+
+def cislo_z_poradi(year: int, s: int) -> int:
+    return number_prefix(year) + kod_z_poradi(s)
+
+
+def poradi(cislo: int) -> int:
+    """Faktura number -> internal sequence s (1..9000, or its residue 0..8999
+    when s wrapped; s = 9000 maps to 0 and is reported as 9000)."""
+    kod = int(cislo) % 10000
+    if not 1000 <= kod <= 9999:
+        raise ValueError(f"Neplatné číslo faktury: {cislo}")
+    s = ((kod - 1000 - CISLO_B) * _A_INV) % _MOD
+    return s or _MOD
+
+
 def _in_year(value, year: int) -> int:
     """The value as int when it belongs to `year`'s series, else 0."""
     try:
@@ -92,8 +125,18 @@ def _in_year(value, year: int) -> int:
     return v if number_prefix(year) < v <= number_prefix(year) + 9999 else 0
 
 
-def _max_in_year(ws, year: int) -> int:
-    return max([_in_year(r[0], year) for r in ws.iter_rows(min_row=2, values_only=True) if r] or [0])
+def _used_in_year(ws, year: int) -> set:
+    return {v for v in (_in_year(r[0], year) for r in ws.iter_rows(min_row=2, values_only=True) if r) if v}
+
+
+def _next_number(used: set, year: int) -> int:
+    """First number of the scrambled series not yet in `used` (ledger + backup).
+    Old-scheme numbers such as 20260001..3 are simply skipped."""
+    for s in range(1, _MOD + 1):
+        n = cislo_z_poradi(year, s)
+        if n not in used:
+            return n
+    raise RuntimeError(f"Řada faktur pro rok {year} je vyčerpána.")
 
 
 def _open(path: str, title: str, header: list):
@@ -124,7 +167,7 @@ def issue_faktura(data_dir: str, rec: dict, today: date | None = None) -> int:
         wb, ws = _open(ledger, "Faktury", _HEADER)
         wbb, wsb = _open(backup, "Záloha", _BACKUP_HEADER)
         year = today.year
-        number = max(_max_in_year(ws, year), _max_in_year(wsb, year), number_prefix(year)) + 1
+        number = _next_number(_used_in_year(ws, year) | _used_in_year(wsb, year), year)
         vozidla = ", ".join(rec.get("vozidla") or [])
         issued, due = fmt_date(today), fmt_date(due_date(today))
         ws.append([number, issued, due, rec.get("payer", ""), rec.get("amount", ""),
@@ -160,7 +203,7 @@ def _read(path: str, keys: list) -> list:
                 rows.append(row)
     finally:
         wb.close()
-    rows.sort(key=lambda x: x["cislo"] if isinstance(x["cislo"], int) else 0, reverse=True)
+    rows.reverse()   # řádky jdou do souboru v pořadí vystavení; čísla už nerostou, třídit podle nich nejde
     return rows
 
 

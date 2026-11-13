@@ -1,0 +1,46 @@
+{# Demo for release 1.34.0 (Doklad je teď vždy faktura s QR kódem): a miniature
+   doklad whose "Doklad" header turns into "Faktura" while a QR code fades in.
+   CSS-only, 4s loop; app tokens only. #}
+<style>
+  .dz1340-demo {
+    box-sizing: border-box; height: 140px; padding: 14px; margin-bottom: 16px; border-radius: 12px;
+    background: var(--wn-bg); overflow: hidden; display: grid; place-items: center;
+    font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1340-paper {
+    display: grid; grid-template-columns: 1fr 52px; gap: 12px; align-items: center;
+    width: 220px; padding: 12px; border-radius: 8px; background: var(--wn-card);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+  }
+  .dz1340-head { position: relative; height: 14px; font-weight: 800; }
+  .dz1340-head span { position: absolute; left: 0; top: 0; }
+  .dz1340-head .a { animation: dz1340-a 4s ease-in-out infinite; color: var(--wn-muted); }
+  .dz1340-head .b { animation: dz1340-b 4s ease-in-out infinite; }
+  .dz1340-line { height: 5px; margin-top: 7px; border-radius: 3px; background: var(--wn-line); }
+  .dz1340-line:nth-of-type(2) { width: 85%; }
+  .dz1340-line:nth-of-type(3) { width: 60%; }
+  .dz1340-qr {
+    width: 52px; height: 52px; border-radius: 4px; animation: dz1340-b 4s ease-in-out infinite;
+    background:
+      conic-gradient(from 90deg at 3px 3px, transparent 90deg, currentColor 0) 0 0 / 8px 8px,
+      var(--wn-card);
+    border: 2px solid currentColor;
+  }
+  @keyframes dz1340-a { 0%, 30% { opacity: 1; } 45%, 90% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes dz1340-b { 0%, 30% { opacity: 0; } 45%, 90% { opacity: 1; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    /* End state: Faktura with QR. */
+    .dz1340-demo * { animation: none !important; }
+    .dz1340-head .a { opacity: 0; }
+    .dz1340-head .b, .dz1340-qr { opacity: 1; }
+  }
+</style>
+<div class="dz1340-demo" aria-hidden="true">
+  <div class="dz1340-paper">
+    <div>
+      <div class="dz1340-head"><span class="a">Doklad</span><span class="b">Faktura</span></div>
+      <div class="dz1340-line"></div><div class="dz1340-line"></div><div class="dz1340-line"></div>
+    </div>
+    <div class="dz1340-qr"></div>
+  </div>
+</div>

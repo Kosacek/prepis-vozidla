@@ -34,8 +34,10 @@
     const pole = koren.matches && koren.matches(TEXTOVA) ? [koren] : [];
     pole.concat([...koren.querySelectorAll(TEXTOVA)]).forEach(el => {
       if (el.hasAttribute('data-navrhy')) {
-        if (el.getAttribute('autocomplete') === 'off') el.removeAttribute('autocomplete');
-        if (el.id) el.setAttribute('list', 'navrhy-' + el.id);
+        // Návrhy dělá appka sama (box přímo pod polem, viz níže); nativní
+        // <datalist> se nepoužívá: vyskakoval nad polem a nešel umístit.
+        if (el.getAttribute('autocomplete') !== 'off') el.setAttribute('autocomplete', 'off');
+        el.removeAttribute('list');
         return;
       }
       if (el.getAttribute('autocomplete') !== 'off') el.setAttribute('autocomplete', 'off');
@@ -110,6 +112,121 @@
   new MutationObserver(zmeny => zmeny.forEach(z => z.addedNodes.forEach(n => {
     if (n.nodeType === 1) bezNavrhuChrome(n);
   }))).observe(document.body, { childList: true, subtree: true });
+
+  // ── Návrhy přímo pod polem ─────────────────────────────────────────────────
+  // Jedna sdílená plovoucí nabídka (position: fixed) pro všechna pole
+  // s data-navrhy. Otevře se POD polem, zarovnaná na jeho šířku; když dole
+  // není místo, nad ním — pole nikdy nepřekryje. ↓↑ listují, Enter vezme
+  // vybraný návrh (bez výběru Enter dělá svoje: další krok), Esc zavře.
+  const NAVRHU_V_NABIDCE = 8;
+  const nabidka = { el: null, pole: null, polozky: [], aktivni: -1 };
+  function navrhyProPole(el) {
+    const seznam = document.getElementById('navrhy-' + el.id);
+    const texty = seznam && seznam.children ? [...seznam.children].map(o => o.value) : [];
+    const psano = String(el.value || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    return texty.filter(t => t !== psano && (!psano || t.toUpperCase().includes(psano)))
+      .slice(0, NAVRHU_V_NABIDCE);
+  }
+  function umistiNabidku() {
+    const { el, pole } = nabidka;
+    if (!el || el.hidden || !pole || !pole.getBoundingClientRect) return;
+    const r = pole.getBoundingClientRect();
+    const vyska = el.offsetHeight || 0;
+    const dole = window.innerHeight - r.bottom;
+    const nahoru = vyska + 8 > dole && r.top > dole;
+    el.style.left = r.left + 'px';
+    el.style.width = r.width + 'px';
+    el.style.top = nahoru ? Math.max(4, r.top - vyska - 4) + 'px' : (r.bottom + 4) + 'px';
+    el.dataset.smer = nahoru ? 'nahoru' : 'dolu';
+  }
+  function zavriNabidku() {
+    if (nabidka.el) nabidka.el.hidden = true;
+    nabidka.pole = null; nabidka.polozky = []; nabidka.aktivni = -1;
+  }
+  function oznacAktivni(i) {
+    nabidka.aktivni = i;
+    nabidka.polozky.forEach((o, j) => o.classList.toggle('on', j === i));
+    const o = nabidka.polozky[i];
+    if (o && o.scrollIntoView) o.scrollIntoView({ block: 'nearest' });
+  }
+  function vezmiNavrh(text) {
+    const pole = nabidka.pole;
+    zavriNabidku();
+    if (!pole) return;
+    pole.value = text;
+    pole.dispatchEvent(new Event('input', { bubbles: true }));
+    pole.focus();
+    zavriNabidku();
+  }
+  function ukazNabidku(pole) {
+    if (!pole || !pole.hasAttribute || !pole.hasAttribute('data-navrhy')) return zavriNabidku();
+    const texty = navrhyProPole(pole);
+    if (!texty.length) return zavriNabidku();
+    if (!nabidka.el) {
+      const el = document.createElement('div');
+      el.id = 'navrhy-nabidka';
+      el.setAttribute('role', 'listbox');
+      // mousedown by pole zbavil fokusu dřív, než proběhne click
+      el.addEventListener('mousedown', e => e.preventDefault());
+      el.addEventListener('click', e => {
+        const o = e.target.closest && e.target.closest('[data-text]');
+        if (o) vezmiNavrh(o.dataset.text);
+      });
+      document.body.appendChild(el);
+      nabidka.el = el;
+    }
+    nabidka.pole = pole;
+    nabidka.el.replaceChildren(...texty.map(t => {
+      const o = document.createElement('div');
+      o.className = 'navrh-polozka';
+      o.setAttribute('role', 'option');
+      o.dataset.text = t;
+      o.textContent = t;
+      return o;
+    }));
+    nabidka.polozky = [...nabidka.el.children];
+    nabidka.aktivni = -1;
+    nabidka.el.hidden = false;
+    umistiNabidku();
+  }
+  try {
+    const styl = document.createElement('style');
+    styl.textContent = '#navrhy-nabidka{position:fixed;z-index:200;box-sizing:border-box;max-height:260px;'
+      + 'overflow-y:auto;background:#fff;border:1.5px solid var(--border,#dde1e7);border-radius:8px;'
+      + 'box-shadow:0 12px 34px rgba(0,0,0,.14);padding:4px 0}'
+      + '#navrhy-nabidka[hidden]{display:none}'
+      + '#navrhy-nabidka .navrh-polozka{padding:9px 14px;font-size:15px;cursor:pointer;color:var(--text,#1a1d23)}'
+      + '#navrhy-nabidka .navrh-polozka:hover,#navrhy-nabidka .navrh-polozka.on{background:var(--card,#f0f2f5)}';
+    document.head.appendChild(styl);
+    document.addEventListener('focusin', e => {
+      if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-navrhy')) ukazNabidku(e.target);
+      else if (!(nabidka.el && nabidka.el.contains(e.target))) zavriNabidku();
+    });
+    document.addEventListener('input', e => {
+      if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-navrhy')) ukazNabidku(e.target);
+    });
+    document.addEventListener('keydown', e => {
+      if (!nabidka.pole || !nabidka.el || nabidka.el.hidden || e.target !== nabidka.pole) return;
+      const n = nabidka.polozky.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); e.stopPropagation();
+        const d = e.key === 'ArrowDown' ? 1 : -1;
+        oznacAktivni(nabidka.aktivni < 0 ? (d > 0 ? 0 : n - 1) : (nabidka.aktivni + d + n) % n);
+      } else if (e.key === 'Enter' && nabidka.aktivni >= 0) {
+        e.preventDefault(); e.stopPropagation();
+        vezmiNavrh(nabidka.polozky[nabidka.aktivni].dataset.text);
+      } else if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation(); zavriNabidku();
+      } else if (e.key === 'Tab') {
+        zavriNabidku();
+      }
+    }, true);
+    document.addEventListener('mousedown', e => {
+      if (nabidka.el && !nabidka.el.hidden && !nabidka.el.contains(e.target) && e.target !== nabidka.pole) zavriNabidku();
+    });
+    window.addEventListener('resize', zavriNabidku);
+    window.addEventListener('scroll', umistiNabidku, true);
+  } catch (_) { /* návrhy jsou pohodlí; v testovacím DOMu bez stylů se přeskočí */ }
 
   // ── Záznam kamery na server ────────────────────────────────────────────────
   // Kamera po pár žádostech zamrzala a na dálku se to nedalo dohledat.
@@ -300,7 +417,6 @@
   const TAHAK = [
     ['Typ úkonu', [['1', '–', '6'], 'vybrat typ'], [['Enter'], 'vyfotit ORV a dál'], [['Shift', '+', 'Enter'], 'dál bez skenu']],
     ['Vyplňování', [['Enter'], 'vzít návrh / další krok'], [['↓', '↑'], 'jiný návrh'], [['Esc'], 'zpět']],
-    ['Doklad', [['←', '→'], 'hotově / převodem']],
     ['Tisk', [['Ctrl', '+', 'Enter'], 'vygenerovat a otevřít vše'], [['Ctrl', '+', 'P'], 'tisk'], [['Ctrl', '+', 'W'], 'další dokument']],
     ['Hotovo', [['Enter'], 'nová žádost']],
   ];

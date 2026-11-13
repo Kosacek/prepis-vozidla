@@ -27,6 +27,12 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.34.0", date(2026, 11, 13), "Doklad je teď vždy faktura s QR kódem",
+            ("Zákazník zaplatí převodem nebo QR kódem a úkon se v evidenci sám "
+             "označí jako zaplacený.",
+             "Firmu v evidenci vybíráš s barevnou tečkou a návrhy poznámek "
+             "naskočí přímo pod polem."),
+            demo="v1_34_0"),
     Release("1.33.0", date(2026, 11, 13), "Doklad převodem i z žádosti",
             ("U dokladu přepneš Hotově / Převodem, šipkami i z klávesnice.",
              "Převodem se vystaví faktura s QR platbou a jde rovnou do evidence."),

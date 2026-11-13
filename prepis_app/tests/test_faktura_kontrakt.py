@@ -1,5 +1,6 @@
 """Kontrakt žádosti ↔ evidence pro fakturu: moznosti, 409, ppd-list, sdílení."""
 import os
+from datetime import date
 
 import pytest
 
@@ -71,12 +72,13 @@ def test_faktura_nedostupna_409_a_cislo_se_nepohne(api, monkeypatch):
     # po zapnutí IBAN je první číslo řady první, žádné spálené číslo
     monkeypatch.setenv("FAKTURA_IBAN", IBAN)
     cislo = _vystav(api, rid="r2", druh="faktura").get_json()["cislo"]
-    assert cislo % 10000 == 1
+    assert cislo == faktura.cislo_z_poradi(date.today().year, 1)
 
 
-def test_bez_druhu_je_porad_ppd_i_bez_iban(api, monkeypatch):
+def test_bez_druhu_je_faktura_a_bez_iban_409_explicitni_ppd_jde(api, monkeypatch):
     monkeypatch.setenv("FAKTURA_IBAN", "")
-    r = _vystav(api)
+    assert _vystav(api).status_code == 409                 # výchozí = faktura
+    r = _vystav(api, rid="p", druh="ppd")
     assert r.status_code == 201 and r.get_json()["druh"] == "ppd"
     assert "splatnost" not in r.get_json()
 
@@ -92,7 +94,7 @@ def test_uspech_faktury_ma_cislo_splatnost_amount(api):
 
 # 3. ppd-list
 def test_ppd_list_ma_druh_a_splatnost(api):
-    ppd_cislo = _vystav(api, rid="a").get_json()["cislo"]
+    ppd_cislo = _vystav(api, rid="a", druh="ppd").get_json()["cislo"]
     fa = _vystav(api, rid="b", druh="faktura").get_json()
     with api.session_transaction() as s:
         s["authed"] = True

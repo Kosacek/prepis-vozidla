@@ -23,7 +23,7 @@ def _barva(firma) -> str:
         pytest.skip("node not installed")
     h = _html()
     start = h.index("function evidenceBarva")
-    end = h.index("function evidenceFirmaDot", start)
+    end = h.index("async function loadEvidenceMeta", start)
     js = h[start:end] + f"\nprocess.stdout.write(JSON.stringify(evidenceBarva({json.dumps(firma)})));"
     out = subprocess.run([node, "-e", js], capture_output=True, text=True, check=True).stdout
     return json.loads(out)
@@ -43,8 +43,7 @@ def test_bez_platne_barvy_zadna_barva(firma):
 
 def test_picker_pouziva_barvu_a_zustava_nativni_select():
     h = _html()
-    assert 'id="evidence_firma_dot"' in h
-    assert "o.style.color = barva" in h
+    assert "o.dataset.color = barva" in h              # tečku kreslí firma_pick.js z data-color
     assert '<select id="evidence_firma"' in h   # klávesnice (klavesnice.js) počítá s selectem
 
 

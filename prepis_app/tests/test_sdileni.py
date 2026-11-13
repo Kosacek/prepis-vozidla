@@ -230,8 +230,9 @@ def _plna_moc(tmp_dir, ico):
 
 
 def _generuj_balik(prod, tmp_path, monkeypatch):
-    """Žádost + plná moc kupujícího + pokladní doklad = tři dokumenty."""
+    """Žádost + plná moc kupujícího + faktura = tři dokumenty."""
     monkeypatch.setattr(A, "PLNE_MOCE_DIR", os.path.join(str(tmp_path), "plne_moce"))
+    monkeypatch.setenv("FAKTURA_IBAN", "CZ6508000000192000145399")
     _plna_moc(str(tmp_path), "27082440")
     prod.post("/login", data={"password": "heslo-jen-pro-test"},
               base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
@@ -248,7 +249,7 @@ def test_balik_nese_zadost_plnou_moc_i_doklad(prod, tmp_path, monkeypatch):
     polozky = sdileni.najdi(str(tmp_path), body["sdilet"].lstrip("/"))
     popisy = " | ".join(p["popis"] for p in polozky)
     assert len(polozky) == 3, popisy
-    assert "Žádost" in popisy and "Plná moc" in popisy and "doklad" in popisy
+    assert "Žádost" in popisy and "Plná moc" in popisy and "Faktura" in popisy
 
 
 def test_vic_dokumentu_ukaze_rozcestnik_ne_rovnou_pdf(prod, tmp_path, monkeypatch):

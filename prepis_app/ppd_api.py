@@ -55,7 +55,7 @@ MAX_REQUEST_ID = 100
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]+$")
 _VIN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 STRANY = ("provozovatel", "vlastnik")
-DRUHY = ("ppd", "faktura")        # druh dokladu; chybějící = ppd (zpětná kompatibilita)
+DRUHY = ("ppd", "faktura")        # druh dokladu; chybějící = faktura, "ppd" jen výslovně
 
 VYSTAVENE = "ppd_api_vystavene.jsonl"   # request_id → doklad (idempotence + audit)
 _ZAMEK = "ppd_api.lock"
@@ -136,7 +136,7 @@ def over(telo) -> dict:
     strana = _text(telo, "strana", max_delka=20).lower()
     if strana and strana not in STRANY:
         raise Chyba("strana smí být jen " + " nebo ".join(STRANY) + ".")
-    druh = _text(telo, "druh", max_delka=20).lower() or "ppd"
+    druh = _text(telo, "druh", max_delka=20).lower() or "faktura"
     if druh not in DRUHY:
         raise Chyba("druh smí být jen " + " nebo ".join(DRUHY) + ".")
     return {

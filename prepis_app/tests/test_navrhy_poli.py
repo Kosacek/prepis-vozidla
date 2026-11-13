@@ -117,8 +117,9 @@ console.log(JSON.stringify({
 def test_chrome_zustava_zapnuty_jen_u_poznamek():
     r = _stranka([["poznamky", {"data-navrhy": "", "autocomplete": "off"}, ""],
                   ["novy_jmeno", {}, ""]])
-    assert "autocomplete" not in r["pole"]["poznamky"]
-    assert r["pole"]["poznamky"]["list"] == "navrhy-poznamky"
+    # nativní datalist pryč: návrhy kreslí appka sama pod polem
+    assert r["pole"]["poznamky"]["autocomplete"] == "off"
+    assert "list" not in r["pole"]["poznamky"]
     assert r["pole"]["novy_jmeno"]["autocomplete"] == "off"
     assert "list" not in r["pole"]["novy_jmeno"]
 
@@ -157,7 +158,7 @@ def test_bez_uloziste_stranka_nespadne():
     r = _stranka([["poznamky", {"data-navrhy": ""}, "KOLA"]],
                  akce="window.zapamatujNavrhy();", rozbite=True)
     assert r["seznamy"]["navrhy-poznamky"] == []
-    assert r["pole"]["poznamky"]["list"] == "navrhy-poznamky"
+    assert "list" not in r["pole"]["poznamky"]
 
 
 def test_poskozena_historie_nerozbije_stranku():
@@ -178,3 +179,71 @@ def test_uklada_se_to_co_odeslo_ne_schovane_pole():
                  akce="window.zapamatujNavrhy({zadost_zmena: '', poznamky: 'KOLA'});")
     assert "zadost_zmena" not in (r["ulozeno"] or {})
     assert r["ulozeno"]["poznamky"]["KOLA"][0] == 1
+
+
+# ── Návrhy přímo pod polem (1.34.0) ──────────────────────────────────────────
+BOX = r"""
+const hand = {};
+const mk = (tag) => { const el = { tagName: tag, children: [], style: {}, dataset: {}, attrs: {}, hidden: false, h: {},
+  className: '', offsetHeight: 120, classList: { toggle() {} },
+  setAttribute(k, v) { this.attrs[k] = v; }, addEventListener(t, f) { this.h[t] = f; },
+  replaceChildren(...d) { this.children = d; }, contains(n) { return n === this || this.children.includes(n); },
+  appendChild(c) { this.children.push(c); return c; } }; return el; };
+const pole = Object.assign(mk('INPUT'), { id: 'evidence_poznamka', value: '', matches: () => true,
+  hasAttribute: n => n === 'data-navrhy', getAttribute: () => null, setAttribute() {}, removeAttribute() {},
+  getBoundingClientRect: () => (RECT), dispatchEvent() {}, focus() {} });
+const seznam = Object.assign(mk('datalist'), { id: 'navrhy-evidence_poznamka' });
+const vBody = { 'navrhy-evidence_poznamka': seznam };
+const HIST = JSON.stringify({ evidence_poznamka: { 'ZÁPIS A50-X': [1, 1], 'KOLA': [3, 2], 'ŽÁDÁM O EL RZ': [1, 3] } });
+globalThis.localStorage = { getItem: () => HIST, setItem() {} };
+globalThis.document = { head: mk('head'), body: { dataset: {}, appendChild: el => { vBody[el.id] = el; } },
+  querySelectorAll: s => s === 'input[data-navrhy]' ? [pole] : [], querySelector: () => ({ cloneNode: () => ({}) }),
+  getElementById: id => vBody[id] || null, createElement: mk,
+  addEventListener(t, f) { (hand[t] = hand[t] || []).push(f); } };
+const fire = (t, e) => (hand[t] || []).forEach(f => f(e));
+globalThis.window = { innerHeight: 800, addEventListener() {}, crypto: {} };
+globalThis.performance = { now: () => 0 }; globalThis.MutationObserver = class { observe() {} };
+globalThis.setInterval = () => 0; globalThis.Event = class { constructor(t) { this.type = t; } };
+const currentPanel = () => 1; let cameraStream = null, appMode = 'prevod';
+"""
+
+
+def _box(rect, akce):
+    script = BOX.replace("RECT", json.dumps(rect)) + KLAVESNICE.read_text(encoding="utf-8") + "\n" + akce
+    return _node(script)
+
+
+def test_navrhy_se_otevrou_primo_pod_polem_a_nepokryji_ho():
+    r = _box({"top": 300, "bottom": 340, "left": 50, "width": 400},
+             "pole.value = 'k'; fire('input', { target: pole });\n"
+             "const b = vBody['navrhy-nabidka'];\n"
+             "console.log(JSON.stringify({ top: b.style.top, left: b.style.left, width: b.style.width,"
+             " smer: b.dataset.smer, texty: b.children.map(c => c.dataset.text), skryta: b.hidden }));")
+    assert r["smer"] == "dolu" and r["top"] == "344px"          # těsně pod polem (bottom + 4)
+    assert r["left"] == "50px" and r["width"] == "400px"        # zarovnané na pole
+    assert r["texty"] == ["KOLA"] and r["skryta"] is False       # filtr podle napsaného
+
+
+def test_bez_mista_dole_se_otevrou_nad_polem_zarovnane():
+    r = _box({"top": 700, "bottom": 740, "left": 50, "width": 400},
+             "fire('focusin', { target: pole });\n"
+             "const b = vBody['navrhy-nabidka'];\n"
+             "console.log(JSON.stringify({ top: b.style.top, smer: b.dataset.smer }));")
+    assert r["smer"] == "nahoru" and r["top"] == "576px"          # 700 - 120 - 4: končí nad polem
+
+
+def test_klavesnice_sipky_enter_vezme_navrh_esc_zavre_a_prazdny_enter_neblokuje():
+    r = _box({"top": 300, "bottom": 340, "left": 0, "width": 300},
+             "fire('focusin', { target: pole });\n"
+             "const ev = (key) => { const e = { key, target: pole, prevented: false, stopped: false,"
+             " preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }; fire('keydown', e); return e; };\n"
+             "const hned = ev('Enter');\n"                        # nic nevybráno -> Enter jde dál průvodci
+             "ev('ArrowDown'); ev('ArrowDown');\n"
+             "const vyber = ev('Enter');\n"
+             "const b = vBody['navrhy-nabidka'];\n"
+             "const hodnota = pole.value; pole.value = ''; fire('focusin', { target: pole }); const esc = ev('Escape');\n"
+             "console.log(JSON.stringify({ hned: [hned.prevented, hned.stopped], vyber: [vyber.prevented, vyber.stopped],"
+             " hodnota, esc: [esc.stopped, b.hidden] }));")
+    assert r["hned"] == [False, False]
+    assert r["vyber"] == [True, True] and r["hodnota"] == "ŽÁDÁM O EL RZ"
+    assert r["esc"] == [True, True]

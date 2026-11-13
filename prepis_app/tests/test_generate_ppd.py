@@ -1,4 +1,5 @@
-"""Integration: PPD is generated alongside the žádost via /api/generate.
+"""Integration: doklad (od 1.34.0 vždy faktura) vzniká se žádostí přes /api/generate;
+staré PPD (zobrazení, tisk, smazání, obnova) dál fungují — ty se tu zakládají přímo.
 
 DATA_DIR is monkeypatched to a tmp dir so the test never touches the real
 NAS evidence ledger / counter.
@@ -10,10 +11,51 @@ import threading
 import pytest
 
 import app as appmod
+import faktura
+import ppd
 import ppd_push
 import tracker_push
 
 _real_ppd_push_async = ppd_push.push_async
+IBAN = "CZ6508000000192000145399"
+
+
+@pytest.fixture(autouse=True)
+def faktura_iban(monkeypatch):
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+
+
+def _stary_ppd(tmp_path, payload=None):
+    """Založí PPD jako dřív formulář (dnes už se z formuláře nevystavuje, ale staré
+    doklady se dál musí zobrazit, vytisknout, smazat a obnovit)."""
+    d = dict(payload or {})
+    spz = ", ".join(x for x in [d.get("registracni_znacka", "1AB2345")]
+                    + [e.strip() for e in (d.get("ppd_extra_spz") or "").split(",")] if x)
+    payer = (d.get("ppd_prijato_od") or "PETR KUPUJÍCÍ").upper()
+    ico = d.get("ppd_prijato_ico", "")
+    dnes = "13.11.2026"
+    n = ppd.reserve_ppd_number_and_log(str(tmp_path), {
+        "date": dnes, "payer": payer, "payer_ico": ico, "amount": 1300,
+        "purpose": "Zastupování na MMB", "vehicle": spz})
+    ppd.append_backup(str(tmp_path), {
+        "cislo": n, "ts": "2026-11-13T10:00:00", "date": dnes, "payer": payer, "payer_ico": ico,
+        "payer_address": "", "amount": 1300, "purpose": "Zastupování na MMB", "spz": spz, "vin": ""})
+    out = tmp_path / "output"
+    out.mkdir(exist_ok=True)
+    (out / f"ppd_{n}.pdf").write_bytes(ppd.build_ppd_pdf({
+        "number": n, "date": dnes, "payer": payer, "payer_ico": ico, "payer_address": "",
+        "spz": spz, "vin": "", "amount": 1300, "purpose": "Zastupování na MMB"}))
+    rec = ppd_push.build_record({"cislo": n, "date": dnes, "payer": payer, "payer_ico": ico,
+                                 "amount": 1300, "purpose": "Zastupování na MMB", "vehicle": spz},
+                                zadost_id="seed")
+    ppd_push.push_async(rec, str(tmp_path))
+    return {"ppd": f"/download/ppd_{n}.pdf", "ppd_print": f"/ppd-print/{n}"}
+
+
+def _pdf_text(data: bytes) -> str:
+    import io as _io
+    from pypdf import PdfReader
+    return "\n".join(p.extract_text() for p in PdfReader(_io.BytesIO(data)).pages)
 
 
 @pytest.fixture(autouse=True)
@@ -40,17 +82,18 @@ def _payload(**over):
     return base
 
 
-def test_generate_includes_ppd(client, tmp_path, monkeypatch):
+def test_generate_includes_faktura(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     r = client.post("/api/generate", json=_payload())
     assert r.status_code == 200
     data = r.get_json()
     assert data["success"] is True
-    assert data["ppd"].startswith("/download/ppd_")
-    # file written + evidence row created under the tmp DATA_DIR
+    assert data["ppd"].startswith("/download/faktura_") and data["doklad_druh"] == "faktura"
+    # file written + faktura ledger row created under the tmp DATA_DIR
     fname = data["ppd"].split("/")[-1]
     assert os.path.exists(os.path.join(str(tmp_path), "output", fname))
-    assert os.path.exists(os.path.join(str(tmp_path), "ppd_evidence.xlsx"))
+    assert os.path.exists(os.path.join(str(tmp_path), "faktura_evidence.xlsx"))
+    assert not os.path.exists(os.path.join(str(tmp_path), "ppd_evidence.xlsx"))
 
 
 def test_generate_pushes_to_evidence_by_default(client, tmp_path, monkeypatch):
@@ -119,7 +162,7 @@ def test_generate_returns_receipt_when_evidence_http_raises(client, tmp_path, mo
     assert finished.wait(2)  # keep the mock active until the background thread ends
     assert response.status_code == 200
     assert response.get_json()["success"] is True
-    assert response.get_json()["ppd"].startswith("/download/ppd_")
+    assert response.get_json()["ppd"].startswith("/download/faktura_")
     queued = json.loads((tmp_path / "failed_ppd_pushes.jsonl").read_text(encoding="utf-8"))
     assert queued["record"] == sent[0]
     assert queued["reason"] == "evidence unavailable"
@@ -138,7 +181,7 @@ def test_generate_returns_receipt_when_push_hook_raises(client, tmp_path, monkey
 
 def test_delete_and_restore_push_status_from_backup(client, tmp_path, monkeypatch, evidence_pushes):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
-    generated = client.post("/api/generate", json=_payload(ppd_prijato_ico="01234567")).get_json()
+    generated = _stary_ppd(tmp_path, _payload(ppd_prijato_ico="01234567"))
     number = int(generated["ppd_print"].rsplit("/", 1)[1])
     issued = evidence_pushes["ppd"].pop()[0]
     deleted = client.delete(f"/api/ppd/{number}")
@@ -171,7 +214,7 @@ def test_delete_skips_push_without_backup(client, tmp_path, monkeypatch, evidenc
 
 def test_delete_and_restore_complete_when_push_raises(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
-    generated = client.post("/api/generate", json=_payload()).get_json()
+    generated = _stary_ppd(tmp_path, _payload())
     number = int(generated["ppd_print"].rsplit("/", 1)[1])
     def fail(*args, **kwargs):
         raise RuntimeError("push failed")
@@ -189,17 +232,15 @@ def test_ppd_payer_is_uppercased(client, tmp_path, monkeypatch):
     r = client.post("/api/generate", json=_payload(
         ppd_prijato_od="autodoprava novák s.r.o.", ppd_prijato_adresa="hlavní 5, brno"))
     assert r.get_json()["success"] is True
-    import ppd as ppdmod
-    log = ppdmod.read_ppd_log(str(tmp_path))
-    assert log[0]["prijato_od"] == "AUTODOPRAVA NOVÁK S.R.O."
+    log = faktura.read_faktura_log(str(tmp_path))
+    assert log[0]["odberatel"] == "AUTODOPRAVA NOVÁK S.R.O."
 
 
 def test_ppd_print_page_is_a5(client, tmp_path, monkeypatch):
     """The generate response links an HTML print page whose @page rule pre-sets
     A5 paper in the browser's print dialog (the žádosti stay A4 PDFs)."""
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
-    r = client.post("/api/generate", json=_payload())
-    data = r.get_json()
+    data = _stary_ppd(tmp_path, _payload())
     assert data["ppd_print"].startswith("/ppd-print/")
     page = client.get(data["ppd_print"])
     assert page.status_code == 200
@@ -242,11 +283,7 @@ def test_ppd_joins_extra_spz_from_the_expander(client, tmp_path, monkeypatch):
     r = client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789, 3EF1234"))
     assert r.get_json()["success"] is True
 
-    import openpyxl
-    import ppd as ppdmod
-    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
-    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
-    assert row[5] == "1AB2345, 2CD6789, 3EF1234"   # Vozidlo column
+    assert faktura.read_faktura_log(str(tmp_path))[0]["vozidlo"] == "1AB2345, 2CD6789, 3EF1234"
 
 
 def test_ppd_ignores_blank_extra_entries(client, tmp_path, monkeypatch):
@@ -255,22 +292,14 @@ def test_ppd_ignores_blank_extra_entries(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     r = client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789, , "))
     assert r.get_json()["success"] is True
-    import openpyxl
-    import ppd as ppdmod
-    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
-    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
-    assert row[5] == "1AB2345, 2CD6789"
+    assert faktura.read_faktura_log(str(tmp_path))[0]["vozidlo"] == "1AB2345, 2CD6789"
 
 
 def test_ppd_works_with_no_extra_spz(client, tmp_path, monkeypatch):
     """Default case (no expander touched) must be unchanged: just the one plate."""
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     r = client.post("/api/generate", json=_payload())
-    import openpyxl
-    import ppd as ppdmod
-    ws = openpyxl.load_workbook(ppdmod._evidence_path(str(tmp_path))).active
-    row = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] is not None][0]
-    assert row[5] == "1AB2345"
+    assert faktura.read_faktura_log(str(tmp_path))[0]["vozidlo"] == "1AB2345"
 
 
 # ── Tisk dokladu s víc auty ──────────────────────────────────────────────────
@@ -282,7 +311,9 @@ def test_ppd_works_with_no_extra_spz(client, tmp_path, monkeypatch):
 
 def _tisk(client, payload):
     data = client.post("/api/generate", json=payload).get_json()
-    return client.get(data["ppd_print"]).get_data(as_text=True)
+    r = client.get(data["ppd_print"])
+    assert r.mimetype == "application/pdf"
+    return _pdf_text(r.data)
 
 
 def test_tisk_ukaze_vsechna_auta(client, tmp_path, monkeypatch):
@@ -305,8 +336,7 @@ def test_zaloha_nese_vsechna_auta(client, tmp_path, monkeypatch):
     """Záloha je zdroj pravdy pro tisk i pro obnovu smazaného dokladu."""
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     client.post("/api/generate", json=_payload(ppd_extra_spz="2CD6789"))
-    import ppd as ppdmod
-    assert ppdmod.read_backup(str(tmp_path))[0]["spz"] == "1AB2345, 2CD6789"
+    assert faktura.read_faktura_backup(str(tmp_path))[0]["vozidla"] == "1AB2345, 2CD6789"
 
 
 def test_tisk_a_pdf_maji_stejna_auta(client, tmp_path, monkeypatch):
@@ -314,12 +344,11 @@ def test_tisk_a_pdf_maji_stejna_auta(client, tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     data = client.post("/api/generate", json=_payload(
         registracni_znacka="", ppd_extra_spz="1AKB126, 3BP3109")).get_json()
-    from pypdf import PdfReader
-    pdf = PdfReader(os.path.join(str(tmp_path), "output", data["ppd"].split("/")[-1]))
-    pdf_text = pdf.pages[0].extract_text()
-    html = client.get(data["ppd_print"]).get_data(as_text=True)
+    with open(os.path.join(str(tmp_path), "output", data["ppd"].split("/")[-1]), "rb") as f:
+        pdf_text = _pdf_text(f.read())
+    tisk = _pdf_text(client.get(data["ppd_print"]).data)
     for spz in ("1AKB126", "3BP3109"):
-        assert spz in pdf_text and spz in html
+        assert spz in pdf_text and spz in tisk
 
 
 def test_tisk_starsiho_poskozeneho_zaznamu_vezme_auta_z_ledgeru(client, tmp_path, monkeypatch):

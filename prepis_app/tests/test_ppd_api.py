@@ -24,7 +24,7 @@ import tracker_push
 
 KLIC = "testovaci-klic-integrace"
 URL = "/api/ppd/vystavit"
-TELO = {"prijato_od": "JE & NE, spol. s r.o.", "prijato_ico": "44960263",
+TELO = {"druh": "ppd", "prijato_od": "JE & NE, spol. s r.o.", "prijato_ico": "44960263",
         "castka": 2600, "ucel": "ZASTUPOVÁNÍ NA MMB",
         "vozidla": ["3BR9309", " 3br7164 "], "zpracoval": "David",
         "request_id": "8d0c6f8e-3c41-4a4e-9a51-0d7f2f7d1a11"}

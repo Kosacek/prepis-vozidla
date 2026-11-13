@@ -1,6 +1,8 @@
 """Faktura převodem + QR Platba: SPAYD, číslování, API (druh), PDF."""
 from datetime import date
 
+import os
+
 import pytest
 
 import app as A
@@ -53,29 +55,77 @@ def test_spayd_rejects_non_positive_amount():
 
 
 # ── numbering ───────────────────────────────────────────────────────────────
-def test_numbers_yyyynnnn_sequential_and_separate_from_ppd(tmp_path):
+def _cisla(d, n, day=date(2026, 1, 1)):
+    return [faktura.issue_faktura(str(d), REC, day) for _ in range(n)]
+
+
+def test_bijection_over_all_9000_codes():
+    kody = {faktura.kod_z_poradi(s) for s in range(1, 9001)}
+    assert kody == set(range(1000, 10000))
+
+
+def test_poradi_round_trip():
+    for s in range(1, 9001):
+        assert faktura.poradi(faktura.cislo_z_poradi(2026, s)) == s
+    assert faktura.CISLO_A == 7393 and faktura.CISLO_B == 2718
+    with pytest.raises(ValueError):
+        faktura.poradi(20260999)
+
+
+def test_first_numbers_of_2026_documented():
+    assert [faktura.cislo_z_poradi(2026, s) for s in range(1, 6)] == [
+        20262111, 20269504, 20267897, 20266290, 20264683]
+
+
+def test_numbers_are_8_digit_year_prefixed_and_not_consecutive(tmp_path):
+    out = _cisla(tmp_path, 6)
+    assert all(len(str(n)) == 8 and str(n).startswith("2026") for n in out)
+    assert all(abs(b - a) > 1 for a, b in zip(out, out[1:]))
+    assert len(set(out)) == 6
+    assert [faktura.poradi(n) for n in out] == [1, 2, 3, 4, 5, 6]
+
+
+def test_new_year_starts_its_own_series_and_ppd_series_is_separate(tmp_path):
     d = str(tmp_path)
     assert ppd.reserve_ppd_number_and_log(d, {"date": "x"}) == 1
-    day = date(2026, 3, 1)
-    assert faktura.issue_faktura(d, REC, day) == 20260001
-    assert faktura.issue_faktura(d, REC, day) == 20260002
-    assert ppd.reserve_ppd_number_and_log(d, {"date": "x"}) == 2     # PPD řada se nehnula
-    assert faktura.issue_faktura(d, REC, date(2027, 1, 5)) == 20270001
+    assert faktura.issue_faktura(d, REC, date(2026, 3, 1)) == faktura.cislo_z_poradi(2026, 1)
+    assert ppd.reserve_ppd_number_and_log(d, {"date": "x"}) == 2
+    assert faktura.issue_faktura(d, REC, date(2027, 1, 5)) == faktura.cislo_z_poradi(2027, 1)
 
 
-def test_numbers_unique(tmp_path):
-    out = [faktura.issue_faktura(str(tmp_path), REC, date(2026, 1, 1)) for _ in range(5)]
-    assert out == list(range(20260001, 20260006))
+def _seed_old_scheme(d, cisla):
+    """Založí faktury ze starého schématu (20260001..) přímo do evidence i zálohy."""
+    wb, ws = faktura._open(os.path.join(d, faktura.EVIDENCE_NAME), "Faktury", faktura._HEADER)
+    wbb, wsb = faktura._open(os.path.join(d, faktura.BACKUP_NAME), "Záloha", faktura._BACKUP_HEADER)
+    for n in cisla:
+        ws.append([n, "1.1.2026", "8.1.2026", "X", 1, "u", "v"])
+        wsb.append([n, "t", "1.1.2026", "8.1.2026", "X", "", "", 1, "u", "v"])
+    faktura._atomic_save(wbb, os.path.join(d, faktura.BACKUP_NAME))
+    faktura._atomic_save(wb, os.path.join(d, faktura.EVIDENCE_NAME))
 
 
-def test_number_never_reused_after_ledger_loss(tmp_path):
+def test_skips_pre_existing_old_scheme_numbers(tmp_path):
     d = str(tmp_path)
-    day = date(2026, 6, 1)
-    faktura.issue_faktura(d, REC, day)
-    last = faktura.issue_faktura(d, REC, day)
-    (tmp_path / faktura.EVIDENCE_NAME).unlink()          # „restart" jen se zálohou
-    assert faktura.issue_faktura(d, REC, day) == last + 1
-    assert [r["cislo"] for r in faktura.read_faktura_backup(d)][:1] == [last + 1]
+    _seed_old_scheme(d, [20260001, 20260002, 20260003])
+    out = _cisla(tmp_path, 3)
+    assert not set(out) & {20260001, 20260002, 20260003}
+    assert out == [faktura.cislo_z_poradi(2026, s) for s in (1, 2, 3)]
+
+
+def test_collision_with_scrambled_number_takes_next_s(tmp_path):
+    d = str(tmp_path)
+    _seed_old_scheme(d, [faktura.cislo_z_poradi(2026, 1)])     # s=1 už je obsazené
+    assert _cisla(tmp_path, 1) == [faktura.cislo_z_poradi(2026, 2)]
+
+
+def test_numbers_survive_restart_and_ledger_loss(tmp_path):
+    d = str(tmp_path)
+    prvni = _cisla(tmp_path, 2)
+    # „restart": nová volání čtou jen soubory; ztráta ledgeru = zůstává záloha
+    (tmp_path / faktura.EVIDENCE_NAME).unlink()
+    dalsi = _cisla(tmp_path, 1)[0]
+    assert dalsi == faktura.cislo_z_poradi(2026, 3) and dalsi not in prvni
+    assert faktura.read_faktura_backup(d)[0]["cislo"] == dalsi
 
 
 def test_records_carry_druh_and_ppd_default(tmp_path):
@@ -164,12 +214,16 @@ def _post(c, **extra):
     return c.post("/api/ppd/vystavit", json=telo, headers={"X-Api-Key": KLIC})
 
 
-def test_api_default_stays_ppd(api):
+def test_api_default_is_faktura_and_explicit_ppd_still_works(api):
     r = _post(api)
     assert r.status_code == 201
     body = r.get_json()
-    assert body["druh"] == "ppd" and body["cislo"] == 1
-    assert body["print_url"] == "/ppd-print/1" and len(api.poslano) == 1
+    assert body["druh"] == "faktura" and body["print_url"] == f"/faktura-print/{body['cislo']}"
+    p = _post(api, druh="ppd")
+    assert p.status_code == 201
+    pb = p.get_json()
+    assert pb["druh"] == "ppd" and pb["cislo"] == 1
+    assert pb["print_url"] == "/ppd-print/1"
 
 
 def test_api_faktura(api):
@@ -183,7 +237,15 @@ def test_api_faktura(api):
     with api.session_transaction() as s:
         s["authed"] = True
     page = api.get(body["print_url"])
-    assert page.status_code == 200 and "FAKTURA" in page.get_data(as_text=True)
+    assert page.status_code == 200 and page.mimetype == "application/pdf"
+    text = " ".join(_pdf_strings(page.data).split())
+    assert "Faktura" in text or "FAKTURA" in text.upper()
+    assert "Vystavil" not in text
+    assert page.headers["Content-Disposition"] == f"inline; filename=faktura_{body['cislo']}.pdf"
+    assert "no-store" in page.headers["Cache-Control"]
+    # download a sdílení servírují stejné bajty jako tisk
+    assert page.data == (api.data / "output" / f"faktura_{body['cislo']}.pdf").read_bytes()
+    assert api.get(f"/download/faktura_{body['cislo']}.pdf").data == page.data
 
 
 def test_api_faktura_idempotent_and_bad_druh(api):

@@ -22,7 +22,6 @@ import openpyxl
 import ppd  # PPD (cash-receipt) generation — see ppd.py
 import faktura  # Faktura převodem + QR Platba — see faktura.py
 import faktura_pdf
-import segno
 import ppd_api  # POST /api/ppd/vystavit — evidence vystavuje doklady — see ppd_api.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import nahled  # PNG náhledy stránek pro sdílenou stránku
@@ -66,7 +65,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.33.0"
+__version__ = "1.34.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1596,7 +1595,6 @@ def resolve_payer_full(data: dict) -> tuple:
     return name, ico, address
 
 
-PLATBY = ("hotove", "prevodem")   # hotově = PPD, převodem = faktura (QR Platba)
 PPD_UCEL = "Zastupování na MMB"   # fixed — ALSETA represents the client at Magistrát města Brna
 
 
@@ -1616,7 +1614,7 @@ def _adresa_firmy_podle_ico(ico: str) -> str:
 
 def _vystav_fakturu_k_zadosti(data: dict, amount: int, rz_full: str, vin: str,
                               payer: str, payer_ico: str, payer_address: str) -> dict:
-    """„Převodem": místo PPD se vystaví faktura ze stejné řady a stejnou cestou
+    """Doklad k žádosti je vždy faktura, ze stejné řady a stejnou cestou
     jako přes /api/ppd/vystavit (ppd_api.vystav). Vrací doklad (druh, cislo,
     splatnost …); chyby nechává propadnout volajícímu."""
     vozidla = [v.strip() for v in rz_full.split(",") if v.strip()] or ([vin] if vin else [])
@@ -1640,7 +1638,7 @@ def _doklad_prevodem(result: dict, sdilene: list, data: dict, amount: int, rz_fu
         _log.warning("Faktura k žádosti odmítnuta: %s", e)
         result["doklad_chyba"] = ("Fakturu nejde vystavit: " + str(e)
                                   if isinstance(e, ppd_api.Chyba) else
-                                  "Fakturu převodem teď nejde vystavit (chybí číslo účtu).")
+                                  "Fakturu teď nejde vystavit (chybí číslo účtu).")
         return
     except Exception as e:
         _log.warning("Faktura k žádosti selhala: %s", e)
@@ -1672,15 +1670,11 @@ def api_generate():
     if mode not in {"prevod", "zapis", "zmena", "3rz", "vyvoz"}:
         return jsonify({"success": False, "error": f"Neznámý mód: {mode}"}), 400
 
-    # Doklad převodem (faktura) jen s platným FAKTURA_IBAN — odmítnout dřív,
-    # než se vytvoří cokoli (žádný doklad ani žádost bez čísla účtu).
-    platba = str(data.get("ppd_platba") or "hotove").strip().lower()
-    if platba not in PLATBY:
-        return jsonify({"success": False, "error": "Neznámý způsob platby."}), 400
-    if platba == "prevodem" and _ppd_castka(data) > 0 and not faktura.dostupna():
+    # Doklad je vždy faktura (QR Platba) a ta jde jen s platným FAKTURA_IBAN —
+    # odmítnout dřív, než se vytvoří cokoli.
+    if _ppd_castka(data) > 0 and not faktura.dostupna():
         return jsonify({"success": False,
-                        "error": "Fakturu převodem teď nejde vystavit (chybí číslo účtu). "
-                                 "Vyber Hotově."}), 400
+                        "error": "Fakturu teď nejde vystavit (chybí číslo účtu)."}), 400
 
     oznac_praci()
     out_dir = os.path.join(DATA_DIR, "output")
@@ -1771,7 +1765,7 @@ def api_generate():
         result["zapis"] = f"/download/{name}"
         sdilene.append({"file": name, "kde": sdileni.KDE_OUTPUT, "popis": "Zápis nového vozidla"})
 
-    # ── PPD (cash receipt) — optional; failure must NOT break the žádost ─────
+    # ── Doklad (faktura) — optional; failure must NOT break the žádost ───────
     try:
         amount = _ppd_castka(data)
         if amount > 0:
@@ -1782,7 +1776,6 @@ def api_generate():
             # řetězec; prázdné položky (rozklikl a nevyplnil) se zahodí.
             extra_spz = [s.strip() for s in (data.get("ppd_extra_spz") or "").split(",")]
             rz_full = ", ".join(p for p in [rz.strip()] + extra_spz if p)
-            purpose = PPD_UCEL
             # Explicit payer (from the field) keeps only its explicit IČO (set
             # when a saved firm / ARES result was picked; empty for a hand-typed
             # name or private person). Only when the field is empty do we fall
@@ -1798,50 +1791,8 @@ def api_generate():
             # (and the app's live-uppercase inputs). Issuer/účel are fixed → left.
             payer = payer.upper()
             payer_address = payer_address.upper()
-            if platba == "prevodem":
-                _doklad_prevodem(result, sdilene, data, amount, rz_full, vin,
-                                 payer, payer_ico, payer_address)
-            else:
-                today = datetime.now().strftime("%d.%m.%Y")
-                number = ppd.reserve_ppd_number_and_log(DATA_DIR, {
-                    "date": today, "payer": payer, "payer_ico": payer_ico,
-                    "amount": amount, "purpose": purpose, "vehicle": rz_full or vin,
-                })
-                ppd_bytes = ppd.build_ppd_pdf({
-                    "number": number, "date": today, "payer": payer, "payer_ico": payer_ico,
-                    "payer_address": payer_address, "spz": rz_full, "vin": vin,
-                    "amount": amount, "purpose": purpose,
-                })
-                # Name the PDF by receipt number (numbers never repeat) so the
-                # Doklady browser can link to it deterministically.
-                ppd_name = f"ppd_{number}.pdf"
-                with open(os.path.join(out_dir, ppd_name), "wb") as f:
-                    f.write(ppd_bytes)
-                result["ppd"] = f"/download/{ppd_name}"
-                result["ppd_print"] = f"/ppd-print/{number}"   # A5-preset print page
-                sdilene.append({"file": ppd_name, "kde": sdileni.KDE_OUTPUT,
-                                "popis": f"Příjmový pokladní doklad č. {number}"})
-                # Append-only backup — the write-only safety net. A row is written
-                # here for every receipt and is NEVER removed, so an accidental
-                # delete in the dashboard stays recoverable.
-                ppd.append_backup(DATA_DIR, {
-                    "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
-                    "date": today, "payer": payer, "payer_ico": payer_ico,
-                    "payer_address": payer_address, "amount": amount, "purpose": purpose,
-                    # rz_full, ne rz: tisková stránka se staví ze zálohy, a s holou
-                    # hlavní SPZ zmizela auta z „+ Přidat vozidlo" (doklad č. 174).
-                    "spz": rz_full, "vin": vin,
-                })
-                # Every receipt goes to evidence, independently of evidence_log.
-                try:
-                    import ppd_push
-                    ppd_push.push_async(ppd_push.build_record({
-                        "cislo": number, "date": today, "payer": payer,
-                        "payer_ico": payer_ico, "amount": amount, "purpose": purpose,
-                        "vehicle": rz_full or vin,
-                    }, zadost_id=data["zadost_id"]), DATA_DIR)
-                except Exception as e:
-                    _log.warning("PPD push skipped: %s", e)
+            _doklad_prevodem(result, sdilene, data, amount, rz_full, vin,
+                             payer, payer_ico, payer_address)
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 
@@ -2153,11 +2104,13 @@ def api_ppd_list():
     """Issued receipts and faktury (newest first) for the in-app Doklady browser
     and evidence. Every row has druh ("ppd"/"faktura"); faktura rows also carry
     splatnost (dd.mm.yyyy) and prijato_od (= odběratel), so one renderer fits both."""
-    rows = ppd.read_ppd_log(DATA_DIR)
-    for f in faktura.read_faktura_log(DATA_DIR):
-        rows.append({**f, "prijato_od": f.get("odberatel", "")})
-    rows.sort(key=lambda r: (r["druh"] == "faktura",
-                             r["cislo"] if isinstance(r["cislo"], int) else 0), reverse=True)
+    pokladni = sorted(ppd.read_ppd_log(DATA_DIR),
+                      key=lambda r: r["cislo"] if isinstance(r["cislo"], int) else 0, reverse=True)
+    # Čísla faktur nerostou (viz faktura.py), ale čtení vrací řádky už od
+    # nejnovějšího podle pořadí vystavení — netřídit je podle čísla.
+    faktury = [{**f, "prijato_od": f.get("odberatel", "")}
+               for f in faktura.read_faktura_log(DATA_DIR)]
+    rows = faktury + pokladni
     return jsonify(rows)
 
 def _smaz_doklad(number: int) -> bool:
@@ -2316,17 +2269,22 @@ def api_ppd_vystavit():
 
 @app.route("/faktura-print/<int:number>")
 def faktura_print(number):
-    """Tisková A5 stránka faktury (data ze zálohy, QR Platba jako inline SVG)."""
+    """Tisk faktury = schválené PDF z faktura_pdf.build_faktura_pdf, vždy čerstvě
+    postavené ze zálohy a inline. Stejné bajty se zapíšou i do output/, takže
+    stažení a sdílení servírují totéž."""
     rec = faktura.get_faktura(DATA_DIR, number)
     if rec is None:
         return Response("Faktura nenalezena.", status=404, mimetype="text/plain")
-    pdf_rec = faktura.pdf_record(rec)
-    cfg = faktura.settings()
-    payload = faktura_pdf.spayd_for(pdf_rec, cfg)
-    qr_svg = segno.make(payload, error="m").svg_inline(scale=3, border=1) if payload else ""
-    from flask import make_response
-    resp = make_response(render_template("faktura_print.html", r=pdf_rec, cfg=cfg, qr_svg=qr_svg,
-                                         placeholder=faktura.PLACEHOLDER))
+    pdf_bytes = faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec))
+    try:
+        cesta = faktura.pdf_path(DATA_DIR, number)
+        os.makedirs(os.path.dirname(cesta), exist_ok=True)
+        with open(cesta, "wb") as f:
+            f.write(pdf_bytes)
+    except OSError as e:
+        _log.warning("Faktura %s: output/ se nepovedlo obnovit (%s)", number, e)
+    resp = Response(pdf_bytes, mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f"inline; filename=faktura_{number}.pdf"
     resp.headers["Cache-Control"] = "no-store, must-revalidate"
     return resp
 
