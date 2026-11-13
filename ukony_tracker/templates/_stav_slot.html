@@ -8,7 +8,7 @@
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno">
   <input type="hidden" name="castka" value="0">
   <input type="hidden" name="back" value="{{ back_url }}">
-  <button type="submit" class="badge ok badge-btn" title="Zrušit platbu (vrátit na nezaplaceno)"><span class="lbl-d">zapl. ✕</span><span class="lbl-m">✓ Zaplaceno</span></button>
+  <button type="submit" class="badge ok badge-btn" title="Zaplaceno · klepnutím zrušíš"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">✓ Zaplaceno</span></button>
 </form>
 {% elif u.stav_platby == 'castecne' %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
@@ -23,10 +23,10 @@
 {% set dk = ukon_doklady(u.id) %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno" class="pay-form">
   <input type="hidden" name="back" value="{{ back_url }}">
-  {% if dk %}
-  <button type="submit" class="btn btn-sm pay-doklad" title="Doklad č. {{ dk|join(', ') }} — potvrď platbu"><span class="lbl-d">✓ č. {{ dk[0] }}</span><span class="lbl-m">Zaplatit · doklad č. {{ dk[0] }}</span></button>
+  {% if dk %}{% set n = dk[0] %}{% set kratke = ('%04d' % (n % 10000)) if n > 99999 else n %}
+  <button type="submit" class="btn btn-sm pay-doklad" title="Doklad č. {{ dk|join(', ') }} — čeká na platbu, klepnutím označíš zaplaceno"><span class="lbl-d">č. {{ kratke }}</span><span class="lbl-m">Zaplatit · č. {{ kratke }}</span></button>
   {% else %}
-  <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">Zaplatit</span></button>
+  <button type="submit" class="btn btn-sm" title="Označit jako zaplaceno"><span class="lbl-d">zapl.</span><span class="lbl-m">Zaplatit</span></button>
   {% endif %}
 </form>
 {% endif %}

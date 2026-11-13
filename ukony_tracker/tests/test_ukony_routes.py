@@ -478,7 +478,7 @@ def test_mark_paid_ajax_returns_both_fragments(client_fid):
     d = r.get_json()
     assert d["ok"] is True and d["stav_platby"] == "zaplaceno" and d["zaplaceno_kc"] == 1300
     assert 'class="badge ok"' in d["pay_badge_html"]
-    assert "zapl. ✕" in d["stav_slot_html"] and f"/ukony/{uid}/zaplaceno" in d["stav_slot_html"]
+    assert "badge ok" in d["stav_slot_html"] and "✓ zapl." in d["stav_slot_html"] and f"/ukony/{uid}/zaplaceno" in d["stav_slot_html"]
     with c.application.app_context():
         assert ukony_repo.get(db.get_db(), uid)["stav_platby"] == "zaplaceno"
 

@@ -39,6 +39,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.9.4", date(2026, 11, 13),
+        "Zelená s ✓ = zaplaceno, všude stejně",
+        ("V Úkonech i Dokladech: zelená s ✓ je zaplacená, žlutá čeká na fakturu, bílá ještě není zaplacená.",),
+        oblast="ukony", nazev="Zaplaceno na první pohled",
+        radek="Zelená s ✓ je zaplacená, žlutá čeká na fakturu, bílá nezaplacená.",
+    ),
+    Release(
         "2.9.3", date(2026, 11, 13),
         "Novinky na jedné stránce",
         ("Nejnovější změna vyskočí jako dřív a pod ní uvidíš všechno, co Evidence umí – bez starých verzí.",

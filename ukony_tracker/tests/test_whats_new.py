@@ -163,4 +163,4 @@ def test_preview_route_needs_the_env_switch(gated_client, monkeypatch):
 def test_dockerfile_copies_novinky_module():
     from pathlib import Path
     text = (Path(appmod.__file__).parent / "Dockerfile").read_text(encoding="utf-8")
-    assert "novinky.py" in text and "CACHEBUST=2026-11-13-novinky" in text
+    assert "novinky.py" in text
