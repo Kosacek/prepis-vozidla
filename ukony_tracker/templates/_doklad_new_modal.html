@@ -5,8 +5,8 @@
 <div class="modal-backdrop" id="doklad-modal" hidden>
   <div class="modal-card card doklad-new" role="dialog" aria-modal="true" aria-labelledby="doklad-new-title">
     <button class="modal-close" type="button" aria-label="Zavřít" data-doklad-close>&times;</button>
-    <h2 id="doklad-new-title">Nový doklad</h2>
-    <form id="doklad-new-form" novalidate>
+    <h2 id="doklad-new-title">Nová faktura</h2>
+    <form id="doklad-new-form" novalidate data-faktura="{{ 1 if faktura_moznost else 0 }}">
       <div class="field">
         <label for="dn-firma">Firma <span class="muted dn-optional">(nepovinné)</span></label>
         <select id="dn-firma">
@@ -30,7 +30,7 @@
       <div class="field">
         <label for="dn-ico">IČO</label>
         <div class="dn-ico-row">
-          <input id="dn-ico" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="44960263">
+          <input id="dn-ico" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="8 číslic">
           <button type="button" class="btn dn-ares" id="dn-ares">ARES</button>
         </div>
         <p class="dn-ares-status" id="dn-ares-status" role="status" aria-live="polite" hidden></p>
@@ -49,8 +49,7 @@
 
       <div class="field">
         <label for="dn-vozidla">Vozidla (RZ / VIN)</label>
-        <input id="dn-vozidla" autocomplete="off" spellcheck="false" placeholder="3BR9309, TMBER6NW0V3099310">
-        <p class="muted small">Předvyplní se z úkonů. Napiš i RZ/VIN, které v evidenci nejsou.</p>
+        <input id="dn-vozidla" autocomplete="off" spellcheck="false" placeholder="SPZ nebo VIN">
       </div>
 
       <div class="form-row dn-row">
@@ -64,23 +63,17 @@
         </div>
       </div>
 
-      {% if faktura_moznost %}
-      {# Shown only when žádosti can issue a faktura (services/doklad_moznosti.py). #}
-      <div class="field dn-platba-field">
-        <label id="dn-platba-label">Platba</label>
-        <div class="seg dn-platba" id="dn-platba" role="radiogroup" aria-labelledby="dn-platba-label">
-          <span role="radio" tabindex="0" aria-checked="true" class="on" data-platba="hotove">Hotově</span>
-          <span role="radio" tabindex="-1" aria-checked="false" data-platba="prevodem">Převodem</span>
-        </div>
-      </div>
+      {# Every doklad is a faktura (2.9.1). When žádosti can't issue one (services/doklad_moznosti.py) the button stays disabled; never a PPD fallback. #}
+      {% if not faktura_moznost %}
+      <p class="dn-error" id="dn-unavailable" role="status">Faktura teď nejde vystavit.</p>
       {% endif %}
 
       <p class="dn-error" id="dn-error" role="alert" hidden></p>
-      <button type="submit" class="btn btn-primary dn-submit" id="dn-submit" disabled>Vystavit doklad</button>
+      <button type="submit" class="btn btn-primary dn-submit" id="dn-submit" disabled>Vystavit fakturu</button>
     </form>
     <div class="dn-done" id="dn-done" hidden>
       <p class="dn-done__title" id="dn-done-title"></p>
-      <a class="btn btn-primary dn-submit" id="dn-print" href="#" target="_blank" rel="noopener">Tisk A5</a>
+      <a class="btn btn-primary dn-submit" id="dn-print" href="#" target="_blank" rel="noopener">Tisk faktury</a>
       <button type="button" class="btn dn-submit" data-doklad-close>Hotovo</button>
     </div>
   </div>

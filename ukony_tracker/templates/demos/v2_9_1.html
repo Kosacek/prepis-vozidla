@@ -1,0 +1,51 @@
+{# Demo for release 2.9.1: every doklad is a faktura: a
+   doklad row with the "Faktura" tag and a yellow "čeká na platbu" chip
+   appears, then the chip flips to green once the payment arrives.
+   CSS-only, 4.5s loop, app tokens only. #}
+<style>
+  .de291-demo { box-sizing: border-box; height: 110px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); font-size: 11px; line-height: 1.25;
+    overflow: hidden; display: grid; align-content: center; }
+  .de291-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px;
+    padding: 9px 11px; border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+    box-shadow: 0 2px 8px rgba(0,0,0,.05); opacity: 0; transform: translateY(8px);
+    animation: de291-row 4.5s ease infinite; }
+  .de291-body { display: grid; gap: 4px; min-width: 0; }
+  .de291-num { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11.5px; }
+  .de291-tag { font-size: 8.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 6px; padding: 0 5px; background: var(--bg); }
+  .de291-car { display: flex; align-items: baseline; gap: 6px; }
+  .de291-spz { font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+  .de291-vin { font-size: 9px; color: var(--muted); letter-spacing: .03em; }
+  .de291-od { font-size: 9.5px; color: var(--muted); }
+  .de291-side { display: grid; justify-items: end; gap: 5px; }
+  .de291-kc { font-size: 12px; font-weight: 800; }
+  .de291-chip { display: inline-grid; font-size: 8.5px; font-weight: 700; }
+  .de291-chip > span { grid-area: 1 / 1; text-align: center; border-radius: 999px; padding: 1px 8px;
+    border: 1px solid transparent; white-space: nowrap; }
+  .de291-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a !important;
+    animation: de291-out 4.5s ease infinite; }
+  .de291-paid { background: var(--flash-success-bg); color: var(--flash-success-ink); opacity: 0;
+    animation: de291-in 4.5s ease infinite; }
+  @keyframes de291-row { 0%, 8% { opacity: 0; transform: translateY(8px); } 20%, 100% { opacity: 1; transform: none; } }
+  @keyframes de291-out { 0%, 68% { opacity: 1; } 76%, 100% { opacity: 0; } }
+  @keyframes de291-in { 0%, 68% { opacity: 0; } 76%, 100% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .de291-row { animation: none; opacity: 1; transform: none; }
+    .de291-unpaid { animation: none; opacity: 0; }
+    .de291-paid { animation: none; opacity: 1; }
+  }
+</style>
+<div class="de291-demo" aria-hidden="true">
+  <div class="de291-row">
+    <div class="de291-body">
+      <div class="de291-num">č. 20267391<span class="de291-tag">Faktura</span></div>
+      <div class="de291-car"><span class="de291-spz">4AE1234</span><span class="de291-vin">TMBJJ7NE5J0123456</span></div>
+      <div class="de291-od">JAZYKOVÁ ŠKOLA P.A.R.K.</div>
+    </div>
+    <div class="de291-side">
+      <span class="de291-kc">1 300 Kč</span>
+      <span class="de291-chip"><span class="de291-unpaid">čeká na platbu</span><span class="de291-paid">✓ 1 úkon</span></span>
+    </div>
+  </div>
+</div>

@@ -83,7 +83,7 @@ def doklady():
         total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
         mesic=mesic, q=q, smazane=smazane, firma=firma, banka=moneta_job.status_view(conn),
         tisk_base=doklad_share.tisk_base(), tisk_base_faktura=doklad_share.tisk_base("faktura"),
-        # Hotově / Převodem choice in Nový doklad: only when žádosti can issue a faktura.
+        # Nová faktura: the modal's button stays disabled when žádosti can't issue one.
         faktura_moznost=bool(config.ZADOSTI_API_URL) and doklad_moznosti.faktura_dostupna(),
         has_faktura=any(r.druh == "faktura" for r in radky),
         back_url=request.full_path.rstrip("?"),

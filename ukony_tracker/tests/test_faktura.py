@@ -1,4 +1,4 @@
-"""Faktura (platba převodem) in evidence: the Hotově / Převodem choice, druh
+"""Faktura (platba převodem) in evidence: every new doklad is a faktura, druh
 forwarded to žádosti, and a faktura never marking its úkony paid."""
 from datetime import date, timedelta
 
@@ -93,13 +93,41 @@ def _body(data, **over):
             "prijato_ico": "44960263", "castka": 2600, "zpracoval": "David", "request_id": RID, **over}
 
 
-# -- The choice in the modal ----------------------------------------------------
+# -- The modal: every new doklad is a faktura (2.9.1) -----------------------------
 
-def test_choice_shown_only_when_zadosti_allow_faktura(client, zadosti):
+def _static(name):
+    from pathlib import Path
+    return (Path(__file__).resolve().parent.parent / "static" / "js" / name).read_text(encoding="utf-8")
+
+
+def _modal(client):
+    """The Nový doklad modal only (the 2.9 release demo in the page still shows Hotově)."""
     html = client.get("/doklady").get_data(as_text=True)
-    assert 'id="dn-platba"' in html and "Hotově" in html and "Převodem" in html
+    start = html.index('id="doklad-modal"')
+    return html[start:html.index('id="dn-firmy-data"', start)]
+
+
+def test_modal_is_a_faktura_and_never_offers_hotove(client, zadosti):
+    html = _modal(client)
+    assert "Nová faktura" in html and "Vystavit fakturu" in html
+    assert 'data-faktura="1"' in html and "dn-unavailable" not in html
+    assert 'id="dn-platba"' not in html and "Hotově" not in html and "Vystavit doklad" not in html
     assert zadosti["gets"][0]["url"] == "http://zadosti-app:8089/api/ppd/moznosti"
     assert zadosti["gets"][0]["headers"] == {"X-Api-Key": "shared-key"}
+
+
+def test_modal_js_always_sends_druh_faktura_and_has_no_hotove_branch():
+    js = _static("doklad_new.js")
+    assert "payload.druh = 'faktura';" in js
+    assert "if (prevodem)" not in js and "hotove" not in js and "Vystavit doklad" not in js
+    assert "!fakturaOk ||" in js  # unavailable -> button stays disabled, submit is a no-op
+
+
+def test_modal_placeholders_are_neutral_hints_without_helper_text(client, zadosti):
+    html = _modal(client)
+    assert 'placeholder="8 číslic"' in html and 'placeholder="SPZ nebo VIN"' in html
+    assert 'placeholder="44960263"' not in html and "3BR9309, TMBER6NW0V3099310" not in html
+    assert "Předvyplní se z úkonů" not in html
 
 
 @pytest.mark.parametrize("answer", [
@@ -110,13 +138,13 @@ def test_choice_shown_only_when_zadosti_allow_faktura(client, zadosti):
     Resp(200, {"faktura": "yes"}),
     requests.ConnectionError("down"),
 ])
-def test_choice_hidden_when_moznosti_false_or_failing(client, zadosti, answer):
+def test_unavailable_faktura_disables_button_with_message_and_no_ppd_fallback(client, zadosti, answer):
     zadosti["moznosti"] = answer
-    page = client.get("/doklady")
-    assert page.status_code == 200
-    html = page.get_data(as_text=True)
-    assert 'id="dn-platba"' not in html
-    assert "Vystavit doklad" in html  # the PPD-only modal is untouched
+    assert client.get("/doklady").status_code == 200
+    html = _modal(client)
+    assert 'data-faktura="0"' in html
+    assert "Faktura teď nejde vystavit." in html and 'id="dn-unavailable"' in html
+    assert "Vystavit fakturu" in html and "Vystavit doklad" not in html and 'id="dn-platba"' not in html
 
 
 def test_moznosti_cached_for_about_five_minutes(client, zadosti, monkeypatch):
@@ -139,13 +167,13 @@ def test_failed_moznosti_is_retried_sooner_than_five_minutes(client, zadosti, mo
     client.get("/doklady")
     zadosti["moznosti"] = Resp(200, {"faktura": True, "splatnost_dni": 14})
     now[0] += 31
-    assert 'id="dn-platba"' in client.get("/doklady").get_data(as_text=True)
+    assert 'data-faktura="1"' in client.get("/doklady").get_data(as_text=True)
 
 
-def test_no_zadosti_url_means_no_request_and_no_choice(client, zadosti, monkeypatch):
+def test_no_zadosti_url_means_no_request(client, zadosti, monkeypatch):
     monkeypatch.setattr(config, "ZADOSTI_API_URL", "")
     html = client.get("/doklady").get_data(as_text=True)
-    assert 'id="dn-platba"' not in html and zadosti["gets"] == []
+    assert zadosti["gets"] == []
 
 
 # -- Issuing -------------------------------------------------------------------

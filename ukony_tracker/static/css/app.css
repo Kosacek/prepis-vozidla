@@ -2269,9 +2269,6 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .doklady-list.has-faktura .doklad-row { grid-template-columns: 118px 158px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 14px; }
 }
 
-/* Nový doklad: Hotově / Převodem (only when žádosti can issue a faktura). */
-.dn-platba-field .dn-platba { align-self: flex-start; }
-.dn-platba span:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .doklad-chev::before {
   content: ""; display: block; width: 7px; height: 7px;
@@ -2531,3 +2528,6 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 @media (prefers-reduced-motion: reduce) {
   .modal-stack, .modal-stack .modal-card { transition: none; }
 }
+
+/* Nová faktura: placeholders are hints, never look like prefilled values (2.9.1). */
+.doklad-new ::placeholder { color: var(--muted); opacity: .5; font-style: italic; }

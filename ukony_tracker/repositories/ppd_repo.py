@@ -177,7 +177,7 @@ def list(
 ) -> list[sqlite3.Row]:
     """Doklady od nejnovějšího data; meze období jsou včetně obou dnů."""
     where, args = _filters(od, do, q, include_deleted)
-    sql = "SELECT * FROM ppd" + where + " ORDER BY datum DESC, cislo DESC"
+    sql = "SELECT * FROM ppd" + where + " ORDER BY datum DESC, created_at DESC, cislo DESC"
     if limit is not None:
         sql += " LIMIT ?"
         args.append(limit)

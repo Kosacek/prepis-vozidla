@@ -122,7 +122,7 @@ def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, 
     # Past its due date and not paid (a doklad marked paid by hand has no worry left).
     po = bool(splatnost_iso and splatnost_iso < (dnes or date.today()).isoformat()
               and pay.stav in ("unpaid", "partial", "none") and not _col(doklad, "zaplaceno_dne"))
-    hledat = " ".join(["faktura" if druh == "faktura" else "", str(cislo), doklad["prijato_od"] or "", doklad["prijato_ico"] or "",
+    hledat = " ".join(["faktura" if druh == "faktura" else "", str(cislo), f"{cislo % 10000:04d}" if druh == "faktura" else "", doklad["prijato_od"] or "", doklad["prijato_ico"] or "",
                        doklad["vozidlo"] or "", firma["zkratka"] if firma else "",
                        *(f"{a.spz} {a.vin}" for a in cars)])
     d = doklad["datum"]

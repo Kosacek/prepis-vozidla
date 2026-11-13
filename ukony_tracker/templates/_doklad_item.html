@@ -11,7 +11,7 @@
         {%- if p.firma %}<span class="doklad-firma-chip" style="--firma: {{ p.firma.color }};"><span class="firma-dot"></span>{{ p.firma.zkratka }}</span>
         {%- else %}<span class="doklad-firma-chip is-none">bez firmy</span>{% endif -%}
       </span>
-      <span class="doklad-id"><span class="doklad-cislo-line"><b class="doklad-cislo">č. {{ p.cislo }}</b>{% if p.druh == 'faktura' %}<span class="tag doklad-druh" title="Faktura · platba převodem{% if p.splatnost %} · splatnost {{ p.splatnost }}{% endif %}">Faktura</span>{% endif %}</span><span class="doklad-datum">{{ p.datum }}{% if p.po_splatnosti %} <span class="doklad-po" title="Splatnost {{ p.splatnost }}">po splatnosti</span>{% endif %}</span></span>
+      <span class="doklad-id"><span class="doklad-cislo-line">{% set kratke = ('%04d' % (p.cislo % 10000)) if p.druh == 'faktura' else p.cislo %}<b class="doklad-cislo"{% if p.druh == 'faktura' %} title="Faktura č. {{ p.cislo }} (VS)"{% endif %}>č. {{ kratke }}</b>{% if p.druh == 'faktura' %}<span class="tag doklad-druh" title="Faktura · platba převodem{% if p.splatnost %} · splatnost {{ p.splatnost }}{% endif %}">Faktura</span>{% endif %}</span><span class="doklad-datum">{{ p.datum }}{% if p.po_splatnosti %} <span class="doklad-po" title="Splatnost {{ p.splatnost }}">po splatnosti</span>{% endif %}</span></span>
       <span class="doklad-auta"{% if p.auta|length > 1 %} title="{% for a in p.auta %}{{ a.spz or a.vin }}{{ ', ' if not loop.last }}{% endfor %}"{% endif %}>
         {%- for a in p.auta[:1] %}
         <span class="doklad-auto{{ ' is-chybi' if a.chybi }}">
