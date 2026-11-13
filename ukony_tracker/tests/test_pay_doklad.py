@@ -40,8 +40,8 @@ def test_unpaid_ukon_with_a_doklad_gets_the_orange_button(client, ids):
     body = client.get("/ukony/vse").get_data(as_text=True)
     orange = _item(body, ids["s_dokladem"])
     assert "pay-doklad" in orange
-    assert 'title="Doklad č. 183 — potvrď platbu"' in orange
-    assert "Zaplatit · doklad č. 183" in orange
+    assert "Doklad č. 183 — čeká na platbu" in orange
+    assert "Zaplatit · č. 183" in orange and "✓ č." not in orange
 
 
 def test_no_doklad_or_already_paid_stays_as_before(client, ids):
