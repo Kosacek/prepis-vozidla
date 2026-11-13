@@ -151,3 +151,19 @@ def invalidate() -> None:
 def ukon_doklady(uid: int) -> list[int]:
     """Doklady paying úkon `uid` (Jinja global for the orange Zaplatit)."""
     return for_request().by_ukon.get(uid, [])
+
+
+def ukon_z_banky(uid: int) -> dict | None:
+    """{"cislo", "datum"} when a faktura paying úkon `uid` was matched by the
+    bank (MONETA), else None. Jinja global: unpaying such an úkon asks first."""
+    from flask import g
+    import db
+    from services.doklady_view import banka_platby
+    if "banka_platby" not in g:
+        g.banka_platby = banka_platby(db.get_db())
+    for cislo in ukon_doklady(uid):
+        iso = g.banka_platby.get(cislo)
+        if iso:
+            return {"cislo": f"{cislo % 10000:04d}" if cislo > 99999 else str(cislo),
+                    "datum": f"{int(iso[8:10])}. {int(iso[5:7])}." if len(iso) >= 10 else ""}
+    return None

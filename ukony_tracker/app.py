@@ -145,6 +145,8 @@ def create_app():
     app.jinja_env.globals["APP_BUILD"] = build_id()
     from services.ppd_links import ukon_doklady
     app.jinja_env.globals["ukon_doklady"] = ukon_doklady  # orange "Zaplatit" in _stav_slot.html
+    from services.ppd_links import ukon_z_banky
+    app.jinja_env.globals["ukon_z_banky"] = ukon_z_banky  # confirm before unpaying a bank-paid úkon
     import novinky
     from releases import CURRENT_VERSION, RELEASES
     app.jinja_env.globals["RELEASES"] = RELEASES

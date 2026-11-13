@@ -62,3 +62,20 @@ def test_orange_button_inside_the_doklad_drawer(client, ids):
     body = client.get("/doklady").get_data(as_text=True)
     drawer = body.split('id="doklad-183"')[1]
     assert "pay-doklad" in drawer
+
+
+def test_unpaying_a_bank_paid_ukon_asks_first(client, ids):
+    with client.application.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute("INSERT INTO moneta_platby(tx_id,datum,castka,vs,zprava,protiucet,faktura_cislo,stav,duvod,created_at)"
+                         " VALUES('t1','2026-11-13',2600,'183','','',183,'sparovano',NULL,'x')")
+    body = client.get("/ukony/vse").get_data(as_text=True)
+    paid = _item(body, ids["zaplaceny"])
+    assert "data-z-banky" in paid and "Zaplaceno z banky 13. 11. (faktura č. 183)" in paid
+    assert "Opravdu zrušit zaplacení?" in paid
+
+
+def test_hand_paid_ukon_unpays_without_asking(client, ids):
+    body = client.get("/ukony/vse").get_data(as_text=True)
+    assert "data-z-banky" not in _item(body, ids["zaplaceny"])

@@ -5,10 +5,12 @@
    page renders on load — one source of truth, no drift. `.lbl-m` is the phone
    label on /ukony/vse ("Zaplatit" / "✓ Zaplaceno"), `.lbl-d` everywhere else. #}
 {% if u.stav_platby == 'zaplaceno' %}
-<form method="post" action="/ukony/{{ u.id }}/zaplaceno">
+{% set zb = ukon_z_banky(u.id) %}
+<form method="post" action="/ukony/{{ u.id }}/zaplaceno"{% if zb %} data-z-banky="1"
+  onsubmit="return confirm('Zaplaceno z banky {{ zb.datum }} (faktura č. {{ zb.cislo }}). Opravdu zrušit zaplacení?')"{% endif %}>
   <input type="hidden" name="castka" value="0">
   <input type="hidden" name="back" value="{{ back_url }}">
-  <button type="submit" class="badge ok badge-btn" title="Zaplaceno · klepnutím zrušíš"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">✓ Zaplaceno</span></button>
+  <button type="submit" class="badge ok badge-btn" title="{{ 'Zaplaceno z banky ' ~ zb.datum if zb else 'Zaplaceno' }} · klepnutím zrušíš"><span class="lbl-d">✓ zapl.</span><span class="lbl-m">✓ Zaplaceno</span></button>
 </form>
 {% elif u.stav_platby == 'castecne' %}
 <form method="post" action="/ukony/{{ u.id }}/zaplaceno"
