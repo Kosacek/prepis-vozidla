@@ -31,6 +31,8 @@
   .kod { font-size:13px; font-weight:800; letter-spacing:.5px; color:var(--muted);
          border:1px solid var(--border); border-radius:6px; padding:1px 7px; }
   .pocet { margin-left:auto; font-size:13px; color:var(--muted); }
+  .btn-vse { flex:none; padding:7px 12px; font-size:14px; }
+  .pocet + .btn-vse { margin-left:0; }
 
   .doky { display:flex; flex-direction:column; gap:16px; }
   .dok { background:var(--card); border:1px solid var(--border); border-radius:14px;
@@ -93,6 +95,12 @@
       <h1>Dokumenty k tisku</h1>
       <span class="kod">{{ kod }}</span>
       {% if dokumenty|length > 1 %}<span class="pocet">{{ dokumenty|length }} {{ 'dokumenty' if dokumenty|length < 5 else 'dokumentů' }}</span>{% endif %}
+      {% if dokumenty|length > 1 %}
+      <a class="btn btn-hl btn-vse" href="/{{ kod }}/vse" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/></svg>
+        Vytisknout vše
+      </a>
+      {% endif %}
     </header>
 
     <div class="doky">

@@ -239,7 +239,8 @@ def _index_path(data_dir: str) -> str:
     return os.path.join(data_dir, INDEX_NAME)
 
 
-def zapis_vystup(data_dir: str, files: list[str], data: dict) -> None:
+def zapis_vystup(data_dir: str, files: list[str], data: dict,
+                 plne_moce: list[str] | None = None) -> None:
     """Append-only index of what each generated PDF contains.
 
     The filename carries only a timestamp, so without this a question like
@@ -259,6 +260,8 @@ def zapis_vystup(data_dir: str, files: list[str], data: dict) -> None:
             # Tímhle id žádost zná evidence — přes něj najde doklad z evidence
             # adresu plátce v hotovém PDF (soubory_zadosti).
             "zadost_id": (data.get("zadost_id") or "").strip(),
+            # IČO firem, jejichž uložená plná moc k žádosti patřila (plne_moce/<ico>.pdf).
+            "pm": [str(i) for i in plne_moce or []],
         }
         if not rec["files"]:
             return
@@ -297,9 +300,15 @@ def soubory_zadosti(data_dir: str, zadost_id: str) -> list[str]:
     """PDF žádosti s daným zadost_id (to, které zná evidence). Poslední zápis
     vyhrává — znovu vygenerovaná nezměněná žádost má stejné id. Žádosti
     z doby před zadost_id v indexu se nenajdou; nikdy nevyhodí."""
+    return [str(f) for f in zaznam_zadosti(data_dir, zadost_id).get("files") or []]
+
+
+def zaznam_zadosti(data_dir: str, zadost_id: str) -> dict:
+    """Poslední záznam indexu výstupů s daným zadost_id (files, rz, pm …),
+    jinak {}. Nikdy nevyhodí."""
     if not zadost_id:
-        return []
-    nalezene: list[str] = []
+        return {}
+    nalezene: dict = {}
     try:
         with open(_index_path(data_dir), encoding="utf-8") as fh:
             for line in fh:
@@ -307,8 +316,8 @@ def soubory_zadosti(data_dir: str, zadost_id: str) -> list[str]:
                     rec = json.loads(line)
                 except ValueError:
                     continue
-                if isinstance(rec, dict) and rec.get("zadost_id") == zadost_id:
-                    nalezene = [str(f) for f in rec.get("files") or []]
+                if isinstance(rec, dict) and str(rec.get("zadost_id") or "").lower() == zadost_id.lower():
+                    nalezene = rec
     except OSError:
         pass
     return nalezene

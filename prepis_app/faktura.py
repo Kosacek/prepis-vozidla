@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 
 import openpyxl
 
+import sdileni
 import spayd
 from ppd import ISSUER_ICO, ISSUER_NAME, _HAVE_FCNTL, _atomic_save
 
@@ -129,12 +130,15 @@ def _used_in_year(ws, year: int) -> set:
     return {v for v in (_in_year(r[0], year) for r in ws.iter_rows(min_row=2, values_only=True) if r) if v}
 
 
-def _next_number(used: set, year: int) -> int:
+def _next_number(used: set, year: int, blocked_codes=()) -> int:
     """First number of the scrambled series not yet in `used` (ledger + backup).
-    Old-scheme numbers such as 20260001..3 are simply skipped."""
+    Old-scheme numbers such as 20260001..3 are simply skipped, and so is a
+    sequence value whose 4-digit code is `blocked_codes` (a live random share
+    code of a single žádost): the code is the faktura's share link too."""
+    blocked = {int(c) for c in blocked_codes}
     for s in range(1, _MOD + 1):
         n = cislo_z_poradi(year, s)
-        if n not in used:
+        if n not in used and kod_z_poradi(s) not in blocked:
             return n
     raise RuntimeError(f"Řada faktur pro rok {year} je vyčerpána.")
 
@@ -167,7 +171,8 @@ def issue_faktura(data_dir: str, rec: dict, today: date | None = None) -> int:
         wb, ws = _open(ledger, "Faktury", _HEADER)
         wbb, wsb = _open(backup, "Záloha", _BACKUP_HEADER)
         year = today.year
-        number = _next_number(_used_in_year(ws, year) | _used_in_year(wsb, year), year)
+        number = _next_number(_used_in_year(ws, year) | _used_in_year(wsb, year), year,
+                              sdileni.aktivni_nahodne_kody(data_dir))
         vozidla = ", ".join(rec.get("vozidla") or [])
         issued, due = fmt_date(today), fmt_date(due_date(today))
         ws.append([number, issued, due, rec.get("payer", ""), rec.get("amount", ""),

@@ -31,6 +31,7 @@ from datetime import datetime
 
 import hledani
 import faktura
+import sdileni
 import faktura_pdf
 import ppd
 import ppd_push
@@ -124,6 +125,24 @@ def _vozidla(hodnota) -> list[str]:
     return vysledek
 
 
+MAX_ZADOST_IDS = 50
+
+
+def over_zadost_ids(hodnota) -> list[str]:
+    """zadost_ids = žádosti úkonů, které evidence k faktuře připojila
+    (jejich soubory jdou pod kód faktury). Nepovinné."""
+    if hodnota is None:
+        return []
+    if not isinstance(hodnota, list) or len(hodnota) > MAX_ZADOST_IDS:
+        raise Chyba(f"zadost_ids musí být seznam, nejvýš {MAX_ZADOST_IDS} položek.")
+    ids = []
+    for x in hodnota:
+        if not isinstance(x, str) or not _REQUEST_ID.match(x) or len(x) > MAX_REQUEST_ID:
+            raise Chyba("zadost_ids smí obsahovat jen id (písmena, číslice a . _ : -).")
+        ids.append(x)
+    return list(dict.fromkeys(ids))
+
+
 def over(telo) -> dict:
     """Zkontroluje a znormalizuje tělo požadavku; při chybě vyhodí Chyba."""
     if not isinstance(telo, dict):
@@ -150,6 +169,7 @@ def over(telo) -> dict:
         "zpracoval": _text(telo, "zpracoval", max_delka=MAX_ZPRACOVAL),
         "request_id": request_id,
         "zadost_id": zadost_id,
+        "zadost_ids": over_zadost_ids(telo.get("zadost_ids")),
         "strana": strana,
     }
 
@@ -249,6 +269,10 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
         "variabilni_symbol": str(number), "amount": udaje["castka"],
     }
     _zapis_vystaveny(data_dir, udaje, doklad)
+    # Kód faktury (její poslední 4 číslice) platí od vystavení; úkony z evidence
+    # se do něj připojí přes jejich zadost_id (sdileni.najdi_balik).
+    sdileni.zapis_fakturu(data_dir, number, [],
+                          list(udaje.get("zadost_ids") or []) + ([udaje["zadost_id"]] if udaje.get("zadost_id") else []))
     try:
         out_dir = os.path.join(data_dir, "output")
         os.makedirs(out_dir, exist_ok=True)

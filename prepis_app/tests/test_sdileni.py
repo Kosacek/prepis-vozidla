@@ -192,7 +192,7 @@ def test_ctyrmistny_odkaz_nestini_ostatni_adresy(prod):
 def test_projizdeni_vsech_cisel_se_zablokuje(prod):
     """Čtyři číslice je jen 9000 možností — po pár netrefách musí appka
     přestat odpovídat, jinak je projde skript za pár minut."""
-    A._kod_chyby.clear()
+    A._kod_reset()
     c = _cizinec(prod)
     kody = [str(1000 + i) for i in range(A._KOD_MAX_CHYB + 3)]
     stavy = [c.get("/" + k, base_url="https://zadosti.spznaklic.cz", headers=HTTPS).status_code
@@ -202,17 +202,17 @@ def test_projizdeni_vsech_cisel_se_zablokuje(prod):
     posledni = c.get("/" + kody[-1], base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert posledni.status_code == 429
     assert posledni.headers.get("Retry-After")
-    A._kod_chyby.clear()
+    A._kod_reset()
 
 
 def test_spravny_kod_projde_i_kdyz_nekdo_jiny_zkousel(prod):
     """Brzda nesmí zavřít odkaz tomu, kdo má správné číslo."""
-    A._kod_chyby.clear()
+    A._kod_reset()
     body = _generuj(prod)
     r = _cizinec(prod).get(body["sdilet"] + "/0", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 200
     assert r.mimetype == "application/pdf"
-    A._kod_chyby.clear()
+    A._kod_reset()
 
 
 # ── Balík: odkaz otevře VŠECHNO, co se vygenerovalo ────────────────────────
@@ -246,7 +246,7 @@ def _generuj_balik(prod, tmp_path, monkeypatch):
 
 def test_balik_nese_zadost_plnou_moc_i_doklad(prod, tmp_path, monkeypatch):
     body = _generuj_balik(prod, tmp_path, monkeypatch)
-    polozky = sdileni.najdi(str(tmp_path), body["sdilet"].lstrip("/"))
+    polozky = sdileni.najdi_balik(str(tmp_path), body["sdilet"].lstrip("/"))
     popisy = " | ".join(p["popis"] for p in polozky)
     assert len(polozky) == 3, popisy
     assert "Žádost" in popisy and "Plná moc" in popisy and "Faktura" in popisy
@@ -272,7 +272,7 @@ def test_rozcestnik_je_slepa_ulicka_do_appky_nepusti(prod, tmp_path, monkeypatch
         assert zakazane not in html, f"rozcestník pouští dál do appky: {zakazane}"
     # Odkazy vedou výhradně na dokumenty toho jednoho balíku.
     odkazy = re.findall(r'href="([^"]+)"', html)
-    assert odkazy and all(re.fullmatch(rf"/{kod}/\d+(\?stahnout=1)?", u) for u in odkazy), odkazy
+    assert odkazy and all(re.fullmatch(rf"/{kod}/(\d+(\?stahnout=1)?|vse)", u) for u in odkazy), odkazy
 
 
 def test_jednotlive_dokumenty_z_baliku_jdou_otevrit(prod, tmp_path, monkeypatch):
@@ -288,10 +288,10 @@ def test_jednotlive_dokumenty_z_baliku_jdou_otevrit(prod, tmp_path, monkeypatch)
 def test_index_mimo_balik_nic_nevyda(prod, tmp_path, monkeypatch):
     body = _generuj_balik(prod, tmp_path, monkeypatch)
     kod = body["sdilet"].lstrip("/")
-    A._kod_chyby.clear()
+    A._kod_reset()
     r = _cizinec(prod).get(f"/{kod}/99", base_url="https://zadosti.spznaklic.cz", headers=HTTPS)
     assert r.status_code == 404
-    A._kod_chyby.clear()
+    A._kod_reset()
 
 
 def test_plna_moc_pres_appku_porad_chce_prihlaseni(prod, tmp_path, monkeypatch):

@@ -145,19 +145,19 @@ def test_nahledy_maji_vsechny_strany_dokumentu(prod):
     assert strany == list(range(1, len(strany) + 1)) and len(strany) >= 2, strany
     cizi = _cizinec(prod)
     assert cizi.get(f"/{kod}/0/nahled/{len(strany)}", base_url=WEB, headers=HTTPS).status_code == 200
-    A._kod_chyby.clear()
+    A._kod_reset()
     assert cizi.get(f"/{kod}/0/nahled/{len(strany) + 1}", base_url=WEB, headers=HTTPS).status_code == 404
     assert cizi.get(f"/{kod}/0/nahled/0", base_url=WEB, headers=HTTPS).status_code == 404
-    A._kod_chyby.clear()
+    A._kod_reset()
 
 
 def test_nahled_spatneho_kodu_je_404_a_pocita_se_jako_pokus(prod):
     _generuj(prod)
-    A._kod_chyby.clear()
+    A._kod_reset()
     r = _cizinec(prod).get("/0000/0/nahled/1", base_url=WEB, headers=HTTPS)
     assert r.status_code == 404
     assert A._kod_chyby
-    A._kod_chyby.clear()
+    A._kod_reset()
 
 
 def test_stahnout_posle_pdf_jako_prilohu(prod):

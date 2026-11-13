@@ -56,7 +56,8 @@ from werkzeug.routing import BaseConverter
 
 
 class _KodConverter(BaseConverter):
-    regex = r"\d{4}"
+    # 4 číslice = kód; 8 číslic = celé číslo faktury (2026XXXX), viz sdileni.py
+    regex = r"\d{4}(?:\d{4})?"
 
 
 app.url_map.converters["kod"] = _KodConverter
@@ -65,7 +66,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.34.0"
+__version__ = "1.35.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1353,32 +1354,48 @@ def _zapomen_pokusy(ip: str) -> None:
 # dorovnat appka: po pár špatných trefách z jedné IP přestane odpovídat.
 # Člověk, co jedno číslo opíše z displeje, se do limitu nikdy nedostane;
 # skript, co zkouší 1000, 1001, 1002…, ano.
-_KOD_MAX_CHYB = 12
+_KOD_MAX_CHYB = 10           # víc než 10 netrefených kódů za okno → blok
 _KOD_OKNO_S = 600            # 10 minut
+_KOD_BLOK_S = 900            # 15 minut
 _kod_chyby: dict[str, list[float]] = {}
+_kod_bloky: dict[str, float] = {}
 _kod_zamek = threading.Lock()
 
-_KOD_CESTA = re.compile(r"^/\d{4}(/\d+(/nahled/\d+)?)?$")
+_KOD_CESTA = re.compile(r"^/\d{4}(\d{4})?(/vse|/\d+(/nahled/\d+)?)?$")
 
 
 def _JE_SDILECI_KOD(path: str) -> bool:
     return bool(_KOD_CESTA.match(path))
 
 
+def _kod_reset() -> None:
+    with _kod_zamek:
+        _kod_chyby.clear()
+        _kod_bloky.clear()
+
+
 def _kod_zablokovan(ip: str) -> int:
     """Kolik sekund ještě nesmí zkoušet sdílecí kódy; 0 = může."""
     ted = time.time()
     with _kod_zamek:
-        chyby = [t for t in _kod_chyby.get(ip, []) if ted - t < _KOD_OKNO_S]
-        _kod_chyby[ip] = chyby
-        if len(chyby) < _KOD_MAX_CHYB:
+        do = _kod_bloky.get(ip)
+        if do is None:
             return 0
-        return max(1, int(_KOD_OKNO_S - (ted - chyby[0])))
+        if do > ted:
+            return max(1, int(do - ted))
+        del _kod_bloky[ip]          # blok doběhl — začíná se načisto
+        _kod_chyby.pop(ip, None)
+        return 0
 
 
 def _kod_netrefa(ip: str) -> None:
+    """Zapíše netrefu (neznámý nebo vypršelý kód); po překročení limitu blok."""
+    ted = time.time()
     with _kod_zamek:
-        _kod_chyby.setdefault(ip, []).append(time.time())
+        chyby = [t for t in _kod_chyby.get(ip, []) if ted - t < _KOD_OKNO_S] + [ted]
+        _kod_chyby[ip] = chyby
+        if len(chyby) > _KOD_MAX_CHYB:
+            _kod_bloky[ip] = ted + _KOD_BLOK_S
 
 
 _CESTA_SMAZAT_DOKLAD = re.compile(r"/api/ppd/[0-9]+/(smazat|sdilet)")
@@ -1815,7 +1832,13 @@ def api_generate():
 
     # Jeden odkaz na celý balík. Sdílet jen žádost bylo k ničemu — protějšek
     # potřebuje vytisknout i plnou moc a doklad.
-    if sdilene:
+    # S fakturou je kódem číslo faktury (poslední 4 číslice) a drží i soubory
+    # tohoto generování — víc kódů na jeden úkon by jen mátlo.
+    if result.get("doklad_cislo") and sdilene:
+        result["sdilet"] = "/" + sdileni.zapis_fakturu(
+            DATA_DIR, result["doklad_cislo"],
+            [p for p in sdilene if p.get("druh") != sdileni.DRUH_FAKTURA])
+    elif sdilene:
         result["sdilet"] = f"/{sdileni.vytvor_kod(DATA_DIR, sdilene)}"
 
     # ── Push the finished žádost to the Úkony Tracker (best-effort, async) ───
@@ -1842,6 +1865,7 @@ def api_generate():
         DATA_DIR,
         [result[k] for k in ("zmeny", "zapis", "zmena", "3rz", "vyvoz") if result.get(k)],
         data,
+        plne_moce=[u.rsplit("/", 1)[-1] for u in plne_moce],
     )
 
     return jsonify(result)
@@ -1999,6 +2023,11 @@ def api_sdilet():
             return jsonify({"success": False, "error": "Dokument nenalezen."}), 404
         polozky.append({"file": nazev, "kde": sdileni.KDE_OUTPUT,
                         "popis": sdileni.popis_souboru(nazev)})
+    m = re.fullmatch(r"faktura_(\d+)\.pdf", polozky[0]["file"])
+    if len(polozky) == 1 and m:
+        # Faktura: kód je její číslo, obnoví se na 30 dní a zůstane stejný.
+        return jsonify({"success": True, "plati_dni": sdileni.TTL_DNI,
+                        "sdilet": "/" + sdileni.zapis_fakturu(DATA_DIR, int(m.group(1)))})
     return jsonify({"success": True, "sdilet": f"/{sdileni.vytvor_kod(DATA_DIR, polozky)}"})
 
 
@@ -2202,14 +2231,22 @@ def api_ppd_sdilet(number):
     chyba = _over_klic_integrace("Sdílení dokladů přes API není zapnuté.")
     if chyba:
         return chyba
-    druh = (request.get_json(silent=True) or {}).get("druh") or sdileni.DRUH_PPD
+    telo = request.get_json(silent=True) or {}
+    druh = telo.get("druh") or sdileni.DRUH_PPD
     if druh not in ppd_api.DRUHY:
         return jsonify({"error": "druh smí být jen " + " nebo ".join(ppd_api.DRUHY) + "."}), 400
     if druh == sdileni.DRUH_FAKTURA:
         nazev = f"faktura_{number}.pdf"
         if not _zajisti_pdf_faktury(number):
             return jsonify({"error": f"Faktura č. {number} tu není."}), 404
-        popis = f"Faktura č. {number}"
+        try:
+            zadost_ids = ppd_api.over_zadost_ids(telo.get("zadost_ids"))
+        except ppd_api.Chyba as e:
+            return jsonify({"error": str(e)}), 400
+        # Kód faktury = její číslo; obnoví se od teď a zůstane stejný. Úkony,
+        # které evidence připojila až po vystavení, se přidají sem.
+        kod = sdileni.zapis_fakturu(DATA_DIR, number, [], zadost_ids)
+        return jsonify({"sdilet": f"/{kod}", "plati_dni": sdileni.TTL_DNI})
     else:
         nazev = f"ppd_{number}.pdf"
         if not os.path.isfile(os.path.join(DATA_DIR, "output", nazev)):
@@ -2460,6 +2497,21 @@ def download(filename):
 _SDILENI_NEPLATI = "Odkaz už neplatí — vypršel, nebo je špatně opsaný."
 
 
+def _polozky_zadosti(zadost_id: str) -> list[dict]:
+    """Soubory žádosti podle zadost_id (to, které zná evidence): PDF žádosti
+    z indexu výstupů (hledani.py) a plné moci firem, které k ní patřily."""
+    zaznam = hledani.zaznam_zadosti(DATA_DIR, zadost_id)
+    polozky = []
+    for f in zaznam.get("files") or []:
+        popis = sdileni.popis_souboru(f)
+        polozky.append({"file": f, "kde": sdileni.KDE_OUTPUT,
+                        "popis": f"{popis} · {zaznam['rz']}" if zaznam.get("rz") else popis})
+    for ico in zaznam.get("pm") or []:
+        polozky.append({"file": f"{ico}.pdf", "kde": sdileni.KDE_PLNE_MOCE,
+                        "popis": f"Plná moc (IČO {ico})"})
+    return polozky
+
+
 def _sdilena_cesta(polozka: dict) -> str:
     return os.path.join(DATA_DIR, polozka.get("kde") or "output", polozka.get("file") or "")
 
@@ -2471,8 +2523,9 @@ def _sdilene_polozky(token: str):
     ip = _kdo_zkousi()
     zbyva = _kod_zablokovan(ip)
     if zbyva:
-        return None, ("Moc pokusů. Zkus to za chvíli.", 429, {"Retry-After": str(zbyva)})
-    polozky = sdileni.najdi(DATA_DIR, token) or []
+        return None, (f"Příliš mnoho pokusů. Zkus to znovu za {max(1, -(-zbyva // 60))} min.",
+                      429, {"Retry-After": str(zbyva)})
+    polozky = sdileni.najdi_balik(DATA_DIR, token, _polozky_zadosti) or []
     polozky = [x for x in polozky if os.path.exists(_sdilena_cesta(x))]
     if not polozky:
         _kod_netrefa(ip)
@@ -2517,6 +2570,27 @@ def _posli_sdilenou(token: str, index=None, stranka: bool = True):
 def sdilena_zadost_kod(kod):
     """Krátký odkaz, co se dá nadiktovat: zadosti.spznaklic.cz/1234."""
     return _posli_sdilenou(kod)
+
+
+@app.route("/<kod:kod>/vse")
+def sdilena_zadost_vse(kod):
+    """Všechny dokumenty balíku v jednom PDF — „Vytisknout vše", jedno okno
+    tisku místo několika záložek."""
+    polozky, chyba = _sdilene_polozky(kod)
+    if chyba:
+        return chyba
+    from pypdf import PdfWriter
+    psani = PdfWriter()
+    for x in polozky:
+        try:
+            psani.append(_sdilena_cesta(x))
+        except Exception as e:
+            _log.warning("Sdílené PDF %s se nepodařilo připojit: %s", x.get("file"), e)
+    buf = io.BytesIO()
+    psani.write(buf)
+    return Response(buf.getvalue(), mimetype="application/pdf",
+                    headers={"Content-Disposition": f"inline; filename=dokumenty_{kod}.pdf",
+                             "Cache-Control": "no-store"})
 
 
 @app.route("/<kod:kod>/<int:index>")

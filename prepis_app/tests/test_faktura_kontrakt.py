@@ -112,7 +112,7 @@ def test_sdilet_faktury_ukaze_fakturu_ne_ppd(api):
     r = api.post(f"/api/ppd/{cislo}/sdilet", headers=H, json={"druh": "faktura"})
     assert r.status_code == 200
     kod = r.get_json()["sdilet"]
-    polozky = sdileni.najdi(str(api.data), kod[1:])
+    polozky = sdileni.najdi_balik(str(api.data), kod[1:])
     assert polozky == [{"file": f"faktura_{cislo}.pdf", "kde": "output",
                         "popis": f"Faktura č. {cislo}", "druh": "faktura"}]
     page = api.get(kod)

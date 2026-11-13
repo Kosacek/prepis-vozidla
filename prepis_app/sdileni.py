@@ -26,7 +26,7 @@ import json
 import os
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 # fcntl je jen POSIX (produkční Linux kontejner, kde gunicorn běží se 2
 # workery — stejná pojistka jako ppd.py a tracker_push.py). Na Windows
@@ -153,6 +153,8 @@ def vytvor_kod(data_dir: str, soubory) -> str:
     polozky = _polozky(soubory)
 
     def _vyber(obsazene: set[str]) -> str:
+        # Čtyři číslice faktury (jejího čísla) jsou taky kód — nesmí se potkat.
+        obsazene = obsazene | kody_faktur(data_dir)
         volne = [k for k in range(KOD_MIN, KOD_MAX + 1) if str(k) not in obsazene]
         if not volne:
             # 9000 živých odkazů naráz se nestane (pár žádostí denně × 30 dnů),
@@ -207,6 +209,8 @@ def pripoj_k_baliku(data_dir: str, k_souboru: str, polozka: dict) -> str | None:
             if token in videne:
                 continue  # starší zápis téhož kódu — platí jen ten poslední
             videne.add(token)
+            if d.get("faktura"):
+                continue  # balík faktury (kód = číslo faktury) se nedoplňuje zvenku
             polozky = _polozky(d.get("soubory") or d.get("file") or [])
             if not _nevyprsel(d) or not any(
                     p["file"] == k_souboru and p["kde"] == KDE_OUTPUT for p in polozky):
@@ -238,7 +242,7 @@ def zivy_kod_souboru(data_dir: str, soubor: str, kde: str = KDE_OUTPUT) -> str |
             if token in videne:
                 continue
             videne.add(token)
-            if not _nevyprsel(d):
+            if not _nevyprsel(d) or d.get("faktura"):
                 continue
             polozky = _polozky(d.get("soubory") or d.get("file") or [])
             if any(p["file"] == soubor and p["kde"] == kde for p in polozky):
@@ -268,3 +272,137 @@ def najdi_soubor(data_dir: str, token: str) -> str | None:
     """Jméno prvního souboru v balíku — tj. té hlavní žádosti."""
     polozky = najdi(data_dir, token)
     return polozky[0]["file"] if polozky else None
+
+
+# ── Jeden kód na fakturu ─────────────────────────────────────────────────────
+# Číslo faktury je 2026XXXX; poslední čtyři číslice (XXXX) jsou zároveň kód,
+# pod kterým je k tisku faktura a všechno, co k ní patří: žádosti a plné moci
+# všech aut na ní. Celé číslo (/2026XXXX) funguje taky — pro starší roky.
+# Záznam v share_tokens.jsonl má token = celé číslo faktury, `faktura` = číslo
+# a `zadost_ids` = žádosti, jejichž soubory se dohledají až při otevření (aby
+# se do kódu dostaly i úkony, které evidence k faktuře připojila později).
+# Platí TTL_DNI od vystavení; „Sdílet kódem" platnost obnoví od teď.
+
+def kod_faktury(cislo) -> str:
+    """Poslední čtyři číslice čísla faktury — krátký kód."""
+    return f"{int(cislo) % 10000:04d}"
+
+
+def _posledni_zaznamy(data_dir: str) -> dict[str, dict]:
+    """token -> poslední zápis (platí vždy poslední, jako v najdi)."""
+    posledni: dict[str, dict] = {}
+    for d in _nacti(data_dir):
+        posledni[str(d.get("token"))] = d
+    return posledni
+
+
+def _aktivni_faktury(data_dir: str, roky) -> dict[str, dict]:
+    """token (celé číslo faktury) -> zápis; jen nevypršelé faktury z `roky`."""
+    roky = {str(r) for r in roky}
+    return {t: d for t, d in _posledni_zaznamy(data_dir).items()
+            if d.get("faktura") and _nevyprsel(d) and str(d["faktura"])[:4] in roky}
+
+
+def kody_faktur(data_dir: str, dnes: date | None = None) -> set[str]:
+    """Krátké kódy živých faktur letošního a loňského roku — náhodný kód
+    jednotlivé žádosti se jim musí vyhnout."""
+    rok = (dnes or date.today()).year
+    try:
+        return {kod_faktury(d["faktura"])
+                for d in _aktivni_faktury(data_dir, (rok, rok - 1)).values()}
+    except Exception:
+        return set()
+
+
+def aktivni_nahodne_kody(data_dir: str) -> set[int]:
+    """Živé náhodné čtyřmístné kódy žádostí — číslování faktur je přeskočí."""
+    try:
+        return {int(t) for t, d in _posledni_zaznamy(data_dir).items()
+                if not d.get("faktura") and _nevyprsel(d)
+                and len(t) == 4 and t.isdigit()}
+    except Exception:
+        return set()
+
+
+def zapis_fakturu(data_dir: str, cislo, polozky=(), zadost_ids=()) -> str:
+    """Založí / obnoví kód faktury a vrátí ho (`4821`).
+
+    Doplní soubory a zadost_ids k těm, které už kód má (nic nezmizí), a
+    platnost počítá znovu od teď — tedy při vystavení i při každém „Sdílet
+    kódem". Kód zůstává stejný. Jen když by krátký kód právě držel náhodný
+    kód jiné žádosti, vrátí se celé číslo faktury, aby se nic nepřebilo.
+    Nikdy nevyhazuje."""
+    cislo = int(cislo)
+    token = str(cislo)
+    nove = _polozky(list(polozky))
+
+    def _vyber(_obsazene: set[str]) -> str:
+        stary = _posledni_zaznamy(data_dir).get(token) or {}
+        stare = _polozky(stary.get("soubory") or [])
+        videne, spojene = set(), []
+        for p in stare + nove:
+            klic = (p["file"], p["kde"])
+            if klic not in videne:
+                videne.add(klic)
+                spojene.append(p)
+        ids = list(dict.fromkeys(list(stary.get("zadost_ids") or []) + list(zadost_ids or [])))
+        radek = {"token": token, "faktura": cislo, "soubory": spojene,
+                 "zadost_ids": ids,
+                 "vytvoreno": datetime.now().isoformat(timespec="seconds")}
+        with open(_cesta(data_dir), "a", encoding="utf-8") as f:
+            f.write(json.dumps(radek, ensure_ascii=False) + "\n")
+        kratky = kod_faktury(cislo)
+        return token if int(kratky) in aktivni_nahodne_kody(data_dir) else kratky
+
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        return _zapis(data_dir, _vyber)
+    except Exception:
+        return kod_faktury(cislo)
+
+
+def _balik_faktury(zaznam: dict, zadosti) -> list[dict]:
+    """Faktura vždy první, pak soubory uložené u kódu, pak soubory žádostí
+    z `zadost_ids` (zadosti(zadost_id) -> seznam položek)."""
+    cislo = zaznam["faktura"]
+    polozky = [{"file": f"faktura_{cislo}.pdf", "kde": KDE_OUTPUT,
+                "popis": f"Faktura č. {cislo}", "druh": DRUH_FAKTURA}]
+    dalsi = _polozky(zaznam.get("soubory") or [])
+    for zid in zaznam.get("zadost_ids") or []:
+        if zadosti:
+            try:
+                dalsi += _polozky(list(zadosti(zid) or []))
+            except Exception:
+                continue
+    videne = {(polozky[0]["file"], KDE_OUTPUT)}
+    for p in dalsi:
+        klic = (p["file"], p["kde"])
+        if klic not in videne:
+            videne.add(klic)
+            polozky.append(p)
+    return polozky
+
+
+def najdi_balik(data_dir: str, kod: str, zadosti=None,
+                dnes: date | None = None) -> list[dict] | None:
+    """Balík pro kód z adresy: náhodný kód žádosti, nebo kód faktury.
+
+    Čtyři číslice: nejdřív náhodný kód (ty se s kódy faktur nepotkávají, viz
+    kody_faktur), pak faktura letošního roku, v lednu a bez letošní shody
+    i loňská. Osm číslic = celé číslo faktury libovolného roku. Vypršelé
+    i neznámé → None."""
+    if not (kod.isdigit() and len(kod) == 8):
+        nahodny = najdi(data_dir, kod)
+        if nahodny is not None or not (kod.isdigit() and len(kod) == 4):
+            return nahodny
+    dnes = dnes or date.today()
+    if len(kod) == 8:
+        tokeny = [kod]
+    else:
+        tokeny = [f"{dnes.year}{kod}"] + ([f"{dnes.year - 1}{kod}"] if dnes.month == 1 else [])
+    posledni = _posledni_zaznamy(data_dir)
+    for t in tokeny:
+        d = posledni.get(t)
+        if d and d.get("faktura") and _nevyprsel(d):
+            return _balik_faktury(d, zadosti)
+    return None
