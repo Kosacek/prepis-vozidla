@@ -54,8 +54,9 @@
   }
   function showCode(data) {
     link = data.url;
-    urlEl.textContent = link.replace(/^https?:\/\//, '');
-    var platnost = 'platí ' + (data.plati_dni || 30) + ' dní';
+    // The code is the headline (/5732); the full address is the small print.
+    urlEl.textContent = '/' + data.kod;
+    var platnost = link.replace(/^https?:\/\//, '') + ' · platí ' + (data.plati_dni || 30) + ' dní';
     stav.textContent = platnost;
     choices.hidden = true; result.hidden = false;
     q('[data-share-send]').focus();

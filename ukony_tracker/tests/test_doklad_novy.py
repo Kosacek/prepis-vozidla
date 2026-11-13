@@ -335,3 +335,41 @@ def test_zadost_of_an_unticked_ukon_is_refused(client, parties, zadosti):
     response = client.post("/doklady/novy", json=_body(
         parties, ukony=[parties["b"]], zadost_id="zad-a", strana="provozovatel"))
     assert response.status_code == 400 and zadosti[0] == []
+
+
+# --- Jeden kód na fakturu (2.9.2): evidence sends the zadost_ids of its úkony ----
+
+def _faktura_reply(cislo=20265732):
+    return FakeResponse(201, {"doklad": {
+        "druh": "faktura", "cislo": cislo, "datum": "13.11.2026", "splatnost": "20.11.2026",
+        "castka": 2600, "prijato_od": "JE & NE", "prijato_ico": "44960263",
+        "ucel": "ZASTUPOVÁNÍ NA MMB", "vozidlo": "3BR9309, TMBER6NW0V3099310"}})
+
+
+def test_faktura_issue_sends_the_zadost_ids_of_its_ukony(client, parties, zadosti):
+    calls, reply = zadosti
+    reply["response"] = _faktura_reply()
+    r = client.post("/doklady/novy", json=_body(parties, druh="faktura"))
+    assert r.status_code == 201
+    assert sorted(calls[0]["json"]["zadost_ids"]) == ["zad-a", "zad-b"]
+
+
+def test_manual_ukony_send_no_zadost_ids_and_ppd_never_does(client, data, zadosti):
+    calls, reply = zadosti
+    reply["response"] = _faktura_reply()
+    client.post("/doklady/novy", json=_body(data, druh="faktura"))
+    assert "zadost_ids" not in calls[0]["json"]
+
+
+def test_sharing_a_faktura_sends_zadost_ids_of_the_linked_ukony(client, parties, zadosti, monkeypatch):
+    from services import doklad_share
+    calls, reply = zadosti
+    reply["response"] = _faktura_reply()
+    client.post("/doklady/novy", json=_body(parties, druh="faktura"))
+    # An úkon linked later (explicit link) is included on the next share.
+    posts = []
+    monkeypatch.setattr(doklad_share.requests, "post", lambda url, **kw: posts.append(kw) or FakeResponse(
+        200, {"sdilet": "/5732", "plati_dni": 30}))
+    r = client.post("/doklady/20265732/sdilet")
+    assert r.get_json()["kod"] == "5732"
+    assert sorted(posts[0]["json"]["zadost_ids"]) == ["zad-a", "zad-b"]

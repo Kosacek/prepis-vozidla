@@ -1,0 +1,33 @@
+{# Demo for release 2.9.2 (Jeden kód na všechno): a /5732 code, under it the
+   faktura and four žádosti fan out as miniature papers. CSS-only, 4s loop,
+   app tokens only. #}
+<style>
+  .de292-demo { box-sizing: border-box; height: 110px; padding: 12px 14px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); overflow: hidden;
+    display: grid; place-items: center; }
+  .de292-col { display: grid; gap: 8px; justify-items: center; }
+  .de292-kod { font-weight: 800; font-size: 15px; letter-spacing: .5px; padding: 2px 12px;
+    border-radius: 8px; background: var(--card); border: 1px solid var(--line); }
+  .de292-row { display: flex; gap: 7px; }
+  .de292-p { width: 28px; height: 38px; box-sizing: border-box; padding: 5px 4px; border-radius: 4px;
+    background: var(--card); border: 1px solid var(--line); opacity: 0; transform: translateY(8px);
+    animation: de292-in 4s ease-out infinite; }
+  .de292-p:nth-child(2) { animation-delay: .15s; }
+  .de292-p:nth-child(3) { animation-delay: .3s; }
+  .de292-p:nth-child(4) { animation-delay: .45s; }
+  .de292-p:nth-child(5) { animation-delay: .6s; }
+  .de292-p i { display: block; height: 3px; margin-bottom: 3px; border-radius: 2px; background: var(--line); }
+  .de292-p:first-child i { background: var(--accent); }
+  @keyframes de292-in { 0%, 10% { opacity: 0; transform: translateY(8px); } 25%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .de292-p { animation: none; opacity: 1; transform: none; } }
+</style>
+<div class="de292-demo" aria-hidden="true">
+  <div class="de292-col">
+    <div class="de292-kod">/5732</div>
+    <div class="de292-row">
+      <div class="de292-p"><i></i><i></i><i></i></div><div class="de292-p"><i></i><i></i><i></i></div>
+      <div class="de292-p"><i></i><i></i><i></i></div><div class="de292-p"><i></i><i></i><i></i></div>
+      <div class="de292-p"><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</div>

@@ -27,6 +27,14 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.9.2", date(2026, 11, 13),
+        "Jeden kód na všechno",
+        ("Číslo faktury je zároveň kód: na zadosti.spznaklic.cz/5732 vytiskneš "
+         "fakturu i všechny žádosti k ní.",
+         "„Sdílet kódem“ kód obnoví na dalších 30 dní, pořád stejný."),
+        demo="v2_9_2",
+    ),
+    Release(
         "2.9.1", date(2026, 11, 13),
         "Každý doklad je teď faktura s QR kódem",
         ("Zákazník zaplatí převodem a úkon se ti sám označí jako zaplacený.",),

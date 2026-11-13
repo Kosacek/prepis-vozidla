@@ -107,6 +107,13 @@ def zadosti(conn, ukon_ids) -> dict[int, dict]:
     } for r in rows}
 
 
+def zadost_ids(conn, ukon_ids) -> list[str]:
+    """zadost_id of every úkon that came from a žádost (prichozi.zadost_id,
+    set by created_ukon_id); manual úkony have none."""
+    ids = [z["id"] for z in zadosti(conn, ukon_ids).values()]
+    return list(dict.fromkeys(ids))
+
+
 def _platce(conn, payload, ukon_ids) -> dict:
     """Optional payer from a žádost: {zadost_id, strana} for žádosti to look up
     the address, or {} when the doklad is on the firm / a typed name."""
@@ -189,6 +196,10 @@ def vystavit(conn, req: dict) -> dict:
     faktura = req.get("druh") == "faktura"
     if faktura:
         body["druh"] = "faktura"  # PPD requests stay byte-for-byte what they were
+        # Žádosti puts these žádosti (and their plné moci) under the faktura's code.
+        ids = zadost_ids(conn, [u["id"] for u in req["ukony"]])
+        if ids:
+            body["zadost_ids"] = ids
     if req.get("prijato_adresa"):
         # Jen když je adresa vyplněná — prázdná se neposílá (žádosti by z ní
         # jinak udělaly prázdnou adresu plátce místo adresy ze žádosti/firmy).

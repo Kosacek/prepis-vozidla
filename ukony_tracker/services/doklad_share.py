@@ -18,6 +18,7 @@ import requests
 
 import config
 from repositories import ppd_repo
+from services import doklad_issue, ppd_links
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,16 @@ def sdilet(conn, cislo: int) -> dict:
     if doklad["smazano"]:
         raise ShareError(f"Doklad č. {cislo} je smazaný.", 409)
     # A faktura is shared the same way; žádosti are told which kind it is.
-    extra = {"json": {"druh": "faktura"}} if doklad["druh"] == "faktura" else {}
+    extra = {}
+    if doklad["druh"] == "faktura":
+        # The faktura's code (last 4 digits of its number) also opens the žádosti
+        # of every úkon linked since it was issued — send them with each share.
+        linked = ppd_links.compute(conn).by_doklad.get(cislo, [])
+        body = {"druh": "faktura"}
+        ids = doklad_issue.zadost_ids(conn, linked)
+        if ids:
+            body["zadost_ids"] = ids
+        extra = {"json": body}
     try:
         # No redirects: without the endpoint the login gate answers 302 → a 200 login page.
         response = requests.post(f"{config.ZADOSTI_API_URL.rstrip('/')}/api/ppd/{cislo}/sdilet",
