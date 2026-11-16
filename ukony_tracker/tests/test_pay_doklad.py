@@ -79,3 +79,25 @@ def test_unpaying_a_bank_paid_ukon_asks_first(client, ids):
 def test_hand_paid_ukon_unpays_without_asking(client, ids):
     body = client.get("/ukony/vse").get_data(as_text=True)
     assert "data-z-banky" not in _item(body, ids["zaplaceny"])
+
+
+def test_paying_from_the_doklady_drawer_returns_the_rows_new_chip(client, ids):
+    # 16. 11. 2026, faktura 0004: after "Zaplatit" in the drawer the row chip kept
+    # saying unpaid until a reload, so the green ✓ got tapped again — and un-paid it.
+    uid = ids["s_dokladem"]
+    before = client.post(f"/ukony/{ids['zaplaceny']}/zaplaceno", data={"back": "/doklady"},
+                         headers={"X-Requested-With": "fetch"}).get_json()
+    assert set(before["doklad_chips"]) == {"183"}
+    assert "is-partial" in before["doklad_chips"]["183"]
+    paid = client.post(f"/ukony/{uid}/zaplaceno", data={"back": "/doklady"},
+                       headers={"X-Requested-With": "fetch"}).get_json()
+    chip = paid["doklad_chips"]["183"]
+    assert 'class="doklad-pocet is-paid' in chip and "2 úkony" in chip
+    page = client.get("/doklady").get_data(as_text=True)
+    assert chip.strip() in page  # same markup as the page renders
+
+
+def test_an_ukon_without_doklad_returns_no_chips(client, ids):
+    r = client.post(f"/ukony/{ids['bez_dokladu']}/zaplaceno", data={"back": "/ukony/vse"},
+                    headers={"X-Requested-With": "fetch"}).get_json()
+    assert r["doklad_chips"] == {}

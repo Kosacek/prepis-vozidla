@@ -1,0 +1,4 @@
+{# Paid chip of one doklad row (expects p = doklady_view.Radek). Shared by
+   _doklad_item.html and the pay toggle's AJAX reply (routes/ukony.py
+   mark_paid → doklad_chips), so the row updates without a reload. #}
+<span class="doklad-pocet is-{{ p.platba.stav }}{{ ' has-ico' if p.platba.zpusob == 'auto' }}" title="{{ p.platba.title }}">{% if p.platba.zpusob == 'auto' %}<svg class="doklad-pocet__ico" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>{% endif %}{{ p.platba.label }}</span>

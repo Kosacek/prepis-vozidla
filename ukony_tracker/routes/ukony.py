@@ -343,6 +343,30 @@ def delete(uid):
     return redirect(_safe_back(request.form.get("back")) or url_for("ukony.table"))
 
 
+def _doklad_chips(conn, uid: int) -> dict[str, str]:
+    """Fresh paid chip of every doklad that pays úkon `uid`, keyed by číslo.
+    On /doklady the row chip must follow a payment made in its drawer — it kept
+    saying unpaid, and the next tap on the green ✓ un-paid the úkon (16. 11. 2026)."""
+    from repositories import ppd_repo
+    from services import doklady_view, ppd_links
+    links = ppd_links.for_request()
+    cisla = links.by_ukon.get(uid, [])
+    if not cisla:
+        return {}
+    ukony = ukony_repo.list_by_ids(conn, (i for c in cisla for i in links.by_doklad.get(c, [])))
+    firmy_by_id = {f["id"]: f for f in firmy_repo.list_all(conn)}
+    colors = colors_service.firma_color_map(conn)
+    banka = doklady_view.banka_platby(conn)
+    chips = {}
+    for cislo in cisla:
+        doklad = ppd_repo.get_by_cislo(conn, cislo)
+        if doklad is None or doklad["smazano"]:
+            continue
+        p = doklady_view.radek(doklad, links, ukony, firmy_by_id, colors, banka=banka)
+        chips[str(cislo)] = render_template("_doklad_pocet.html", p=p).strip()
+    return chips
+
+
 @bp.post("/ukony/<int:uid>/zaplaceno")
 def mark_paid(uid):
     conn = db.get_db()
@@ -367,6 +391,7 @@ def mark_paid(uid):
         row = {"id": uid, "stav_platby": stav, "zaplaceno_kc": z}
         return jsonify(
             ok=True, id=uid, stav_platby=stav, zaplaceno_kc=z,
+            doklad_chips=_doklad_chips(conn, uid),
             pay_badge_html=render_template("_pay_badge.html", u=row),
             stav_slot_html=render_template("_stav_slot.html", u=row, back_url=back_url),
         )

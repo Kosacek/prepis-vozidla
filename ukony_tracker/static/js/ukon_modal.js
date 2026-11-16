@@ -327,7 +327,18 @@
     var payEl = item.querySelector(".recent-pay");
     if (payEl && d.pay_badge_html != null) payEl.innerHTML = d.pay_badge_html;
     var slotEl = item.querySelector(".stav-slot");
-    if (slotEl && d.stav_slot_html != null) slotEl.innerHTML = d.stav_slot_html;
+    if (slotEl && d.stav_slot_html != null) {
+      slotEl.innerHTML = d.stav_slot_html;
+      // The second tap of a double-tap lands on the button that just
+      // replaced the first one — it must not undo the payment.
+      var now = String(Date.now());
+      slotEl.querySelectorAll("form").forEach(function (f) { f.setAttribute("data-pay-at", now); });
+    }
+    // On /doklady the row's chip follows a payment made in its drawer.
+    Object.keys(d.doklad_chips || {}).forEach(function (cislo) {
+      document.querySelectorAll('.doklad-item[data-cislo="' + cislo + '"] .doklad-pocet')
+        .forEach(function (chip) { chip.outerHTML = d.doklad_chips[cislo]; });
+    });
     var flashEl = item.querySelector("a.recent-row") || item;
     flashEl.classList.add("row-saved");
     setTimeout(function () { flashEl.classList.remove("row-saved"); }, 1200);
@@ -350,7 +361,13 @@
 
     var mPay = /\/ukony\/(\d+)\/zaplaceno$/.exec(action);
     if (mPay) {
+      // Un-paying a bank-paid or part-paid úkon asks first (inline
+      // onsubmit="return confirm(...)"). "Zrušit" there cancels the submit —
+      // it used to un-pay anyway (faktura 0004, 16. 11. 2026).
+      if (e.defaultPrevented) return;
       e.preventDefault();
+      var payAt = Number(form.getAttribute("data-pay-at") || 0);
+      if (payAt && Date.now() - payAt < 700) return;
       var item = form.closest(".ukony-item");
       var btn = form.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
