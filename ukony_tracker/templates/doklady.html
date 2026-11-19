@@ -25,15 +25,16 @@
         {% endfor %}
       </select>
       {% with month_name="mesic", month_value=mesic %}{% include "_month_field.html" %}{% endwith %}
-      <select name="smazane" class="filter-select" aria-label="Smazané doklady">
-        <option value="">Platné</option>
-        <option value="1" {{ 'selected' if smazane }}>I smazané</option>
+      <select name="smazane" class="filter-select" aria-label="Stornované doklady">
+        <option value="">Všechny</option>
+        <option value="ne" {{ 'selected' if smazane == 'ne' }}>Platné</option>
+        <option value="jen" {{ 'selected' if smazane == 'jen' }}>Stornované</option>
       </select>
       <a href="{{ url_for('ppd.doklady') }}" class="btn btn-sm">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
       <span id="doklady-count">{{ total.pocet }}</span> dokladů ·
-      <span id="doklady-sum">{{ total.castka|kc }}</span> Kč
+      <span id="doklady-sum">{{ total.castka|kc }}</span> Kč<span id="doklady-storno"{% if not total.storno %} hidden{% endif %}> · <span id="doklady-storno-n">{{ total.storno }}</span> stornováno</span>
     </div>
     {% if banka %}
     <div class="muted" style="margin-top: var(--sp-2); font-size: 0.875rem;">
@@ -60,7 +61,7 @@
 {% if novy_doklad %}{% include "_doklad_new_modal.html" %}{% endif %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=14"></script>
 <script src="{{ url_for('static', filename='js/firma_pick.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/doklady.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/doklady.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/doklad_share.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/doklad_payer.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=9"></script>

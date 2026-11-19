@@ -53,7 +53,33 @@ def _normalize(record: dict) -> dict:
     if "splatnost" in record:
         splatnost = record["splatnost"]
         values["splatnost"] = _iso_date(splatnost, "Splatnost") if splatnost not in (None, "") else None
+    values.update(_storno(record, smazano))
     return values
+
+
+def _storno(record: dict, smazano: bool) -> dict:
+    """storno_cas / storno_kdo from žádosti 1.36.0. Obnovit (smazano false) clears
+    them; a push without the keys (older žádosti) leaves the stored ones alone."""
+    if not smazano:
+        return {"storno_cas": None, "storno_kdo": None}
+    out = {}
+    if "storno_cas" in record:
+        cas = record["storno_cas"]
+        if cas is not None and not isinstance(cas, str):
+            raise ValueError("Pole storno_cas musí být text.")
+        cas = (cas or "").strip()
+        if cas:
+            try:
+                datetime.fromisoformat(cas)
+            except ValueError:
+                raise ValueError("Pole storno_cas musí být čas ISO 8601.") from None
+        out["storno_cas"] = cas or None
+    if "storno_kdo" in record:
+        kdo = record["storno_kdo"]
+        if kdo is not None and not isinstance(kdo, str):
+            raise ValueError("Pole storno_kdo musí být text.")
+        out["storno_kdo"] = (kdo or "").strip()[:60] or None
+    return out
 
 
 def _iso_date(value, label: str) -> str:
@@ -123,6 +149,10 @@ def upsert(conn: sqlite3.Connection, record: dict) -> tuple[sqlite3.Row, bool]:
             existing = get_by_cislo(conn, values["cislo"])
             if values["ukon_id"] is None:
                 values["ukon_id"] = existing["ukon_id"]
+            if not values["zadost_id"]:
+                # A push without zadost_id (storno/obnovit, older builds) never
+                # blanks the link to the žádost.
+                values["zadost_id"] = existing["zadost_id"] or ""
             if any(existing[key] != value for key, value in values.items()):
                 # Názvy sloupců pochází pouze z našeho pevného seznamu polí.
                 setters = ",".join(f"{key}=?" for key in values)
@@ -138,11 +168,13 @@ def get_by_cislo(conn: sqlite3.Connection, cislo: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM ppd WHERE cislo=?", (cislo,)).fetchone()
 
 
-def mark_deleted(conn: sqlite3.Connection, cislo: int) -> None:
-    """Skryje doklad, který žádosti právě smazaly (jejich push řekne totéž o chvíli později)."""
+def mark_deleted(conn: sqlite3.Connection, cislo: int, kdo: str | None = None) -> None:
+    """Označí doklad, který žádosti právě stornovaly (jejich push řekne totéž o chvíli později)."""
+    cas = datetime.now().isoformat(timespec="seconds")  # local time, like žádosti send it
     with conn:
-        conn.execute("UPDATE ppd SET smazano=1, updated_at=? WHERE cislo=? AND smazano=0",
-                     (db.now_iso(), cislo))
+        conn.execute("UPDATE ppd SET smazano=1, storno_cas=?, storno_kdo=?, updated_at=?"
+                     " WHERE cislo=? AND smazano=0",
+                     (cas, (kdo or "").strip()[:60] or None, db.now_iso(), cislo))
 
 
 def _filters(od, do, q, include_deleted) -> tuple[str, list]:

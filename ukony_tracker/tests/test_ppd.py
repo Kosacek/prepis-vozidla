@@ -326,7 +326,7 @@ def test_import_rejects_invalid_envelope(client, payload):
     assert response.status_code == 400 and response.get_json()["error"]
 
 
-def test_doklady_renders_link_and_hides_deleted_by_default(client):
+def test_doklady_renders_link_and_greys_stornovane_out_of_the_sums(client):
     with client.application.app_context():
         conn = db.get_db()
         fid = firmy_repo.create(conn, nazev="Cardion", zkratka="Cardion")
@@ -337,16 +337,18 @@ def test_doklady_renders_link_and_hides_deleted_by_default(client):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert '<a href="/doklady">Doklady</a>' in body
-    assert 'data-cislo="101"' in body and 'data-cislo="102"' not in body
+    # Since žádosti 1.36.0 a stornovaný doklad stays in the list, greyed (2.9.6).
+    assert 'data-cislo="101"' in body and 'data-cislo="102"' in body and "Stornováno" in body
     # 2.8: a linked car is shown as evidence has it (the úkon's RZ), not as the doklad wrote it.
     assert "14.06.2026" in body and "JAN ŽIŽKA" in body and '<b class="doklad-spz">1AB2345</b>' in body
     assert f'href="/ukony/{uid}/upravit?back=' in body
     assert '<span id="doklady-count">1</span>' in body
     assert '<span id="doklady-sum">1\u00a0300</span>' in body
-    body = client.get("/doklady?smazane=1").get_data(as_text=True)
-    assert 'data-cislo="102"' in body and "smazaný" in body
-    assert '<span id="doklady-count">2</span>' in body
-    assert '<span id="doklady-sum">2\u00a0600</span>' in body
+    body = client.get("/doklady?smazane=ne").get_data(as_text=True)
+    assert 'data-cislo="101"' in body and 'data-cislo="102"' not in body
+    body = client.get("/doklady?smazane=jen").get_data(as_text=True)
+    assert 'data-cislo="102"' in body and 'data-cislo="101"' not in body
+    assert '<span id="doklady-count">0</span>' in body
 
 
 @pytest.mark.parametrize("query", ["nová", "9zz", "102"])
@@ -362,7 +364,8 @@ def test_doklady_filters_month_and_search_and_updates_header(client, query):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert 'data-cislo="102"' in body
-    assert all(f'data-cislo="{n}"' not in body for n in (101, 103, 104))
+    assert all(f'data-cislo="{n}"' not in body for n in (101, 103))
+    # 104 is stornovaný: shown greyed when the search finds it, never counted.
     assert '<span id="doklady-count">1</span>' in body
     assert '<span id="doklady-sum">700</span>' in body
     assert 'name="mesic" value="2026-06"' in body

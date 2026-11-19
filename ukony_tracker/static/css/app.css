@@ -2283,6 +2283,11 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-row[aria-expanded="true"] .doklad-chev::before { transform: rotate(45deg); }
 .doklad-item.is-open .doklad-row { background: var(--bg); }
 .doklad-item.is-smazany .doklad-cislo { text-decoration: line-through; color: var(--muted); }
+/* Stornovaný doklad (žádosti 1.36.0): stays in the list, greyed, out of every sum. */
+.doklad-item.is-smazany .doklad-row { opacity: .55; }
+.doklad-item.is-smazany .doklad-firma-chip { filter: grayscale(1); }
+.doklad-pocet.is-storno { background: var(--bg); color: var(--muted); border-style: dashed; }
+.doklad-storno-kdy { color: var(--muted); font-weight: 500; }
 
 .doklad-share {
   display: inline-grid; place-items: center; width: 40px; height: 40px; margin-right: 4px;

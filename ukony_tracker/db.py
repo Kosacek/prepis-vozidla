@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS ppd (
   druh TEXT NOT NULL DEFAULT 'ppd',
   splatnost TEXT,
   zaplaceno_dne TEXT,
+  storno_cas TEXT,
+  storno_kdo TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -197,6 +199,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "ppd", "druh", "druh TEXT NOT NULL DEFAULT 'ppd'")
     _ensure_column(conn, "ppd", "splatnost", "splatnost TEXT")
     _ensure_column(conn, "ppd", "zaplaceno_dne", "zaplaceno_dne TEXT")
+    # Storno (žádosti 1.36.0): when (local ISO time) and who, shown on a greyed row.
+    _ensure_column(conn, "ppd", "storno_cas", "storno_cas TEXT")
+    _ensure_column(conn, "ppd", "storno_kdo", "storno_kdo TEXT")
     conn.commit()
 
 

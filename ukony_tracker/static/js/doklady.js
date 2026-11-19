@@ -33,17 +33,23 @@
   items.forEach(function (it) {
     it._s = fold(it.getAttribute('data-search'));
     it._kc = parseInt(it.getAttribute('data-kc'), 10) || 0;
+    it._storno = it.classList.contains('is-smazany');
   });
+  var stornoEl = document.getElementById('doklady-storno');
+  var stornoN = document.getElementById('doklady-storno-n');
   function apply() {
     var q = fold(input.value.trim()).replace(/\s+/g, '');
-    var n = 0, sum = 0;
+    var n = 0, sum = 0, storno = 0;
     items.forEach(function (it) {
       // Spaces are ignored so "3br 9309" finds 3BR9309.
       var show = !q || it._s.replace(/\s+/g, '').indexOf(q) >= 0;
       it.hidden = !show;
-      if (show) { n++; sum += it._kc; }
+      // Stornované stay visible (greyed) but never count.
+      if (show && it._storno) storno++;
+      else if (show) { n++; sum += it._kc; }
     });
     countEl.textContent = n;
+    if (stornoEl) { stornoEl.hidden = !storno; stornoN.textContent = storno; }
     sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
   if (input) input.addEventListener('input', apply);
@@ -59,17 +65,17 @@
     e.preventDefault();
     var btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
-    fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'fetch' } })
+    var body = new FormData(form);
+    // Who stornoes it goes to žádosti as "kdo" (the 👤 profile, like elsewhere).
+    try { body.set('zpracoval', localStorage.getItem('ukony_zpracoval') || ''); } catch (_) {}
+    fetch(form.action, { method: 'POST', body: body, headers: { 'X-Requested-With': 'fetch' } })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; });
       })
       .then(function (res) {
         if (!res.ok || !res.d.ok) { var err = new Error(res.d.error || FAIL); err.shown = true; throw err; }
-        var item = form.closest('.doklad-item');
-        items = items.filter(function (it) { return it !== item; });
-        item.style.transition = 'opacity .15s ease';
-        item.style.opacity = '0';
-        setTimeout(function () { item.remove(); apply(); }, 160);
+        // The doklad stays in the list, greyed as "Stornováno" — reload to draw it.
+        window.location.reload();
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;

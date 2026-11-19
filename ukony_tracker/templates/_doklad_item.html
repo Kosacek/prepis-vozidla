@@ -21,7 +21,7 @@
         </span>
         {%- else %}<span class="doklad-vin is-only muted">bez auta</span>{% endfor -%}
       </span>
-      <span class="doklad-od" title="{{ p.prijato_od }}">{{ p.prijato_od or '—' }}{% if p.smazano %} <span class="tag">smazaný</span>{% endif %}</span>
+      <span class="doklad-od" title="{{ p.prijato_od }}">{{ p.prijato_od or '—' }}{% if p.smazano and p.platba.radek != 'Stornováno' %} <span class="tag doklad-storno-kdy">{{ p.platba.radek|replace('Stornováno · ', '') }}</span>{% endif %}</span>
       <span class="doklad-kc"><b>{{ p.castka|kc }} Kč</b></span>
       {% include "_doklad_pocet.html" %}
       <span class="doklad-chev" aria-hidden="true"></span>

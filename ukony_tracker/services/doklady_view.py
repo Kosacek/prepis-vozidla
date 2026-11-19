@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 
 from services import ppd_links
 
@@ -134,6 +134,22 @@ def _dmy(iso: str) -> str:
     return f"{iso[8:10]}.{iso[5:7]}.{iso[0:4]}" if iso else ""
 
 
+def storno_text(doklad) -> str:
+    """ "Stornováno · 19. 11. 16:02 · David" (when and who only if žádosti sent them)."""
+    parts = ["Stornováno"]
+    cas = _col(doklad, "storno_cas", "")
+    try:
+        t = datetime.fromisoformat(cas) if cas else None
+    except ValueError:
+        t = None
+    if t:
+        parts.append(f"{t.day}. {t.month}. {t:%H:%M}")
+    kdo = _col(doklad, "storno_kdo", "")
+    if kdo:
+        parts.append(kdo)
+    return " · ".join(parts)
+
+
 def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, object],
           firma_colors: Mapping[str, str], dnes: date | None = None,
           banka: Mapping[int, str] | None = None) -> Radek:
@@ -149,9 +165,14 @@ def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, 
     pay = platba(linked, druh)
     if druh == "faktura":
         pay = _zpusob(pay, banka, cislo)
+    storno = storno_text(doklad) if doklad["smazano"] else ""
+    if doklad["smazano"]:
+        # Stornovaný doklad pays nothing and waits for nothing (žádosti 1.36.0).
+        pay = Platba("storno", "Stornováno", storno, radek=storno)
     # Past its due date and not paid (a doklad marked paid by hand has no worry left).
     po = bool(splatnost_iso and splatnost_iso < (dnes or date.today()).isoformat()
-              and pay.stav in ("unpaid", "partial", "none") and not _col(doklad, "zaplaceno_dne"))
+              and pay.stav in ("unpaid", "partial", "none") and not _col(doklad, "zaplaceno_dne")
+              and not doklad["smazano"])
     hledat = " ".join(["faktura" if druh == "faktura" else "", str(cislo), f"{cislo % 10000:04d}" if druh == "faktura" else "", doklad["prijato_od"] or "", doklad["prijato_ico"] or "",
                        doklad["vozidlo"] or "", firma["zkratka"] if firma else "",
                        *(f"{a.spz} {a.vin}" for a in cars)])

@@ -56,7 +56,11 @@ def doklady():
     # měsíc a smazané filtruje server (odkaz jde uložit), hledání i živě v JS.
     mesic = (request.args.get("mesic") or "").strip()
     q = (request.args.get("q") or "").strip()
-    smazane = request.args.get("smazane") == "1"
+    # Stornované show greyed by default (žádosti 1.36.0); "ne" hides them, "jen"
+    # shows only them. "1" is the old "I smazané" link (= all).
+    smazane = request.args.get("smazane") or ""
+    if smazane not in ("", "ne", "jen", "1"):
+        smazane = ""
     firma = request.args.get("firma", type=int)
     od = do = None
     if mesic:
@@ -70,8 +74,10 @@ def doklady():
             abort(400, description="Neplatný měsíc.")
     conn = db.get_db()
     links = ppd_links.for_request()
-    rows = [r for r in ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=smazane, limit=None)
-            if firma is None or links.firma.get(r["cislo"]) == firma]
+    rows = [r for r in ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=smazane != "ne", limit=None)
+            if (firma is None or links.firma.get(r["cislo"]) == firma)
+            and (smazane != "jen" or r["smazano"])]
+    platne = [r for r in rows if not r["smazano"]]
     ukony = ukony_repo.list_by_ids(conn, (uid for r in rows for uid in links.by_doklad.get(r["cislo"], [])))
     firmy = firmy_repo.list_all(conn)
     firmy_by_id = {f["id"]: f for f in firmy}
@@ -81,7 +87,9 @@ def doklady():
     return render_template(
         "doklady.html", doklady=radky,
         ukony=ukony, firmy=firmy, firma_colors=firma_colors,
-        total={"pocet": len(rows), "castka": sum(r["castka"] for r in rows)},
+        # Stornované never count: not in the number, not in the sum.
+        total={"pocet": len(platne), "castka": sum(r["castka"] for r in platne),
+               "storno": len(rows) - len(platne)},
         mesic=mesic, q=q, smazane=smazane, firma=firma, banka=moneta_job.status_view(conn),
         tisk_base=doklad_share.tisk_base(), tisk_base_faktura=doklad_share.tisk_base("faktura"),
         # Nová faktura: the modal's button stays disabled when žádosti can't issue one.
@@ -99,7 +107,7 @@ def smazat(cislo):
     """The trash on Doklady: deletes the doklad through žádosti, never an úkon."""
     ajax = request.headers.get("X-Requested-With") == "fetch"
     try:
-        doklad_delete.smazat(db.get_db(), cislo)
+        doklad_delete.smazat(db.get_db(), cislo, normalize_profil(request.form.get("zpracoval")) or None)
     except doklad_delete.DeleteError as e:
         if ajax:
             return jsonify(ok=False, error=str(e)), e.status
@@ -107,7 +115,7 @@ def smazat(cislo):
     else:
         if ajax:
             return jsonify(ok=True, cislo=cislo)
-        flash(f"Doklad č. {cislo} smazán.", "success")
+        flash(f"Doklad č. {doklad_delete._kratke(cislo)} stornován.", "success")
     return redirect(safe_back(request.form.get("back")) or url_for("ppd.doklady"))
 
 

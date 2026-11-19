@@ -146,14 +146,19 @@ def test_delete_asks_zadosti_and_hides_the_doklad_keeping_its_ukony(client, data
     assert calls[0]["allow_redirects"] is False  # the login page is not a success
     assert _smazano(client) == 1
     assert _snapshot(client) == before
-    assert 'data-cislo="183"' not in client.get("/doklady").get_data(as_text=True)
+    # 2.9.6: the stornovaný doklad stays in the list, greyed, without its trash.
+    html = client.get("/doklady").get_data(as_text=True)
+    assert 'data-cislo="183"' in html and "Stornováno" in html
+    assert 'action="/doklady/183/smazat"' not in html
 
 
-def test_zadosti_no_longer_having_the_doklad_still_hides_it(client, data, zadosti):
+def test_removed_false_is_not_a_storno_and_hides_nothing(client, data, zadosti):
+    # 13. 11. 2026: {"removed": false} hid faktura 0001 while žádosti kept it live.
     zadosti[1]["response"] = FakeResponse(200, {"removed": False})
     before = _snapshot(client)
-    assert _delete(client).status_code == 200
-    assert _smazano(client) == 1
+    r = _delete(client)
+    assert r.status_code == 409 and r.get_json()["ok"] is False
+    assert _smazano(client) == 0
     assert _snapshot(client) == before
 
 
@@ -203,7 +208,7 @@ def test_already_deleted_doklad_is_not_sent_again(client, data, zadosti):
 def test_plain_form_post_redirects_back_with_a_message(client, data, zadosti):
     r = client.post("/doklady/183/smazat", data={"back": "/doklady?q=3br"})
     assert r.status_code == 302 and r.headers["Location"].endswith("/doklady?q=3br")
-    assert "Doklad č. 183 smazán." in client.get("/doklady").get_data(as_text=True)
+    assert "Doklad č. 183 stornován." in client.get("/doklady").get_data(as_text=True)
 
 
 def test_plain_form_post_failure_flashes_the_error(client, data, zadosti):
