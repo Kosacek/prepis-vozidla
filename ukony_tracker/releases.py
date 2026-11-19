@@ -39,6 +39,13 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.9.5", date(2026, 11, 19),
+        "Znovu naskenované auto už sken nezasekne",
+        ("Auto, které v evidenci už je, se označí „Už zapsáno“; nové číslo ORV zapíšeš jedním klepnutím.",),
+        oblast="technicak", nazev="Znovu naskenované auto",
+        radek="Už zapsané auto se jen označí, nové číslo ORV zapíšeš jedním klepnutím.",
+    ),
+    Release(
         "2.9.4", date(2026, 11, 13),
         "Zelená s ✓ = zaplaceno, všude stejně",
         ("V Úkonech i Dokladech: zelená s ✓ je zaplacená, žlutá čeká na fakturu, bílá ještě není zaplacená.",),
