@@ -250,7 +250,7 @@ def zadost_id_dokladu(data_dir: str, number: int, *, druh: str | None = None) ->
     if zadost_id or druh == "ppd":
         return zadost_id
     # Starý wizard ukládal do indexu jen žádosti. Původní soubory k faktuře
-    # zná její uložený balík i po vypršení kódu, bez rozbalování zadost_ids.
+    # hledáme ve všech uložených balících i po vypršení kódu.
     return hledani.zadost_id_pro_soubory(data_dir, sdileni.ulozene_soubory_faktury(data_dir, number))
 
 

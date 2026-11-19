@@ -362,12 +362,21 @@ def zapis_fakturu(data_dir: str, cislo, polozky=(), zadost_ids=()) -> str:
 
 
 def ulozene_soubory_faktury(data_dir: str, cislo: int) -> set[str]:
-    """Přímo uložené soubory faktury pro dohledání původní žádosti v indexu."""
-    zaznam = _posledni_zaznamy(data_dir).get(str(cislo)) or {}
-    if zaznam.get("faktura") != cislo:
-        return set()
-    return {p["file"] for p in _polozky(zaznam.get("soubory") or [])
-            if p["kde"] == KDE_OUTPUT}
+    """Soubory vedle faktury, včetně historických balíků pod náhodným kódem."""
+    faktura_pdf = f"faktura_{cislo}.pdf"
+    soubory = set()
+    for zaznam in _nacti(data_dir):
+        if not isinstance(zaznam, dict):
+            continue
+        ulozene = zaznam.get("soubory") or []
+        if not isinstance(ulozene, list):
+            continue
+        prilohy = {p["file"] for p in _polozky(x for x in ulozene if isinstance(x, (str, dict)))
+                   if p["kde"] == KDE_OUTPUT and isinstance(p["file"], str)}
+        # Novější balíky mají fakturu implicitně, staré ji mají přímo mezi soubory.
+        if faktura_pdf in prilohy or (str(zaznam.get("token")) == str(cislo) and zaznam.get("faktura") == cislo):
+            soubory.update(prilohy - {faktura_pdf})
+    return soubory
 
 
 def _balik_faktury(zaznam: dict, zadosti) -> list[dict]:

@@ -67,7 +67,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.36.2"
+__version__ = "1.36.3"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2176,12 +2176,12 @@ def _najdi_ppd(rows, number):
     return next((r for r in rows if r["cislo"] == number), None)
 
 
-def _zmen_ppd(number: int, smazano: bool) -> tuple[dict | None, bool]:
+def _podklady_ppd(number: int, smazano: bool) -> dict | None:
     rec = _najdi_ppd(ppd.read_backup(DATA_DIR), number)
     if rec is None:
         rec = _najdi_ppd(ppd.read_ppd_log(DATA_DIR), number)
         if rec is None or not smazano:
-            return rec, False
+            return rec
         # Nejstarší PPD před zavedením zálohy musejí jít také obnovit.
         ppd.append_backup(DATA_DIR, {
             "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
@@ -2190,14 +2190,12 @@ def _zmen_ppd(number: int, smazano: bool) -> tuple[dict | None, bool]:
         })
         if _najdi_ppd(ppd.read_backup(DATA_DIR), number) is None:
             raise OSError(f"Zálohu PPD č. {number} se nepodařilo uložit.")
-    if smazano:
-        return rec, ppd.delete_ppd(DATA_DIR, number)
-    return rec, ppd.restore_ppd_row(DATA_DIR, {
-        **rec, "vozidlo": rec.get("spz") or rec.get("vin") or "",
-    })
+    return rec
 
 
 def _zmen_storno(number: int, *, smazano: bool, vychozi_kdo: str = "") -> tuple[dict | None, bool]:
+    import ppd_push
+
     telo = request.get_json(silent=True)
     kdo = telo.get("kdo", vychozi_kdo) if isinstance(telo, dict) else vychozi_kdo
     with storno.transakce(DATA_DIR) as zapis_udalost:
@@ -2205,25 +2203,40 @@ def _zmen_storno(number: int, *, smazano: bool, vychozi_kdo: str = "") -> tuple[
         druh = "faktura" if rec is not None else "ppd"
         stav = storno.stav(DATA_DIR).get((druh, number), {})
         journal_zmena = bool(stav.get("storno")) != smazano
-        zmena_stavu = journal_zmena
         if druh == "ppd":
-            rec, zmena_stavu = _zmen_ppd(number, smazano)
+            rec = _podklady_ppd(number, smazano)
         if rec is None:
             return None, False
-        zmeneno = zmena_stavu or journal_zmena
-        if zmeneno:
-            udalost = zapis_udalost(druh, number, "storno" if smazano else "obnoveno", kdo)
-            stav = {"storno_cas": udalost["ts"], "storno_kdo": udalost["kdo"]}
-    try:
-        import ppd_push
         if druh == "faktura":
             rec = {**rec, "prijato_od": rec.get("odberatel", ""),
                    "vozidlo": rec.get("vozidla") or rec.get("vozidlo", "")}
-        record = ppd_push.build_record(
-            rec, zadost_id=ppd_api.zadost_id_dokladu(DATA_DIR, number, druh=druh), smazano=smazano)
-        record.update(storno_cas=stav.get("storno_cas", "") if smazano else "",
-                      storno_kdo=stav.get("storno_kdo", "") if smazano else "")
-        ppd_push.enqueue(record, DATA_DIR)
+        udalost = storno.priprav_udalost(druh, number, "storno" if smazano else "obnoveno", kdo)
+        try:
+            record = ppd_push.build_record(
+                rec, zadost_id=ppd_api.zadost_id_dokladu(DATA_DIR, number, druh=druh), smazano=smazano)
+            record.update(storno_cas="", storno_kdo="")
+            if smazano:
+                record.update(storno_cas=udalost["ts"] if journal_zmena else stav["storno_cas"],
+                              storno_kdo=udalost["kdo"] if journal_zmena else stav["storno_kdo"])
+            ppd_push.enqueue(record, DATA_DIR)
+        except Exception as e:
+            _log.warning("Doklad %s: storno push se nepodařilo uložit (%s)", number, e)
+            return {"success": False, "error": "Storno se nepodařilo uložit."}, False
+
+        zmena_stavu = journal_zmena
+        if druh == "ppd":
+            if smazano:
+                zmena_stavu = ppd.delete_ppd(DATA_DIR, number)
+            else:
+                zmena_stavu = ppd.restore_ppd_row(DATA_DIR, {
+                    **rec, "vozidlo": rec.get("spz") or rec.get("vin") or rec.get("vozidlo") or "",
+                })
+        zmeneno = zmena_stavu or journal_zmena
+        if zmeneno:
+            zapis_udalost(udalost)
+            if smazano:
+                record.update(storno_cas=udalost["ts"], storno_kdo=udalost["kdo"])
+    try:
         ppd_push.push_async(record, DATA_DIR)
     except Exception as e:
         _log.warning("Doklad %s: storno push se nepodařil (%s)", number, e)
@@ -2236,7 +2249,7 @@ def api_doklady_zmen_storno(cislo, smazano):
     vysledek, _ = _zmen_storno(cislo, smazano=smazano)
     if vysledek is None:
         return jsonify({"success": False, "error": "Doklad nenalezen."}), 404
-    return jsonify(vysledek)
+    return jsonify(vysledek), 200 if vysledek["success"] else 500
 
 
 def _over_klic_integrace(vypnuto: str):
@@ -2262,7 +2275,9 @@ def _over_klic_integrace(vypnuto: str):
 
 @app.route("/api/ppd/<int:number>", methods=["DELETE"])
 def api_ppd_delete(number):
-    _, removed = _zmen_storno(number, smazano=True)
+    vysledek, removed = _zmen_storno(number, smazano=True)
+    if vysledek is not None and vysledek.get("success") is False:
+        return jsonify(vysledek), 500
     return jsonify({"success": True, "removed": removed})
 
 
@@ -2276,7 +2291,9 @@ def api_ppd_smazat(number):
     chyba = _over_klic_integrace("Mazání dokladů přes API není zapnuté.")
     if chyba:
         return chyba
-    _, removed = _zmen_storno(number, smazano=True, vychozi_kdo="evidence")
+    vysledek, removed = _zmen_storno(number, smazano=True, vychozi_kdo="evidence")
+    if vysledek is not None and vysledek.get("success") is False:
+        return jsonify({"removed": False}), 500
     if removed:
         _log.info("Doklad %s stornován přes API (evidence)", number)
     return jsonify({"removed": removed})
@@ -2489,6 +2506,8 @@ def api_ppd_restore(number):
     vysledek, restored = _zmen_storno(number, smazano=False)
     if vysledek is None:
         return jsonify({"success": False, "error": "V záloze není doklad s tímto číslem."}), 404
+    if not vysledek["success"]:
+        return jsonify(vysledek), 500
     return jsonify({"success": True, "restored": restored})
 
 @app.route("/api/scan", methods=["POST"])
@@ -2668,27 +2687,25 @@ def _sdilene_polozky(token: str):
     stavy = storno.stav(DATA_DIR)
     polozky = []
     index = 0
-    stornovane_ppd = None
     for x in balik:
+        if not os.path.exists(_sdilena_cesta(x)):
+            continue
+        x = {**x, "index": index}
+        index += 1
         number = _cislo_faktury_pdf(x["file"])
         ppd_number = _cislo_dokladu_pdf(x["file"], "ppd")
         if number is not None:
-            x = {**x, "cislo_faktury": number}
+            x["cislo_faktury"] = number
             stav = stavy.get(("faktura", number), {})
             if stav.get("storno"):
-                polozky.append({**x, "index": index, "storno_cas": stav["storno_cas"],
-                                "popis": (x["popis"] or sdileni.popis_souboru(x["file"])) + " · STORNO"})
-                index += 1
+                x.update(storno_cas=stav["storno_cas"],
+                         popis=(x["popis"] or sdileni.popis_souboru(x["file"])) + " · STORNO")
+        if ppd_number is not None:
+            # Stornované PPD má dál svou pozici v odkazu, ale veřejně se nezobrazí.
+            if ppd.je_stornovany(DATA_DIR, ppd_number):
                 continue
-        if os.path.exists(_sdilena_cesta(x)):
-            if ppd_number is not None:
-                if stornovane_ppd is None:
-                    stornovane_ppd = {r["cislo"] for r in ppd.deleted_ppd(DATA_DIR)}
-                x = {**x, "cislo_ppd": ppd_number}
-            # URL ostatních souborů v balíku se po stornu PPD neposunou.
-            if ppd_number is None or ppd_number not in stornovane_ppd:
-                polozky.append({**x, "index": index})
-            index += 1
+            x["cislo_ppd"] = ppd_number
+        polozky.append(x)
     if not polozky:
         _kod_netrefa(ip)
         return None, (_SDILENI_NEPLATI, 404)

@@ -39,10 +39,13 @@ def stav(data_dir: str) -> dict[tuple[str, int], dict]:
     return vysledek
 
 
-def _zapis(data_dir: str, druh: str, cislo: int, akce: str, kdo: str = "") -> dict:
+def priprav_udalost(druh: str, cislo: int, akce: str, kdo: str = "") -> dict:
     kdo = kdo.strip().lstrip("= \t\r\n")[:60].rstrip() if isinstance(kdo, str) else ""
-    udalost = {"ts": datetime.now().isoformat(timespec="seconds"), "druh": druh,
-               "cislo": cislo, "akce": akce, "kdo": kdo}
+    return {"ts": datetime.now().isoformat(timespec="seconds"), "druh": druh,
+            "cislo": cislo, "akce": akce, "kdo": kdo}
+
+
+def _zapis(data_dir: str, udalost: dict) -> dict:
     radek = (json.dumps(udalost, ensure_ascii=False) + "\n").encode("utf-8")
     with open(os.path.join(data_dir, LOG_NAME), "a+b") as f:
         if f.tell():
@@ -68,4 +71,4 @@ def transakce(data_dir: str):
 
 def zapis(data_dir: str, druh: str, cislo: int, akce: str, kdo: str = "") -> dict:
     with transakce(data_dir) as zapis_udalost:
-        return zapis_udalost(druh, cislo, akce, kdo)
+        return zapis_udalost(priprav_udalost(druh, cislo, akce, kdo))

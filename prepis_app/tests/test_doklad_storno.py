@@ -116,6 +116,33 @@ def test_evidence_stornuje_fakturu(api, monkeypatch, json_data, kdo):
     assert r.status_code == 409
 
 
+@pytest.mark.parametrize("druh", ["faktura", "ppd"])
+@pytest.mark.parametrize("akce", ["odebrat", "obnovit"])
+def test_storno_bez_ulozeneho_pushe_nezmeni_stav(api, monkeypatch, druh, akce):
+    n = _vystav(api, monkeypatch, druh)["cislo"]
+    dd = str(api.data)
+    _prihlas(api)
+    if akce == "obnovit":
+        _zmen(api, n, "odebrat", "DAVID")
+        api.poslano.clear()
+    journal = storno.stav(dd)
+    kniha = api.get("/api/ppd-list").get_json()
+
+    def nedostupna_fronta(*args):
+        raise OSError("queue write failed")
+
+    monkeypatch.setattr(ppd_push, "enqueue", nedostupna_fronta)
+    r = api.post(f"/api/doklady/{n}/{akce}")
+    assert r.status_code == 500
+    assert r.get_json() == {"success": False, "error": "Storno se nepodařilo uložit."}
+    if akce == "odebrat":
+        r = api.post(f"/api/ppd/{n}/smazat", headers=HLAVICKY)
+        assert r.status_code == 500 and r.get_json() == {"removed": False}
+    assert storno.stav(dd) == journal
+    assert api.get("/api/ppd-list").get_json() == kniha
+    assert api.poslano == []
+
+
 def _text(pdf):
     return "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
 
@@ -167,6 +194,33 @@ def _over_storno_pdf(r, original, datum):
     for platebni_udaj in ("QR Platba", "IBAN", "Číslo účtu", "Variabilní symbol",
                           "Datum splatnosti", "Forma úhrady", "Celkem k úhradě", "SPD*"):
         assert platebni_udaj not in obsah
+
+
+@pytest.mark.parametrize("faktura_existuje", [True, False])
+def test_indexy_baliku_faktury_a_zadosti_respektuji_existenci_souboru(api, monkeypatch, faktura_existuje):
+    n = _vystav(api, monkeypatch)["cislo"]
+    dd = str(api.data)
+    faktura_pdf = api.data / "output" / f"faktura_{n}.pdf"
+    zadost = faktura_pdf.with_name("zmeny_TEST.pdf")
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    with zadost.open("wb") as f:
+        writer.write(f)
+    kod = sdileni.vytvor_kod(dd, [faktura_pdf.name, zadost.name])
+    if not faktura_existuje:
+        faktura_pdf.unlink()
+    url = f"/{kod}/{int(faktura_existuje)}"
+    _prihlas(api)
+    public = A.app.test_client()
+    assert public.get(url).data == zadost.read_bytes()
+    _zmen(api, n, "odebrat", "DAVID")
+    assert public.get(url).data == zadost.read_bytes()
+    assert ("STORNO" in public.get(f"/{kod}").get_data(as_text=True)) == faktura_existuje
+    if faktura_existuje:
+        assert "STORNO" in _text(public.get(f"/{kod}/0").data)
+        faktura_pdf.unlink()
+        assert public.get(f"/{kod}/0").data == zadost.read_bytes()
+    assert public.get(f"/{kod}/1").status_code == 404
 
 
 def test_stary_ppd_bez_udalosti_a_kompatibilni_cesty(api, monkeypatch):
@@ -294,6 +348,23 @@ def test_stara_faktura_z_wizardu_dohleda_id_pres_puvodni_soubory(api, monkeypatc
     assert api.poslano[-1]["zadost_id"] == "puvodni-zadost"
 
 
+@pytest.mark.parametrize("jednoznacna", [True, False])
+def test_stara_faktura_dohleda_zadost_pres_vyprsely_nahodny_kod(api, monkeypatch, jednoznacna):
+    n = _vystav(api, monkeypatch)["cislo"]
+    dd = str(api.data)
+    faktura_pdf = f"faktura_{n}.pdf"
+    hledani.zapis_vystup(dd, ["zmeny_PUVODNI.pdf"], {"zadost_id": "puvodni-zadost"})
+    hledani.zapis_vystup(dd, ["zmeny_JINA.pdf"], {"zadost_id": "jina-zadost"})
+    sdileni._pripis(dd, "4321", [faktura_pdf, "zmeny_PUVODNI.pdf"], "2026-01-01T00:00:00")
+    # Kód se později přidělil znovu. Původní záznam musí být stále dohledatelný.
+    sdileni._pripis(dd, "4321", ["zmeny_JINA.pdf"])
+    if not jednoznacna:
+        sdileni.vytvor_token(dd, [faktura_pdf, "zmeny_JINA.pdf"])
+    _prihlas(api)
+    _zmen(api, n, "odebrat", "DAVID")
+    assert api.poslano[-1]["zadost_id"] == ("puvodni-zadost" if jednoznacna else "")
+
+
 @pytest.mark.parametrize("pred_upgradem", [False, True])
 def test_stornovany_ppd_se_neda_verejne_sdilet(api, monkeypatch, pred_upgradem):
     n = _vystav(api, monkeypatch, "ppd")["cislo"]
@@ -336,6 +407,33 @@ def test_stornovany_ppd_se_neda_verejne_sdilet(api, monkeypatch, pred_upgradem):
     assert api.get(f"/ppd-print/{n}").status_code == 200
 
 
+def test_storno_ppd_plati_i_s_necitelnou_zalohou(api, monkeypatch):
+    doklad = _vystav(api, monkeypatch, "ppd")
+    n = doklad["cislo"]
+    dd = str(api.data)
+    soubor = f"ppd_{n}.pdf"
+    kod = sdileni.vytvor_kod(dd, [soubor])
+    _prihlas(api)
+    _zmen(api, n, "odebrat", "DAVID")
+    api.poslano.clear()
+    (api.data / ppd.BACKUP_NAME).write_bytes(b"unreadable workbook")
+    assert ppd.read_backup(dd) == []
+    assert ppd.je_stornovany(dd, n)
+
+    with A.app.test_client() as public:
+        assert public.get(f"/{kod}/0").status_code == 404
+    assert api.post("/api/sdilet", json={"soubory": [soubor]}).status_code == 409
+    assert api.post(f"/api/ppd/{n}/sdilet", headers=HLAVICKY).status_code == 409
+    assert api.post("/api/ppd/vystavit", headers=HLAVICKY, json=TELO).status_code == 409
+    assert api.poslano == []
+
+    ppd_push.enqueue(doklad, dd)
+    sent = []
+    monkeypatch.setattr(ppd_push, "_put_once", lambda record: sent.append(record) or {})
+    assert ppd_push.retry_failed(dd) == 0
+    assert [r["smazano"] for r in sent] == [True]
+
+
 @pytest.mark.parametrize("akce", ["odebrat", "obnovit"])
 def test_ppd_opakuje_udalost_po_selhani_zapisu_po_excelu(api, monkeypatch, akce):
     n = _vystav(api, monkeypatch, "ppd")["cislo"]
@@ -348,7 +446,8 @@ def test_ppd_opakuje_udalost_po_selhani_zapisu_po_excelu(api, monkeypatch, akce)
     puvodni_zapis = storno._zapis
 
     def chybny_zapis(*args):
-        assert ppd.je_stornovany(dd, n) == smazano
+        assert any(r["cislo"] == n for r in ppd.read_ppd_log(dd)) != smazano
+        assert ppd.je_stornovany(dd, n)
         raise OSError("journal write failed")
 
     monkeypatch.setitem(A.app.config, "TESTING", True)
@@ -371,11 +470,18 @@ def test_zmena_se_ulozi_do_fronty_pred_spustenim_vlakna(api, monkeypatch):
     queue = api.data / "failed_ppd_pushes.jsonl"
     _prihlas(api)
     snapshots = []
+    ulozene_udalosti = []
+    zapis = storno._zapis
+
+    def zapis_po_fronta(data_dir, udalost):
+        ulozene_udalosti.append(json.loads(queue.read_bytes())["record"]["smazano"])
+        return zapis(data_dir, udalost)
 
     def restart(record, data_dir):
         snapshots.append((record, json.loads(queue.read_bytes())["record"]))
         raise RuntimeError("worker restart")
 
+    monkeypatch.setattr(storno, "_zapis", zapis_po_fronta)
     monkeypatch.setattr(ppd_push, "push_async", restart)
     sent = []
     monkeypatch.setattr(ppd_push, "_put_once", lambda record: sent.append(record) or {})
@@ -383,6 +489,7 @@ def test_zmena_se_ulozi_do_fronty_pred_spustenim_vlakna(api, monkeypatch):
         _zmen(api, n, akce, "DAVID")
         assert ppd_push.retry_failed(dd) == 0 and not queue.exists()
     assert [r["smazano"] for r in sent] == [True, False]
+    assert ulozene_udalosti == [True, False]
     assert snapshots == [(r, r) for r in sent]
 
 

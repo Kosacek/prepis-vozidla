@@ -366,6 +366,10 @@ def deleted_ppd(data_dir: str) -> list:
 
 
 def je_stornovany(data_dir: str, number: int) -> bool:
+    import storno
+
+    if storno.stav(data_dir).get(("ppd", number), {}).get("storno"):
+        return True
     return (not any(r["cislo"] == number for r in read_ppd_log(data_dir))
             and any(r["cislo"] == number for r in read_backup(data_dir)))
 

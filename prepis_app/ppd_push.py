@@ -9,6 +9,8 @@ import logging
 import os
 import threading
 import time
+from collections import defaultdict, deque
+from uuid import uuid4
 
 import requests
 
@@ -78,7 +80,8 @@ def _with_lock(data_dir: str, fn):
 
 def enqueue(record: dict, data_dir: str, *, reason: str = "čeká na odeslání") -> None:
     """Ulož push dřív, než se předá vláknu."""
-    radek = (json.dumps({"reason": reason, "record": record}, ensure_ascii=False) + "\n").encode("utf-8")
+    entry = {"id": uuid4().hex, "reason": reason, "record": record}
+    radek = (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
 
     def _append():
         with open(_failed_path(data_dir), "a+b") as f:
@@ -125,12 +128,13 @@ def _put_aktualni(data_dir: str, record: dict) -> dict | str:
             if _HAVE_FCNTL:
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
-                stav = storno.stav(data_dir).get((druh, number))
-                smazano = ppd.je_stornovany(data_dir, number) if druh == "ppd" else bool(stav and stav["storno"])
-                if smazano != bool(record.get("smazano")):
-                    return {}
-                if smazano and stav and stav["storno"] and "storno_cas" in record:
-                    record = {**record, "storno_cas": stav["storno_cas"], "storno_kdo": stav["storno_kdo"]}
+                with storno.transakce(data_dir):
+                    stav = storno.stav(data_dir).get((druh, number), {})
+                    smazano = ppd.je_stornovany(data_dir, number) if druh == "ppd" else bool(stav.get("storno"))
+                    if smazano != bool(record.get("smazano")):
+                        return {}
+                    if stav.get("storno") and "storno_cas" in record:
+                        record = {**record, "storno_cas": stav["storno_cas"], "storno_kdo": stav["storno_kdo"]}
                 if "storno_cas" in record and not record.get("zadost_id"):
                     from ppd_api import zadost_id_dokladu
                     zadost_id = zadost_id_dokladu(data_dir, number, druh=druh)
@@ -174,31 +178,40 @@ def retry_failed(data_dir: str) -> int:
         except FileNotFoundError:
             return b""
 
+    def parse(line):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            return None, line
+        if not isinstance(entry, dict) or "record" not in entry:
+            return None, line
+        entry_id = entry.get("id")
+        return entry, entry_id if isinstance(entry_id, str) and entry_id else line
+
     snapshot = _with_lock(data_dir, read_queue)
     if not snapshot:
         return 0
     # Čekání na Evidenci nesmí držet zámek potřebný pro uložení nového storna.
-    still_failing = []
-    for line in snapshot.splitlines():
-        if not line.strip():
-            continue
-        try:
-            entry = json.loads(line)
-            record = entry["record"]
-        except (ValueError, TypeError, KeyError):
-            still_failing.append(line)
-            continue
-        result = _put_aktualni(data_dir, record)
-        if isinstance(result, str):
-            entry["reason"] = result
-            still_failing.append(json.dumps(entry, ensure_ascii=False).encode("utf-8"))
+    outcomes = defaultdict(deque)
+    for line in snapshot.split(b"\n"):
+        entry, key = parse(line)
+        if entry is not None:
+            outcomes[key].append(_put_aktualni(data_dir, entry["record"]))
 
     def save_queue():
         current = read_queue()
-        if not current.startswith(snapshot):
-            # Jiný worker ji už zkrátil. Další průchod zpracuje aktuální frontu.
-            return sum(bool(line.strip()) for line in current.splitlines())
-        remaining = still_failing + [line for line in current[len(snapshot):].splitlines() if line.strip()]
+        remaining = []
+        for line in current.split(b"\n"):
+            if not line.strip():
+                continue
+            entry, key = parse(line)
+            if entry is not None and outcomes.get(key):
+                result = outcomes[key].popleft()
+                if not isinstance(result, str):
+                    continue
+                entry["reason"] = result
+                line = json.dumps(entry, ensure_ascii=False).encode("utf-8")
+            remaining.append(line)
         if remaining:
             tmp = path + ".tmp"
             with open(tmp, "wb") as f:
@@ -206,7 +219,7 @@ def retry_failed(data_dir: str) -> int:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, path)
-        else:
+        elif current:
             os.remove(path)
         return len(remaining)
 

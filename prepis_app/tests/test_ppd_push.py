@@ -1,10 +1,13 @@
 """PPD mapping, best-effort delivery, sweep integration and historical import."""
 import json
 import threading
+from contextlib import contextmanager
+from uuid import UUID
 
 import pytest
 
 import ppd_push
+import storno
 import tracker_push
 from scripts import ppd_do_evidence as backfill
 
@@ -104,6 +107,7 @@ def test_push_queues_response_decoding_exception(tmp_path, monkeypatch):
     body = record()
     assert ppd_push.push(body, str(tmp_path)) is None
     entry = json.loads((tmp_path / "failed_ppd_pushes.jsonl").read_text(encoding="utf-8"))
+    assert UUID(hex=entry.pop("id")).version == 4
     assert entry == {"reason": "empty body", "record": body}
 
 
@@ -126,6 +130,7 @@ def test_push_failures_are_queued_once_after_retries(tmp_path, monkeypatch, fail
     entries = [json.loads(line) for line in (tmp_path / "failed_ppd_pushes.jsonl").read_text(
         encoding="utf-8").splitlines()]
     reason = "evidence down" if failure == "exception" else f"HTTP {failure}: unavailable"
+    assert len(entries) == 1 and UUID(hex=entries[0].pop("id")).version == 4
     assert entries == [{"reason": reason, "record": body}]
     assert (tmp_path / "failed_ppd_pushes.jsonl.lock").exists()
 
@@ -255,6 +260,81 @@ def test_sweep_neblokuje_a_nezahodi_nove_ulozeny_push(tmp_path, monkeypatch):
     assert result == [1]
     log = tmp_path / "failed_ppd_pushes.jsonl"
     assert json.loads(log.read_bytes())["record"] == record(2)
+
+
+def test_sweep_posoudi_push_az_po_dokonceni_storna(tmp_path, monkeypatch):
+    dd = str(tmp_path)
+    body = {**record(), "druh": "faktura", "smazano": True}
+    doruceni_ceka = threading.Event()
+    transakce = storno.transakce
+    sent = []
+    results = []
+
+    @contextmanager
+    def hlas_zacatek_transakce(data_dir):
+        doruceni_ceka.set()
+        with transakce(data_dir):
+            yield
+
+    monkeypatch.setattr(storno, "transakce", hlas_zacatek_transakce)
+    monkeypatch.setattr(ppd_push, "_put_once", lambda push: sent.append(push) or {})
+    sweep = threading.Thread(target=lambda: results.append(ppd_push.retry_failed(dd)), daemon=True)
+    try:
+        with transakce(dd) as zapis:
+            ppd_push.enqueue(body, dd)
+            sweep.start()
+            assert doruceni_ceka.wait(5)
+            assert sent == []
+            zapis(storno.priprav_udalost("faktura", body["cislo"], "storno"))
+    finally:
+        if sweep.ident is not None:
+            sweep.join(5)
+    assert results == [0] and sent == [body]
+
+
+@pytest.mark.parametrize("prvni_vysledek", [{}, "stará chyba"])
+def test_dva_sweepy_nezasahnou_novy_push_se_stejnym_obsahem(tmp_path, monkeypatch, prvni_vysledek):
+    dd = str(tmp_path)
+    log = tmp_path / "failed_ppd_pushes.jsonl"
+    body = record()
+    ppd_push.enqueue(body, dd)
+    puvodni = json.loads(log.read_bytes())
+
+    def doruc_a_pockej_na_druhy_sweep(data_dir, queued):
+        assert data_dir == dd and queued == body
+        monkeypatch.setattr(ppd_push, "_put_aktualni", lambda *_: {})
+        assert ppd_push.retry_failed(dd) == 0
+        ppd_push.enqueue(body, dd)
+        return prvni_vysledek
+
+    monkeypatch.setattr(ppd_push, "_put_aktualni", doruc_a_pockej_na_druhy_sweep)
+    assert ppd_push.retry_failed(dd) == 1
+    aktualni = json.loads(log.read_bytes())
+    assert aktualni.pop("id") != puvodni.pop("id")
+    assert aktualni == puvodni
+
+
+def test_sweep_legacy_radky_pocita_po_jedne_kopii(tmp_path, monkeypatch):
+    dd = str(tmp_path)
+    log = tmp_path / "failed_ppd_pushes.jsonl"
+    body = record()
+    radek = json.dumps({"reason": "old", "record": body}).encode("utf-8") + b"\n"
+    log.write_bytes(radek * 2)
+    vysledky = iter([{}, "still down"])
+
+    def doruc(data_dir, queued):
+        assert data_dir == dd and queued == body
+        vysledek = next(vysledky)
+        if isinstance(vysledek, str):
+            with log.open("ab") as f:
+                f.write(radek)
+        return vysledek
+
+    monkeypatch.setattr(ppd_push, "_put_aktualni", doruc)
+    assert ppd_push.retry_failed(dd) == 2
+    zmeneny, beze_zmeny = log.read_bytes().splitlines()
+    assert json.loads(zmeneny) == {"reason": "still down", "record": body}
+    assert beze_zmeny + b"\n" == radek
 
 
 @pytest.mark.parametrize("failing", ["tracker", "ppd", None])
