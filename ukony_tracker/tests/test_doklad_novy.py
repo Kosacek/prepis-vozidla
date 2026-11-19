@@ -373,3 +373,31 @@ def test_sharing_a_faktura_sends_zadost_ids_of_the_linked_ukony(client, parties,
     r = client.post("/doklady/20265732/sdilet")
     assert r.get_json()["kod"] == "5732"
     assert sorted(posts[0]["json"]["zadost_ids"]) == ["zad-a", "zad-b"]
+
+
+def test_a_replay_never_revives_a_stornovany_doklad(client, data, zadosti):
+    # žádosti astra review 1.36.3: the issue/replay upsert cleared smazano, so a
+    # repeated request landing with a storno made the doklad live again. Only the
+    # state push PUT /api/ppd/<cislo> changes the storno state.
+    assert client.post("/doklady/novy", json=_body(data)).status_code == 201
+    with client.application.app_context():
+        conn = db.get_db()
+        ppd_repo.upsert(conn, {"cislo": 183, "datum": "26.10.2026", "castka": 2600,
+                               "prijato_od": "JE & NE, SPOL. S R.O.", "vozidlo": "3BR9309, TMBER6NW0V3099310",
+                               "smazano": True, "storno_cas": "2026-11-19T20:10:00", "storno_kdo": "David"})
+    zadosti[1]["response"].status_code = 200   # žádosti replay the same doklad, "smazano": False
+    assert client.post("/doklady/novy", json=_body(data)).status_code == 201
+    with client.application.app_context():
+        row = ppd_repo.get_by_cislo(db.get_db(), 183)
+    assert (row["smazano"], row["storno_cas"], row["storno_kdo"]) == (1, "2026-11-19T20:10:00", "David")
+
+
+def test_the_state_push_still_changes_the_storno_state(client, data, zadosti):
+    assert client.post("/doklady/novy", json=_body(data)).status_code == 201
+    with client.application.app_context():
+        conn = db.get_db()
+        ppd_repo.upsert(conn, {"cislo": 183, "datum": "26.10.2026", "castka": 2600, "smazano": True,
+                               "storno_cas": "2026-11-19T20:10:00"})
+        ppd_repo.upsert(conn, {"cislo": 183, "datum": "26.10.2026", "castka": 2600, "smazano": False,
+                               "storno_cas": "", "storno_kdo": ""})
+        assert ppd_repo.get_by_cislo(conn, 183)["smazano"] == 0

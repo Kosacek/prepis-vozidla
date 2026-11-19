@@ -126,13 +126,20 @@ def _find_ukon(conn: sqlite3.Connection, values: dict, zadost_id: str) -> int | 
     return match
 
 
-def upsert(conn: sqlite3.Connection, record: dict) -> tuple[sqlite3.Row, bool]:
+STAV_POLE = ("smazano", "storno_cas", "storno_kdo")
+
+
+def upsert(conn: sqlite3.Connection, record: dict, *, keep_state: bool = False) -> tuple[sqlite3.Row, bool]:
     """Uloží celý doklad podle čísla; opakovaný stejný push nezmění ani timestamp.
 
     Neplatný záznam vyvolá ValueError. Každý doklad má vlastní transakci, aby
     chybný řádek při importu nevrátil zpět dříve úspěšně uložené doklady.
+
+    `keep_state`: the issue/replay path (Nový doklad) never changes the storno
+    state of an existing doklad — only the state push PUT /api/ppd/<cislo> does
+    (žádosti astra review 1.36.3: a replay landing with a storno revived it).
     """
-    values = _normalize(record)
+    values = _normalize({k: v for k, v in record.items() if k not in STAV_POLE} if keep_state else record)
     zadost_id = (record.get("zadost_id") or "").strip()
     with conn:
         values["ukon_id"] = _find_ukon(conn, values, zadost_id)
@@ -153,6 +160,8 @@ def upsert(conn: sqlite3.Connection, record: dict) -> tuple[sqlite3.Row, bool]:
                 # A push without zadost_id (storno/obnovit, older builds) never
                 # blanks the link to the žádost.
                 values["zadost_id"] = existing["zadost_id"] or ""
+            if keep_state:
+                values.update({key: existing[key] for key in STAV_POLE})
             if any(existing[key] != value for key, value in values.items()):
                 # Názvy sloupců pochází pouze z našeho pevného seznamu polí.
                 setters = ",".join(f"{key}=?" for key in values)

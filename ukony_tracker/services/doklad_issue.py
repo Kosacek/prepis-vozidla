@@ -226,7 +226,8 @@ def vystavit(conn, req: dict) -> dict:
     if faktura:
         # Whatever žádosti echo, this row is a faktura with its due date.
         doklad = {**doklad, "druh": "faktura", "splatnost": doklad.get("splatnost") or data.get("splatnost")}
-    row, _ = ppd_repo.upsert(conn, doklad)
+    # The storno state belongs to žádosti's state push, never to an issue or replay.
+    row, _ = ppd_repo.upsert(conn, doklad, keep_state=True)
     ppd_links.set_explicit(conn, row["cislo"], [u["id"] for u in req["ukony"]])
     default_print = f"/faktura-print/{row['cislo']}" if faktura else f"/ppd-print/{row['cislo']}"
     print_url = str(data.get("print_url") or default_print)
