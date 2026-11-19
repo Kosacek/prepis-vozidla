@@ -267,7 +267,7 @@ def _review(conn, row, data, values, result):
     if not changes:
         return dict(result, stav="uz_zapsano", ukon=_view(row),
                     rz=row["rz"] if misread else result["rz"], zprava="Už zapsáno · beze změny")
-    if _auto_update(row, data):
+    if set(changes) == {"orv"} and _auto_update(row, data):
         out = _write(conn, row, values, result)
         out["aktualizovano"] = sorted(set(out["prepsano"]) | set(out["doplneno"]))
         out["zprava"] = "Aktualizováno: " + ", ".join(f.upper() for f in out["aktualizovano"])
@@ -511,6 +511,11 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
             if again.get("orv_cislo") != first_orv:
                 return _uncertain(result, UNSURE)
             result.pop("_overit_orv")
+            if not result.get("provozovatel") and again.get("provozovatel"):
+                result["provozovatel"] = again["provozovatel"]
+                if result.get("ukon") and result.get("lze_zapsat"):
+                    row = ukony_repo.get(conn, result["ukon"]["id"])
+                    result["lze_zapsat"] = bool(row) and _can_write_review(row, result)
         return result  # two identical readings: the first answer stands
     if result["stav"] == "bez_firmy" or result.get("_overit_orv") or not first_orv:
         return _uncertain(result, UNSURE)

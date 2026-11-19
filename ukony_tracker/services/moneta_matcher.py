@@ -23,7 +23,7 @@ def _mismatch(p, f) -> str:
     return f"částka nesedí (přišlo {_kc(p.castka)}, faktura {_kc(f['castka'])})"
 
 
-def sparuj(platby, otevrene_faktury, zaplacene_cisla=()):
+def sparuj(platby, otevrene_faktury, zaplacene_cisla=(), stornovane_cisla=()):
     """-> (shody, nesparene): shody = [(Platba, cislo)], nesparene = [(Platba, duvod)].
 
     `otevrene_faktury`: rows/dicts with cislo, castka, vozidlo (unpaid, not
@@ -31,9 +31,10 @@ def sparuj(platby, otevrene_faktury, zaplacene_cisla=()):
     late payment is left alone."""
     faktury = {int(f["cislo"]): f for f in otevrene_faktury}
     zaplacene = {int(c) for c in zaplacene_cisla}
+    stornovane = {int(c) for c in stornovane_cisla}
     shody, nesparene, pouzite = [], [], set()
     for p in platby:
-        cislo, duvod = _najdi(p, faktury, zaplacene, pouzite)
+        cislo, duvod = _najdi(p, faktury, zaplacene, pouzite, stornovane)
         if cislo is None:
             nesparene.append((p, duvod))
         else:
@@ -42,8 +43,12 @@ def sparuj(platby, otevrene_faktury, zaplacene_cisla=()):
     return shody, nesparene
 
 
-def _najdi(p, faktury, zaplacene, pouzite):
+def _najdi(p, faktury, zaplacene, pouzite, stornovane=frozenset()):
     vs = int(p.vs) if p.vs.isdigit() else None
+    if vs in stornovane:
+        # Its VS names a stornovaná faktura: a person decides, the VIN fallback
+        # must not settle another invoice for the same car with it.
+        return None, f"faktura č. {vs % 10000:04d} je stornovaná"
     if vs in zaplacene:
         return None, f"faktura č. {vs} je už zaplacená"
     if vs in pouzite:

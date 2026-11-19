@@ -1169,3 +1169,12 @@ def test_another_sale_still_offers_a_new_ukon(conn, make):
     result = _rescan(conn, _read_albion())
     assert result.get("aktualizovano") is None and result["stav"] != "doplneno"
     assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_a_plate_exchange_on_an_older_ukon_is_asked_not_written(conn, make):
+    # astra 19. 11.: the stored ORV resolves to the right VIN, but a 3-character
+    # plate difference may still be an OCR error — only a new ORV is automatic.
+    uid = make(datum=_ago(6), typ_kod="PŘEVOD", prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion(rz="9XY9999", orv_cislo=OLD_ORV))
+    assert result["stav"] == "zmena_ke_kontrole" and "aktualizovano" not in result
+    assert ukony_repo.get(conn, uid)["rz"] == OLD_PLATE

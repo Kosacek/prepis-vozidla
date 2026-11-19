@@ -50,6 +50,10 @@ def _faktury(conn):
     return open_, paid
 
 
+def _stornovane(conn):
+    return [r["cislo"] for r in conn.execute("SELECT cislo FROM ppd WHERE druh='faktura' AND smazano=1")]
+
+
 NO_MATCH = "žádná odpovídající faktura"
 
 
@@ -83,7 +87,7 @@ def run_once(conn, fetch=None, now=None) -> None:
         nove = [p for p in platby if p.id not in known]
         nove = list({p.id: p for p in nove}.values())
         open_, paid = _faktury(conn)
-        shody, nesparene = moneta_matcher.sparuj(nove, open_, paid)
+        shody, nesparene = moneta_matcher.sparuj(nove, open_, paid, _stornovane(conn))
         for p, cislo in shody:
             try:
                 faktura_platby.oznac_fakturu_zaplacenou(cislo, p.datum, conn)

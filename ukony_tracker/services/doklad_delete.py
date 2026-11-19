@@ -61,5 +61,5 @@ def smazat(conn, cislo: int, kdo: str | None = None) -> None:
     if data["removed"] is not True:
         log.warning("Doklad %s: žádosti answered removed=false, kept live here", cislo)
         raise DeleteError(f"Žádosti doklad č. {_kratke(cislo)} nestornovaly – zkontroluj ho v žádostech.", 409)
-    ppd_repo.mark_deleted(conn, cislo, kdo)
+    ppd_repo.mark_deleted(conn, cislo, kdo, if_updated_at=doklad["updated_at"])
     ppd_links.invalidate()

@@ -118,6 +118,8 @@ test('close stops queued photos, waits for active writes, then releases photos a
   const e = environment();
   for (let i = 0; i < 10; i++) e.add();
   const done = e.el('process').handlers.click();
+  // Photos still waiting to be read are work: closing asks first (astra 19. 11.).
+  e.acceptClose();
   let prevented = false;
   e.handlers['ukon:modal-closing']({preventDefault: () => { prevented = true; }});
   assert.equal(prevented, true);
@@ -296,4 +298,14 @@ test('Hotovo finishes a batch with written, unchanged, skipped, and pending card
   assert.deepEqual(e.prompts, []);
   assert.equal(e.stats().reloads, 1);
   assert.equal(e.stored().items[3].result.stav, 'bez_firmy');
+});
+
+test('closing while photos still wait to be read asks, and cancel keeps them', async () => {
+  const e = environment();
+  for (let i = 0; i < 3; i++) e.add();
+  let prevented = false;
+  e.handlers['ukon:modal-closing']({preventDefault: () => { prevented = true; }});
+  assert.equal(prevented, true);
+  assert.equal(e.prompts.length, 1);
+  assert.equal(e.stats().revoked, 0);
 });

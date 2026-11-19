@@ -64,6 +64,8 @@
   function closePending(photos) {
     return photos.filter(photo => {
       const state = stateOf(photo);
+      // A captured photo not read yet (or queued) is work too: closing drops it.
+      if (!state || state === 'ceka_na_fotku') return true;
       return state === 'zmena_ke_kontrole' || state === 'jiz_v_evidence' || (assignable(photo) && (
         (photo.firmaOverride !== undefined &&
           String(photo.firmaOverride || '') !== String(photo.result.navrh_firma_id || '')) ||

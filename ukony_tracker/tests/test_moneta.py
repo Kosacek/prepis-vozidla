@@ -286,3 +286,12 @@ def test_parse_real_moneta_shape():
     debit = copy.deepcopy(MONETA_REAL_SHAPE); debit["creditDebitIndicator"] = "DBIT"
     reversed_ = copy.deepcopy(MONETA_REAL_SHAPE); reversed_["reversalIndicator"] = True
     assert _parse_transaction(debit) is None and _parse_transaction(reversed_) is None
+
+
+def test_a_payment_for_a_stornovana_faktura_never_settles_another_one():
+    # astra 19. 11.: the cancelled VS fell through to the VIN fallback and could
+    # settle the replacement faktura for the same car.
+    vin = "TMBJJ7NE5J0123456"
+    s, n = moneta_matcher.sparuj([P(vs="20260001", zprava=f"za auto {vin}")],
+                                 [F(20260004, vozidlo=vin)], stornovane_cisla=[20260001])
+    assert s == [] and n[0][1] == "faktura č. 0001 je stornovaná"

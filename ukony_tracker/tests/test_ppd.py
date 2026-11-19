@@ -61,7 +61,7 @@ def test_schema_is_idempotent_and_indexes_datum(conn):
 
 
 def test_upsert_create_update_and_identical_retry(conn, monkeypatch):
-    monkeypatch.setattr(db, "now_iso", lambda: "2026-06-14T10:00:00+00:00")
+    monkeypatch.setattr(db, "now_iso", lambda **_: "2026-06-14T10:00:00+00:00")
     original, created = ppd_repo.upsert(conn, _record())
     assert created is True
     assert original["prijato_od"] == "JAN ŽIŽKA"
@@ -70,7 +70,7 @@ def test_upsert_create_update_and_identical_retry(conn, monkeypatch):
     assert original["vozidlo"] == "1AB 2345"
     assert original["ukon_id"] is None
 
-    monkeypatch.setattr(db, "now_iso", lambda: "2026-06-14T11:00:00+00:00")
+    monkeypatch.setattr(db, "now_iso", lambda **_: "2026-06-14T11:00:00+00:00")
     same, created = ppd_repo.upsert(conn, _record(datum="2026-06-14", prijato_od="JAN ŽIŽKA"))
     assert created is False
     assert dict(same) == dict(original)

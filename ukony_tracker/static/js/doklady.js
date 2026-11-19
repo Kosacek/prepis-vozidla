@@ -74,8 +74,11 @@
       })
       .then(function (res) {
         if (!res.ok || !res.d.ok) { var err = new Error(res.d.error || FAIL); err.shown = true; throw err; }
-        // The doklad stays in the list, greyed as "Stornováno" — reload to draw it.
-        window.location.reload();
+        // The doklad stays in the list, greyed as "Stornováno" — reload to draw it,
+        // keeping a typed search (it lives only in the box, not in the URL).
+        var url = new URL(window.location.href);
+        if (input && input.value.trim()) url.searchParams.set('q', input.value.trim());
+        window.location.assign(url.toString());
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;

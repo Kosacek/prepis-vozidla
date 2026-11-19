@@ -101,10 +101,6 @@ def compute(conn) -> Links:
     firma: dict[int, int | None] = {}
     for d in conn.execute("SELECT cislo, datum, castka, vozidlo, zadost_id, prijato_ico, smazano"
                           " FROM ppd"):
-        if d["smazano"]:
-            # A deleted doklad pays nothing; it keeps only the payer's firm for the filter.
-            firma[d["cislo"]] = firma_by_ico.get(_digits(d["prijato_ico"]))
-            continue
         cars = vozidla(d["vozidlo"])
         if d["cislo"] in explicit:
             linked = set(explicit[d["cislo"]])
@@ -119,12 +115,15 @@ def compute(conn) -> Links:
                         if abs((date.fromisoformat(u["datum"]) - day).days) <= WINDOW_DAYS]
                 if near:
                     linked.update(u["id"] for u in _nearest(near, day, d["castka"]))
-        found_keys = {k for uid in linked for k in (_key(ukony[uid]["rz"]), _key(ukony[uid]["vin"]))}
-        by_doklad[d["cislo"]] = sorted(linked)
-        missing[d["cislo"]] = [car for car in cars if car not in found_keys]
         counts = Counter(ukony[uid]["firma_id"] for uid in linked)
         firma[d["cislo"]] = (max(counts, key=lambda f: (counts[f], -f)) if counts
                              else firma_by_ico.get(_digits(d["prijato_ico"])))
+        if d["smazano"]:
+            # A stornovaný doklad pays nothing, but keeps its firm for the filter.
+            continue
+        found_keys = {k for uid in linked for k in (_key(ukony[uid]["rz"]), _key(ukony[uid]["vin"]))}
+        by_doklad[d["cislo"]] = sorted(linked)
+        missing[d["cislo"]] = [car for car in cars if car not in found_keys]
 
     by_ukon: dict[int, list[int]] = {}
     for cislo in sorted(by_doklad):

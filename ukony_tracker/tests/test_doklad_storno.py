@@ -227,3 +227,31 @@ def test_bank_check_sits_on_the_summary_line(client, homeland, monkeypatch):
     html = client.get("/doklady").get_data(as_text=True)
     summary = html.split('<span id="doklady-count">')[1].split("</div>")[0]
     assert '<span class="doklady-banka">Banka zkontrolována před 10 min</span>' in summary
+
+
+def test_a_late_storno_reply_never_undoes_an_obnovit(client, homeland, monkeypatch):
+    # astra 19. 11.: storno push, then obnovit push, then the original /smazat
+    # reply {"removed": true} arrives — the doklad must stay live.
+    def post(url, **kwargs):
+        # The two pushes land while the trash request waits for žádosti.
+        conn = db.connect(config.DB_PATH)
+        base = {"cislo": 20260001, "datum": TODAY, "castka": 1000, "prijato_od": "HOMELAND CZECH S.R.O.",
+                "druh": "faktura", "vozidlo": ""}
+        ppd_repo.upsert(conn, {**base, "smazano": True, "storno_cas": "2026-11-19T19:40:00"})
+        ppd_repo.upsert(conn, {**base, "smazano": False, "storno_cas": "", "storno_kdo": ""})
+        conn.close()
+        return FakeResponse(200, {"removed": True})
+    monkeypatch.setattr(doklad_delete.requests, "post", post)
+    client.post("/doklady/20260001/smazat", headers={"X-Requested-With": "fetch"})
+    assert _row(client, 20260001)["smazano"] == 0
+
+
+def test_a_stornovany_doklad_keeps_its_firm_in_the_firm_filter(client, homeland):
+    # žádosti push the full record on storno (vozidlo included).
+    _put(client, 20260002, vozidlo="LRW3E7FS3VC007284", smazano=True, storno_cas="2026-11-19T16:02:11")
+    with client.application.app_context():
+        conn = db.get_db()
+        fid = conn.execute("SELECT firma_id FROM ukony WHERE id=?", (homeland,)).fetchone()[0]
+        assert ppd_links.compute(conn).firma[20260002] == fid
+    html = client.get(f"/doklady?firma={fid}").get_data(as_text=True)
+    assert 'data-cislo="20260002"' in html and "Stornováno" in html

@@ -136,7 +136,7 @@ def upsert(conn: sqlite3.Connection, record: dict) -> tuple[sqlite3.Row, bool]:
     zadost_id = (record.get("zadost_id") or "").strip()
     with conn:
         values["ukon_id"] = _find_ukon(conn, values, zadost_id)
-        ts = db.now_iso()
+        ts = db.now_iso(timespec="microseconds")  # a late storno reply must see a push in the same second
         columns = ",".join(values)
         placeholders = ",".join("?" for _ in values)
         cur = conn.execute(
@@ -168,13 +168,21 @@ def get_by_cislo(conn: sqlite3.Connection, cislo: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM ppd WHERE cislo=?", (cislo,)).fetchone()
 
 
-def mark_deleted(conn: sqlite3.Connection, cislo: int, kdo: str | None = None) -> None:
-    """Označí doklad, který žádosti právě stornovaly (jejich push řekne totéž o chvíli později)."""
+def mark_deleted(conn: sqlite3.Connection, cislo: int, kdo: str | None = None,
+                 if_updated_at: str | None = None) -> None:
+    """Označí doklad, který žádosti právě stornovaly (jejich push řekne totéž o chvíli později).
+
+    `if_updated_at`: only when the row is still as it was before the request —
+    an obnovit pushed meanwhile must not be undone by the late reply."""
     cas = datetime.now().isoformat(timespec="seconds")  # local time, like žádosti send it
+    sql = ("UPDATE ppd SET smazano=1, storno_cas=?, storno_kdo=?, updated_at=?"
+           " WHERE cislo=? AND smazano=0")
+    args = [cas, (kdo or "").strip()[:60] or None, db.now_iso(), cislo]
+    if if_updated_at is not None:
+        sql += " AND updated_at=?"
+        args.append(if_updated_at)
     with conn:
-        conn.execute("UPDATE ppd SET smazano=1, storno_cas=?, storno_kdo=?, updated_at=?"
-                     " WHERE cislo=? AND smazano=0",
-                     (cas, (kdo or "").strip()[:60] or None, db.now_iso(), cislo))
+        conn.execute(sql, args)
 
 
 def _filters(od, do, q, include_deleted) -> tuple[str, list]:
