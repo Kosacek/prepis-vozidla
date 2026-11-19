@@ -289,11 +289,17 @@
   .dok-mesic { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 8px 2px 0; font-size: 12px; font-weight: 700; color: var(--muted); }
   .dok-mesic:first-child { margin-top: 0; }
   .dok-mesic span { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .dok-card { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; flex-shrink: 0; transition: border-color .15s, background .15s; }
-  /* Koš v pravém dolním rohu jako v evidenci — částka zůstane zarovnaná vpravo. */
-  .dok-card .firm-chips { padding-right: 40px; }
-  .dok-card.smazany .firm-chips { padding-right: 0; }
-  .dok-card .firm-delete { position: absolute; right: 8px; bottom: 8px; width: 36px; height: 36px; padding: 9px; }
+  .dok-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: start; column-gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; flex-shrink: 0; transition: border-color .15s, background .15s; }
+  /* Jméno vedle částky; řádek pod ním a čipy jdou až k pravému kraji karty,
+     takže se Tisk · PDF · Sdílet i koš vejdou na jeden řádek i na telefonu. */
+  .dok-card .firm-info { display: contents; }
+  .dok-card .dok-num { grid-row: 1 / span 2; }
+  .dok-card .firm-card-name { grid-column: 2; grid-row: 1; min-width: 0; }
+  .dok-card .dok-castka { grid-column: 3; grid-row: 1; }
+  .dok-card .firm-card-sub { grid-column: 2 / 4; grid-row: 2; min-width: 0; }
+  .dok-card .firm-chips { grid-column: 2 / 4; grid-row: 3; flex-wrap: nowrap; }
+  /* Koš v pravém dolním rohu jako v evidenci. */
+  .dok-card .firm-delete { flex: none; margin: -2px -4px -2px auto; width: 36px; height: 36px; padding: 9px; }
   .dok-card:hover, .dok-card:focus-within { border-color: #b5caf5; background: #f7faff; }
   .dok-num { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 40px; border-radius: 10px; background: var(--accent); color: var(--primary); font-size: 13px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .dok-num small { font-size: 9px; font-weight: 700; letter-spacing: .04em; opacity: .7; }
@@ -645,6 +651,8 @@
     #doklady-modal-body, #hledani-body { padding: 0 16px 16px; }
     .dok-card { grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 8px; }
     .dok-num { width: 40px; }
+    /* Na telefonu má řádek akcí celou šířku karty, ať se nic nezalomí. */
+    .dok-card .firm-chips { grid-column: 1 / 4; }
     .ask-bar { margin: 0 16px 12px; }
     .ask-go { padding: 0 13px; }
     .ask-go span { display: none; }
@@ -666,6 +674,10 @@
     .hbtn { padding: 9px 11px; }
     .app-actions { gap: 6px; }
     .subtitle { display: none; }
+  }
+  @media (max-width: 360px) {
+    .dok-card .firm-chips { gap: 4px; }
+    .dok-card .firm-chip { padding: 5px 7px; }
   }
 </style>
 <!-- Emil polish overlay: motion, press/hover/focus states, touch behaviour.
@@ -2983,10 +2995,9 @@ function _dokladKarta(d, smazany) {
       <div class="firm-info">
         <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${esc(String(d.prijato_od || '—'))}</div>
         <div class="firm-card-sub" title="${sub}">${sub}</div>
-        <div class="firm-chips">${akce}</div>
+        <div class="firm-chips">${akce}${smazany ? '' : `<button type="button" class="firm-delete" data-cislo="${c}" onclick="otevriStornoDokladu(this.dataset.cislo)" title="Odebrat" aria-label="Odebrat"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}</div>
       </div>
       <div class="dok-castka">${_kcFmt(d.castka)}</div>
-      ${smazany ? '' : `<button type="button" class="firm-delete" data-cislo="${c}" onclick="otevriStornoDokladu(this.dataset.cislo)" title="Odebrat" aria-label="Odebrat"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
     </div>`;
 }
 
