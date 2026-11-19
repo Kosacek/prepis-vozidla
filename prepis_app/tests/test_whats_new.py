@@ -42,7 +42,9 @@ def test_superseded_and_obsolete_releases_never_appear(client):
 
 def test_newest_release_is_the_one_popped(client):
     html = client.get("/").get_data(as_text=True)
-    assert RELEASES[0].version == CURRENT_RELEASE == __version__
+    # Patch bez novinky (např. 1.36.1) zvedne verzi, ale znovu nic nevyskočí.
+    assert RELEASES[0].version == CURRENT_RELEASE
+    assert _v(CURRENT_RELEASE) <= _v(__version__)
     card = html[html.index('class="nv-intro"'):]
     assert f"Verze {CURRENT_RELEASE}" in card.split("nv-timer")[0]
     assert RELEASES[0].title in card.split("nv-timer")[0]
