@@ -219,7 +219,42 @@ def test_failure_append_and_sweep_use_exclusive_flock(tmp_path, monkeypatch):
     ppd_push.push(record(), str(tmp_path))
     monkeypatch.setattr(ppd_push.requests, "put", lambda *a, **k: Response())
     assert ppd_push.retry_failed(str(tmp_path)) == 0
-    assert locks == [Flock.LOCK_EX, Flock.LOCK_UN, Flock.LOCK_EX, Flock.LOCK_UN]
+    # PUTy, připojení k frontě, načtení fronty, opakovaný PUT, uložení fronty.
+    assert locks == [Flock.LOCK_EX, Flock.LOCK_UN] * (len(ppd_push.RETRY_DELAYS) + 5)
+
+
+def test_sweep_neblokuje_a_nezahodi_nove_ulozeny_push(tmp_path, monkeypatch):
+    dd = str(tmp_path)
+    ppd_push.enqueue(record(1), dd)
+    entered, release, queued = threading.Event(), threading.Event(), threading.Event()
+    result = []
+
+    def put(body):
+        assert body["cislo"] == 1
+        entered.set()
+        assert release.wait(5)
+        return {}
+
+    def append():
+        ppd_push.enqueue(record(2), dd)
+        queued.set()
+
+    monkeypatch.setattr(ppd_push, "_put_once", put)
+    sweep = threading.Thread(target=lambda: result.append(ppd_push.retry_failed(dd)), daemon=True)
+    enqueue = threading.Thread(target=append, daemon=True)
+    sweep.start()
+    try:
+        assert entered.wait(5)
+        enqueue.start()
+        assert queued.wait(2)
+    finally:
+        release.set()
+        sweep.join(5)
+        if enqueue.ident is not None:
+            enqueue.join(5)
+    assert result == [1]
+    log = tmp_path / "failed_ppd_pushes.jsonl"
+    assert json.loads(log.read_bytes())["record"] == record(2)
 
 
 @pytest.mark.parametrize("failing", ["tracker", "ppd", None])

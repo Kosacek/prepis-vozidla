@@ -323,6 +323,31 @@ def zaznam_zadosti(data_dir: str, zadost_id: str) -> dict:
     return nalezene
 
 
+def zadost_id_pro_soubory(data_dir: str, soubory: set[str]) -> str:
+    """ID z historického indexu, pokud soubory ukazují na jedinou žádost."""
+    if not soubory:
+        return ""
+    ids = set()
+    try:
+        with open(_index_path(data_dir), "rb") as f:
+            for radek in f:
+                try:
+                    rec = json.loads(radek)
+                    if not isinstance(rec, dict) or not isinstance(rec.get("files"), list):
+                        continue
+                    zid = rec.get("zadost_id")
+                    if isinstance(zid, str) and zid.strip() and any(
+                        isinstance(jmeno, str) and os.path.basename(jmeno) in soubory
+                        for jmeno in rec["files"]
+                    ):
+                        ids.add(zid.strip())
+                except ValueError:
+                    continue
+    except OSError:
+        return ""
+    return next(iter(ids)) if len(ids) == 1 else ""
+
+
 def nacti_vystupy(data_dir: str) -> list[dict]:
     """Vygenerované žádosti — datum čte z názvu souboru (ts = %Y%m%d_%H%M%S)."""
     out_dir = os.path.join(data_dir, "output")

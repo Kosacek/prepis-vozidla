@@ -14,6 +14,7 @@ sys.path.insert(0, BASE_DIR)
 
 import requests
 
+import faktura
 import ppd
 import ppd_push
 
@@ -43,11 +44,17 @@ def main(argv=None) -> int:
     # The oldest receipts (before the append-only backup existed) live only in
     # the ledger; send them too or evidence would be missing them forever.
     rows = [*backup, *(row for row in ledger if int(row["cislo"]) not in in_backup)]
+    # Import je jen pro PPD. Číslo z řady faktur může v evidenci označovat
+    # i storno, takže ho nesmí přepsat ani případná kolize se starým PPD.
+    cisla_faktur = {r["cislo"] for r in faktura.read_faktura_backup(data_dir)
+                   + faktura.read_faktura_log(data_dir, include_stornovane=True)}
     records = []
     errors = []
     for row in rows:
         try:
-            records.append(ppd_push.build_record(row, smazano=int(row["cislo"]) not in live))
+            cislo = int(row["cislo"])
+            if cislo not in cisla_faktur:
+                records.append(ppd_push.build_record(row, smazano=cislo not in live))
         except (TypeError, ValueError, OverflowError) as e:
             errors.append({"cislo": row.get("cislo"), "error": str(e)})
 

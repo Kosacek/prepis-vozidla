@@ -281,6 +281,11 @@
   #doklady-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
   #doklady-search { padding: 10px 12px 10px 38px; font-family: inherit; font-size: 14px; }
   #doklady-modal-body { display: flex; flex-direction: column; gap: 8px; padding-top: 0; flex: 1 1 auto; min-height: 0; overflow-x: hidden; }
+  #doklad-storno-dialog { width: calc(100% - 32px); max-width: 380px; margin: auto; padding: 0; border: 0; background: transparent; color: var(--text); }
+  #doklad-storno-dialog::backdrop { background: rgba(0,0,0,.45); }
+  #doklad-storno-dialog .modal-box { background: var(--card); }
+  #doklad-storno-dialog .modal-header { border-bottom: 0; overflow-wrap: anywhere; }
+  #doklad-storno-dialog .modal-body { display: flex; justify-content: end; gap: 8px; padding-top: 0; }
   .dok-mesic { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 8px 2px 0; font-size: 12px; font-weight: 700; color: var(--muted); }
   .dok-mesic:first-child { margin-top: 0; }
   .dok-mesic span { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -290,7 +295,7 @@
   .dok-num small { font-size: 9px; font-weight: 700; letter-spacing: .04em; opacity: .7; }
   .dok-castka { padding-top: 1px; font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
   a.firm-chip { text-decoration: none; }
-  .dok-card.smazany .dok-num { background: #f1f2f4; color: var(--muted); }
+  .dok-card.smazany .dok-num { background: var(--bg); color: var(--muted); }
   .dok-card.smazany .firm-card-name, .dok-card.smazany .dok-castka { color: var(--muted); }
   .firm-chip.dok-obnovit { border-color: #b9e5d1; background: #ecfdf5; color: var(--success); }
   .firm-chip.dok-obnovit:hover, .firm-chip.dok-obnovit:focus-visible { border-color: var(--success); background: #d1fae5; color: var(--success); }
@@ -636,6 +641,7 @@
     #doklady-modal-body, #hledani-body { padding: 0 16px 16px; }
     .dok-card { position: relative; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 8px; }
     .dok-card .firm-chips { padding-right: 36px; }
+    .dok-card.smazany .firm-chips { padding-right: 0; }
     .dok-card .firm-delete { position: absolute; right: 8px; bottom: 8px; }
     .dok-num { width: 40px; }
     .ask-bar { margin: 0 16px 12px; }
@@ -770,7 +776,7 @@
   </div>
 </div>
 
-<!-- Doklady (vystavené PPD) modal -->
+<!-- Doklady -->
 <div class="modal-overlay" id="doklady-modal" onkeydown="event.stopPropagation();if(event.key==='Escape')closeDokladyModal()">
   <div class="modal-box">
     <div class="modal-header">
@@ -784,6 +790,17 @@
     <div class="modal-body" id="doklady-modal-body">Načítám…</div>
   </div>
 </div>
+
+<dialog id="doklad-storno-dialog" aria-labelledby="doklad-storno-otazka"
+        onkeydown="event.stopPropagation()" onclose="potvrdStornoDokladu(this)">
+  <form method="dialog" class="modal-box">
+    <div class="modal-header"><h3 id="doklad-storno-otazka"></h3></div>
+    <div class="modal-body">
+      <button class="btn btn-secondary" value="zpet" autofocus>Zpět</button>
+      <button class="btn btn-primary" value="storno">Stornovat</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- Zeptej se — AI hledání v historii (žádosti / doklady / firmy) -->
 <div class="modal-overlay" id="hledani-modal" onkeydown="event.stopPropagation();if(event.key==='Escape')closeHledaniModal()">
@@ -2298,7 +2315,7 @@ document.addEventListener('keydown', e => {
 
 // ── Doklady (vystavené PPD) modal ────────────────────────────────────────────
 let _dokladyCache = [];
-let _dokladyDeletedCache = [];
+let _dokladyStornovaneCache = [];
 // Tiskopis říká „nepřesahující 3 měsíce od data vydání" — předvyplníme přesně
 // tuhle mez, ať se nemusí počítat, a napíšeme k tomu, odkud se bere.
 function vyvozPlatnostDefault() {
@@ -2900,16 +2917,14 @@ async function openDokladyModal() {
   setTimeout(() => document.getElementById('doklady-search').focus(), 50);
 }
 async function reloadDoklady() {
-  // Live ledger + the deleted (backup-only) rows, fetched from the server so
-  // the view always matches the write-only backup truth.
   try {
     const [live, del] = await Promise.all([
       fetch('/api/ppd-list').then(r => r.json()),
-      fetch('/api/ppd-deleted').then(r => r.json()),
+      fetch('/api/doklady-stornovane').then(r => r.json()),
     ]);
     _dokladyCache = live || [];
-    _dokladyDeletedCache = del || [];
-  } catch { _dokladyCache = []; _dokladyDeletedCache = []; }
+    _dokladyStornovaneCache = del || [];
+  } catch { _dokladyCache = []; _dokladyStornovaneCache = []; }
   renderDoklady();
 }
 function closeDokladyModal() {
@@ -2940,27 +2955,37 @@ function _dokCastka(v) {
   return isNaN(n) ? 0 : n;
 }
 
+function _dokladKod(d) {
+  const cislo = String(d.cislo);
+  return d.druh === 'faktura' ? cislo.slice(-4) : cislo;
+}
+
 function _dokladKarta(d, smazany) {
   const c = esc(String(d.cislo));
   const fa = d.druh === 'faktura';
   const tisk = fa ? 'faktura-print' : 'ppd-print';
   const soubor = (fa ? 'faktura_' : 'ppd_') + c + '.pdf';
-  const sub = [d.datum, fa && d.splatnost ? 'splatnost ' + d.splatnost : '', d.ucel, d.vozidlo].filter(Boolean).map(x => esc(String(x))).join(' · ');
+  const datumStorna = (d.storno_cas || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+  const storno = datumStorna ? `storno ${datumStorna[2]}.${datumStorna[1]}.` : '';
+  const sub = (smazany
+    ? [storno || d.datum, d.storno_kdo, d.vozidlo]
+    : [d.datum, fa && d.splatnost ? 'splatnost ' + d.splatnost : '', d.ucel, d.vozidlo]
+  ).filter(Boolean).map(x => esc(String(x))).join(' · ');
   const akce = smazany
     ? `<a class="firm-chip" href="/download/${soubor}" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
-       <button type="button" class="firm-chip dok-obnovit" onclick="restoreDoklad('${c}')" title="Obnovit doklad"><svg class="ico" aria-hidden="true"><use href="#i-undo"></use></svg>Obnovit</button>`
+       <button type="button" class="firm-chip dok-obnovit" data-cislo="${c}" onclick="zmenStornoDokladu(this.dataset.cislo, 'obnovit')" title="Obnovit doklad"><svg class="ico" aria-hidden="true"><use href="#i-undo"></use></svg>Obnovit</button>`
     : `<a class="firm-chip" href="/${tisk}/${c}" target="_blank" rel="noopener" title="Vytisknout na A5"><svg class="ico" aria-hidden="true"><use href="#i-printer"></use></svg>Tisk</a>
        <a class="firm-chip" href="/download/${soubor}" target="_blank" rel="noopener" title="Otevřít PDF"><svg class="ico" aria-hidden="true"><use href="#i-receipt"></use></svg>PDF</a>
        <button type="button" class="firm-chip" data-soubor="${soubor}" onclick="sdiletSoubory([this.dataset.soubor], this)" title="Kód pro sdílení dokladu"><svg class="ico" aria-hidden="true"><use href="#i-share"></use></svg>Sdílet</button>`;
   return `<div class="dok-card${smazany ? ' smazany' : ''}">
-      <div class="dok-num" aria-label="Doklad číslo ${c}"${fa ? ` title="Faktura č. ${c} (VS)"` : ''}><small>Č.</small>${fa ? c.slice(-4) : c}</div>
+      <div class="dok-num" aria-label="Doklad číslo ${c}"${fa ? ` title="Faktura č. ${c}"` : ''}><small>Č.</small>${esc(_dokladKod(d))}</div>
       <div class="firm-info">
         <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${esc(String(d.prijato_od || '—'))}</div>
         <div class="firm-card-sub" title="${sub}">${sub}</div>
         <div class="firm-chips">${akce}</div>
       </div>
       <div class="dok-castka">${_kcFmt(d.castka)}</div>
-      ${smazany || fa ? '<span></span>' : `<button type="button" class="firm-delete" onclick="deleteDoklad('${c}')" title="Smazat doklad" aria-label="Smazat doklad"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
+      ${smazany ? '' : `<button type="button" class="firm-delete" data-cislo="${c}" onclick="otevriStornoDokladu(this.dataset.cislo)" title="Odebrat" aria-label="Odebrat"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}
     </div>`;
 }
 
@@ -2996,32 +3021,43 @@ function renderDoklady() {
     });
   }
 
-  // Deleted receipts live in the append-only backup and can be restored.
-  const del = (_dokladyDeletedCache || []).filter(d => _dokladySedi(d, q));
+  const del = _dokladyStornovaneCache.filter(d => _dokladySedi(d, q));
   if (del.length) {
-    html += `<details class="dok-deleted">
-      <summary><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg>Smazané <span class="firm-count">${del.length}</span></summary>
+    const otevreno = body.querySelector('.dok-deleted')?.open;
+    html += `<details class="dok-deleted"${otevreno ? ' open' : ''}>
+      <summary><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg>Stornované <span class="firm-count">${del.length}</span></summary>
       <div class="dok-list">${del.map(d => _dokladKarta(d, true)).join('')}</div>
     </details>`;
   }
   body.innerHTML = html;
 }
-async function deleteDoklad(cislo) {
-  if (!confirm('Opravdu smazat doklad č. ' + cislo + '?\nZůstane v záloze a půjde kdykoliv obnovit.')) return;
-  try {
-    const res = await fetch('/api/ppd/' + encodeURIComponent(cislo), { method: 'DELETE' });
-    const d = await res.json();
-    if (d.success) { await reloadDoklady(); }
-    else alert('Smazání se nezdařilo.');
-  } catch { alert('Chyba při mazání dokladu.'); }
+function otevriStornoDokladu(cislo) {
+  const d = _dokladyCache.find(row => String(row.cislo) === cislo);
+  if (!d) return;
+  const dialog = document.getElementById('doklad-storno-dialog');
+  document.getElementById('doklad-storno-otazka').textContent =
+    `Stornovat doklad č. ${_dokladKod(d)} – ${d.prijato_od || '—'}?`;
+  dialog.dataset.cislo = cislo;
+  dialog.returnValue = '';
+  dialog.showModal();
 }
-async function restoreDoklad(cislo) {
+
+function potvrdStornoDokladu(dialog) {
+  if (dialog.returnValue === 'storno') zmenStornoDokladu(dialog.dataset.cislo, 'odebrat');
+}
+
+async function zmenStornoDokladu(cislo, akce) {
+  let kdo = '';
+  try { kdo = window.getProfil(); } catch {}
+  const chyba = akce === 'odebrat' ? 'Storno se nezdařilo.' : 'Obnovení se nezdařilo.';
   try {
-    const res = await fetch('/api/ppd/' + encodeURIComponent(cislo) + '/restore', { method: 'POST' });
+    const res = await fetch('/api/doklady/' + encodeURIComponent(cislo) + '/' + akce, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({kdo}),
+    });
     const d = await res.json();
     if (d.success) { await reloadDoklady(); }
-    else alert(d.error || 'Obnovení se nezdařilo.');
-  } catch { alert('Chyba při obnovování dokladu.'); }
+    else alert(d.error || chyba);
+  } catch { alert(chyba); }
 }
 
 function _firmSearchText(value) {

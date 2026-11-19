@@ -469,7 +469,10 @@ def test_smazat_vyradi_doklad_z_knihy_a_necha_zalohu_i_pdf(api):
     assert _v_knize(api) == []
     assert [d["cislo"] for d in ppd.deleted_ppd(str(api.data))] == [1], "jde obnovit ze zálohy"
     assert (api.data / "output" / "ppd_1.pdf").exists()
-    assert api.poslano == [ppd_push.build_record(zaloha, smazano=True)]
+    record, = api.poslano
+    assert datetime.fromisoformat(record["storno_cas"])
+    assert record == {**ppd_push.build_record(zaloha, smazano=True),
+                      "storno_cas": record["storno_cas"], "storno_kdo": "evidence"}
 
 
 def test_smazat_znovu_je_neskodne(api):
@@ -477,7 +480,7 @@ def test_smazat_znovu_je_neskodne(api):
     _smaz(api)
     r = _smaz(api)
     assert r.status_code == 200 and r.get_json() == {"removed": False}
-    assert len(api.poslano) == 1, "druhé smazání evidenci nic neposílá"
+    assert len(api.poslano) == 2 and api.poslano[0] == api.poslano[1]
 
 
 def test_smazat_neexistujici_doklad(api):
@@ -529,8 +532,11 @@ def test_delete_z_appky_dal_chce_prihlaseni(api):
 
 def test_evidence_i_appka_mazou_stejnym_kodem(api, monkeypatch):
     volano = []
-    monkeypatch.setattr(A, "_smaz_doklad", lambda n: volano.append(n) or True)
+    def zmen(n, *, smazano, vychozi_kdo=""):
+        volano.append((n, smazano, vychozi_kdo))
+        return {"zmeneno": True}, True
+    monkeypatch.setattr(A, "_zmen_storno", zmen)
     assert _smaz(api, cislo=7).get_json() == {"removed": True}
     api.post("/login", data={"password": "heslo-jen-pro-test"})
     assert api.delete("/api/ppd/8").get_json() == {"success": True, "removed": True}
-    assert volano == [7, 8]
+    assert volano == [(7, True, "evidence"), (8, True, "")]

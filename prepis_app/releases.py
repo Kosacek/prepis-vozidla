@@ -40,6 +40,13 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.36.0", date(2026, 11, 19), "Špatný doklad stornuješ",
+            ("Koš u dokladu ho stornuje, číslo zůstane.",
+             "Ve Stornovaných ho obnovíš."),
+            demo="v1_36_0",
+            oblast="faktury",
+            nazev="Špatný doklad stornuješ",
+            radek="Koš u dokladu ho stornuje, číslo zůstane. Ve Stornovaných ho obnovíš."),
     Release("1.35.1", date(2026, 11, 13), "Novinky na jedné stránce",
             ("Nejnovější změna vyskočí jako dřív a pod ní uvidíš všechno, co "
              "aplikace umí – bez starých verzí.",),

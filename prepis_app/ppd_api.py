@@ -225,10 +225,41 @@ def _najdi_vystaveny(data_dir: str, request_id: str) -> dict | None:
     return None
 
 
-def _zapis_vystaveny(data_dir: str, udaje: dict, doklad: dict) -> None:
+def zadost_id_dokladu(data_dir: str, number: int, *, druh: str | None = None) -> str:
+    """ID původní žádosti pro Evidenci."""
+    zadost_id = ""
+    try:
+        with open(os.path.join(data_dir, VYSTAVENE), "rb") as f:
+            for radek in f:
+                try:
+                    zaznam = json.loads(radek)
+                    doklad = zaznam["doklad"]
+                    if doklad["cislo"] != number or (druh and doklad.get("druh", "ppd") != druh):
+                        continue
+                    hodnota = zaznam.get("evidence_zadost_id") or doklad.get("zadost_id")
+                    if isinstance(hodnota, str) and hodnota.strip():
+                        zadost_id = hodnota.strip()
+                except (KeyError, TypeError, ValueError):
+                    continue
+    except OSError:
+        pass
+    if zadost_id:
+        return zadost_id
+    soubory = {f"{typ}_{number}.pdf" for typ in ((druh,) if druh else DRUHY)}
+    zadost_id = hledani.zadost_id_pro_soubory(data_dir, soubory)
+    if zadost_id or druh == "ppd":
+        return zadost_id
+    # Starý wizard ukládal do indexu jen žádosti. Původní soubory k faktuře
+    # zná její uložený balík i po vypršení kódu, bez rozbalování zadost_ids.
+    return hledani.zadost_id_pro_soubory(data_dir, sdileni.ulozene_soubory_faktury(data_dir, number))
+
+
+def _zapis_vystaveny(data_dir: str, udaje: dict, doklad: dict, *, evidence_zadost_id: str = "") -> None:
     zaznam = {"ts": datetime.now().isoformat(timespec="seconds"),
               "request_id": udaje["request_id"], "zpracoval": udaje["zpracoval"],
               "doklad": doklad}
+    if evidence_zadost_id:
+        zaznam["evidence_zadost_id"] = evidence_zadost_id
     with open(os.path.join(data_dir, VYSTAVENE), "a", encoding="utf-8") as f:
         f.write(json.dumps(zaznam, ensure_ascii=False) + "\n")
         f.flush()
@@ -251,9 +282,9 @@ def _pod_zamkem(data_dir: str, fn):
                 lock_fd.close()
 
 
-def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
+def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico, *, evidence_zadost_id: str) -> dict:
     """Faktura převodem: vlastní číselná řada (YYYYNNNN), ledger + záloha, PDF
-    faktura_<n>.pdf. Do evidence se nepushuje (kontrakt pozná jen PPD)."""
+    faktura_<n>.pdf. Push do evidence řeší volající."""
     payer = udaje["prijato_od"].upper()
     address = adresa_platce(data_dir, udaje, adresa_podle_ico).upper()
     vozidla = udaje["vozidla"]
@@ -268,7 +299,9 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
         "ucel": udaje["ucel"], "vozidlo": ", ".join(vozidla),
         "variabilni_symbol": str(number), "amount": udaje["castka"],
     }
-    _zapis_vystaveny(data_dir, udaje, doklad)
+    if udaje.get("zadost_id"):
+        doklad["zadost_id"] = udaje["zadost_id"]
+    _zapis_vystaveny(data_dir, udaje, doklad, evidence_zadost_id=evidence_zadost_id)
     # Kód faktury (její poslední 4 číslice) platí od vystavení; úkony z evidence
     # se do něj připojí přes jejich zadost_id (sdileni.najdi_balik).
     sdileni.zapis_fakturu(data_dir, number, [],
@@ -283,7 +316,7 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico) -> dict:
     return doklad
 
 
-def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
+def vystav(data_dir: str, udaje: dict, adresa_podle_ico, *, evidence_zadost_id: str = "") -> tuple[dict, bool]:
     """Vystaví doklad (nebo vrátí už vystavený pro stejný request_id).
 
     adresa_podle_ico(ico) → adresa uložené firmy nebo "" — záloha, když adresa
@@ -299,7 +332,7 @@ def vystav(data_dir: str, udaje: dict, adresa_podle_ico) -> tuple[dict, bool]:
             # Dřív než se sáhne na číselnou řadu (issue_faktura).
             if not faktura.dostupna():
                 raise FakturaNedostupna()
-            return _vystav_fakturu(data_dir, udaje, adresa_podle_ico), True
+            return _vystav_fakturu(data_dir, udaje, adresa_podle_ico, evidence_zadost_id=evidence_zadost_id), True
         dnes = datetime.now().strftime("%d.%m.%Y")
         # Plátce velkými písmeny jako u dokladu k žádosti; účel tak, jak přišel.
         payer = udaje["prijato_od"].upper()

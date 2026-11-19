@@ -213,13 +213,16 @@ def _dopis_pole(obrazek, pole: list[dict], vyska_pt: float, meritko: float) -> N
 
 @lru_cache(maxsize=32)
 def _png(cesta: str, _mtime: float, strana: int) -> bytes:
-    import pypdfium2 as pdfium
     with open(cesta, "rb") as f:
-        data = f.read()
+        return _vykresli_png(f.read(), strana, sede=True)
+
+
+def _vykresli_png(data: bytes, strana: int, *, sede: bool) -> bytes:
+    import pypdfium2 as pdfium
     try:
         data, pole = bez_textovych_poli(data, strana - 1)
     except Exception as e:  # neobvyklé PDF — radši náhled od PDFia než žádný
-        _log.warning("náhled: pole nejde přečíst %s: %s", os.path.basename(cesta), e)
+        _log.warning("náhled: pole nejde přečíst: %s", e)
         pole = []
     with _zamek:
         pdf = pdfium.PdfDocument(data)
@@ -230,7 +233,7 @@ def _png(cesta: str, _mtime: float, strana: int) -> bytes:
             obrazek = stranka.render(scale=MERITKO, may_draw_forms=True).to_pil()
         finally:
             pdf.close()
-    obrazek = obrazek.convert("L")
+    obrazek = obrazek.convert("L" if sede else "RGB")
     _dopis_pole(obrazek, pole, vyska_pt, MERITKO)
     buf = io.BytesIO()
     obrazek.save(buf, format="PNG", optimize=True)
@@ -246,12 +249,12 @@ def pocet_stran(cesta: str) -> int:
         return 0
 
 
-def stranka_png(cesta: str, strana: int) -> bytes | None:
+def stranka_png(cesta: str | bytes, strana: int) -> bytes | None:
     """PNG jedné stránky (číslováno od 1), nebo None když taková není."""
-    if not 1 <= strana <= pocet_stran(cesta):
-        return None
     try:
-        return _png(*_klic(cesta), strana)
+        if isinstance(cesta, bytes):
+            return _vykresli_png(cesta, strana, sede=False) if 1 <= strana <= MAX_STRAN else None
+        return _png(*_klic(cesta), strana) if 1 <= strana <= pocet_stran(cesta) else None
     except Exception as e:
-        _log.warning("náhled: nejde vykreslit %s/%d: %s", os.path.basename(cesta), strana, e)
+        _log.warning("náhled: nejde vykreslit stránku %d: %s", strana, e)
         return None

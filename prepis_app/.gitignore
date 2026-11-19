@@ -34,6 +34,9 @@ failed_ppd_pushes.jsonl.lock
 failed_ppd_pushes.jsonl.tmp
 share_tokens.jsonl
 share_tokens.jsonl.lock
+doklady_storno.jsonl
+doklady_storno.jsonl.lock
+doklad_push_*.lock
 
 # Šablony plné moci mají natištěnou adresu a datum narození zmocněnce — repo
 # je veřejné. Davidova a Petrova tu dřív byly a 2026-10-01 se musely vyřezat

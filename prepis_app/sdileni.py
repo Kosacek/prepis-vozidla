@@ -361,6 +361,15 @@ def zapis_fakturu(data_dir: str, cislo, polozky=(), zadost_ids=()) -> str:
         return kod_faktury(cislo)
 
 
+def ulozene_soubory_faktury(data_dir: str, cislo: int) -> set[str]:
+    """Přímo uložené soubory faktury pro dohledání původní žádosti v indexu."""
+    zaznam = _posledni_zaznamy(data_dir).get(str(cislo)) or {}
+    if zaznam.get("faktura") != cislo:
+        return set()
+    return {p["file"] for p in _polozky(zaznam.get("soubory") or [])
+            if p["kde"] == KDE_OUTPUT}
+
+
 def _balik_faktury(zaznam: dict, zadosti) -> list[dict]:
     """Faktura vždy první, pak soubory uložené u kódu, pak soubory žádostí
     z `zadost_ids` (zadosti(zadost_id) -> seznam položek)."""

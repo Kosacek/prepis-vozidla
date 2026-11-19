@@ -123,15 +123,15 @@
           {% if d.strany > 1 %}
           <div class="strany">
             {% for s in range(1, d.strany + 1) %}
-              <button type="button" class="nahl" data-src="{{ d.url }}/nahled/{{ s }}"
+              <button type="button" class="nahl" data-src="{{ d.url }}/nahled/{{ s }}{{ d.nahled_query }}"
                       aria-current="{{ 'true' if s == 1 else 'false' }}" title="Strana {{ s }}">
-                <img src="{{ d.url }}/nahled/{{ s }}" alt="Strana {{ s }}" loading="lazy">
+                <img src="{{ d.url }}/nahled/{{ s }}{{ d.nahled_query }}" alt="Strana {{ s }}" loading="lazy">
               </button>
             {% endfor %}
           </div>
           {% endif %}
           <button type="button" class="papir" data-zoom title="Zvětšit">
-            <img src="{{ d.url }}/nahled/1" alt="{{ d.popis }}, strana 1">
+            <img src="{{ d.url }}/nahled/1{{ d.nahled_query }}" alt="{{ d.popis }}, strana 1">
           </button>
         </div>
         {% endif %}

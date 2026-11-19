@@ -195,21 +195,25 @@ def test_delete_and_restore_push_status_from_backup(client, tmp_path, monkeypatc
         assert body["prijato_ico"] == "01234567"
         assert body["vozidlo"] == issued["vozidlo"]
         assert body["castka"] == issued["castka"]
-    # Repeating the restore has no local change and sends no extra push.
+    # Repeating the restore resends the state without changing the ledger.
     assert client.post(f"/api/ppd/{number}/restore").get_json()["restored"] is False
-    assert len(evidence_pushes["ppd"]) == 2
+    assert [body for body, _ in evidence_pushes["ppd"]] == [*bodies, bodies[-1]]
 
 
-def test_delete_skips_push_without_backup(client, tmp_path, monkeypatch, evidence_pushes):
+def test_delete_backs_up_ledger_only_ppd_and_pushes(client, tmp_path, monkeypatch, evidence_pushes):
     monkeypatch.setattr(appmod, "DATA_DIR", str(tmp_path))
     number = appmod.ppd.reserve_ppd_number_and_log(str(tmp_path), {
         "date": "08.10.2026", "payer": "Firma", "amount": 1300, "vehicle": "RZ",
     })
     assert client.delete(f"/api/ppd/{number}").get_json()["removed"] is True
-    assert evidence_pushes["ppd"] == []
+    (odstraneny, dd), = evidence_pushes["ppd"]
+    assert dd == str(tmp_path)
+    assert odstraneny["smazano"] is True and odstraneny["vozidlo"] == "RZ"
     assert client.delete(f"/api/ppd/{number}").get_json()["removed"] is False
-    assert client.post(f"/api/ppd/{number}/restore").status_code == 404
-    assert evidence_pushes["ppd"] == []
+    assert client.post(f"/api/ppd/{number}/restore").get_json()["restored"] is True
+    obnovene = {**odstraneny, "smazano": False, "storno_cas": "", "storno_kdo": ""}
+    assert evidence_pushes["ppd"] == [(odstraneny, dd), (odstraneny, dd), (obnovene, dd)]
+    assert appmod.ppd.read_ppd_log(str(tmp_path))[0]["cislo"] == number
 
 
 def test_delete_and_restore_complete_when_push_raises(client, tmp_path, monkeypatch):

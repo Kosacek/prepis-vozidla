@@ -12,9 +12,13 @@ import time
 
 import requests
 
+import ppd
+import storno
 from tracker_push import UKONY_API_URL, UKONY_API_KEY, TIMEOUT, RETRY_DELAYS
 
 _log = logging.getLogger("prepis.ppd_push")
+_DORUCENI_ZAMKY = tuple(threading.Lock() for _ in range(32))
+_FRONTA_ZAMEK = threading.Lock()
 
 # Same POSIX flock / Windows dev fallback as tracker_push.py and ppd.py.
 try:
@@ -62,26 +66,36 @@ def _failed_path(data_dir: str) -> str:
 def _with_lock(data_dir: str, fn):
     """Serialize appends and sweeps across gunicorn workers with our own lock."""
     os.makedirs(data_dir, exist_ok=True)
-    lock_fd = open(_failed_path(data_dir) + ".lock", "a+")
-    try:
+    with _FRONTA_ZAMEK, open(_failed_path(data_dir) + ".lock", "a+") as lock_fd:
         if _HAVE_FCNTL:
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        return fn()
-    finally:
         try:
+            return fn()
+        finally:
             if _HAVE_FCNTL:
                 fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
-        finally:
-            lock_fd.close()
+
+
+def enqueue(record: dict, data_dir: str, *, reason: str = "čeká na odeslání") -> None:
+    """Ulož push dřív, než se předá vláknu."""
+    radek = (json.dumps({"reason": reason, "record": record}, ensure_ascii=False) + "\n").encode("utf-8")
+
+    def _append():
+        with open(_failed_path(data_dir), "a+b") as f:
+            if f.tell():
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) != b"\n":
+                    f.write(b"\n")
+            f.write(radek)
+            f.flush()
+            os.fsync(f.fileno())
+
+    _with_lock(data_dir, _append)
 
 
 def _record_failure(data_dir: str, record: dict, reason) -> None:
-    def _append():
-        with open(_failed_path(data_dir), "a", encoding="utf-8") as f:
-            f.write(json.dumps({"reason": str(reason), "record": record},
-                               ensure_ascii=False) + "\n")
     try:
-        _with_lock(data_dir, _append)
+        enqueue(record, data_dir, reason=str(reason))
     except Exception as e:  # pragma: no cover - last-resort logging
         _log.warning("could not record failed PPD push: %s", e)
 
@@ -99,13 +113,44 @@ def _put_once(record: dict) -> dict | str:
         return str(e)
 
 
+def _put_aktualni(data_dir: str, record: dict) -> dict | str:
+    """PUTy stejného čísla se nepředbíhají. Starší pokus po změně stavu zahodíme."""
+    try:
+        number = int(record["cislo"])
+        druh = record.get("druh") or "ppd"
+        index = number % len(_DORUCENI_ZAMKY)
+        os.makedirs(data_dir, exist_ok=True)
+        path = os.path.join(data_dir, f"doklad_push_{index}.lock")
+        with _DORUCENI_ZAMKY[index], open(path, "a+b") as f:
+            if _HAVE_FCNTL:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                stav = storno.stav(data_dir).get((druh, number))
+                smazano = ppd.je_stornovany(data_dir, number) if druh == "ppd" else bool(stav and stav["storno"])
+                if smazano != bool(record.get("smazano")):
+                    return {}
+                if smazano and stav and stav["storno"] and "storno_cas" in record:
+                    record = {**record, "storno_cas": stav["storno_cas"], "storno_kdo": stav["storno_kdo"]}
+                if "storno_cas" in record and not record.get("zadost_id"):
+                    from ppd_api import zadost_id_dokladu
+                    zadost_id = zadost_id_dokladu(data_dir, number, druh=druh)
+                    if zadost_id:
+                        record = {**record, "zadost_id": zadost_id}
+                return _put_once(record)
+            finally:
+                if _HAVE_FCNTL:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except Exception as e:
+        return str(e)
+
+
 def push(record: dict, data_dir: str) -> dict | None:
     """Deliver synchronously with the tracker's retry delays; queue failures."""
     last_reason = "no attempt made"
     for delay in (0,) + RETRY_DELAYS:
         if delay:
             time.sleep(delay)
-        result = _put_once(record)
+        result = _put_aktualni(data_dir, record)
         if not isinstance(result, str):
             return result
         last_reason = result
@@ -120,31 +165,49 @@ def push_async(record: dict, data_dir: str) -> None:
 
 def retry_failed(data_dir: str) -> int:
     """Resend the backlog once, drop successes and return the remaining count."""
-    def _run():
-        path = _failed_path(data_dir)
-        if not os.path.exists(path):
-            return 0
-        with open(path, encoding="utf-8") as f:
-            lines = [line for line in f.read().splitlines() if line.strip()]
-        still_failing = []
-        for line in lines:
-            try:
-                entry = json.loads(line)
-                record = entry["record"]
-            except Exception:
-                # Retain unreadable entries for inspection; never lose a receipt.
-                still_failing.append(line)
-                continue
-            result = _put_once(record)
-            if isinstance(result, str):
-                entry["reason"] = result
-                still_failing.append(json.dumps(entry, ensure_ascii=False))
-        if still_failing:
+    path = _failed_path(data_dir)
+
+    def read_queue():
+        try:
+            with open(path, "rb") as f:
+                return f.read()
+        except FileNotFoundError:
+            return b""
+
+    snapshot = _with_lock(data_dir, read_queue)
+    if not snapshot:
+        return 0
+    # Čekání na Evidenci nesmí držet zámek potřebný pro uložení nového storna.
+    still_failing = []
+    for line in snapshot.splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+            record = entry["record"]
+        except (ValueError, TypeError, KeyError):
+            still_failing.append(line)
+            continue
+        result = _put_aktualni(data_dir, record)
+        if isinstance(result, str):
+            entry["reason"] = result
+            still_failing.append(json.dumps(entry, ensure_ascii=False).encode("utf-8"))
+
+    def save_queue():
+        current = read_queue()
+        if not current.startswith(snapshot):
+            # Jiný worker ji už zkrátil. Další průchod zpracuje aktuální frontu.
+            return sum(bool(line.strip()) for line in current.splitlines())
+        remaining = still_failing + [line for line in current[len(snapshot):].splitlines() if line.strip()]
+        if remaining:
             tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write("\n".join(still_failing) + "\n")
+            with open(tmp, "wb") as f:
+                f.write(b"\n".join(remaining) + b"\n")
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp, path)
-        elif os.path.exists(path):
+        else:
             os.remove(path)
-        return len(still_failing)
-    return _with_lock(data_dir, _run)
+        return len(remaining)
+
+    return _with_lock(data_dir, save_queue)

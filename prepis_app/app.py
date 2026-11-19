@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, abort, render_template, request, jsonify, send_file
 import requests
 import functools
 import json
@@ -24,6 +24,7 @@ import faktura  # Faktura převodem + QR Platba — see faktura.py
 import faktura_pdf
 import ppd_api  # POST /api/ppd/vystavit — evidence vystavuje doklady — see ppd_api.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
+import storno
 import nahled  # PNG náhledy stránek pro sdílenou stránku
 import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
 import hledani  # deterministic history search (no AI) — see hledani.py
@@ -66,7 +67,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.35.1"
+__version__ = "1.36.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1640,7 +1641,8 @@ def _vystav_fakturu_k_zadosti(data: dict, amount: int, rz_full: str, vin: str,
         "prijato_adresa": payer_address, "castka": amount, "ucel": PPD_UCEL,
         "vozidla": vozidla, "zpracoval": str(data.get("profil") or "")[:ppd_api.MAX_ZPRACOVAL],
     })
-    doklad, _novy = ppd_api.vystav(DATA_DIR, udaje, _adresa_firmy_podle_ico)
+    doklad, _novy = ppd_api.vystav(DATA_DIR, udaje, _adresa_firmy_podle_ico,
+                                   evidence_zadost_id=data.get("zadost_id") or "")
     return doklad
 
 
@@ -2004,6 +2006,27 @@ def _kod_pro_plnou_moc(name: str, jmeno: str, zdroj: str | None) -> str:
 _SDILET_MAX_SOUBORU = 10
 
 
+def _cislo_dokladu_pdf(nazev: str, druh: str) -> int | None:
+    m = re.fullmatch(r"(faktura|ppd)_([0-9]+)\.pdf", nazev, flags=re.IGNORECASE)
+    return int(m.group(2)) if m and m.group(1).lower() == druh else None
+
+
+def _cislo_faktury_pdf(nazev: str) -> int | None:
+    return _cislo_dokladu_pdf(nazev, "faktura")
+
+
+def _storno_faktury(number: int) -> dict:
+    return storno.stav(DATA_DIR).get(("faktura", number), {})
+
+
+def _chyba_stornovane_faktury(number: int):
+    return jsonify({"error": f"Faktura č. {number} je stornovaná."}), 409
+
+
+def _chyba_stornovaneho_ppd(number: int):
+    return jsonify({"error": f"Doklad č. {number} je stornovaný."}), 409
+
+
 @app.route("/api/sdilet", methods=["POST"])
 def api_sdilet():
     """Sdílecí kód pro dokument(y), které už existují — z historie, z Dokladů.
@@ -2018,16 +2041,22 @@ def api_sdilet():
     for s in soubory:
         nazev = os.path.basename(str(s or ""))
         cesta = os.path.join(DATA_DIR, "output", nazev)
+        number = _cislo_faktury_pdf(nazev)
+        if number is not None and _storno_faktury(number).get("storno"):
+            return _chyba_stornovane_faktury(number)
+        ppd_number = _cislo_dokladu_pdf(nazev, "ppd")
+        if ppd_number is not None and ppd.je_stornovany(DATA_DIR, ppd_number):
+            return _chyba_stornovaneho_ppd(ppd_number)
         if (nazev != str(s) or nazev.startswith(".") or not nazev.lower().endswith(".pdf")
                 or not os.path.isfile(cesta)):
             return jsonify({"success": False, "error": "Dokument nenalezen."}), 404
         polozky.append({"file": nazev, "kde": sdileni.KDE_OUTPUT,
                         "popis": sdileni.popis_souboru(nazev)})
-    m = re.fullmatch(r"faktura_(\d+)\.pdf", polozky[0]["file"])
-    if len(polozky) == 1 and m:
+    number = _cislo_faktury_pdf(polozky[0]["file"])
+    if len(polozky) == 1 and number is not None:
         # Faktura: kód je její číslo, obnoví se na 30 dní a zůstane stejný.
         return jsonify({"success": True, "plati_dni": sdileni.TTL_DNI,
-                        "sdilet": "/" + sdileni.zapis_fakturu(DATA_DIR, int(m.group(1)))})
+                        "sdilet": "/" + sdileni.zapis_fakturu(DATA_DIR, number)})
     return jsonify({"success": True, "sdilet": f"/{sdileni.vytvor_kod(DATA_DIR, polozky)}"})
 
 
@@ -2142,20 +2171,72 @@ def api_ppd_list():
     rows = faktury + pokladni
     return jsonify(rows)
 
-def _smaz_doklad(number: int) -> bool:
-    """Remove a receipt from the LIVE ledger and tell evidence (smazano=True).
-    The append-only backup keeps its copy and the PDF file is left on disk, so
-    the receipt can be restored. Repeating it is harmless (False, no push)."""
-    removed = ppd.delete_ppd(DATA_DIR, number)
-    if removed:
-        try:
-            rec = next((r for r in ppd.read_backup(DATA_DIR) if r.get("cislo") == number), None)
-            if rec is not None:
-                import ppd_push
-                ppd_push.push_async(ppd_push.build_record(rec, smazano=True), DATA_DIR)
-        except Exception as e:
-            _log.warning("PPD delete push skipped: %s", e)
-    return removed
+
+def _najdi_ppd(rows, number):
+    return next((r for r in rows if r["cislo"] == number), None)
+
+
+def _zmen_ppd(number: int, smazano: bool) -> tuple[dict | None, bool]:
+    rec = _najdi_ppd(ppd.read_backup(DATA_DIR), number)
+    if rec is None:
+        rec = _najdi_ppd(ppd.read_ppd_log(DATA_DIR), number)
+        if rec is None or not smazano:
+            return rec, False
+        # Nejstarší PPD před zavedením zálohy musejí jít také obnovit.
+        ppd.append_backup(DATA_DIR, {
+            "cislo": number, "ts": datetime.now().isoformat(timespec="seconds"),
+            "date": rec["datum"], "payer": rec["prijato_od"], "amount": rec["castka"],
+            "purpose": rec["ucel"], "spz": rec["vozidlo"],
+        })
+        if _najdi_ppd(ppd.read_backup(DATA_DIR), number) is None:
+            raise OSError(f"Zálohu PPD č. {number} se nepodařilo uložit.")
+    if smazano:
+        return rec, ppd.delete_ppd(DATA_DIR, number)
+    return rec, ppd.restore_ppd_row(DATA_DIR, {
+        **rec, "vozidlo": rec.get("spz") or rec.get("vin") or "",
+    })
+
+
+def _zmen_storno(number: int, *, smazano: bool, vychozi_kdo: str = "") -> tuple[dict | None, bool]:
+    telo = request.get_json(silent=True)
+    kdo = telo.get("kdo", vychozi_kdo) if isinstance(telo, dict) else vychozi_kdo
+    with storno.transakce(DATA_DIR) as zapis_udalost:
+        rec = faktura.get_faktura(DATA_DIR, number)
+        druh = "faktura" if rec is not None else "ppd"
+        stav = storno.stav(DATA_DIR).get((druh, number), {})
+        journal_zmena = bool(stav.get("storno")) != smazano
+        zmena_stavu = journal_zmena
+        if druh == "ppd":
+            rec, zmena_stavu = _zmen_ppd(number, smazano)
+        if rec is None:
+            return None, False
+        zmeneno = zmena_stavu or journal_zmena
+        if zmeneno:
+            udalost = zapis_udalost(druh, number, "storno" if smazano else "obnoveno", kdo)
+            stav = {"storno_cas": udalost["ts"], "storno_kdo": udalost["kdo"]}
+    try:
+        import ppd_push
+        if druh == "faktura":
+            rec = {**rec, "prijato_od": rec.get("odberatel", ""),
+                   "vozidlo": rec.get("vozidla") or rec.get("vozidlo", "")}
+        record = ppd_push.build_record(
+            rec, zadost_id=ppd_api.zadost_id_dokladu(DATA_DIR, number, druh=druh), smazano=smazano)
+        record.update(storno_cas=stav.get("storno_cas", "") if smazano else "",
+                      storno_kdo=stav.get("storno_kdo", "") if smazano else "")
+        ppd_push.enqueue(record, DATA_DIR)
+        ppd_push.push_async(record, DATA_DIR)
+    except Exception as e:
+        _log.warning("Doklad %s: storno push se nepodařil (%s)", number, e)
+    return {"success": True, "druh": druh, "cislo": number, "storno": smazano, "zmeneno": zmeneno}, zmena_stavu
+
+
+@app.post("/api/doklady/<int:cislo>/odebrat", defaults={"smazano": True})
+@app.post("/api/doklady/<int:cislo>/obnovit", defaults={"smazano": False})
+def api_doklady_zmen_storno(cislo, smazano):
+    vysledek, _ = _zmen_storno(cislo, smazano=smazano)
+    if vysledek is None:
+        return jsonify({"success": False, "error": "Doklad nenalezen."}), 404
+    return jsonify(vysledek)
 
 
 def _over_klic_integrace(vypnuto: str):
@@ -2181,8 +2262,8 @@ def _over_klic_integrace(vypnuto: str):
 
 @app.route("/api/ppd/<int:number>", methods=["DELETE"])
 def api_ppd_delete(number):
-    """Doklady browser in the app — see _smaz_doklad."""
-    return jsonify({"success": True, "removed": _smaz_doklad(number)})
+    _, removed = _zmen_storno(number, smazano=True)
+    return jsonify({"success": True, "removed": removed})
 
 
 @app.route("/api/ppd/<int:number>/smazat", methods=["POST"])
@@ -2195,9 +2276,9 @@ def api_ppd_smazat(number):
     chyba = _over_klic_integrace("Mazání dokladů přes API není zapnuté.")
     if chyba:
         return chyba
-    removed = _smaz_doklad(number)
+    _, removed = _zmen_storno(number, smazano=True, vychozi_kdo="evidence")
     if removed:
-        _log.info("PPD %s smazán přes API (evidence)", number)
+        _log.info("Doklad %s stornován přes API (evidence)", number)
     return jsonify({"removed": removed})
 
 
@@ -2231,25 +2312,31 @@ def api_ppd_sdilet(number):
     chyba = _over_klic_integrace("Sdílení dokladů přes API není zapnuté.")
     if chyba:
         return chyba
-    telo = request.get_json(silent=True) or {}
+    telo = request.get_json(silent=True)
+    telo = telo if isinstance(telo, dict) else {}
     druh = telo.get("druh") or sdileni.DRUH_PPD
     if druh not in ppd_api.DRUHY:
         return jsonify({"error": "druh smí být jen " + " nebo ".join(ppd_api.DRUHY) + "."}), 400
     if druh == sdileni.DRUH_FAKTURA:
-        nazev = f"faktura_{number}.pdf"
-        if not _zajisti_pdf_faktury(number):
-            return jsonify({"error": f"Faktura č. {number} tu není."}), 404
-        try:
-            zadost_ids = ppd_api.over_zadost_ids(telo.get("zadost_ids"))
-        except ppd_api.Chyba as e:
-            return jsonify({"error": str(e)}), 400
-        # Kód faktury = její číslo; obnoví se od teď a zůstane stejný. Úkony,
-        # které evidence připojila až po vystavení, se přidají sem.
-        kod = sdileni.zapis_fakturu(DATA_DIR, number, [], zadost_ids)
+        with storno.transakce(DATA_DIR):
+            if _storno_faktury(number).get("storno"):
+                return _chyba_stornovane_faktury(number)
+            if not _zajisti_pdf_faktury(number):
+                return jsonify({"error": f"Faktura č. {number} tu není."}), 404
+            try:
+                zadost_ids = ppd_api.over_zadost_ids(telo.get("zadost_ids"))
+            except ppd_api.Chyba as e:
+                return jsonify({"error": str(e)}), 400
+            # Úkony, které evidence připojila až po vystavení, se přidají sem.
+            kod = sdileni.zapis_fakturu(DATA_DIR, number, [], zadost_ids)
         return jsonify({"sdilet": f"/{kod}", "plati_dni": sdileni.TTL_DNI})
     else:
+        if ppd.je_stornovany(DATA_DIR, number):
+            return _chyba_stornovaneho_ppd(number)
         nazev = f"ppd_{number}.pdf"
         if not os.path.isfile(os.path.join(DATA_DIR, "output", nazev)):
+            if _storno_faktury(number).get("storno"):
+                return _chyba_stornovane_faktury(number)
             return jsonify({"error": f"Doklad č. {number} tu není."}), 404
         popis = f"Příjmový pokladní doklad č. {number}"
     kod = sdileni.zivy_kod_souboru(DATA_DIR, nazev) or sdileni.vytvor_kod(DATA_DIR, [
@@ -2288,6 +2375,12 @@ def api_ppd_vystavit():
     except ppd_api.FakturaNedostupna:
         return jsonify({"error": "faktura_nedostupna"}), 409
     druh = doklad.get("druh", "ppd")
+    number = doklad["cislo"]
+    # Evidence odpověď z vystavení sama upsertuje i při opakovaném request_id.
+    if druh == "faktura" and _storno_faktury(number).get("storno"):
+        return _chyba_stornovane_faktury(number)
+    if druh == "ppd" and ppd.je_stornovany(DATA_DIR, number):
+        return _chyba_stornovaneho_ppd(number)
     if novy and druh == "ppd":
         try:
             import ppd_push
@@ -2312,18 +2405,20 @@ def faktura_print(number):
     rec = faktura.get_faktura(DATA_DIR, number)
     if rec is None:
         return Response("Faktura nenalezena.", status=404, mimetype="text/plain")
-    pdf_bytes = faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec))
-    try:
-        cesta = faktura.pdf_path(DATA_DIR, number)
-        os.makedirs(os.path.dirname(cesta), exist_ok=True)
-        with open(cesta, "wb") as f:
-            f.write(pdf_bytes)
-    except OSError as e:
-        _log.warning("Faktura %s: output/ se nepovedlo obnovit (%s)", number, e)
-    resp = Response(pdf_bytes, mimetype="application/pdf")
-    resp.headers["Content-Disposition"] = f"inline; filename=faktura_{number}.pdf"
-    resp.headers["Cache-Control"] = "no-store, must-revalidate"
-    return resp
+    with storno.transakce(DATA_DIR):
+        stav = _storno_faktury(number)
+        pdf_bytes = faktura_pdf.build_faktura_pdf(
+            faktura.pdf_record(rec), storno=bool(stav.get("storno")),
+            storno_cas=stav.get("storno_cas", ""))
+        if not stav.get("storno"):
+            try:
+                cesta = faktura.pdf_path(DATA_DIR, number)
+                os.makedirs(os.path.dirname(cesta), exist_ok=True)
+                with open(cesta, "wb") as f:
+                    f.write(pdf_bytes)
+            except OSError as e:
+                _log.warning("Faktura %s: output/ se nepovedlo obnovit (%s)", number, e)
+    return _posli_fakturu_pdf(pdf_bytes, f"faktura_{number}.pdf")
 
 
 @app.route("/ppd-print/<int:number>")
@@ -2363,24 +2458,37 @@ def api_ppd_deleted():
     return jsonify(ppd.deleted_ppd(DATA_DIR))
 
 
+@app.get("/api/doklady-stornovane")
+def api_doklady_stornovane():
+    stavy = storno.stav(DATA_DIR)
+    rows = []
+    faktury = {}
+    if any(druh == "faktura" and stav["storno"] for (druh, _), stav in stavy.items()):
+        for rec in (faktura.read_faktura_backup(DATA_DIR)
+                    + faktura.read_faktura_log(DATA_DIR, include_stornovane=True)):
+            stav = stavy.get(("faktura", rec["cislo"]), {})
+            if stav.get("storno"):
+                faktury.setdefault(rec["cislo"], rec)
+    for rec in [*faktury.values(), *ppd.deleted_ppd(DATA_DIR)]:
+        druh, cislo = rec["druh"], rec["cislo"]
+        stav = stavy.get((druh, cislo), {})
+        rows.append({
+            "druh": druh, "cislo": cislo,
+            "prijato_od": rec.get("prijato_od") or rec.get("odberatel") or "",
+            "datum": rec.get("datum") or "", "castka": rec.get("castka") or 0,
+            "vozidlo": (rec.get("vozidla") or rec.get("vozidlo")
+                        or rec.get("spz") or rec.get("vin") or ""),
+            "storno_cas": stav["storno_cas"] if stav.get("storno") else "",
+            "storno_kdo": stav["storno_kdo"] if stav.get("storno") else "",
+        })
+    return jsonify(sorted(rows, key=lambda rec: rec["storno_cas"], reverse=True))
+
+
 @app.route("/api/ppd/<int:number>/restore", methods=["POST"])
 def api_ppd_restore(number):
-    """Put a deleted receipt back into the live ledger from the backup. The PDF
-    was never removed, so nothing to regenerate."""
-    rec = next((r for r in ppd.read_backup(DATA_DIR) if r.get("cislo") == number), None)
-    if not rec:
+    vysledek, restored = _zmen_storno(number, smazano=False)
+    if vysledek is None:
         return jsonify({"success": False, "error": "V záloze není doklad s tímto číslem."}), 404
-    restored = ppd.restore_ppd_row(DATA_DIR, {
-        "cislo": number, "datum": rec.get("datum", ""),
-        "prijato_od": rec.get("prijato_od", ""), "castka": rec.get("castka", ""),
-        "ucel": rec.get("ucel", ""), "vozidlo": rec.get("spz") or rec.get("vin") or "",
-    })
-    if restored:
-        try:
-            import ppd_push
-            ppd_push.push_async(ppd_push.build_record(rec, smazano=False), DATA_DIR)
-        except Exception as e:
-            _log.warning("PPD restore push skipped: %s", e)
     return jsonify({"success": True, "restored": restored})
 
 @app.route("/api/scan", methods=["POST"])
@@ -2486,12 +2594,37 @@ def api_evidence_zalozit():
         profil=d.get("profil"), zadost_id=d.get("zadost_id")))
 
 
+def _posli_fakturu_pdf(pdf_bytes: bytes, filename: str, *, stahnout: bool = False):
+    resp = send_file(io.BytesIO(pdf_bytes), mimetype="application/pdf",
+                     as_attachment=stahnout, download_name=filename)
+    resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
+
+
+def _stornovane_pdf(number: int, storno_cas: str) -> bytes:
+    rec = faktura.get_faktura(DATA_DIR, number)
+    if rec is None:
+        abort(404)
+    return faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec), storno=True, storno_cas=storno_cas)
+
+
 @app.route("/download/<filename>")
 def download(filename):
+    if any(znak in filename for znak in ("/", "\\", ":")) or filename.rstrip(" .") != filename:
+        abort(404)
     path = os.path.join(DATA_DIR, "output", filename)
-    if not os.path.exists(path):
+    number = _cislo_faktury_pdf(filename)
+    if number is not None:
+        stav = _storno_faktury(number)
+        if stav.get("storno"):
+            return _posli_fakturu_pdf(_stornovane_pdf(number, stav["storno_cas"]), filename)
+    if not os.path.isfile(path):
         return "File not found", 404
-    return send_file(path, as_attachment=False, mimetype="application/pdf")
+    resp = send_file(path, as_attachment=False, mimetype="application/pdf",
+                     conditional=number is None)
+    if number is not None:
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
 
 
 _SDILENI_NEPLATI = "Odkaz už neplatí — vypršel, nebo je špatně opsaný."
@@ -2516,6 +2649,12 @@ def _sdilena_cesta(polozka: dict) -> str:
     return os.path.join(DATA_DIR, polozka.get("kde") or "output", polozka.get("file") or "")
 
 
+def _sdileny_pdf(polozka: dict) -> str | bytes:
+    if "storno_cas" in polozka:
+        return _stornovane_pdf(polozka["cislo_faktury"], polozka["storno_cas"])
+    return _sdilena_cesta(polozka)
+
+
 def _sdilene_polozky(token: str):
     """Existující dokumenty balíku, nebo odpověď 429/404 k vrácení rovnou.
     Kód neexistuje/vypršel → stejná zpráva pro obojí, ať se venku nedá
@@ -2525,8 +2664,31 @@ def _sdilene_polozky(token: str):
     if zbyva:
         return None, (f"Příliš mnoho pokusů. Zkus to znovu za {max(1, -(-zbyva // 60))} min.",
                       429, {"Retry-After": str(zbyva)})
-    polozky = sdileni.najdi_balik(DATA_DIR, token, _polozky_zadosti) or []
-    polozky = [x for x in polozky if os.path.exists(_sdilena_cesta(x))]
+    balik = sdileni.najdi_balik(DATA_DIR, token, _polozky_zadosti) or []
+    stavy = storno.stav(DATA_DIR)
+    polozky = []
+    index = 0
+    stornovane_ppd = None
+    for x in balik:
+        number = _cislo_faktury_pdf(x["file"])
+        ppd_number = _cislo_dokladu_pdf(x["file"], "ppd")
+        if number is not None:
+            x = {**x, "cislo_faktury": number}
+            stav = stavy.get(("faktura", number), {})
+            if stav.get("storno"):
+                polozky.append({**x, "index": index, "storno_cas": stav["storno_cas"],
+                                "popis": (x["popis"] or sdileni.popis_souboru(x["file"])) + " · STORNO"})
+                index += 1
+                continue
+        if os.path.exists(_sdilena_cesta(x)):
+            if ppd_number is not None:
+                if stornovane_ppd is None:
+                    stornovane_ppd = {r["cislo"] for r in ppd.deleted_ppd(DATA_DIR)}
+                x = {**x, "cislo_ppd": ppd_number}
+            # URL ostatních souborů v balíku se po stornu PPD neposunou.
+            if ppd_number is None or ppd_number not in stornovane_ppd:
+                polozky.append({**x, "index": index})
+            index += 1
     if not polozky:
         _kod_netrefa(ip)
         return None, (_SDILENI_NEPLATI, 404)
@@ -2551,19 +2713,30 @@ def _posli_sdilenou(token: str, index=None, stranka: bool = True):
         return chyba
 
     if index is None and stranka:
-        return render_template("sdilene.html", kod=token, dokumenty=[
-            {"popis": x["popis"] or x["file"], "url": f"/{token}/{i}",
-             "strany": nahled.pocet_stran(_sdilena_cesta(x))}
-            for i, x in enumerate(polozky)
+        html = render_template("sdilene.html", kod=token, dokumenty=[
+            {"popis": x["popis"] or x["file"], "url": f"/{token}/{x['index']}",
+             "strany": 1 if "storno_cas" in x else nahled.pocet_stran(_sdilena_cesta(x)),
+             # Náhled vystavený starší verzí mohl zůstat 10 minut v cache.
+             "nahled_query": "?storno=1" if "storno_cas" in x else ""}
+            for x in polozky
         ])
+        if any("cislo_faktury" in x or "cislo_ppd" in x for x in polozky):
+            return html, 200, {"Cache-Control": "no-store"}
+        return html
 
-    i = 0 if index is None else index
-    if i >= len(polozky):
+    polozka = polozky[0] if index is None else next((x for x in polozky if x["index"] == index), None)
+    if polozka is None:
         return _netrefa_404()
     stahnout = request.args.get("stahnout") == "1"
-    return send_file(_sdilena_cesta(polozky[i]), mimetype="application/pdf",
-                     as_attachment=stahnout,
-                     download_name=polozky[i]["file"] if stahnout else None)
+    pdf = _sdileny_pdf(polozka)
+    if isinstance(pdf, bytes):
+        return _posli_fakturu_pdf(pdf, polozka["file"], stahnout=stahnout)
+    je_doklad = "cislo_faktury" in polozka or "cislo_ppd" in polozka
+    resp = send_file(pdf, mimetype="application/pdf", as_attachment=stahnout,
+                     download_name=polozka["file"] if stahnout else None, conditional=not je_doklad)
+    if je_doklad:
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
 
 
 @app.route("/<kod:kod>")
@@ -2583,7 +2756,8 @@ def sdilena_zadost_vse(kod):
     psani = PdfWriter()
     for x in polozky:
         try:
-            psani.append(_sdilena_cesta(x))
+            pdf = _sdileny_pdf(x)
+            psani.append(io.BytesIO(pdf) if isinstance(pdf, bytes) else pdf)
         except Exception as e:
             _log.warning("Sdílené PDF %s se nepodařilo připojit: %s", x.get("file"), e)
     buf = io.BytesIO()
@@ -2605,12 +2779,15 @@ def sdilena_zadost_nahled(kod, index, strana):
     polozky, chyba = _sdilene_polozky(kod)
     if chyba:
         return chyba
-    png = (nahled.stranka_png(_sdilena_cesta(polozky[index]), strana)
-           if index < len(polozky) else None)
+    polozka = next((x for x in polozky if x["index"] == index), None)
+    if polozka is None:
+        return _netrefa_404()
+    png = nahled.stranka_png(_sdileny_pdf(polozka), strana)
     if png is None:
         return _netrefa_404()
+    je_doklad = "cislo_faktury" in polozka or "cislo_ppd" in polozka
     return png, 200, {"Content-Type": "image/png",
-                      "Cache-Control": "private, max-age=600"}
+                      "Cache-Control": "no-store" if je_doklad else "private, max-age=600"}
 
 
 @app.route("/s/<token>")

@@ -16,6 +16,7 @@ import openpyxl
 
 import sdileni
 import spayd
+import storno
 from ppd import ISSUER_ICO, ISSUER_NAME, _HAVE_FCNTL, _atomic_save
 
 if _HAVE_FCNTL:
@@ -212,10 +213,14 @@ def _read(path: str, keys: list) -> list:
     return rows
 
 
-def read_faktura_log(data_dir: str) -> list:
-    """Live ledger, newest first; every row carries druh "faktura"."""
-    return _read(os.path.join(data_dir, EVIDENCE_NAME),
+def read_faktura_log(data_dir: str, *, include_stornovane: bool = False) -> list:
+    """Newest first, filtering out storno unless explicitly requested."""
+    rows = _read(os.path.join(data_dir, EVIDENCE_NAME),
                  ["cislo", "datum", "splatnost", "odberatel", "castka", "ucel", "vozidlo"])
+    if include_stornovane:
+        return rows
+    stavy = storno.stav(data_dir)
+    return [r for r in rows if not stavy.get((DRUH, r["cislo"]), {}).get("storno")]
 
 
 def read_faktura_backup(data_dir: str) -> list:
@@ -226,12 +231,17 @@ def read_faktura_backup(data_dir: str) -> list:
 
 
 def get_faktura(data_dir: str, number: int) -> dict | None:
-    return next((r for r in read_faktura_backup(data_dir) if r.get("cislo") == number), None)
+    """Original record including cancelled invoices, ledger as a fallback."""
+    rec = next((r for r in read_faktura_backup(data_dir) if r["cislo"] == number), None)
+    if rec is not None:
+        return rec
+    return next((r for r in read_faktura_log(data_dir, include_stornovane=True)
+                 if r["cislo"] == number), None)
 
 
 def pdf_record(rec: dict) -> dict:
     """Backup row -> input for faktura_pdf.build_faktura_pdf."""
-    vozidla = [v.strip() for v in str(rec.get("vozidla") or "").split(",") if v.strip()]
+    vozidla = [v.strip() for v in str(rec.get("vozidla") or rec.get("vozidlo") or "").split(",") if v.strip()]
     return {"number": rec["cislo"], "date": rec.get("datum", ""), "due": rec.get("splatnost", ""),
             "payer": rec.get("odberatel", ""), "payer_ico": rec.get("ico", ""),
             "payer_address": rec.get("adresa", ""), "amount": rec.get("castka", 0),

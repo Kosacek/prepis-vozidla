@@ -1,0 +1,47 @@
+<style>
+  .dz1360-demo {
+    box-sizing: border-box; height: 140px; padding: 14px; margin-bottom: 16px;
+    border-radius: 12px; background: var(--wn-bg); display: grid; place-items: center;
+    overflow: hidden; font-size: 11px; line-height: 1.2; color: var(--wn-ink);
+  }
+  .dz1360-list { width: min(100%, 208px); display: grid; gap: 6px; }
+  .dz1360-summary { padding: 1px 2px; color: var(--wn-muted); font-weight: 600; }
+  .dz1360-card {
+    display: flex; align-items: center; gap: 7px; min-height: 37px; padding: 4px 8px;
+    box-sizing: border-box; border: 1px solid var(--wn-line); border-radius: 8px;
+    background: var(--wn-card); font-weight: 600;
+  }
+  .dz1360-kod { padding: 5px; border-radius: 5px; background: var(--wn-soft); color: var(--wn-accent); }
+  .dz1360-chip { margin-left: auto; padding: 4px 5px; border: 1px solid var(--wn-line); border-radius: 5px; }
+  .dz1360-kos { margin-left: auto; width: 14px; height: 14px; color: var(--wn-muted); }
+  .dz1360-live { animation: dz1360-live 4s var(--nv-ease) infinite; }
+  .dz1360-deleted { color: var(--wn-muted); animation: dz1360-deleted 4s var(--nv-ease) infinite; }
+  .dz1360-deleted .dz1360-kod { color: inherit; background: var(--wn-bg); }
+  @keyframes dz1360-live {
+    0%, 26% { opacity: 1; transform: none; }
+    38%, 94% { opacity: 0; transform: translateY(35%); }
+    100% { opacity: 1; transform: none; }
+  }
+  @keyframes dz1360-deleted {
+    0%, 31% { opacity: 0; transform: translateY(-35%); }
+    48%, 89% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-35%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dz1360-live { display: none; }
+    .dz1360-deleted { animation: none; }
+  }
+</style>
+<div class="dz1360-demo" aria-hidden="true">
+  <div class="dz1360-list">
+    <div class="dz1360-card dz1360-live">
+      <span class="dz1360-kod">5732</span> NOVÁK S.R.O.
+      <svg class="dz1360-kos"><use href="#i-trash"></use></svg>
+    </div>
+    <div class="dz1360-summary">Stornované</div>
+    <div class="dz1360-card dz1360-deleted">
+      <span class="dz1360-kod">5732</span> NOVÁK S.R.O.
+      <span class="dz1360-chip">Obnovit</span>
+    </div>
+  </div>
+</div>

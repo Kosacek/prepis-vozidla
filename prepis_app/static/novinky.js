@@ -17,7 +17,7 @@
   var timer = null, opened = false, lockedUntil = 0;
 
   function seen() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return true; } }
-  function markSeen() { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+  function markSeen() { try { localStorage.setItem(KEY, '1'); return true; } catch (e) { return false; } }
 
   function lockPage(on) { document.documentElement.style.overflow = on ? 'hidden' : ''; }
 
@@ -97,14 +97,29 @@
   });
 
   // Start.
+  var pointers = new Set();
+  function startPointer(e) { pointers.add(e.pointerId); }
+  function endPointer(e) { pointers.delete(e.pointerId); }
+  function clearPointers() { pointers.clear(); }
+  function watchPointers(on) {
+    var method = on ? 'addEventListener' : 'removeEventListener';
+    window[method]('pointerdown', startPointer, true);
+    window[method]('pointerup', endPointer, true);
+    window[method]('pointercancel', endPointer, true);
+    window[method]('blur', clearPointers);
+  }
   function autoOpen() {
     if (KEY) {
-      if (seen()) return;
-      if (document.querySelector('.modal-overlay.open')) { setTimeout(autoOpen, 2000); return; }
-      markSeen();
+      if (seen()) { watchPointers(false); return; }
+      var dialogOpen = Array.from(document.querySelectorAll('.modal-overlay, dialog[open]'))
+        .some(function (dialog) { return getComputedStyle(dialog).display !== 'none'; });
+      if (pointers.size || dialogOpen) { setTimeout(autoOpen, 2000); return; }
+      watchPointers(false);
+      if (!markSeen()) return;
     }
     open(START === 'sheet-still' ? 'still' : START);
   }
+  if (KEY && !seen()) watchPointers(true);
   setTimeout(autoOpen, KEY ? 900 : 150);
 
   window.novinky = { open: open, close: close };

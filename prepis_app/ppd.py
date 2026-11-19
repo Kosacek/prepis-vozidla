@@ -365,6 +365,11 @@ def deleted_ppd(data_dir: str) -> list:
     return out
 
 
+def je_stornovany(data_dir: str, number: int) -> bool:
+    return (not any(r["cislo"] == number for r in read_ppd_log(data_dir))
+            and any(r["cislo"] == number for r in read_backup(data_dir)))
+
+
 def restore_ppd_row(data_dir: str, record: dict) -> bool:
     """Re-insert a deleted receipt into the LIVE ledger using its ORIGINAL číslo
     (no re-allocation). Returns True if inserted, False if that číslo is already

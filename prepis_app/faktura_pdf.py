@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import re
+from datetime import datetime
 
 import segno
 from reportlab.lib.colors import Color, black, lightgrey
@@ -210,7 +211,6 @@ def _payment(c, font, record, cfg, payload, H, width) -> None:
     """Bottom block: QR Platba left with the bank details under it (for anyone
     who can't scan), total top-right."""
     top = H - 131 * mm
-    right = LEFT + width
     if payload:
         _draw_qr(c, payload, LEFT, top, QR_SIZE)
     else:
@@ -219,7 +219,12 @@ def _payment(c, font, record, cfg, payload, H, width) -> None:
     c.setFillColor(GREY)
     c.drawCentredString(LEFT + QR_SIZE / 2, top - QR_SIZE - 4 * mm, QR_LABEL)
 
-    c.drawRightString(right, top + 3 * mm, "Celkem k úhradě")
+    _total(c, font, record, LEFT + width, top, "Celkem k úhradě")
+    _bank_details(c, font, record, cfg, LEFT, top - QR_SIZE - 9.5 * mm)
+
+
+def _total(c, font, record, right, top, label) -> None:
+    c.drawRightString(right, top + 3 * mm, label)
     amount = _money(record.get("amount", 0))
     c.setFillColor(black)
     c.saveState()
@@ -230,7 +235,6 @@ def _payment(c, font, record, cfg, payload, H, width) -> None:
     t.textOut(amount)
     c.drawText(t)
     c.restoreState()
-    _bank_details(c, font, record, cfg, LEFT, top - QR_SIZE - 9.5 * mm)
 
 
 def _bank_details(c, font, record, cfg, x, y) -> None:
@@ -250,17 +254,18 @@ def _bank_details(c, font, record, cfg, x, y) -> None:
         y -= 4.2 * mm
 
 
-def _watermark(c, font, W, H) -> None:
+def _watermark(c, font, W, H, label, color) -> None:
     c.saveState()
-    c.setFillColor(Color(0.85, 0.85, 0.85))
+    c.setFillColor(color)
     c.setFont(font, 70)
     c.translate(W / 2, H / 2)
     c.rotate(40)
-    c.drawCentredString(0, 0, "VZOR")
+    c.drawCentredString(0, 0, label)
     c.restoreState()
 
 
-def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
+def build_faktura_pdf(record: dict, sample: bool = False, *,
+                      storno: bool = False, storno_cas: str = "") -> bytes:
     """Draw an A5 portrait faktura.
 
     record: {number, date, due, payer, payer_ico, payer_address, amount,
@@ -273,7 +278,7 @@ def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
     c = canvas.Canvas(buf, pagesize=A5)
     width = W - 2 * LEFT
     if sample:
-        _watermark(c, font, W, H)
+        _watermark(c, font, W, H, "VZOR", Color(0.85, 0.85, 0.85))
     c.setLineWidth(1)
     c.rect(12 * mm, 12 * mm, W - 24 * mm, H - 24 * mm)
     c.setFont(font, 15)
@@ -287,16 +292,30 @@ def build_faktura_pdf(record: dict, sample: bool = False) -> bytes:
     _party(c, font, LEFT + width / 2 + 2 * mm, H - 41 * mm, col, "Odběratel", _customer_lines(record))
 
     c.setFont(font, 8.5)
-    for i, (label, value) in enumerate((("Datum vystavení:", record.get("date", "")),
-                                        ("Datum splatnosti:", record.get("due", "")),
-                                        ("Forma úhrady:", "převodem"),
-                                        ("Variabilní symbol:", record.get("number", "")))):
+    udaje = [("Datum vystavení:", record.get("date", ""))]
+    if not storno:
+        udaje += [("Datum splatnosti:", record.get("due", "")),
+                  ("Forma úhrady:", "převodem"),
+                  ("Variabilní symbol:", record.get("number", ""))]
+    for i, (label, value) in enumerate(udaje):
         x = LEFT + (width / 2 + 2 * mm) * (i % 2)
         y = H - (84 + 5.5 * (i // 2)) * mm
         c.drawString(x, y, f"{label} {value}")
 
     _items(c, font, record, H - 98 * mm, width)
-    _payment(c, font, record, cfg, spayd_for(record, cfg), H, width)
+    if storno:
+        cervena = Color(0.72, 0.08, 0.12)
+        top = H - 131 * mm
+        c.setFont(font, 8)
+        c.setFillColor(GREY)
+        _total(c, font, record, LEFT + width, top, "Celkem")
+        _watermark(c, font, W, H, "STORNO", Color(0.72, 0.08, 0.12, alpha=0.32))
+        datum = faktura.fmt_date(datetime.fromisoformat(storno_cas)) if storno_cas else ""
+        c.setFont(font, 11)
+        c.setFillColor(cervena)
+        c.drawString(LEFT, top, f"Stornováno {datum}".rstrip())
+    else:
+        _payment(c, font, record, cfg, spayd_for(record, cfg), H, width)
 
     if sample:
         c.setFont(font, 8)
