@@ -1,7 +1,8 @@
 // Doklady (2.5, 2.8): a doklad opens like an FAQ entry to show the úkony it pays;
 // the search box filters live like on Úkony, firma/měsíc/smazané reload the page.
 (function () {
-  var list = document.querySelector('.doklady-list');
+  // The live list and the closed "Stornované" section share one handler.
+  var list = document.querySelector('.doklady-wrap') || document.querySelector('.doklady-list');
   var form = document.getElementById('doklady-filter');
   if (!list || !form) return;
 
@@ -35,7 +36,7 @@
     it._kc = parseInt(it.getAttribute('data-kc'), 10) || 0;
     it._storno = it.classList.contains('is-smazany');
   });
-  var stornoEl = document.getElementById('doklady-storno');
+  var stornoBox = document.getElementById('doklady-storno');
   var stornoN = document.getElementById('doklady-storno-n');
   function apply() {
     var q = fold(input.value.trim()).replace(/\s+/g, '');
@@ -49,7 +50,7 @@
       else if (show) { n++; sum += it._kc; }
     });
     countEl.textContent = n;
-    if (stornoEl) { stornoEl.hidden = !storno; stornoN.textContent = storno; }
+    if (stornoBox) { stornoBox.hidden = !storno; stornoN.textContent = storno; }
     sumEl.textContent = String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
   if (input) input.addEventListener('input', apply);

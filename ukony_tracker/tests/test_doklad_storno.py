@@ -114,7 +114,7 @@ def test_stornovane_are_out_of_the_count_and_sum(client, homeland):
 @pytest.mark.parametrize("smazane, shown, hidden", [
     ("", ("20260001", "20260002"), ()),
     ("ne", ("20260002",), ("20260001",)),
-    ("jen", ("20260001",), ("20260002",)),
+    ("jen", ("20260001", "20260002"), ()),   # old "Stornované" link: section opened
     ("1", ("20260001", "20260002"), ()),   # old links: "I smazané"
 ])
 def test_stornovane_filter(client, homeland, smazane, shown, hidden):
@@ -213,12 +213,43 @@ def test_a_faktura_paid_by_the_bank_without_ukony_counts_as_paid(client, homelan
     assert 'data-cislo="20260001"' in html
 
 
-def test_the_filter_offers_all_five_states(client, homeland):
-    html = client.get("/doklady?stav=storno").get_data(as_text=True)
-    for value, label in (("", "Všechny"), ("platne", "Platné"), ("nezaplacene", "Nezaplacené"),
-                         ("zaplacene", "Zaplacené"), ("storno", "Stornované")):
+def test_the_filter_offers_three_states(client, homeland):
+    # 2.9.8: Platné / Stornované are redundant now that stornované sit in their
+    # own section; old links keep working.
+    html = client.get("/doklady?stav=nezaplacene").get_data(as_text=True)
+    for value, label in (("", "Všechny"), ("nezaplacene", "Nezaplacené"), ("zaplacene", "Zaplacené")):
         assert f'value="{value}"' in html and label in html
-    assert 'value="storno" selected' in html
+    assert 'value="nezaplacene" selected' in html
+    assert 'value="platne"' not in html and 'value="storno"' not in html
+
+
+def _main_list(html):
+    return html.split('<div class="doklady-wrap">')[1].split('id="doklady-storno"')[0]
+
+
+def test_stornovane_sit_in_a_closed_section_below_the_list(client, homeland):
+    # David 19. 11.: out of the main list, collected at the bottom, closed.
+    _storno(client)
+    html = client.get("/doklady").get_data(as_text=True)
+    assert 'data-cislo="20260001"' not in _main_list(html)
+    assert 'data-cislo="20260002"' in _main_list(html)
+    section = html.split('id="doklady-storno"')[1].split("</details>")[0]
+    assert html.split('id="doklady-storno"')[0].rstrip().endswith('<details class="card recent-card doklady-storno"')
+    assert section.startswith(">")  # no "open" attribute: closed by default
+    assert 'Stornované (<span id="doklady-storno-n">1</span>)' in section
+    assert 'data-cislo="20260001"' in section and "is-smazany" in section
+
+
+def test_old_stornovane_link_opens_the_section(client, homeland):
+    _storno(client)
+    html = client.get("/doklady?stav=storno").get_data(as_text=True)
+    assert 'id="doklady-storno" open' in html
+
+
+def test_no_section_without_stornovane_or_in_platne(client, homeland):
+    assert 'id="doklady-storno"' not in client.get("/doklady").get_data(as_text=True)
+    _storno(client)
+    assert 'id="doklady-storno"' not in client.get("/doklady?stav=platne").get_data(as_text=True)
 
 
 def test_bank_check_sits_on_the_summary_line(client, homeland, monkeypatch):

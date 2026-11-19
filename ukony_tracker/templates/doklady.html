@@ -27,16 +27,14 @@
       {% with month_name="mesic", month_value=mesic %}{% include "_month_field.html" %}{% endwith %}
       <select name="stav" class="filter-select" aria-label="Stav dokladů">
         <option value="">Všechny</option>
-        <option value="platne" {{ 'selected' if stav == 'platne' }}>Platné</option>
         <option value="nezaplacene" {{ 'selected' if stav == 'nezaplacene' }}>Nezaplacené</option>
         <option value="zaplacene" {{ 'selected' if stav == 'zaplacene' }}>Zaplacené</option>
-        <option value="storno" {{ 'selected' if stav == 'storno' }}>Stornované</option>
       </select>
       <a href="{{ url_for('ppd.doklady') }}" class="btn btn-sm">Vše</a>
     </div>
     <div class="muted" style="margin-top: var(--sp-3); font-size: 0.875rem;">
       <span id="doklady-count">{{ total.pocet }}</span> dokladů ·
-      <span id="doklady-sum">{{ total.castka|kc }}</span> Kč<span id="doklady-storno"{% if not total.storno %} hidden{% endif %}> · <span id="doklady-storno-n">{{ total.storno }}</span> stornováno</span>
+      <span id="doklady-sum">{{ total.castka|kc }}</span> Kč
       {%- if banka %}<span class="doklady-banka">
         {%- if banka.auth_failed %}<span style="color: var(--flash-error-ink);">Banka: token vypršel – vytvoř nový v internetovém bankovnictví</span>
         {%- elif banka.cas %}Banka zkontrolována {{ banka.cas }}{% else %}Banka zatím nezkontrolována{% endif %}
@@ -46,6 +44,7 @@
   </form>
 </div>
 
+<div class="doklady-wrap">
 <div class="card recent-card">
   <div class="doklady-list{{ ' has-faktura' if has_faktura }}">
     {% for p in doklady %}
@@ -55,13 +54,25 @@
     {% endfor %}
   </div>
 </div>
+{% if stornovane %}
+{# Stornované (2.9.8): out of the main list, closed by default, greyed as before. #}
+<details class="card recent-card doklady-storno" id="doklady-storno"{% if storno_otevreno %} open{% endif %}>
+  <summary class="doklady-storno__head">Stornované (<span id="doklady-storno-n">{{ stornovane|length }}</span>)</summary>
+  <div class="doklady-list{{ ' has-faktura' if has_faktura }}">
+    {% for p in stornovane %}
+    {% include "_doklad_item.html" %}
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+</div>
 
 {% include "_ukon_modal.html" %}
 {% include "_doklad_share.html" %}
 {% if novy_doklad %}{% include "_doklad_new_modal.html" %}{% endif %}
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=14"></script>
 <script src="{{ url_for('static', filename='js/firma_pick.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/doklady.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/doklady.js') }}?v=6"></script>
 <script src="{{ url_for('static', filename='js/doklad_share.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/doklad_payer.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/doklad_new.js') }}?v=9"></script>

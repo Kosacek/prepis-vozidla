@@ -2290,7 +2290,16 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-storno-kdy { color: var(--muted); font-weight: 500; }
 /* Bank check on the summary line (2.9.7), small and muted, no line of its own. */
 .doklady-banka { font-size: 0.75rem; }
-#doklady-storno { white-space: nowrap; }
+/* Stornované (2.9.8): one closed section under the list. */
+.doklady-storno { margin-top: var(--sp-4); }
+.doklady-storno__head {
+  cursor: pointer; list-style: none; padding: var(--sp-3) var(--sp-4);
+  color: var(--muted); font-size: 0.875rem; font-weight: 600;
+}
+.doklady-storno__head::-webkit-details-marker { display: none; }
+.doklady-storno__head::after { content: " ▸"; display: inline-block; transition: transform .15s ease; }
+.doklady-storno[open] .doklady-storno__head::after { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .doklady-storno__head::after { transition: none; } }
 .doklady-banka::before { content: " · "; }
 
 .doklad-share {

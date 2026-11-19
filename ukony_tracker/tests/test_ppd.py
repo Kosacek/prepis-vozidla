@@ -347,8 +347,9 @@ def test_doklady_renders_link_and_greys_stornovane_out_of_the_sums(client):
     body = client.get("/doklady?smazane=ne").get_data(as_text=True)
     assert 'data-cislo="101"' in body and 'data-cislo="102"' not in body
     body = client.get("/doklady?smazane=jen").get_data(as_text=True)
-    assert 'data-cislo="102"' in body and 'data-cislo="101"' not in body
-    assert '<span id="doklady-count">0</span>' in body
+    # 2.9.8: the old "Stornované" link opens the closed section under the list.
+    assert 'id="doklady-storno" open' in body and 'data-cislo="102"' in body
+    assert '<span id="doklady-count">1</span>' in body
 
 
 @pytest.mark.parametrize("query", ["nová", "9zz", "102"])
