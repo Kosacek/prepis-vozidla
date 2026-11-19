@@ -1,4 +1,6 @@
 """Read ORV photos, fill existing jobs, or create one safely when missing."""
+from __future__ import annotations
+
 import base64
 import os
 import re
@@ -63,6 +65,11 @@ def _another_sale(ukon, data):
     return same_party(_new_owner(ukon["prevod"]), data.get("provozovatel")) is False
 
 
+def _can_write_review(ukon, data):
+    cutoff = (date.today() - timedelta(days=AWAITING_WINDOW_DAYS)).isoformat()
+    return (ukon["datum"] or "") >= cutoff and not _another_sale(ukon, data)
+
+
 def _prevod(older, data):
     """Owner line for an úkon created from the scan: "previous → ORV owner"."""
     new = (data.get("provozovatel") or "").strip()
@@ -87,7 +94,7 @@ Druhé čtení: první pokus číslo dokladu jistě nepřečetl. Najdi velké č
 číslo dokladu dole (3 písmena a 6 číslic) a čti ho znak po znaku. Když si
 nejsi jistý každým znakem, vrať orv_cislo null."""
 # Results that already prove the read: the registry VIN (or RZ) found the úkon.
-CONFIRMED = {"doplneno", "uz_doplneno", "vice_shod", "konflikt"}
+CONFIRMED = {"doplneno", "uz_doplneno", "vice_shod", "konflikt", "uz_zapsano", "zmena_ke_kontrole"}
 UNSURE = "Číslo ORV se nepodařilo přečíst jistě — vyfoť techničák znovu."
 TOOL = {
     "name": "zapsat_dokument", "description": "Zapiš pouze jasně čitelné údaje z ORV.",
@@ -200,12 +207,72 @@ def _base(data):
             "zmeny": {}, "zprava": "Fotku se nepodařilo zpracovat. Zkuste to znovu."}
 
 
+def _values(data):
+    return {key: data[source] for key, source in (("rz", "rz"), ("orv", "orv_cislo"))
+            if data.get(source)}
+
+
+def _writable(row, values):
+    misread = _misread_plate(normalize(row["rz"] or ""), values.get("rz"))
+    return {k: v for k, v in values.items() if not (k == "rz" and misread)}, misread
+
+
+def _changes(row, values):
+    return {k: {"pred": row[k], "po": v} for k, v in values.items()
+            if normalize(row[k] or "") != v}
+
+
+def _write(conn, row, values, result):
+    writable, misread = _writable(row, values)
+    filled = (doplnit(conn, row["id"], writable, prepsat=True) if writable
+              else {"zmeneno": [], "prepsano": []})
+    changed = filled["zmeneno"]
+    message = ("Přepsáno podle fotky." if filled["prepsano"] else
+               "Doplněno." if changed else "Údaje souhlasí.")
+    if misread:
+        result["rz"] = row["rz"]
+        result["rz_ponechano"] = {"evidence": row["rz"], "foto": values["rz"]}
+        message += f" RZ ponechána, na fotce přečteno {values['rz']}."
+    result.update(stav="doplneno" if changed else "uz_doplneno", zprava=message, ukon=_view(row),
+                  doplneno=changed, prepsano=filled["prepsano"],
+                  zmeny={k: {"pred": row[k], "po": filled[k]} for k in writable})
+    return result
+
+
+def _review(row, data, values, result):
+    if not values:
+        return dict(result, stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
+    writable, misread = _writable(row, values)
+    changes = _changes(row, writable)
+    if not changes:
+        return dict(result, stav="uz_zapsano", ukon=_view(row),
+                    rz=row["rz"] if misread else result["rz"], zprava="Už zapsáno · beze změny")
+    snapshot = {field: row[field] for field in ("updated_at", "rz", "orv", "vin")}
+    return dict(result, stav="zmena_ke_kontrole", ukon=_view(row), zmeny=changes,
+                lze_zapsat=_can_write_review(row, data), zprava="Zkontroluj změny",
+                _snapshot=snapshot, _overit_orv=not (
+                    data.get("vin_zdroj") == "registr" and data["vin"] == normalize(row["vin"] or "")))
+
+
+def zapsat_po_kontrole(conn, uid, proposal):
+    with transaction(conn):
+        row = ukony_repo.get_with_firma(conn, uid)
+        if row is None:
+            raise FillError(404, "Úkon nenalezen.")
+        if any(row[field] != previous for field, previous in proposal["snapshot"].items()):
+            raise FillError(409, "Úkon se mezitím změnil. Otevři ho a zkontroluj údaje.")
+        if not _can_write_review(row, proposal):
+            raise FillError(409, "Úkon je příliš starý nebo provozovatel nesouhlasí.")
+        result = _write(conn, row, _values(proposal), _base(proposal))
+        result["zapsano_po_kontrole"] = True
+        return result
+
+
 def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
                     auto_firma=False, poznamka=None, potvrdit_novy=False, celkem=None):
     """Check and mutate one vehicle in a single immediate transaction."""
     result = _base(data)
-    values = {key: data.get(source) for key, source in (("rz", "rz"), ("orv", "orv_cislo"))
-              if data.get(source)}
+    values = _values(data)
     with transaction(conn):
         found = ukony_repo.find_by_vehicle_any_firm(
             conn, vin=data.get("vin"),
@@ -214,12 +281,12 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
         other = [u for u in found if u not in rows]
         if other:
             result["predchozi"] = _view(other[0])
-        # Starší úkony téhož auta (mimo okno automatického doplnění) jsou možné
-        # duplicity: klient dostane `existujici` a bez `potvrdit_novy` se nový
-        # úkon nezaloží (2026-11-05, RZ 1AKI647: #1537 vs. #1573). Když ale ORV
-        # jmenuje jiného nového majitele, je to další prodej, ne duplicita
-        # (2026-11-11, 2BP1720: 7. 10. koupilo JE & NE, teď prodává dál).
+        # Older matches from the same or an unknown owner need review. The
+        # separate create request still guards them with potvrdit_novy.
         duplicates = [u for u in other if not _another_sale(u, data)]
+        if auto_firma and not rows and duplicates:
+            result["predchozi"] = _view(duplicates[0])
+            return _review(duplicates[0], data, values, result)
         if duplicates:
             result["existujici"] = [_view(u) for u in duplicates[:5]]
             result["predchozi"] = result["existujici"][0]
@@ -234,32 +301,10 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
             rows = candidates or rows[:1]
         if rows:
             row = rows[0]
-            result["ukon"] = _view(row)
             if not values:
-                result.update(stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
+                result.update(stav="necitelne", ukon=_view(row), zprava="RZ ani číslo ORV nejsou čitelné.")
                 return result
-            # A plate one or two characters off the stored one is a misread, never
-            # an exchange (#1646: I read as T, 1AKI998 → 1AKT998): the stored
-            # plate stays. A real exchange is a whole new number (1AKI988 →
-            # 3BN4796) and still replaces it, shown on the card as old → new.
-            stored_rz = normalize(row["rz"] or "")
-            misread = _misread_plate(stored_rz, values.get("rz"))
-            writable = {k: v for k, v in values.items() if not (k == "rz" and misread)}
-            filled = (doplnit(conn, row["id"], writable, prepsat=True) if writable
-                      else {"zmeneno": [], "prepsano": []})
-            result["doplneno"] = filled["zmeneno"]
-            result["prepsano"] = filled["prepsano"]
-            result["zmeny"] = {field: {"pred": row[field], "po": filled[field]}
-                               for field in writable}
-            changed = filled["zmeneno"]
-            message = ("Přepsáno podle fotky." if filled["prepsano"] else
-                       "Doplněno." if changed else "Údaje souhlasí.")
-            if misread:
-                result["rz"] = row["rz"]
-                result["rz_ponechano"] = {"evidence": row["rz"], "foto": values["rz"]}
-                message += f" RZ ponechána, na fotce přečteno {values['rz']}."
-            result.update(stav="doplneno" if changed else "uz_doplneno", zprava=message)
-            return result
+            return _write(conn, row, values, result)
 
         if not data.get("vin") and not data.get("rz"):
             result.update(stav="nenalezeno", zprava="Chybí čitelná RZ i VIN.")
@@ -381,9 +426,7 @@ def _with_registry_vin(data, lookup):
     if not data.get("orv_cislo") and candidate:
         vin = _registry_vin(candidate, lookup)
         if vin and data.get("vin") in (None, vin):
-            data["orv_cislo"] = candidate
-            if not data.get("vin"):
-                data["vin"], data["vin_zdroj"] = vin, "registr"
+            data.update(orv_cislo=candidate, vin=vin, vin_zdroj="registr")
         return data
     if data.get("vin") or not data.get("orv_cislo"):
         return data
@@ -397,7 +440,15 @@ def _uncertain(result, zprava):
     """Ask for a new photo instead of offering the car as new."""
     result = {**result, "stav": "necitelne", "zprava": zprava, "druhe_cteni": True}
     result.pop("navrh_firma_id", None)
+    if result.pop("_overit_orv", False):
+        result.update(ukon=None, zmeny={})
+        result.pop("lze_zapsat", None)
+        result.pop("_snapshot", None)
     return result
+
+
+def _confirmed(result):
+    return result["stav"] in CONFIRMED and not result.get("_overit_orv")
 
 
 def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup, zpracoval):
@@ -409,6 +460,8 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
     try:
         again = extract(image_bytes, media_type, client=client, prompt=PROMPT + RECHECK)
     except ScanUnavailable:
+        if result.get("_overit_orv"):
+            return _uncertain(result, UNSURE)
         return result  # keep the first, already safe answer
     finally:
         tokens.set(spent + tokens.get())
@@ -421,7 +474,7 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
                                    "provozovatel": again.get("provozovatel") or first.get("provozovatel")},
                                   lookup)
         retry = _fill_or_create(conn, data, zpracoval=zpracoval, auto_firma=True)
-        if retry["stav"] in CONFIRMED:
+        if _confirmed(retry):
             retry["druhe_cteni"] = True
             return retry
         if first_orv:
@@ -429,8 +482,12 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
                                      f"{second_orv}) — vyfoť techničák znovu.")
         return _uncertain(retry, UNSURE)
     if second_orv:
+        if result.get("_overit_orv"):
+            if again.get("orv_cislo") != first_orv:
+                return _uncertain(result, UNSURE)
+            result.pop("_overit_orv")
         return result  # two identical readings: the first answer stands
-    if result["stav"] == "bez_firmy" or not first_orv:
+    if result["stav"] == "bez_firmy" or result.get("_overit_orv") or not first_orv:
         return _uncertain(result, UNSURE)
     return result
 
@@ -445,9 +502,10 @@ def zpracuj(conn, image_bytes, media_type, *, client=None, lookup=None, zpracova
             return result
         _with_registry_vin(data, lookup)
         result = _fill_or_create(conn, data, zpracoval=zpracoval, auto_firma=True)
-        if result["stav"] not in CONFIRMED:
+        if not _confirmed(result):
             result = _second_look(conn, image_bytes, media_type, data, result,
                                   client=client, lookup=lookup, zpracoval=zpracoval)
+        result.pop("_overit_orv", None)
         return result
     except FillError as exc:
         return _fill_error(conn, locals().get("data", {}), exc)

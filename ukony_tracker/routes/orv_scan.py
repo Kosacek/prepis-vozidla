@@ -1,8 +1,12 @@
 """Session-authenticated ORV fragment and one-photo endpoint."""
+from __future__ import annotations
+
+import json
 import logging
 import math
 import os
 import re
+import secrets
 import time
 import uuid
 
@@ -13,7 +17,7 @@ import db
 import config
 from repositories import firmy_repo, typy_repo
 from services import orv_images, orv_scan_service, pricing_service, colors_service
-from services.vehicle_fill_service import transaction
+from services.vehicle_fill_service import FillError, normalize, transaction
 from services.ingest_service import normalize_profil
 
 bp = Blueprint("orv_scan", __name__)
@@ -22,6 +26,7 @@ logger.setLevel(logging.INFO)
 if not logger.handlers:
     logger.addHandler(logging.StreamHandler())
 logger.propagate = False
+REVIEW_MAX_AGE = 14 * 24 * 3600
 
 
 def _session_id():
@@ -40,6 +45,34 @@ def _rate_allowed(conn):
             return False
         conn.execute("INSERT INTO orv_scan_rate(sid, stamp) VALUES (?, ?)", (sid, now))
     return True
+
+
+def _clean_vehicle(value, field):
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        value = normalize(value)
+        if re.fullmatch(orv_scan_service.PATTERNS[field], value):
+            return value
+    raise ValueError("Neplatné údaje vozidla.")
+
+
+def _remember_review(conn, result, snapshot):
+    # Keep the scan and the exact row it was compared with on the server.
+    token = secrets.token_urlsafe(16)
+    now = time.time()
+    review = {key: result[key] for key in ("rz", "orv_cislo", "vin", "vin_zdroj", "provozovatel")}
+    review["snapshot"] = snapshot
+    with transaction(conn):
+        conn.execute("DELETE FROM orv_scan_review WHERE stamp <= ?", (now - REVIEW_MAX_AGE,))
+        inserted = conn.execute(
+            "INSERT INTO orv_scan_review(token, sid, ukon_id, stamp, scan)"
+            " SELECT ?, ?, id, ?, ? FROM ukony WHERE id = ?",
+            (token, _session_id(), now, json.dumps(review, ensure_ascii=False), result["ukon"]["id"]))
+    if inserted.rowcount:
+        result["navrh_token"] = token
+    else:
+        result["lze_zapsat"] = False
 
 
 @bp.get("/ukony/orv-sken")
@@ -98,6 +131,9 @@ def scan():
         image_bytes, media_type = orv_images.prepare(data)
         result = orv_scan_service.zpracuj(conn, image_bytes, media_type,
                                           zpracoval=normalize_profil(request.form.get("zpracoval")))
+        snapshot = result.pop("_snapshot", None)
+        if result["stav"] == "zmena_ke_kontrole" and result["lze_zapsat"]:
+            _remember_review(conn, result, snapshot)
         return jsonify(result)
     except RequestEntityTooLarge:
         return jsonify(error="Fotka smí mít nejvýše 8 MB."), 413
@@ -113,6 +149,34 @@ def scan():
                     round((time.monotonic() - start) * 1000), 2 if result.get("druhe_cteni") else 1,
                     orv_scan_service.tokens.get(), result.get("rz") or "-",
                     result.get("orv_cislo") or "-", ",".join(orv_scan_service.raw_orv.get()) or "-")
+
+
+@bp.post("/ukony/orv-sken/zapsat")
+def zapsat():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) - {"token", "ukon_id"}:
+        return jsonify(error="Neplatné údaje vozidla."), 400
+    token = payload.get("token")
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{22}", token):
+        return jsonify(error="Neplatný návrh změny."), 400
+    uid = payload.get("ukon_id")
+    if "ukon_id" in payload and (type(uid) is not int or not 0 < uid <= 2**63 - 1):
+        return jsonify(error="Neplatné číslo úkonu."), 400
+    conn = db.get_db()
+    if not _rate_allowed(conn):
+        return jsonify(error="Limit skenování za 10 minut. Zkus to za chvíli."), 429
+    try:
+        with transaction(conn):
+            review = conn.execute(
+                "SELECT ukon_id, scan FROM orv_scan_review WHERE token = ? AND sid = ? AND stamp > ?",
+                (token, _session_id(), time.time() - REVIEW_MAX_AGE)
+            ).fetchone()
+            if review is None or (uid is not None and review["ukon_id"] != uid):
+                return jsonify(error="Změnu nelze zapsat. Otevři úkon nebo načti fotku znovu."), 409
+            return jsonify(orv_scan_service.zapsat_po_kontrole(
+                conn, review["ukon_id"], json.loads(review["scan"])))
+    except FillError as exc:
+        return jsonify(exc.data), exc.status
 
 
 @bp.post("/ukony/orv-sken/zalozit")
@@ -136,19 +200,10 @@ def zalozit():
                 "poznamka", "potvrdit_novy", "celkem"}:
             return jsonify(error="Neplatný záznam auta."), 400
         rz, vin, orv = item.get("rz"), item.get("vin"), item.get("orv_cislo")
-        def clean(value, pattern):
-            if value is None or value == "":
-                return None
-            if not isinstance(value, str):
-                raise ValueError("Neplatné údaje vozidla.")
-            normalized = value.strip().upper().replace(" ", "").replace("-", "")
-            if not re.fullmatch(pattern, normalized):
-                raise ValueError("Neplatné údaje vozidla.")
-            return normalized
         try:
-            rz = clean(rz, r"[A-Z0-9]{5,8}")
-            vin = clean(vin, r"[A-Z0-9]{5,17}")
-            orv = clean(orv, r"[A-Z]{3}[0-9]{6}")
+            rz = _clean_vehicle(rz, "rz")
+            vin = _clean_vehicle(vin, "vin")
+            orv = _clean_vehicle(orv, "orv_cislo")
             poznamka = _clean_poznamka(item.get("poznamka"))
         except ValueError as exc:
             return jsonify(error=str(exc)), 400

@@ -22,4 +22,5 @@ def login():
 @bp.post("/logout")
 def logout():
     session.pop("authed", None)
+    session.pop("orvsken_sid", None)
     return redirect(url_for("auth.login"))

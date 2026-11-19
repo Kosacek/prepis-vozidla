@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import re
 import sqlite3
@@ -136,6 +138,14 @@ CREATE TABLE IF NOT EXISTS moneta_platby (
 CREATE TABLE IF NOT EXISTS moneta_stav (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS orv_scan_rate (sid TEXT NOT NULL, stamp REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_orv_scan_rate ON orv_scan_rate(sid, stamp);
+CREATE TABLE IF NOT EXISTS orv_scan_review (
+  token TEXT NOT NULL PRIMARY KEY,
+  sid TEXT NOT NULL,
+  ukon_id INTEGER NOT NULL REFERENCES ukony(id) ON DELETE CASCADE,
+  stamp REAL NOT NULL,
+  scan TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_orv_scan_review_stamp ON orv_scan_review(stamp);
 """
 
 
@@ -190,8 +200,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+def now_iso(*, timespec: str = "seconds") -> str:
+    return datetime.now(timezone.utc).isoformat(timespec=timespec)
 
 
 def backup_db(db_path: str | None = None, min_interval_sec: int | None = None) -> str | None:

@@ -1,7 +1,9 @@
 """Offline scan contract, atomic fill matrix, upload and session boundaries."""
+from __future__ import annotations
+
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from types import SimpleNamespace as NS
 
@@ -277,7 +279,7 @@ def test_overwrite_picks_newest_when_no_row_awaits(conn, make):
 
 
 @pytest.mark.parametrize("filled", [True, False])
-def test_car_back_after_window_is_a_new_ukon_not_the_old_one(conn, make, filled):
+def test_car_back_after_window_needs_review_and_does_not_overwrite(conn, make, filled):
     # 2026-10-21: EL375AT from August (JE & NE) got its ORV overwritten by a
     # new techničák — the car had been sold and bought back. Old úkony stay as they are.
     window = scan.MATCH_WINDOW_DAYS if filled else scan.AWAITING_WINDOW_DAYS
@@ -287,12 +289,10 @@ def test_car_back_after_window_is_a_new_ukon_not_the_old_one(conn, make, filled)
     before = dict(ukony_repo.get(conn, old))
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
     assert dict(ukony_repo.get(conn, old)) == before
-    assert result["stav"] in ("zalozeno", "bez_firmy")
+    assert result["stav"] == "zmena_ke_kontrole"
     assert result["predchozi"]["id"] == old and result["predchozi"]["datum"] == old_date
-    # The scan still offers the car as new, but also lists the older úkon as a
-    # possible duplicate — zalozit without potvrdit_novy then refuses to create.
-    assert result["existujici"] == [result["predchozi"]]
-    assert result["vyzaduje_potvrzeni"] is True
+    assert result["ukon"] == result["predchozi"]
+    assert result["lze_zapsat"] is filled
     assert result["predchozi"]["stav_platby"] == "nezaplaceno"
     assert result["predchozi"]["poznamka"] is None
 
@@ -462,7 +462,7 @@ def test_complete_ukon_from_two_days_ago_is_not_overwritten(conn, make):
     uid = make(datum=(date.today() - timedelta(days=2)).isoformat(), rz="1AA1111", orv="UBC425944")
     before = dict(ukony_repo.get(conn, uid))
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
-    assert result["stav"] == "bez_firmy" and result["predchozi"]["id"] == uid
+    assert result["stav"] == "zmena_ke_kontrole" and result["ukon"]["id"] == uid
     assert dict(ukony_repo.get(conn, uid)) == before
 
 
@@ -470,7 +470,8 @@ def test_waiting_ukon_older_than_window_is_left_alone(conn, make):
     old = (date.today() - timedelta(days=scan.AWAITING_WINDOW_DAYS + 1)).isoformat()
     uid = make(datum=old)
     result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient())
-    assert result["stav"] == "bez_firmy" and ukony_repo.get(conn, uid)["rz"] is None
+    assert result["stav"] == "zmena_ke_kontrole" and ukony_repo.get(conn, uid)["rz"] is None
+    assert result["lze_zapsat"] is False
 
 
 def test_api_fill_still_refuses_to_overwrite(conn, make):
@@ -571,6 +572,7 @@ def test_route_login_and_key(client, monkeypatch):
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "test-password")
     assert client.get("/ukony/orv-sken").status_code == 302
     assert post(client).status_code == 302
+    assert client.post("/ukony/orv-sken/zapsat", json={"ukon_id": 1, "rz": "5AB1234"}).status_code == 302
     with client.session_transaction() as s:
         s["authed"] = True
     r = post(client)
@@ -765,7 +767,8 @@ def test_same_or_unread_owner_still_asks_before_a_second_ukon(conn, make, operat
                prevod="ŠKOFIN S.R.O. → JAROSLAV KOLACEK")
     result = scan.zpracuj(conn, b"p", "image/jpeg",
                           client=FakeClient({**DATA, "provozovatel": operator}))
-    assert result["vyzaduje_potvrzeni"] is True and result["existujici"][0]["id"] == old
+    assert result["stav"] == "zmena_ke_kontrole" and result["ukon"]["id"] == old
+    assert result["lze_zapsat"] is False
     blocked = scan.zalozit_pro_firmu(conn, _car(result), firma_id=ukony_repo.get(conn, old)["firma_id"],
                                      typ_kod="KOLA")
     assert blocked["stav"] == "jiz_v_evidence"
@@ -779,3 +782,322 @@ def test_a_car_new_to_evidence_gets_its_owner_written(conn, make):
                                   firma_id=fid, typ_kod="KOLA")
     assert made["stav"] == "zalozeno"
     assert ukony_repo.get(conn, made["ukon"]["id"])["prevod"] == "→ BSAuto s.r.o."
+
+
+NEW_ORV = "UBP590636"
+OLD_ORV = "UBF670979"
+OLD_PLATE = "5AB1234"
+ALBION = "Albion Cars s.r.o."
+TRANSFER = "MM INSTALACE s.r.o. → Albion Cars s.r.o."
+WRITE_URL = "/ukony/orv-sken/zapsat"
+
+
+def _ago(days):
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+def _read_albion(**fields):
+    return {**DATA, "vin": None, "rz": OLD_PLATE,
+            "orv_cislo": NEW_ORV, "provozovatel": ALBION, **fields}
+
+
+@pytest.mark.parametrize("rz,orv", [(OLD_PLATE, OLD_ORV), ("5AB1235", OLD_ORV), (OLD_PLATE, None)])
+def test_unchanged_duplicate_is_done_on_first_read(conn, make, rz, orv):
+    uid = make(datum=_ago(6), prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    before = dict(ukony_repo.get(conn, uid))
+    fake = FakeClient(_read_albion(vin=VIN, rz=rz, orv_cislo=orv))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=fake)
+    assert result["stav"] == "uz_zapsano" and result["ukon"]["id"] == uid
+    assert result["rz"] == OLD_PLATE
+    assert not result["zmeny"] and not result.get("vyzaduje_potvrzeni")
+    assert len(fake.calls) == 1 and not result.get("druhe_cteni")
+    assert dict(ukony_repo.get(conn, uid)) == before
+
+
+@pytest.mark.parametrize("days,prevod,operator,can_write", [
+    (6, TRANSFER, ALBION, True),
+    (40, TRANSFER, ALBION, False),
+    (100, TRANSFER, "Albion s.r.o.", False),
+    (40, "Albion", ALBION, False),
+    (40, TRANSFER, None, False),
+    (scan.AWAITING_WINDOW_DAYS, "Albion", ALBION, True),
+])
+def test_verified_older_duplicate_compares_newest_and_applies_owner_guard(
+    conn, make, days, prevod, operator, can_write,
+):
+    older = make(datum=_ago(days + 1), prevod=TRANSFER, rz=OLD_PLATE, orv="UBA123456")
+    uid = make(datum=_ago(days), prevod=prevod, rz=OLD_PLATE, orv=OLD_ORV)
+    fake = FakeClient(_read_albion(rz="3BN4796", provozovatel=operator))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=fake, lookup=registry({NEW_ORV: VIN}))
+    assert result["stav"] == "zmena_ke_kontrole" and result["ukon"]["id"] == uid
+    assert result["zmeny"] == {"orv": {"pred": OLD_ORV, "po": NEW_ORV},
+                              "rz": {"pred": OLD_PLATE, "po": "3BN4796"}}
+    assert result["lze_zapsat"] is can_write
+    assert result["vin_zdroj"] == "registr" and len(fake.calls) == 1
+    assert ukony_repo.get(conn, older)["orv"] == "UBA123456"
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+@pytest.mark.parametrize("second_orv,expected", [(NEW_ORV, "zmena_ke_kontrole"),
+                                                 (None, "necitelne"), ("UBP590637", "necitelne")])
+def test_unverified_orv_change_requires_two_identical_readings(conn, make, second_orv, expected):
+    uid = make(datum=_ago(6), prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    fake = SeqClient(_read_albion(), _read_albion(orv_cislo=second_orv))
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=fake)
+    assert result["stav"] == expected and result["druhe_cteni"] and len(fake.calls) == 2
+    assert bool(result["zmeny"]) is (second_orv == NEW_ORV)
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+@pytest.mark.parametrize("read_orv,second_orv,verified,expected,reads", [
+    (None, None, False, "necitelne", 2),
+    (OLD_ORV, None, False, "necitelne", 2),
+    (OLD_ORV, NEW_ORV, False, "necitelne", 2),
+    (OLD_ORV, OLD_ORV, False, "zmena_ke_kontrole", 2),
+    (OLD_ORV, None, True, "zmena_ke_kontrole", 1),
+])
+def test_plate_only_change_also_requires_verification(
+    conn, make, read_orv, second_orv, verified, expected, reads,
+):
+    uid = make(datum=_ago(6), prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    first = _read_albion(vin=None if verified else VIN, rz="3BN4796", orv_cislo=read_orv)
+    fake = SeqClient(first, {**first, "orv_cislo": second_orv})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=fake,
+                          lookup=registry({OLD_ORV: VIN} if verified else {}))
+    assert result["stav"] == expected
+    if expected == "zmena_ke_kontrole":
+        assert result["ukon"]["id"] == uid
+        assert result["zmeny"] == {"rz": {"pred": OLD_PLATE, "po": "3BN4796"}}
+    else:
+        assert not result["zmeny"] and "vyfoť techničák znovu" in result["zprava"]
+    assert len(fake.calls) == reads and ukony_repo.get(conn, uid)["rz"] == OLD_PLATE
+
+
+def _route_job(**fields):
+    with db.connect(config.DB_PATH) as conn:
+        db.init_schema(conn)
+        firm = firmy_repo.create(conn, nazev="Albion", zkratka="AL")
+        return pridat_ukon(conn, **({"firma_id": firm, "datum": _ago(6), "typ_kod": "KOLA",
+                                    "celkem": 1300, "vin": VIN, "rz": OLD_PLATE,
+                                    "orv": OLD_ORV, "prevod": TRANSFER} | fields))
+
+
+def _write_request(result, uid):
+    return {"ukon_id": uid, "token": result["navrh_token"]}
+
+
+STALE_MESSAGE = "Úkon se mezitím změnil. Otevři ho a zkontroluj údaje."
+
+
+def test_zapsat_writes_the_reviewed_orv_and_keeps_a_misread_plate(client, vision, monkeypatch):
+    uid = _route_job()
+    vision.data = _read_albion(rz="5AB1235")
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    result = post(client).json
+    assert result["stav"] == "zmena_ke_kontrole" and result["lze_zapsat"]
+    with db.connect(config.DB_PATH) as conn:
+        assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+    response = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert response.status_code == 200
+    assert response.json["stav"] == "doplneno" and response.json["doplneno"] == ["orv"]
+    assert response.json["rz_ponechano"] == {"evidence": OLD_PLATE, "foto": "5AB1235"}
+    with db.connect(config.DB_PATH) as conn:
+        row = ukony_repo.get(conn, uid)
+        assert (row["orv"], row["rz"]) == (NEW_ORV, OLD_PLATE)
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+    replay = client.post(WRITE_URL, json={"token": result["navrh_token"]})
+    assert replay.status_code == 409 and replay.json["error"] == STALE_MESSAGE
+
+
+def test_same_vehicle_readings_have_independent_proposals(client, vision, monkeypatch):
+    uid = _route_job()
+    vision.data = _read_albion()
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    first = post(client).json
+    vision.data = _read_albion(provozovatel=None)
+    second = post(client).json
+    assert first["zmeny"] == second["zmeny"]
+    assert first["navrh_token"] != second["navrh_token"]
+    assert "_snapshot" not in first and "_snapshot" not in second
+    write = _write_request(first, uid)
+    assert client.post(WRITE_URL, json={**write, "ukon_id": uid + 999}).status_code == 409
+    assert client.post(WRITE_URL, json={**write, "orv": "UBP590637"}).status_code == 400
+    with db.connect(config.DB_PATH) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM orv_scan_review").fetchone()[0] == 2
+        # Change only the owner line to exercise the server's sale check independently.
+        conn.execute("UPDATE ukony SET prevod = ? WHERE id = ?", ("→ Jiný majitel s.r.o.", uid))
+    refused = client.post(WRITE_URL, json=write)
+    assert refused.status_code == 409 and "provozovatel nesouhlasí" in refused.json["error"]
+    with db.connect(config.DB_PATH) as conn:
+        assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+    allowed = client.post(WRITE_URL, json={"token": second["navrh_token"]})
+    assert allowed.status_code == 200 and allowed.json["stav"] == "doplneno"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("updated_at", "2026-01-01T00:00:00+00:00"),
+    ("rz", "3BN4796"),
+    ("orv", "UBP590638"),
+    ("vin", OTHER_VIN),
+])
+def test_zapsat_refuses_each_changed_snapshot_field_on_a_plate_match(client, vision, field, value):
+    uid = _route_job()
+    vision.data = _read_albion()
+    result = post(client).json
+    assert result["vin"] is None and result["druhe_cteni"] and result["lze_zapsat"]
+    with db.connect(config.DB_PATH) as conn:
+        conn.execute(f"UPDATE ukony SET {field} = ? WHERE id = ?", (value, uid))
+        before = dict(ukony_repo.get(conn, uid))
+    refused = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert refused.status_code == 409 and refused.json["error"] == STALE_MESSAGE
+    with db.connect(config.DB_PATH) as conn:
+        assert dict(ukony_repo.get(conn, uid)) == before
+
+
+def test_snapshot_is_taken_at_comparison_even_if_row_changes_before_proposal_storage(
+    client, vision, monkeypatch,
+):
+    uid = _route_job()
+    vision.data = _read_albion()
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    zpracuj = scan.zpracuj
+
+    def scan_then_correct_plate(conn, *args, **kwargs):
+        result = zpracuj(conn, *args, **kwargs)
+        ukony_repo.update(conn, uid, rz="3BN4796")
+        return result
+
+    monkeypatch.setattr(scan, "zpracuj", scan_then_correct_plate)
+    result = post(client).json
+    refused = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert refused.status_code == 409 and refused.json["error"] == STALE_MESSAGE
+
+
+def test_note_edit_in_the_same_second_invalidates_proposal(client, vision, monkeypatch):
+    uid = _route_job()
+    vision.data = _read_albion()
+    now = datetime(2026, 11, 19, 10, 30, 0, 100_000, tzinfo=timezone.utc)
+
+    class TestClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+
+    monkeypatch.setattr(db, "datetime", TestClock)
+    with db.connect(config.DB_PATH) as conn:
+        ukony_repo.update(conn, uid, poznamka="Původní poznámka")
+    result = post(client).json
+    now = now.replace(microsecond=200_000)
+    with db.connect(config.DB_PATH) as conn:
+        ukony_repo.update(conn, uid, poznamka="Změněná poznámka")
+    refused = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert refused.status_code == 409 and refused.json["error"] == STALE_MESSAGE
+
+
+def test_zapsat_rechecks_awaiting_window_even_for_a_matching_owner(client, vision, monkeypatch):
+    today = date.today()
+    uid = _route_job(datum=(today - timedelta(days=scan.AWAITING_WINDOW_DAYS)).isoformat())
+    vision.data = _read_albion(provozovatel="Albion s.r.o.")
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    result = post(client).json
+    assert result["lze_zapsat"]
+
+    class Tomorrow(date):
+        @classmethod
+        def today(cls):
+            return today + timedelta(days=1)
+
+    monkeypatch.setattr(scan, "date", Tomorrow)
+    refused = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert refused.status_code == 409 and "příliš starý" in refused.json["error"]
+    with db.connect(config.DB_PATH) as conn:
+        assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_old_job_does_not_issue_a_proposal_token(client, vision, monkeypatch):
+    _route_job(datum=_ago(100))
+    vision.data = _read_albion(provozovatel="Albion s.r.o.")
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    result = post(client).json
+    assert result["stav"] == "zmena_ke_kontrole" and result["lze_zapsat"] is False
+    assert "navrh_token" not in result
+    with db.connect(config.DB_PATH) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM orv_scan_review").fetchone()[0] == 0
+
+
+def test_logout_removes_scan_session_and_relogin_cannot_write_old_proposal(client, vision, monkeypatch):
+    uid = _route_job()
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "test-password")
+    assert client.post("/login", data={"heslo": "test-password"}).status_code == 302
+    vision.data = _read_albion()
+    result = post(client).json
+    with client.session_transaction() as session:
+        old_sid = session["orvsken_sid"]
+    assert client.post("/logout").status_code == 302
+    with client.session_transaction() as session:
+        assert "orvsken_sid" not in session and "authed" not in session
+    assert client.post("/login", data={"heslo": "test-password"}).status_code == 302
+    refused = client.post(WRITE_URL, json=_write_request(result, uid))
+    assert refused.status_code == 409
+    with client.session_transaction() as session:
+        assert session["orvsken_sid"] != old_sid
+
+
+def test_explicit_new_job_from_review_keeps_old_job_untouched(client, vision, monkeypatch):
+    uid = _route_job()
+    vision.data = _read_albion()
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry({NEW_ORV: VIN}))
+    result = post(client).json
+    assert result["stav"] == "zmena_ke_kontrole"
+    car = {**_car(result), "firma_id": result["ukon"]["firma_id"], "typ_kod": "KOLA"}
+    url = "/ukony/orv-sken/zalozit"
+    assert client.post(url, json={"auta": [car]}).json["results"][0]["stav"] == "jiz_v_evidence"
+    made = client.post(url, json={"auta": [{**car, "potvrdit_novy": True}]}).json["results"][0]
+    assert made["stav"] == "zalozeno" and made["ukon"]["id"] != uid
+    with db.connect(config.DB_PATH) as conn:
+        assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+        assert ukony_repo.get(conn, made["ukon"]["id"])["orv"] == NEW_ORV
+
+
+def test_explicit_new_job_from_plate_only_match_is_refused_without_vin(client, vision):
+    uid = _route_job()
+    vision.data = _read_albion()
+    result = post(client).json
+    assert result["stav"] == "zmena_ke_kontrole" and result["vin"] is None
+    car = {**_car(result), "firma_id": result["ukon"]["firma_id"],
+           "typ_kod": "KOLA", "potvrdit_novy": True}
+    refused = client.post("/ukony/orv-sken/zalozit", json={"auta": [car]}).json["results"][0]
+    assert refused["stav"] == "chyba" and "nevrátil VIN" in refused["zprava"]
+    with db.connect(config.DB_PATH) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+        assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_mixed_batch_keeps_both_dupes_and_only_creates_the_selected_car(client, vision, monkeypatch):
+    changed_id = _route_job()
+    filled_vin, same_vin, new_vin = "TMBAAAAAA00000001", "TMBAAAAAA00000002", "TMBAAAAAA00000003"
+    with db.connect(config.DB_PATH) as conn:
+        fid = ukony_repo.get(conn, changed_id)["firma_id"]
+        shared = dict(firma_id=fid, typ_kod="KOLA", celkem=1300, prevod=TRANSFER)
+        filled_id = pridat_ukon(conn, datum=RECENT, vin=filled_vin, **shared)
+        same_id = pridat_ukon(conn, datum=_ago(6), vin=same_vin, rz="2AA2222", orv="UBL123456", **shared)
+    numbers = {"UBL123455": filled_vin, "UBL123456": same_vin, NEW_ORV: VIN, "UBL123457": new_vin}
+    monkeypatch.setattr(scan.orv_service, "lookup_vin", registry(numbers))
+    results = []
+    for rz, orv in zip(("1AA1111", "2AA2222", OLD_PLATE, "3AA3333"), numbers):
+        vision.data = _read_albion(rz=rz, orv_cislo=orv)
+        results.append(post(client).json)
+    filled, same, changed, new = results
+    assert [r["stav"] for r in results] == ["doplneno", "uz_zapsano", "zmena_ke_kontrole", "bez_firmy"]
+    assert [r["ukon"]["id"] for r in (filled, same, changed)] == [filled_id, same_id, changed_id]
+    with db.connect(config.DB_PATH) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 3
+    assert client.post(WRITE_URL, json=_write_request(changed, changed_id)).json["stav"] == "doplneno"
+    response = client.post("/ukony/orv-sken/zalozit", json={"auta": [
+        {**_car(new), "firma_id": fid, "typ_kod": "KOLA", "potvrdit_novy": False},
+    ]})
+    assert response.json["results"][0]["stav"] == "zalozeno"
+    with db.connect(config.DB_PATH) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 4
+        assert [ukony_repo.get(conn, uid)["orv"] for uid in (filled_id, same_id, changed_id)] == [
+            "UBL123455", "UBL123456", NEW_ORV]

@@ -167,7 +167,7 @@ test('banner is green only when there is nothing left to decide', () => {
 test('summary counts created, filled, unchanged, review and unreadable cars', () => {
   assert.deepEqual(R.totals(['zalozeno', 'doplneno', 'uz_doplneno', 'bez_firmy', 'jiz_v_evidence', 'necitelne']
     .map((state, id) => photo(id, state))),
-    {zalozeno: 1, doplneno: 1, uz_doplneno: 1, review: 2, necitelne: 1});
+    {zalozeno: 1, doplneno: 1, uz_doplneno: 1, preskoceno: 0, review: 2, necitelne: 1});
 });
 
 test('summary chips show only non-zero counts, in a fixed order', () => {
@@ -675,7 +675,8 @@ test('a kept plate puts the card under Zkontroluj, never under Beze změny', () 
   assert.equal(R.needsAction(kept), true);
   assert.deepEqual(R.reviewPhotos([kept, fine]).map(p => p.id), [1]);
   assert.deepEqual(R.writtenPhotos([kept, fine]).map(p => p.id), [2]);
-  assert.deepEqual(R.totals([kept, fine]), {zalozeno: 0, doplneno: 0, uz_doplneno: 1, review: 1, necitelne: 0});
+  assert.deepEqual(R.totals([kept, fine]),
+    {zalozeno: 0, doplneno: 0, uz_doplneno: 1, preskoceno: 0, review: 1, necitelne: 0});
   assert.equal(R.bannerState([kept, fine]).tone, 'warn');
   const root = render([kept, fine]);
   assert.deepEqual(issues(root).map(c => c.dataset.photo), ['1']);
@@ -729,4 +730,70 @@ test('a typed price survives a firm or type change; clearing it brings the firm 
 test('written cards keep a plain price, no input', () => {
   const root = render([photo(1, 'doplneno', {ukon: {id: 5, celkem: 1300, typ: 'PŘEVOD', firma_id: 14}})]);
   assert.equal(cards(root)[0].querySelector('.orv-card-cena'), null);
+});
+
+test('unchanged duplicates are done, proposed changes have three decisions and count once', () => {
+  const ukon = {id: 1711, firma_id: 14, typ: 'PŘEVOD', datum: '2026-11-13'};
+  const recorded = photo(1, 'uz_zapsano', {ukon, rz: '5AB1234'});
+  const changed = photo(2, 'zmena_ke_kontrole', {ukon, lze_zapsat: true, rz: '5AB1234',
+    vin: 'TMBEK6NW7M3158470', navrh_token: 'original-proposal-token',
+    zmeny: {orv: {pred: 'UBF670979', po: 'UBP590636'}}});
+  const skipped = photo(3, 'preskoceno', {ukon});
+  const root = render([recorded, changed, skipped]);
+  assert.deepEqual(cards(root).map(p => p.dataset.photo), ['1', '3']);
+  assert.equal(cards(root)[0].querySelector('.orv-status').textContent, 'Už zapsáno · beze změny');
+  assert.equal(unassigned(root).length, 0);
+  assert.deepEqual(R.summaryChips([recorded, changed, skipped]).map(c => [c.key, c.n]),
+    [['uz_doplneno', 1], ['preskoceno', 1], ['review', 1]]);
+  const [card] = issues(root);
+  assert.match(plain(allText(card.querySelector('.orv-changes'))), /UBF670979.*→.*UBP590636/);
+  assert.deepEqual(card.querySelectorAll('button').slice(0, 3).map(b => b.textContent),
+    ['Zapsat do #1711', 'Nový úkon', 'Přeskočit']);
+  changed.result.lze_zapsat = false;
+  const [guarded] = issues(render([changed]));
+  assert.equal(guarded.querySelector('.orv-write-existing'), null);
+  assert.deepEqual(guarded.querySelectorAll('button').slice(0, 3).map(b => b.textContent),
+    ['Otevřít úkon', 'Nový úkon', 'Přeskočit']);
+});
+
+test('choosing Nový úkon opens the existing form with an explicit create confirmation', () => {
+  const changed = photo(2, 'zmena_ke_kontrole', {ukon: {id: 1711}, rz: '5AB1234', vin: 'TMBEK6NW7M3158470'});
+  const root = render([changed]);
+  assert.equal(unassigned(root).length, 0);
+  changed.novyUkon = true;
+  changed.firmaOverride = '14';
+  changed.typOverride = 'PŘEVOD';
+  const [card] = unassigned(render([changed]));
+  assert.equal(card.querySelector('.orv-confirm-input'), null);
+  assert.equal(R.payload(changed, R.selected([changed])[0]).potvrdit_novy, true);
+});
+
+test('a review without VIN hides Nový úkon, including a previously saved create draft', () => {
+  const car = photo(1, 'zmena_ke_kontrole', {ukon: {id: 1711}, rz: '5AB1234',
+    lze_zapsat: true, navrh_token: 'original-proposal-token'});
+  car.novyUkon = true;
+  const root = render([car]);
+  assert.equal(unassigned(root).length, 0);
+  const [card] = issues(root);
+  assert.equal(card.querySelector('.orv-new-job'), null);
+  assert.ok(card.querySelector('.orv-write-existing'));
+  assert.deepEqual(R.selected([car]), []);
+});
+
+test('Nový úkon keeps the review draft and shows the per-car refusal', () => {
+  const car = photo(1, 'zmena_ke_kontrole', {ukon: {id: 1711}, rz: '5AB1234', vin: 'TMBEK6NW7M3158470'});
+  Object.assign(car, {novyUkon: true, firmaOverride: '14', typOverride: 'PŘEVOD', poznamka: 'Rozepsáno'});
+  const refusal = 'Typ úkonu není aktivní.';
+  R.applyCreateResults(R.selected([car]), [{stav: 'chyba', zprava: refusal}]);
+  const [card] = unassigned(render([car]));
+  assert.equal(card.querySelector('.orv-message').textContent, refusal);
+  assert.equal(card.querySelector('.orv-card-poznamka').value, 'Rozepsáno');
+  assert.equal(car.result.stav, 'zmena_ke_kontrole');
+});
+
+test('old saved duplicate shapes reopen with the existing fields and warning', () => {
+  const old = photo(1, 'bez_firmy', {existujici: [{id: 1537}], vyzaduje_potvrzeni: true});
+  const [card] = unassigned(render([old]));
+  assert.ok(card.querySelector('.orv-card-firma'));
+  assert.ok(card.querySelector('.orv-confirm-input'));
 });

@@ -17,15 +17,16 @@
    Pure helpers are exported for node tests; the DOM builders stay here. */
 (function (root) {
   'use strict';
-  const DONE = {zalozeno: 1, doplneno: 2, uz_doplneno: 3};
-  const DONE_ORDER = {zalozeno: 0, doplneno: 1, uz_doplneno: 2};
+  const DONE_ORDER = {zalozeno: 0, doplneno: 1, uz_doplneno: 2, uz_zapsano: 2, preskoceno: 3};
   // Cars the person can still create an úkon for.
   const ASSIGN = {bez_firmy: 1, jiz_v_evidence: 1};
-  const REVIEW_ORDER = {bez_firmy: 0, jiz_v_evidence: 0, konflikt: 1, vice_shod: 2,
+  const REVIEW_ORDER = {bez_firmy: 0, jiz_v_evidence: 0, zmena_ke_kontrole: 1, konflikt: 1, vice_shod: 2,
     nenalezeno: 3, chyba: 4, necitelne: 5};
   const LABELS = {konflikt: 'Ke kontrole', vice_shod: 'Více shod', bez_firmy: 'Nové auto',
     jiz_v_evidence: 'Už v evidenci', nenalezeno: 'Nenalezeno', chyba: 'Chyba',
-    zalozeno: 'Založeno', doplneno: 'Doplněno', uz_doplneno: 'Beze změny', necitelne: 'Nečitelné'};
+    zalozeno: 'Založeno', doplneno: 'Doplněno', uz_doplneno: 'Beze změny', necitelne: 'Nečitelné',
+    uz_zapsano: 'Už zapsáno · beze změny', zmena_ke_kontrole: 'Změna ke kontrole',
+    preskoceno: 'Přeskočeno', ceka_na_fotku: 'Čeká na přečtení'};
   const PAY_LABELS = {zaplaceno: 'Zaplaceno', castecne: 'Částečně', nezaplaceno: 'Nezaplaceno'};
   const FIELD_LABELS = {rz: 'RZ', orv: 'ORV', vin: 'VIN'};
   const MAX_NOTE = 120;
@@ -38,19 +39,38 @@
     ['zalozeno', '✚ Založeno'],
     ['doplneno', '✎ Doplněno'],
     ['uz_doplneno', '✓ Beze změny'],
+    ['preskoceno', 'Přeskočeno'],
     ['review', '⚠ Ke kontrole'],
     ['necitelne', '✗ Nečitelné'],
   ];
 
   function stateOf(photo) { return (photo && photo.result && photo.result.stav) || null; }
-  function isWritten(photo) { return !!DONE[stateOf(photo)]; }
+  function isWritten(photo) { return Object.hasOwn(DONE_ORDER, stateOf(photo)); }
   // The photo's plate disagrees with evidence (kept as a misread). That is a
   // question, not a ✓ — 2026-11-11 a typo WBP1720 hid 2BP1720 this way.
-  function plateQuestion(photo) { return !!(photo && photo.result && photo.result.rz_ponechano); }
+  function plateQuestion(photo) {
+    const result = photo && photo.result;
+    return !!(result && result.rz_ponechano && !result.zapsano_po_kontrole);
+  }
   function needsAction(photo) {
     return !!stateOf(photo) && (!isWritten(photo) || plateQuestion(photo));
   }
-  function assignable(photo) { return !!ASSIGN[stateOf(photo)]; }
+  function assignable(photo) {
+    const state = stateOf(photo);
+    return Object.hasOwn(ASSIGN, state) ||
+      (state === 'zmena_ke_kontrole' && !!photo.novyUkon && !!photo.result.vin);
+  }
+
+  function closePending(photos) {
+    return photos.filter(photo => {
+      const state = stateOf(photo);
+      return state === 'zmena_ke_kontrole' || state === 'jiz_v_evidence' || (assignable(photo) && (
+        (photo.firmaOverride !== undefined &&
+          String(photo.firmaOverride || '') !== String(photo.result.navrh_firma_id || '')) ||
+        photo.typOverride || photo.cenaOverride != null ||
+        noteValue(photo.poznamka) || photo.potvrdit));
+    }).length;
+  }
 
   function reviewRank(photo) {
     const state = stateOf(photo);
@@ -76,12 +96,12 @@
   }
 
   function totals(photos) {
-    const out = {zalozeno: 0, doplneno: 0, uz_doplneno: 0, review: 0, necitelne: 0};
+    const out = {zalozeno: 0, doplneno: 0, uz_doplneno: 0, preskoceno: 0, review: 0, necitelne: 0};
     photos.forEach(p => {
       const state = stateOf(p);
       if (plateQuestion(p)) out.review++;
-      else if (state === 'zalozeno' || state === 'doplneno' || state === 'uz_doplneno') out[state]++;
-      else if (state === 'necitelne') out.necitelne++;
+      else if (state === 'uz_zapsano') out.uz_doplneno++;
+      else if (Object.hasOwn(out, state)) out[state]++;
       else if (state) out.review++;
     });
     return out;
@@ -252,7 +272,8 @@
       rz: result.rz || null, vin: result.vin || null, orv_cislo: result.orv_cislo || null,
       provozovatel: result.provozovatel || null, vin_zdroj: result.vin_zdroj || null,
       firma_id: Number(pick.firma_id), typ_kod: pick.typ_kod || null,
-      potvrdit_novy: !!(photo.potvrdit && needsConfirm(photo)),
+      potvrdit_novy: !!(stateOf(photo) === 'zmena_ke_kontrole' && photo.novyUkon ||
+        photo.potvrdit && needsConfirm(photo)),
     };
     const note = noteValue(photo.poznamka);
     if (note) out.poznamka = note;
@@ -268,9 +289,13 @@
     (chosen || []).forEach((item, i) => {
       const result = (results || [])[i];
       if (!item || !item.photo || !result) return;
-      item.photo.result = result;
+      if (isWritten({result}) || result.stav === 'jiz_v_evidence') item.photo.result = result;
+      item.photo.createError = null;
       if (result.stav === 'jiz_v_evidence') {
         item.photo.potvrdit = false;
+      }
+      if (!isWritten({result})) {
+        item.photo.createError = result.zprava;
         blocked.push(item.photo);
       }
     });
@@ -392,6 +417,7 @@
     input.value = photo.cenaOverride != null ? photo.cenaOverride : defaultPriceText(ctx.ceny, chosen);
     input.addEventListener('input', () => {
       photo.cenaOverride = input.value.trim() ? input.value : null;
+      ctx.actions.onDraft?.();
       updateCreateCount(ctx.rootEl, ctx.photos);
     });
     wrap.append(el('span', 'orv-card-price-k', 'Cena'), input, el('span', 'orv-card-price-u', 'Kč'));
@@ -517,6 +543,7 @@
       input.checked = !!photo.potvrdit;
       input.addEventListener('change', () => {
         photo.potvrdit = input.checked;
+        ctx.actions.onDraft?.();
         if (photo.cardEl) photo.cardEl.dataset.confirmed = input.checked ? '1' : '0';
         refreshPrices(ctx.rootEl, ctx.photos);
         if (photo.cardEl) renderConfirmedChip(photo);
@@ -584,6 +611,7 @@
     fillSelect(firma, ctx.rootEl, '#orv-firma-options', '— vyber firmu —', chosen.firma_id);
     firma.addEventListener('change', () => {
       photo.firmaOverride = firma.value || null;
+      ctx.actions.onDraft?.();
       refreshPrices(ctx.rootEl, ctx.photos);
     });
     const typ = el('select', 'orv-card-typ');
@@ -591,6 +619,7 @@
     fillSelect(typ, ctx.rootEl, '#orv-typ-options', '— vyber typ —', chosen.typ_kod);
     typ.addEventListener('change', () => {
       photo.typOverride = typ.value || null;
+      ctx.actions.onDraft?.();
       refreshPrices(ctx.rootEl, ctx.photos);
     });
     const note = el('input', 'orv-card-poznamka');
@@ -599,19 +628,36 @@
     note.value = photo.poznamka || '';
     note.placeholder = 'Poznámka';
     note.setAttribute('aria-label', 'Poznámka k úkonu ' + name);
-    note.addEventListener('input', () => { photo.poznamka = note.value; });
+    note.addEventListener('input', () => { photo.poznamka = note.value; ctx.actions.onDraft?.(); });
     field(fields, 'Firma', firma);
     field(fields, 'Typ', typ);
     body.append(fields);
     // Row 2: Poznámka (left, wide) + Cena (right).
     body.append(noteRow(ctx, photo, chosen, note));
-    const meta = metaNode([vinItem(result),
+    const meta = metaNode([vinItem(result), earlier(result),
       result.provozovatel ? 'Provozovatel: ' + result.provozovatel : null]);
     if (meta) body.append(meta);
+    if (stateOf(photo) === 'zmena_ke_kontrole') {
+      if (photo.createError) {
+        const message = el('p', 'orv-message', photo.createError);
+        message.setAttribute('role', 'alert');
+        body.append(message);
+      }
+      const actions = el('div', 'orv-card-actions');
+      actions.append(decisionButton(ctx, photo, 'Zpět', 'orv-review-back', 'onBack'),
+        decisionButton(ctx, photo, 'Přeskočit', 'orv-skip', 'onSkip'));
+      body.append(actions);
+    }
     // Options are filled and the select is in the card → the shared coloured
     // picker can wrap it. Without firma_pick.js the native select stays.
     attachFirmaPick(firma);
     return card;
+  }
+  function decisionButton(ctx, photo, label, cls, action) {
+    const button = el('button', 'btn ' + cls, label);
+    button.type = 'button';
+    button.addEventListener('click', () => ctx.actions[action]?.(photo));
+    return button;
   }
   function issueCard(ctx, photo) {
     const result = photo.result || {};
@@ -623,6 +669,25 @@
     body.append(orvRow(result));
     if (ukon && (ukon.firma_id != null || ukon.firma || ukon.firma_zkratka)) {
       body.append(firmNode(ukon, ctx.firms));
+    }
+    if (state === 'zmena_ke_kontrole') {
+      const changes = changesNode(result);
+      if (changes) body.append(changes);
+      if (ukon) body.append(metaNode([existingLine(ukon)]));
+      const actions = el('div', 'orv-card-actions');
+      if (ukon && ukon.id && result.lze_zapsat && result.navrh_token) {
+        actions.append(decisionButton(ctx, photo, 'Zapsat do #' + ukon.id,
+          'btn-primary orv-write-existing', 'onWrite'));
+      } else if (ukon && ukon.id) {
+        const open = el('button', 'btn orv-open-issue', 'Otevřít úkon');
+        open.type = 'button';
+        open.dataset.ukon = String(ukon.id);
+        actions.append(open);
+      }
+      if (result.vin) actions.append(decisionButton(ctx, photo, 'Nový úkon', 'orv-new-job', 'onNew'));
+      actions.append(decisionButton(ctx, photo, 'Přeskočit', 'orv-skip', 'onSkip'));
+      body.append(actions);
+      return card;
     }
     const duplicate = duplicateBlock(ctx, photo);
     if (duplicate) body.append(duplicate);
@@ -655,13 +720,13 @@
     }
     // A new photo is the fix for "nothing readable"; "Přečíst znovu" (same
     // photo) only helps a transient error, never an unreadable document.
-    if (photo.blob && (state === 'necitelne' || state === 'chyba' || state === 'nenalezeno')) {
+    if (['necitelne', 'chyba', 'nenalezeno', 'ceka_na_fotku'].includes(state)) {
       const retake = el('button', 'btn orv-retake-btn', 'Vyfotit znovu');
       retake.type = 'button';
       retake.addEventListener('click', () => ctx.actions.onRetake && ctx.actions.onRetake(photo));
       actions.append(retake);
     }
-    if (photo.blob && state === 'chyba') {
+    if (photo.blob && (state === 'chyba' || state === 'ceka_na_fotku')) {
       const retry = el('button', 'btn orv-retry-btn', 'Přečíst znovu');
       retry.type = 'button';
       retry.addEventListener('click', () => ctx.actions.onRetry && ctx.actions.onRetry(photo));
@@ -691,7 +756,7 @@
     }
     const kept = keptPlateNode(result);
     if (kept) body.append(kept);
-    if (ukon.id) {
+    if (ukon.id && state !== 'preskoceno') {
       const actions = el('div', 'orv-card-actions');
       const open = el('button', 'btn btn-primary orv-open-written', 'Otevřít a upravit úkon');
       open.type = 'button';
@@ -732,7 +797,7 @@
     const writtenSection = rootEl.querySelector('#orv-written');
     if (writtenSection) writtenSection.hidden = !written.length;
     const writtenTitle = rootEl.querySelector('#orv-written-title');
-    if (writtenTitle) writtenTitle.textContent = 'Zapsáno';
+    if (writtenTitle) writtenTitle.textContent = written.some(p => stateOf(p) === 'preskoceno') ? 'Vyřízeno' : 'Zapsáno';
     const rows = rootEl.querySelector('#orv-unassigned');
     const issues = rootEl.querySelector('#orv-issues');
     if (rows) rows.replaceChildren();
@@ -755,7 +820,7 @@
   }
 
   const api = {LABELS, PAY_LABELS, FIELD_LABELS, MAX_NOTE, stateOf, isWritten, needsAction,
-    assignable, reviewPhotos, writtenPhotos, group, bannerState, totals, summaryChips,
+    assignable, closePending, reviewPhotos, writtenPhotos, group, bannerState, totals, summaryChips,
     czechCars, czechJobs, dateCs, readFactsList, factText, earlier, kc, priceFor, priceLabel,
     firmsMap, dataOf, cenyOf, firmsOf, firmOf, existingList, visibleExisting, needsConfirm,
     existingLine, kandidati, choiceOf, noteValue, typedPrice, canCreate, selected, payload,

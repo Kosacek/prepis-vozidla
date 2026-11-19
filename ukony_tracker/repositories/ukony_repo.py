@@ -41,7 +41,8 @@ def create(
 
 
 def update(conn: sqlite3.Connection, uid: int, *, commit: bool = True, **fields) -> None:
-    fields["updated_at"] = db.now_iso()
+    # A scan proposal must detect edits made within the same second.
+    fields["updated_at"] = db.now_iso(timespec="microseconds")
     cols = ", ".join(f"{k}=?" for k in fields)
     conn.execute(f"UPDATE ukony SET {cols} WHERE id=?", (*fields.values(), uid))
     if commit:
@@ -114,7 +115,7 @@ def get_with_firma(conn: sqlite3.Connection, uid: int) -> sqlite3.Row | None:
     """Úkon i se zkratkou firmy — přesně to, co potřebuje partial _recent_rows.html
     při výměně jednoho řádku po uložení bez reloadu."""
     return conn.execute(
-        "SELECT u.*, f.zkratka AS firma_zkratka FROM ukony u"
+        "SELECT u.*, f.nazev AS firma, f.zkratka AS firma_zkratka FROM ukony u"
         " JOIN firmy f ON f.id = u.firma_id WHERE u.id = ?", (uid,)
     ).fetchone()
 

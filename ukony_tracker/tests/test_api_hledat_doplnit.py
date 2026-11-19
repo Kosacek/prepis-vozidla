@@ -210,7 +210,7 @@ def test_doplnit_preserves_all_other_columns(client, make_ukon, monkeypatch):
     )
     before = _get_ukon(client, uid)
     timestamp = "2026-10-08T12:00:00+00:00"
-    monkeypatch.setattr(db, "now_iso", lambda: timestamp)
+    monkeypatch.setattr(db, "now_iso", lambda *, timespec: timestamp)
     r = client.post(f"/api/ukony/{uid}/doplnit", json={
         "rz": "1AB2345", "orv": "UBE037263", "celkem": 0,
         "datum": "2020-01-01", "firma_id": 999, "stav_platby": "zaplaceno",

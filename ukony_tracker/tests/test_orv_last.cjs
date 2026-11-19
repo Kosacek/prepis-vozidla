@@ -42,3 +42,14 @@ test('label says Dnes for today, date otherwise', () => {
   assert.equal(L.label(new Date(2026, 9, 19, 9, 5).getTime(), now), 'Dnes 9:05');
   assert.equal(L.label(new Date(2026, 9, 17, 14, 30).getTime(), now), '17. 10. 14:30');
 });
+
+test('saving is synchronous for decisions and new-car drafts', () => {
+  const {L} = fresh();
+  const decision = {stav: 'zmena_ke_kontrole', ukon: {id: 1711}, lze_zapsat: true};
+  assert.equal(L.save([{result: decision, novyUkon: true, firmaOverride: '14',
+    typOverride: 'PŘEVOD', cenaOverride: '800', poznamka: 'Poznámka', potvrdit: false}]), true);
+  const [item] = L.load().items;
+  assert.deepEqual(item.result, decision);
+  assert.deepEqual(L.draftOf(item.draft), {novyUkon: true, firmaOverride: '14',
+    typOverride: 'PŘEVOD', cenaOverride: '800', poznamka: 'Poznámka', potvrdit: false});
+});

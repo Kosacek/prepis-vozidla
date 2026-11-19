@@ -52,7 +52,7 @@
      počítají s prázdnými mapami. #}
   <script type="application/json" id="orv-data">{{ {"ceny": ceny|default({}, true), "firmy": firmy_data|default([], true)}|tojson }}</script>
   <section id="orv-review" class="orv-section orv-review ask-reveal" aria-labelledby="orv-review-title" hidden>
-    <h3 id="orv-review-title" class="orv-section-title">Ke kontrole a doplnění</h3>
+    <h3 id="orv-review-title" class="orv-section-title">Zkontroluj</h3>
     <form id="orv-assign" class="card orv-assign">
       <div id="orv-unassigned" class="orv-unassigned" aria-label="Nová auta k doplnění"></div>
       <div id="orv-issues" class="orv-unassigned" aria-label="Fotky, které je potřeba dořešit"></div>
@@ -88,8 +88,8 @@
     <button id="orv-shutter" class="orv-shutter" type="button" aria-label="Vyfotit techničák" disabled hidden><span></span></button>
     <button id="orv-process" class="btn btn-primary" type="button" disabled>Zpracovat 0 fotek</button>
     <div id="orv-done" class="orv-done" hidden>
-      <button id="orv-again" class="btn btn-primary" type="button">Vyfotit další</button>
-      <button class="btn" type="button" data-modal-close>Zavřít</button>
+      <button id="orv-again" class="btn" type="button">Vyfotit další</button>
+      <button class="btn btn-primary" type="button" data-modal-close>Hotovo</button>
     </div>
   </footer>
 </section>

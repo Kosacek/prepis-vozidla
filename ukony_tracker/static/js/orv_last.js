@@ -4,6 +4,9 @@
   const KEY = 'ukony_orv_posledni';
   const MAX_AGE_MS = 14 * 24 * 3600 * 1000;
   const THUMB_PX = 240;
+  const DRAFT_FIELDS = ['firmaOverride', 'typOverride', 'cenaOverride',
+    'poznamka', 'potvrdit', 'novyUkon'];
+  let saveNumber = 0;
 
   function thumb(photo) {
     if (photo.thumb) return Promise.resolve(photo.thumb);
@@ -29,14 +32,37 @@
     try { root.localStorage.setItem(KEY, JSON.stringify(record)); return true; } catch (_) { return false; }
   }
 
-  async function save(photos) {
+  function draftOf(photo) {
+    return Object.fromEntries(DRAFT_FIELDS.filter(key => photo && Object.hasOwn(photo, key))
+      .map(key => [key, photo[key]]));
+  }
+
+  async function addThumbnails(photos, items, at, number) {
+    for (const [i, photo] of photos.entries()) {
+      const thumbnail = await thumb(photo);
+      if (number !== saveNumber) return;
+      photo.thumb = items[i].thumb = thumbnail;
+    }
+    write({at, items});
+  }
+
+  function save(photos) {
     const done = photos.filter(p => p.result);
-    if (!done.length) return;
-    for (const p of done) p.thumb = await thumb(p);
-    const items = done.map(p => ({thumb: p.thumb || '', result: p.result, upraveno: !!p.upraveno}));
+    if (!done.length) return false;
+    const number = ++saveNumber;
+    const items = done.map(p => {
+      const item = {thumb: p.thumb || '', result: p.result, upraveno: !!p.upraveno};
+      const draft = draftOf(p);
+      if (Object.keys(draft).length) item.draft = draft;
+      return item;
+    });
     const at = Date.now();
-    // Plné úložiště → aspoň výsledky bez náhledů.
-    if (!write({at, items})) write({at, items: items.map(i => ({...i, thumb: ''}))});
+    // Save decisions before closing or reloading. Thumbnails can arrive later.
+    const saved = write({at, items}) || write({at, items: items.map(i => ({...i, thumb: ''}))});
+    if (saved && done.some(p => !p.thumb && p.url)) {
+      addThumbnails(done, items, at, number);
+    }
+    return saved;
   }
 
   function load(now = Date.now()) {
@@ -56,7 +82,7 @@
     return (sameDay ? 'Dnes' : d.getDate() + '. ' + (d.getMonth() + 1) + '.') + ' ' + time;
   }
 
-  const api = {KEY, save, load, label, thumb};
+  const api = {KEY, save, load, label, thumb, draftOf};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OrvLast = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -2,12 +2,13 @@
   let active;
   const H = window.OrvHelpers;
   const REPORT = window.OrvReport;
-  const ok = r => r && ['zalozeno', 'doplneno', 'uz_doplneno'].includes(r.stav);
+  const ok = result => REPORT.isWritten({result});
   const LAST = window.OrvLast;
+  const FINISHING = 'Dokončuji zpracování…';
   function mount(root) {
     const el = id => root.querySelector('#orv-' + id);
     let photos = [], running = false, dead = false, closing = false, imported = false;
-    let processed = false, serial = 0, retakePhoto = null;
+    let processed = false, saving = false, dirty = false, serial = 0, retakePhoto = null;
     const thinking = window.Thinking(el('thinking'), el('verb'));
     // The hidden retake camera must not be treated as a batch source.
     const addInputs = () => root.querySelectorAll('input[type=file]:not(#orv-retake)');
@@ -79,11 +80,12 @@
         : photo.busy ? 'Čtu…' : 'Čeká';
       const u = r && r.ukon;
       const date = u && /^\d{4}-\d{2}-\d{2}$/.test(u.datum) ? u.datum.slice(8) + '.' + u.datum.slice(5, 7) + '.' : '';
-      photo.text.textContent = r ? (u ? u.firma + ' · ' + date + ' — ' : '') + r.zprava : 'Fotka ' + photo.id;
+      photo.text.textContent = r ? (u ? u.firma + ' · ' + date + ' — ' : '') +
+        (r.zprava || REPORT.LABELS[r.stav] || '') : 'Fotka ' + photo.id;
     }
     // Znovu vyfocení: nová fotka nahradí tu v kartě a hned se přečte.
     function requestRetake(photo) {
-      if (running || dead || imported || !photo || !photo.blob) return;
+      if (running || saving || dead || imported || !photo) return;
       retakePhoto = photo;
       const input = el('retake');
       input.value = '';
@@ -94,7 +96,7 @@
       this.value = '';
       const photo = retakePhoto;
       retakePhoto = null;
-      if (!file || !photo || dead || running) return;
+      if (!file || !photo || dead || running || saving) return;
       imported = true; controls();
       let blob;
       try { blob = await window.OrvFile(file, camera); }
@@ -106,15 +108,45 @@
       URL.revokeObjectURL(photo.url);
       photo.blob = blob;
       photo.url = URL.createObjectURL(blob);
+      photo.thumb = null;
       photo.result = null;
       photo.upraveno = false;
       photo.potvrdit = false;
       if (photo.thumbEl) { photo.thumbEl.hidden = false; photo.thumbEl.src = photo.url; }
       await run([photo]);
     });
+    function warnBeforeUnload(event) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
+    function syncUnloadGuard() {
+      if (running || saving || dirty || REPORT.closePending(photos)) {
+        window.addEventListener('beforeunload', warnBeforeUnload);
+      } else {
+        window.removeEventListener('beforeunload', warnBeforeUnload);
+      }
+    }
+    function persist() {
+      if (LAST.save(photos)) dirty = false;
+      syncUnloadGuard();
+    }
+    function decide(photo, changes) {
+      if (saving || running || dead) return;
+      Object.assign(photo, changes);
+      photo.createError = null;
+      dirty = true;
+      notice('');
+      summary();
+    }
     const actions = {
       onRetry: photo => run([photo]),
       onRetake: photo => requestRetake(photo),
+      onDraft: () => { dirty = true; syncUnloadGuard(); },
+      onWrite: photo => writeExisting(photo),
+      onNew: photo => decide(photo, {novyUkon: true}),
+      onBack: photo => decide(photo, {novyUkon: false}),
+      onSkip: photo => decide(photo, {novyUkon: false, result: {
+        ...photo.result, stav: 'preskoceno', zmeny: {}, zprava: 'Přeskočeno'}}),
     };
     function summary(save = true) {
       photos.forEach(photo => { photo.row = null; photo.retry = null; });
@@ -122,13 +154,13 @@
       el('capture').hidden = el('process').hidden = true;
       el('summary').hidden = false;
       el('results').hidden = false;
-      // „Vyfotit další“ / „Zavřít“ až když není co doplnit — jinak by jedno
-      // omylem trefené tlačítko zahodilo rozdělané firmy a poznámky.
-      el('done').hidden = REPORT.reviewPhotos(photos).length > 0;
+      const pending = REPORT.reviewPhotos(photos).length;
+      el('done').hidden = false;
+      el('again').hidden = pending > 0;
       el('last').hidden = true;
-      el('step').textContent = REPORT.reviewPhotos(photos).length
-        ? '3 · Zkontroluj a doplň' : '4 · Hotovo';
-      if (save) LAST.save(photos);
+      el('step').textContent = pending ? '3 · Zkontroluj a doplň' : '4 · Hotovo';
+      if (save) persist();
+      else syncUnloadGuard();
     }
     // Uložení v editaci → karta auta dostane „Upraveno" a report se uloží znovu.
     function onSaved(event) {
@@ -146,7 +178,8 @@
       camera.stop(); notice('');
       photos.forEach(p => URL.revokeObjectURL(p.url));
       el('thumbnails').replaceChildren();
-      photos = stored.items.map((item, i) => ({id: i + 1, url: item.thumb || '', thumb: item.thumb || '',
+      photos = stored.items.map((item, i) => ({...LAST.draftOf(item.draft),
+        id: i + 1, url: item.thumb || '', thumb: item.thumb || '',
         result: item.result, upraveno: !!item.upraveno, blob: null}));
       serial = photos.length;
       summary(false);
@@ -186,8 +219,9 @@
       }
     }
     async function run(queue) {
-      if (running || dead || imported || !queue.length) return;
+      if (running || saving || dead || imported || !queue.length) return;
       running = true; processed = true; camera.stop(); notice('');
+      syncUnloadGuard();
       el('capture').hidden = el('process').hidden = el('done').hidden = el('summary').hidden = true;
       el('review').hidden = true;
       el('written').hidden = false;
@@ -206,13 +240,20 @@
       running = false;
       if (dead) return;
       thinking.stop(); photos.forEach(row);
-      if (closing) { window.UkonModal.close(); return; }
+      if (closing) {
+        photos.filter(p => !p.result).forEach(p => {
+          p.result = {stav: 'ceka_na_fotku'};
+        });
+      }
       summary();
+      finishClose();
     }
     function reset() {
-      if (running) return;
+      if (running || saving) return;
       photos.forEach(p => URL.revokeObjectURL(p.url)); photos = [];
       retakePhoto = null;
+      dirty = false;
+      syncUnloadGuard();
       el('thumbnails').replaceChildren(); el('results').replaceChildren();
       el('results').hidden = el('summary').hidden = el('done').hidden = true;
       el('review').hidden = el('written').hidden = true;
@@ -222,6 +263,7 @@
     }
     function destroy() {
       dead = true; camera.destroy(); thinking.stop();
+      window.removeEventListener('beforeunload', warnBeforeUnload);
       document.removeEventListener('ukon:saved', onSaved);
       photos.forEach(p => { URL.revokeObjectURL(p.url); if (p.abort) p.abort.abort(); });
       photos = [];
@@ -234,34 +276,71 @@
     person.addEventListener('change', () => {
       try { localStorage.setItem('ukony_zpracoval', person.value); } catch (_) {}
     });
+    function finishClose() {
+      if (!closing || dead) return;
+      closing = false;
+      if (el('note').textContent === FINISHING) notice('');
+      window.UkonModal.close();
+    }
+    async function postAction(path, payload, accept, fallback) {
+      if (running || saving || dead || imported) return;
+      saving = true;
+      syncUnloadGuard();
+      el('assign').inert = true;
+      el('create-unmatched').disabled = true;
+      notice('');
+      try {
+        const response = await fetch('/ukony/orv-sken/' + path, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+          body: JSON.stringify(payload)});
+        if (response.redirected) throw Error('Přihlášení vypršelo.');
+        const data = await response.json().catch(() => ({}));
+        if (dead) return;
+        if (!response.ok) {
+          if (fallback) fallback(response.status);
+          throw Error(data.error || 'Zápis se nezdařil.');
+        }
+        accept(data);
+      } catch (error) {
+        if (!dead) notice(error.message || 'Zápis se nezdařil.');
+      } finally {
+        saving = false;
+        if (!dead) {
+          syncUnloadGuard();
+          el('assign').inert = false;
+          REPORT.updateCreateCount(root, photos);
+          finishClose();
+        }
+      }
+    }
+    function writeExisting(photo) {
+      const result = photo.result;
+      return postAction('zapsat', {token: result.navrh_token, ukon_id: result.ukon.id},
+        data => {
+          if (!ok(data)) throw Error('Zápis se nezdařil.');
+          processed = true;
+          photo.result = data;
+          summary();
+        }, status => {
+          if (status !== 409 && status !== 404) return;
+          photo.result = {...photo.result, lze_zapsat: false};
+          summary();
+        });
+    }
     el('assign').addEventListener('submit', async event => {
       event.preventDefault();
-      if (running || dead || imported) return;
       const chosen = REPORT.selected(photos);
       if (!chosen.length) return;
-      const button = el('create-unmatched'); button.disabled = true;
-      try {
-        const response = await fetch('/ukony/orv-sken/zalozit', {method: 'POST',
-          headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
-          body: JSON.stringify({zpracoval: person.value,
-            auta: chosen.map(item => REPORT.payload(item.photo, item))})});
-        if (response.redirected) throw Error('Přihlášení vypršelo. Obnovte stránku a přihlaste se.');
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(data.results)) {
-          throw Error(data.error || 'Úkony se nepodařilo založit.');
+      return postAction('zalozit', {zpracoval: person.value,
+        auta: chosen.map(item => REPORT.payload(item.photo, item))}, data => {
+        if (!Array.isArray(data.results) || data.results.length !== chosen.length) {
+          throw Error('Úkony se nepodařilo založit.');
         }
-        // Karta auta, které server i teď odmítl (duplicita), zůstává i s
-        // vyplněnými poli — nic se neztratí, jen se znovu zeptá.
+        if (data.results.some(ok)) processed = true;
         const blocked = REPORT.applyCreateResults(chosen, data.results);
-        if (!dead) summary(true);
-        if (blocked.length) {
-          const first = blocked[0].result || {};
-          notice(first.zprava || 'Některé auto už je v evidenci — potvrď „Přesto založit nový úkon“.');
-        }
-      } catch (error) {
-        notice(error.message || 'Úkony se nepodařilo založit.');
-        if (!dead) summary(false);
-      } finally { REPORT.updateCreateCount(root, photos); }
+        summary();
+        if (blocked.length) notice(blocked[0].createError || 'Úkon se nepodařilo založit.');
+      });
     });
     // „Otevřít úkon" (stávající i zapsaný) a zvětšení fotky — delegované na
     // celou sekci, protože karty jsou v obou sekcích.
@@ -279,21 +358,22 @@
       }
     });
     el('preview').querySelector('.orv-preview-close').addEventListener('click', () => el('preview').close());
+    el('preview').addEventListener('keydown', event => {
+      if (event.key === 'Escape') event.stopPropagation();
+    });
     offerLast();
     camera.start();
     return {destroy, close: function (event) {
-      camera.stop();
-      if (running) {
-        // Finish only the (at most three) requests already sent before refresh.
-        closing = true; event.preventDefault(); notice('Dokončuji rozpracované fotky…'); return;
+      if (running || saving) {
+        closing = true; event.preventDefault(); notice(FINISHING); return;
       }
-      // Rozdělaná kontrola (nevyplněné firmy, potvrzení duplicity) se nesmí
-      // ztratit jen proto, že uživatel trefí křížek.
-      if (processed && REPORT.reviewPhotos(photos).length &&
-          !window.confirm('Něco ještě není doplněné. Zavřít a zahodit rozdělanou kontrolu?')) {
-        if (event && event.preventDefault) event.preventDefault();
+      const pending = REPORT.closePending(photos);
+      if (pending && !window.confirm('Zavřít? ' + pending + ' ' + REPORT.czechCars(pending) +
+          (pending >= 2 && pending <= 4 ? ' čekají' : ' čeká') + ' na rozhodnutí.')) {
+        event.preventDefault();
         return;
       }
+      if (dirty || pending) persist();
       destroy(); active = null;
       if (processed) window.location.reload();
     }};
