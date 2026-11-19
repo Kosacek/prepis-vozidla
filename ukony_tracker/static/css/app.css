@@ -2288,6 +2288,9 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-item.is-smazany .doklad-firma-chip { filter: grayscale(1); }
 .doklad-pocet.is-storno { background: var(--bg); color: var(--muted); border-style: dashed; }
 .doklad-storno-kdy { color: var(--muted); font-weight: 500; }
+/* Bank check on the summary line (2.9.7), small and muted, no line of its own. */
+.doklady-banka { font-size: 0.75rem; white-space: nowrap; }
+.doklady-banka::before { content: " · "; }
 
 .doklad-share {
   display: inline-grid; place-items: center; width: 40px; height: 40px; margin-right: 4px;

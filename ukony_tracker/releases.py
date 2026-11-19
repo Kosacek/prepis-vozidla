@@ -39,6 +39,14 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.9.7", date(2026, 11, 19),
+        "Znovu naskenovaný techničák se zapíše sám",
+        ("Nové číslo ORV u auta, které už v evidenci máš, se samo aktualizuje – bez otázek.",
+         "V Dokladech vybereš Nezaplacené a hned vidíš, co ještě nepřišlo."),
+        oblast="technicak", nahrazuje=("2.9.5",), nazev="Nový techničák se zapíše sám",
+        radek="Nové číslo ORV u auta, které už máš, se samo aktualizuje.",
+    ),
+    Release(
         "2.9.6", date(2026, 11, 19),
         "Stornované doklady vidíš šedě",
         ("Stornovaný doklad zůstane v seznamu šedě s datem a kdo ho stornoval – do součtů se nepočítá.",),

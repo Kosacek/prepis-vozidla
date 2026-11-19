@@ -434,8 +434,11 @@
     const state = stateOf(photo);
     const chips = el('span', 'orv-chips');
     const overwritten = state === 'doplneno' && (result.prepsano || []).length;
+    // 2.9.7: a rescan of the same sale updates on its own ("✓ Aktualizováno: ORV").
+    const updated = state === 'doplneno' && (result.aktualizovano || []).length
+      ? '✓ Aktualizováno: ' + result.aktualizovano.map(f => FIELD_LABELS[f] || f).join(', ') : null;
     chips.append(el('span', 'orv-status', plateQuestion(photo) ? 'Ke kontrole' :
-      overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole'));
+      updated || (overwritten ? 'Přepsáno' : LABELS[state] || 'Ke kontrole')));
     if (photo.upraveno) chips.append(el('span', 'orv-edited', '✓ Upraveno'));
     if (photo.potvrdit && needsConfirm(photo)) {
       chips.append(el('span', 'orv-confirmed', '✓ Potvrzeno'));

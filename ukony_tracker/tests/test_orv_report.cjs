@@ -797,3 +797,15 @@ test('old saved duplicate shapes reopen with the existing fields and warning', (
   assert.ok(card.querySelector('.orv-card-firma'));
   assert.ok(card.querySelector('.orv-confirm-input'));
 });
+
+test('2.9.7: a rescan that updated the úkon reads "✓ Aktualizováno: ORV" and counts as done', () => {
+  const updated = photo(1, 'doplneno', {rz: '9AL2661', orv_cislo: 'UBP590636', aktualizovano: ['orv'],
+    prepsano: ['orv'], doplneno: ['orv'], zmeny: {orv: {pred: 'UBF670979', po: 'UBP590636'}},
+    ukon: {id: 1711, datum: '2026-11-13', firma: 'Albion', firma_zkratka: 'Albion', typ: 'PŘEVOD', celkem: 1300}});
+  const root = render([updated]);
+  const text = allText(cards(root)[0]);
+  assert.match(text, /✓ Aktualizováno: ORV/);
+  assert.doesNotMatch(text, /Přepsáno/);
+  assert.equal(R.needsAction(updated), false);
+  assert.equal(R.totals([updated]).doplneno, 1);
+});

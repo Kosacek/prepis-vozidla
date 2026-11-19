@@ -877,7 +877,7 @@ def _route_job(**fields):
     with db.connect(config.DB_PATH) as conn:
         db.init_schema(conn)
         firm = firmy_repo.create(conn, nazev="Albion", zkratka="AL")
-        return pridat_ukon(conn, **({"firma_id": firm, "datum": _ago(6), "typ_kod": "KOLA",
+        return pridat_ukon(conn, **({"firma_id": firm, "datum": _ago(6), "typ_kod": "3RZ",
                                     "celkem": 1300, "vin": VIN, "rz": OLD_PLATE,
                                     "orv": OLD_ORV, "prevod": TRANSFER} | fields))
 
@@ -1101,3 +1101,71 @@ def test_mixed_batch_keeps_both_dupes_and_only_creates_the_selected_car(client, 
         assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 4
         assert [ukony_repo.get(conn, uid)["orv"] for uid in (filled_id, same_id, changed_id)] == [
             "UBL123455", "UBL123456", NEW_ORV]
+
+
+# --- 2.9.7: a rescan of the same sale updates on its own (David 2026-11-19) ---------
+
+
+
+def _rescan(conn, photo):
+    return scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(photo),
+                        lookup=lambda _orv: {"success": True, "vin": VIN})
+
+
+@pytest.mark.parametrize("typ,prevod", [("PŘEVOD", TRANSFER), ("KOLA", "FOJTŮ RENATA")])
+def test_same_sale_new_techničák_updates_the_orv_without_a_card(conn, make, typ, prevod):
+    # Owner matches (PŘEVOD) or is unknown (KOLA, no arrow): every visit to the
+    # authorities issues a new techničák, so the new ORV number is written.
+    uid = make(datum=_ago(6), typ_kod=typ, prevod=prevod, rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion())
+    assert result["stav"] == "doplneno" and result["aktualizovano"] == ["orv"]
+    assert result["zprava"] == "Aktualizováno: ORV" and "navrh_token" not in result
+    assert result["zmeny"]["orv"] == {"pred": OLD_ORV, "po": NEW_ORV}
+    assert ukony_repo.get(conn, uid)["orv"] == NEW_ORV
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("typ,prevod", [("3RZ", TRANSFER), ("3RZ", "FOJTŮ RENATA")])
+def test_disagreeing_or_missing_signals_keep_the_decision_card(conn, make, typ, prevod):
+    # Owner says same sale but the type comes without a new techničák, or the
+    # owner is unknown and the type says no: ask, write nothing.
+    uid = make(datum=_ago(6), typ_kod=typ, prevod=prevod, rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion())
+    assert result["stav"] == "zmena_ke_kontrole" and "aktualizovano" not in result
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_an_unverified_reading_is_never_written_automatically(conn, make):
+    # The registry knows another VIN for that ORV number: nothing proves the
+    # photo belongs to this úkon.
+    uid = make(datum=_ago(6), typ_kod="PŘEVOD", prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(_read_albion(vin=VIN)),
+                          lookup=lambda _orv: {"success": True, "vin": "WVWZZZ1KZ6W000001"})
+    assert result.get("aktualizovano") is None
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_older_than_30_days_is_not_updated_automatically(conn, make):
+    uid = make(datum=_ago(40), typ_kod="PŘEVOD", prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion())
+    assert result.get("aktualizovano") is None
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV
+
+
+def test_auto_update_keeps_a_misread_plate(conn, make):
+    # #1646 still holds: a plate 1–2 characters off is never written, even when
+    # the new ORV number is (the registry has no plate to confirm it).
+    uid = make(datum=_ago(6), typ_kod="PŘEVOD", prevod=TRANSFER, rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion(rz="5AB1235"))
+    row = ukony_repo.get(conn, uid)
+    assert (row["rz"], row["orv"]) == (OLD_PLATE, NEW_ORV)
+    assert result["aktualizovano"] == ["orv"]
+    assert result["rz_ponechano"] == {"evidence": OLD_PLATE, "foto": "5AB1235"}
+
+
+def test_another_sale_still_offers_a_new_ukon(conn, make):
+    uid = make(datum=_ago(6), typ_kod="PŘEVOD", prevod="MM INSTALACE s.r.o. → Jiná firma a.s.",
+               rz=OLD_PLATE, orv=OLD_ORV)
+    result = _rescan(conn, _read_albion())
+    assert result.get("aktualizovano") is None and result["stav"] != "doplneno"
+    assert ukony_repo.get(conn, uid)["orv"] == OLD_ORV

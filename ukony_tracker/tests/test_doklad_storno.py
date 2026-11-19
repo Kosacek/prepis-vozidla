@@ -183,3 +183,47 @@ def test_storno_without_a_profile_sends_no_body(client, homeland, zadosti):
     calls, _ = zadosti
     client.post("/doklady/20260001/smazat", headers={"X-Requested-With": "fetch"})
     assert "json" not in calls[0]
+
+
+# --- 2.9.7: Zaplacené / Nezaplacené and the bank line ---------------------------------
+
+def test_paid_filter_never_counts_stornovane(client, homeland):
+    # 0001: faktura without a car, unpaid; 0002: its úkon unpaid; 0003: stornovaná.
+    _put(client, 20260003, vozidlo="", smazano=True, storno_cas="2026-11-19T16:02:11")
+    html = client.get("/doklady?stav=nezaplacene").get_data(as_text=True)
+    assert 'data-cislo="20260001"' in html and 'data-cislo="20260002"' in html
+    assert 'data-cislo="20260003"' not in html
+    assert '<span id="doklady-count">2</span>' in html
+    with client.application.app_context():
+        conn = db.get_db()
+        ukony_repo.update(conn, homeland, stav_platby="zaplaceno", zaplaceno_kc=1000)
+    html = client.get("/doklady?stav=zaplacene").get_data(as_text=True)
+    assert 'data-cislo="20260002"' in html
+    assert 'data-cislo="20260001"' not in html and 'data-cislo="20260003"' not in html
+    html = client.get("/doklady?stav=nezaplacene").get_data(as_text=True)
+    assert 'data-cislo="20260001"' in html and 'data-cislo="20260002"' not in html
+
+
+def test_a_faktura_paid_by_the_bank_without_ukony_counts_as_paid(client, homeland):
+    with client.application.app_context():
+        conn = db.get_db()
+        conn.execute("UPDATE ppd SET zaplaceno_dne='2026-11-16' WHERE cislo=20260001")
+        conn.commit()
+    html = client.get("/doklady?stav=zaplacene").get_data(as_text=True)
+    assert 'data-cislo="20260001"' in html
+
+
+def test_the_filter_offers_all_five_states(client, homeland):
+    html = client.get("/doklady?stav=storno").get_data(as_text=True)
+    for value, label in (("", "Všechny"), ("platne", "Platné"), ("nezaplacene", "Nezaplacené"),
+                         ("zaplacene", "Zaplacené"), ("storno", "Stornované")):
+        assert f'value="{value}"' in html and label in html
+    assert 'value="storno" selected' in html
+
+
+def test_bank_check_sits_on_the_summary_line(client, homeland, monkeypatch):
+    monkeypatch.setattr(moneta_job, "status_view", lambda conn: {"cas": "před 10 min", "pocet": 0,
+                                                               "auth_failed": False})
+    html = client.get("/doklady").get_data(as_text=True)
+    summary = html.split('<span id="doklady-count">')[1].split("</div>")[0]
+    assert '<span class="doklady-banka">Banka zkontrolována před 10 min</span>' in summary

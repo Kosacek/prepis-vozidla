@@ -50,6 +50,7 @@ class Radek:
     druh: str = "ppd"       # "ppd" (hotově) | "faktura" (převodem)
     splatnost: str = ""     # "26.11.2026", only a faktura has one
     po_splatnosti: bool = False
+    zaplaceno: bool | None = None   # None: stornovaný / PPD bez úkonu
 
 
 def _key(value: str | None) -> str:
@@ -134,6 +135,21 @@ def _dmy(iso: str) -> str:
     return f"{iso[8:10]}.{iso[5:7]}.{iso[0:4]}" if iso else ""
 
 
+def _zaplaceno(doklad, pay: Platba, druh: str) -> bool | None:
+    """Paid at a glance for the Zaplacené / Nezaplacené filter: the chip's state;
+    a faktura without úkony by its payment date. Stornované and a PPD without
+    úkony are neither (None)."""
+    if doklad["smazano"]:
+        return None
+    if pay.stav == "paid":
+        return True
+    if pay.stav in ("unpaid", "partial"):
+        return False
+    if druh == "faktura":
+        return bool(_col(doklad, "zaplaceno_dne"))
+    return None
+
+
 def storno_text(doklad) -> str:
     """ "Stornováno · 19. 11. 16:02 · David" (when and who only if žádosti sent them)."""
     parts = ["Stornováno"]
@@ -184,6 +200,7 @@ def radek(doklad, links, ukony: Mapping[int, object], firmy_by_id: Mapping[int, 
         ukony_kc=round(sum(u["celkem"] or 0 for u in linked)), uids=uids, chybi=chybi,
         hledat=" ".join(hledat.split()).lower(),
         druh=druh, splatnost=_dmy(splatnost_iso), po_splatnosti=po,
+        zaplaceno=_zaplaceno(doklad, pay, druh),
     )
 
 

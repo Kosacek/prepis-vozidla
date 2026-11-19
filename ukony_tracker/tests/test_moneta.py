@@ -234,7 +234,7 @@ def test_ui_status_and_list(client, monkeypatch):
         conn = db.get_db()
         moneta_job.run_once(conn, fetch=lambda s: [P("z", castka=77, zprava="záhada", vs="20269999")])
     html = client.get("/doklady").get_data(as_text=True)
-    assert "Banka: zkontrolováno" in html and "1 plateb k ručnímu spárování" in html
+    assert "Banka zkontrolována" in html and "1 plateb k ručnímu spárování" in html
     page = client.get("/doklady/platby").get_data(as_text=True)
     assert "77 Kč" in page and "žádná odpovídající faktura" in page
     with client.application.app_context():

@@ -13,6 +13,7 @@ from services import colors_service, doklad_delete, doklad_issue, doklad_moznost
 from services.ingest_service import normalize_profil
 
 bp = Blueprint("ppd", __name__)
+STAVY_FILTRU = ("", "platne", "nezaplacene", "zaplacene", "storno")
 
 
 @bp.put("/api/ppd/<int:cislo>")
@@ -56,11 +57,14 @@ def doklady():
     # měsíc a smazané filtruje server (odkaz jde uložit), hledání i živě v JS.
     mesic = (request.args.get("mesic") or "").strip()
     q = (request.args.get("q") or "").strip()
-    # Stornované show greyed by default (žádosti 1.36.0); "ne" hides them, "jen"
-    # shows only them. "1" is the old "I smazané" link (= all).
-    smazane = request.args.get("smazane") or ""
-    if smazane not in ("", "ne", "jen", "1"):
-        smazane = ""
+    # One filter (2.9.7): Všechny / Platné / Nezaplacené / Zaplacené / Stornované.
+    # Stornované show greyed under Všechny and never count as unpaid or paid.
+    # Old links: smazane=ne → platne, smazane=jen → storno, smazane=1 → all.
+    stav = request.args.get("stav")
+    if stav is None:
+        stav = {"ne": "platne", "jen": "storno"}.get(request.args.get("smazane") or "", "")
+    if stav not in STAVY_FILTRU:
+        stav = ""
     firma = request.args.get("firma", type=int)
     od = do = None
     if mesic:
@@ -74,23 +78,26 @@ def doklady():
             abort(400, description="Neplatný měsíc.")
     conn = db.get_db()
     links = ppd_links.for_request()
-    rows = [r for r in ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=smazane != "ne", limit=None)
+    rows = [r for r in ppd_repo.list(conn, od=od, do=do, q=q, include_deleted=stav in ("", "storno"),
+                                     limit=None)
             if (firma is None or links.firma.get(r["cislo"]) == firma)
-            and (smazane != "jen" or r["smazano"])]
-    platne = [r for r in rows if not r["smazano"]]
+            and (stav != "storno" or r["smazano"])]
     ukony = ukony_repo.list_by_ids(conn, (uid for r in rows for uid in links.by_doklad.get(r["cislo"], [])))
     firmy = firmy_repo.list_all(conn)
     firmy_by_id = {f["id"]: f for f in firmy}
     firma_colors = colors_service.firma_color_map(conn)
     radky = doklady_view.radky(rows, links, ukony, firmy_by_id, firma_colors,
                                banka=doklady_view.banka_platby(conn))
+    if stav in ("zaplacene", "nezaplacene"):
+        radky = [r for r in radky if r.zaplaceno is (stav == "zaplacene")]
+    platne = [r for r in radky if not r.smazano]
     return render_template(
         "doklady.html", doklady=radky,
         ukony=ukony, firmy=firmy, firma_colors=firma_colors,
         # Stornované never count: not in the number, not in the sum.
-        total={"pocet": len(platne), "castka": sum(r["castka"] for r in platne),
-               "storno": len(rows) - len(platne)},
-        mesic=mesic, q=q, smazane=smazane, firma=firma, banka=moneta_job.status_view(conn),
+        total={"pocet": len(platne), "castka": sum(r.castka for r in platne),
+               "storno": len(radky) - len(platne)},
+        mesic=mesic, q=q, stav=stav, firma=firma, banka=moneta_job.status_view(conn),
         tisk_base=doklad_share.tisk_base(), tisk_base_faktura=doklad_share.tisk_base("faktura"),
         # Nová faktura: the modal's button stays disabled when žádosti can't issue one.
         faktura_moznost=bool(config.ZADOSTI_API_URL) and doklad_moznosti.faktura_dostupna(),

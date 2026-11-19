@@ -95,6 +95,9 @@ Druhé čtení: první pokus číslo dokladu jistě nepřečetl. Najdi velké č
 nejsi jistý každým znakem, vrať orv_cislo null."""
 # Results that already prove the read: the registry VIN (or RZ) found the úkon.
 CONFIRMED = {"doplneno", "uz_doplneno", "vice_shod", "konflikt", "uz_zapsano", "zmena_ke_kontrole"}
+# Úkony that come with a new techničák: a new ORV number on a rescan is normal
+# (David 2026-11-19: every visit to the authorities issues a new one).
+NOVY_TECHNICAK = frozenset({"PŘEVOD", "NOVÉ", "DOVOZ", "ORV", "KOLA", "A50-X"})
 UNSURE = "Číslo ORV se nepodařilo přečíst jistě — vyfoť techničák znovu."
 TOOL = {
     "name": "zapsat_dokument", "description": "Zapiš pouze jasně čitelné údaje z ORV.",
@@ -222,6 +225,23 @@ def _changes(row, values):
             if normalize(row[k] or "") != v}
 
 
+def _registry_verified(row, data):
+    """The techničák's ORV number led the registry to exactly this úkon's VIN."""
+    vin = data.get("vin")
+    return data.get("vin_zdroj") == "registr" and bool(vin) and vin == normalize(row["vin"] or "")
+
+
+def _auto_update(row, data):
+    """Same sale, new techničák: write it without asking (David 2026-11-19).
+    Two signals: the owner (never another sale here) and the úkon type (one that
+    comes with a new techničák). Both agree, or the owner is unknown and the
+    type says yes; otherwise the decision card stays."""
+    if not _registry_verified(row, data) or not _can_write_review(row, data):
+        return False
+    owner = same_party(_new_owner(row["prevod"]), data.get("provozovatel"))
+    return owner is not False and (row["typ_kod"] or "").upper() in NOVY_TECHNICAK
+
+
 def _write(conn, row, values, result):
     writable, misread = _writable(row, values)
     filled = (doplnit(conn, row["id"], writable, prepsat=True) if writable
@@ -239,7 +259,7 @@ def _write(conn, row, values, result):
     return result
 
 
-def _review(row, data, values, result):
+def _review(conn, row, data, values, result):
     if not values:
         return dict(result, stav="necitelne", zprava="RZ ani číslo ORV nejsou čitelné.")
     writable, misread = _writable(row, values)
@@ -247,6 +267,11 @@ def _review(row, data, values, result):
     if not changes:
         return dict(result, stav="uz_zapsano", ukon=_view(row),
                     rz=row["rz"] if misread else result["rz"], zprava="Už zapsáno · beze změny")
+    if _auto_update(row, data):
+        out = _write(conn, row, values, result)
+        out["aktualizovano"] = sorted(set(out["prepsano"]) | set(out["doplneno"]))
+        out["zprava"] = "Aktualizováno: " + ", ".join(f.upper() for f in out["aktualizovano"])
+        return out
     snapshot = {field: row[field] for field in ("updated_at", "rz", "orv", "vin")}
     return dict(result, stav="zmena_ke_kontrole", ukon=_view(row), zmeny=changes,
                 lze_zapsat=_can_write_review(row, data), zprava="Zkontroluj změny",
@@ -286,7 +311,7 @@ def _fill_or_create(conn, data, *, firma_id=None, typ_kod=None, zpracoval=None,
         duplicates = [u for u in other if not _another_sale(u, data)]
         if auto_firma and not rows and duplicates:
             result["predchozi"] = _view(duplicates[0])
-            return _review(duplicates[0], data, values, result)
+            return _review(conn, duplicates[0], data, values, result)
         if duplicates:
             result["existujici"] = [_view(u) for u in duplicates[:5]]
             result["predchozi"] = result["existujici"][0]
