@@ -138,7 +138,9 @@
       try {
         const aspect = view.clientWidth / view.clientHeight || 16 / 9;
         const canvas = frameCanvas(video, video.videoWidth, video.videoHeight, aspect);
-        if (auto) qr = await auto.verify(canvas, canvas.width, canvas.height);
+        // Never let the QR read hold the shutter: after 1.5 s the photo goes without it.
+        if (auto) qr = await Promise.race([auto.verify(canvas, canvas.width, canvas.height),
+          new Promise(resolve => setTimeout(() => resolve(null), 1500))]);
         const blob = await toJpeg(canvas);
         if (!dead && gen === generation) {
           id = addPhoto(blob, {qr, zachyt, auto: isAuto}) || 0;

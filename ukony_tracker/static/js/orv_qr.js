@@ -11,6 +11,10 @@
   const ORV = /^[A-Z]{3}[0-9]{6}$/;
   const GUIDE = {x: 0.08, y: 0.06, w: 0.84, h: 0.88};
   const MAX_NATIVE = 1280, MAX_JSQR = 960;
+  const DETECT_MS = 800;   // a detector call that hangs must not hold the reader
+  const WAIT_MS = 600;     // verify() waits this long for a live read to finish
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function clean(value) {
     return typeof value === 'string' && ORV.test(value) ? value : null;
@@ -74,7 +78,7 @@
       canvas.height = Math.max(1, Math.round(region.h * scale));
       ctx.drawImage(source, region.x, region.y, region.w, region.h, 0, 0, canvas.width, canvas.height);
       if (detector) {
-        const codes = await detector.detect(canvas);
+        const codes = await Promise.race([detector.detect(canvas), sleep(DETECT_MS).then(() => [])]);
         return single((codes || []).map(code => code && code.rawValue));
       }
       const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -99,7 +103,10 @@
     // they must not disagree. This is what binds the QR to the photo.
     async function verify(source, width, height) {
       if (!(detector || jsqr) || width < 2 || height < 2) return null;
-      while (busy) await new Promise(resolve => setTimeout(resolve, 15));
+      for (let waited = 0; busy; waited += 15) {
+        if (waited >= WAIT_MS) return null;
+        await sleep(15);
+      }
       busy = true;
       try {
         const area = within({x: 0, y: 0, w: width, h: height}, guide);

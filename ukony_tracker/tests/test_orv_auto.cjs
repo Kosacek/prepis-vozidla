@@ -233,6 +233,25 @@ test('the photo itself is read twice and both reads must agree', async () => {
   assert.equal(await env.reader.verify({}, 1800, 1013), null);
 });
 
+test('a detector that never answers cannot hold the photo', async () => {
+  const ctx = {drawImage() {}, getImageData: () => ({data: [], width: 1, height: 1})};
+  const document = {createElement: () => ({getContext: () => ctx})};
+  function BarcodeDetector() {}
+  BarcodeDetector.getSupportedFormats = async () => ['qr_code'];
+  BarcodeDetector.prototype.detect = () => new Promise(() => {}); // hangs forever
+  const window = {BarcodeDetector};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../static/js/orv_qr.js'), 'utf8'),
+    {window, document, setTimeout});
+  const reader = window.OrvQr.create({});
+  await reader.prepare();
+  const started = Date.now();
+  const live = reader.decode({}, {x: 0, y: 0, w: 100, h: 100});   // holds the reader
+  assert.equal(await reader.verify({}, 1800, 1013), null);
+  assert.equal(await live, null);
+  assert.ok(Date.now() - started < 4000);
+  assert.equal(await reader.verify({}, 1800, 1013), null);          // not stuck afterwards
+});
+
 test('the capture summary always matches the server log pattern', () => {
   const auto = require('../static/js/orv_auto.js');
   const ZACHYT = /^(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4}$/;
@@ -250,8 +269,10 @@ test('the driver feeds frames, fires through onFire and stops cleanly', async ()
   // A fake video whose analysed copy is a sharp, still, printed card.
   const pixels = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => ((i >> 2) % 160 >> 1) % 2 ? 230 : 20);
   const desk = new Uint8ClampedArray(160 * 90 * 4).fill(90);
-  let frames = 0;
-  const ctx = {drawImage() {}, getImageData: () => ({data: ++frames <= 4 ? desk : pixels})};
+  // Another textured place, as after "Vyfotit další" at another desk.
+  const elsewhere = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => (((i >> 2) % 160) / 6 | 0) % 2 ? 250 : 60);
+  let frames = 0, scene = () => (++frames <= 4 ? desk : pixels);
+  const ctx = {drawImage() {}, getImageData: () => ({data: scene()})};
   const document = {createElement: () => ({width: 0, height: 0, getContext: () => ctx})};
   let now = 0;
   const timers = [];
@@ -273,4 +294,11 @@ test('the driver feeds frames, fires through onFire and stops cleanly', async ()
   assert.match(fires[0].zachyt, /^klid m=0\.0 s=\d+ e=[01]\.\d{3}$/);
   if (timers.length) timers.shift()();
   assert.equal(timers.length, 0); // a stopped driver schedules nothing more
+  // Restarted over another textured surface: a fresh start, so it is the
+  // background and fires nothing (review 2026-11-22).
+  scene = () => elsewhere;
+  driver.start();
+  for (let i = 0; i < 24 && timers.length; i++) { now += STEP; timers.shift()(); }
+  driver.stop();
+  assert.equal(fires.length, 1);
 });

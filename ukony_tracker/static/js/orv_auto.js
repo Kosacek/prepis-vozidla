@@ -99,6 +99,7 @@
       if (running) return;
       running = true;
       prev = null;
+      core.reset(); // a restarted camera looks at a new scene: learn it afresh
       if (qr) qr.prepare();
       timer = setTimeout(tick, period);
     }
