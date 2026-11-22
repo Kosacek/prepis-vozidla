@@ -60,6 +60,17 @@
     try { if (hodnota == null) localStorage.removeItem(klic); else localStorage.setItem(klic, hodnota); } catch (_) {}
   }
   function log(udalost, detail) { if (root.kameraLog) root.kameraLog(udalost, detail); }
+  // Časté události nanejvýš jednou za 30 s (s počtem), ať kamera log
+  // (drží jen ~0,5 MB) nevytlačí historii zamrzání kamery.
+  const TLUMENI_MS = 30 * 1000;
+  const tlumene = {};
+  function logTlumene(udalost, detail) {
+    const ted = Date.now(), z = tlumene[udalost] || (tlumene[udalost] = {posledni: -Infinity, pocet: 0});
+    if (ted - z.posledni < TLUMENI_MS) { z.pocet++; return; }
+    log(udalost, detail + (z.pocet ? ' +' + z.pocet + ' dalších' : ''));
+    z.posledni = ted;
+    z.pocet = 0;
+  }
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function spust() {
@@ -115,7 +126,7 @@
     function onTick(info) {
       ukaz(info);
       if (hlidac.tick(info)) log('auto_prazdno', root.OrvAuto.zachyt(info.rearmed, info));
-      else if (info.rearmed) log('auto_rearm', root.OrvAuto.zachyt(info.rearmed, info));
+      else if (info.rearmed) logTlumene('auto_rearm', root.OrvAuto.zachyt(info.rearmed, info));
       if (info.t - posledniVzorek >= VZOREK_MS) {
         posledniVzorek = info.t;
         log('auto_vzorek', root.OrvAuto.zachyt(info.armed ? 'ceka' : 'hotovo', info) + ' ' + auto.qrKind());
@@ -126,7 +137,7 @@
       const popis = info.zachyt + (qr ? ' qr=' + qr : '');
       if (!hlidac.smiFotit(info.reason, qr)) {
         auto.commit(++fotka);   // karta zůstává „vyfocená", nic se neposílá
-        log('auto_potlaceno', popis);
+        logTlumene('auto_potlaceno', popis);
         return;
       }
       if (!sleduje() || typeof quickScanOrv !== 'function') { auto.release(); return; }
