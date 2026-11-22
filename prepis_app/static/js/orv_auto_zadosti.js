@@ -100,12 +100,43 @@
     }
 
     function hledi() { return document.getElementById('orv-hledi'); }
+    const nahled = root.OrvNahled ? root.OrvNahled.create(video, {log}) : null;
+
+    // ── Obrys karty: rohy z rozdílu proti prázdnému stolu (orv_quad.js) ──
+    // Pozadí = klidný snímek stolu: první klidná vteřina, potvrzený prázdný
+    // stůl (auto_prazdno), „díra" po kartě, která ležela v pozadí, nebo 4 s
+    // klidu bez karty (změna světla).
+    const QUAD_W = 256;
+    const detektor = root.OrvQuad ? root.OrvQuad.create() : null;
+    const qPlatno = document.createElement('canvas');
+    const qCtx = qPlatno.getContext('2d', {willReadFrequently: true});
+    let klidOd = null, posledniKarta = -Infinity, ucitPozadi = false;
+    function obrys(info) {
+      if (!detektor || !nahled || !video.videoWidth) return;
+      const h = Math.max(1, Math.round(QUAD_W * video.videoHeight / video.videoWidth));
+      if (qPlatno.width !== QUAD_W || qPlatno.height !== h) { qPlatno.width = QUAD_W; qPlatno.height = h; }
+      qCtx.drawImage(video, 0, 0, QUAD_W, h);
+      const g = root.OrvAutoCore.gray(qCtx.getImageData(0, 0, QUAD_W, h).data, QUAD_W, h);
+      const klid = typeof info.motion === 'number' && info.motion <= root.OrvAutoCore.DEFAULTS.steadyMotion;
+      klidOd = klid ? (klidOd == null ? info.t : klidOd) : null;
+      const klidMs = klidOd == null ? 0 : info.t - klidOd;
+      if (!detektor.hasBackground() || (ucitPozadi && klid)) {
+        if (klidMs >= 1000 || ucitPozadi) { detektor.setBackground(g, QUAD_W, h); ucitPozadi = false; }
+        nahled.quad(null);
+        return;
+      }
+      const r = detektor.find(g, QUAD_W, h);
+      if (r && r.hole && klidMs >= 500) { detektor.setBackground(g, QUAD_W, h); nahled.quad(null); return; }
+      if (r && r.ok) {
+        posledniKarta = info.t;
+        nahled.quad(r.corners, info.locked ? 'zamek' : 'sleduje');
+        return;
+      }
+      nahled.quad(null);
+      if (klidMs >= 4000 && info.t - posledniKarta >= 4000 && !info.locked) detektor.setBackground(g, QUAD_W, h);
+    }
+
     function ukaz(info) {
-      const h = hledi();
-      if (!h) return;
-      const zamek = info.locked ? 'lock' : '';
-      if (h.dataset.auto !== zamek) h.dataset.auto = zamek;
-      h.style.setProperty('--orv-hold', String(info.progress || 0));
       const ladici = document.getElementById('orv-ladeni');
       if (ladici) {
         ladici.hidden = !ladeni;
@@ -125,6 +156,8 @@
     }
     function onTick(info) {
       ukaz(info);
+      try { obrys(info); } catch (_) { if (nahled) nahled.quad(null); }   // obrys nesmí shodit sken
+      if (info.rearmed === 'prazdno') ucitPozadi = true;   // potvrzený prázdný stůl = nové pozadí
       if (hlidac.tick(info)) log('auto_prazdno', root.OrvAuto.zachyt(info.rearmed, info));
       else if (info.rearmed) logTlumene('auto_rearm', root.OrvAuto.zachyt(info.rearmed, info));
       if (info.t - posledniVzorek >= VZOREK_MS) {
@@ -142,6 +175,7 @@
       }
       if (!sleduje() || typeof quickScanOrv !== 'function') { auto.release(); return; }
       blesk();
+      if (nahled) nahled.foto();
       log('auto_foto', popis);
       Promise.resolve(quickScanOrv({auto: true, zachyt: info.zachyt})).then(
         odeslano => { if (odeslano) auto.commit(++fotka); else auto.release(); },
@@ -160,10 +194,17 @@
 
     function ukazPrepinac() {
       const b = document.getElementById('orv-auto');
-      if (b && b.getAttribute('aria-pressed') !== String(zapnuto)) b.setAttribute('aria-pressed', String(zapnuto));
-      const h = hledi();
-      if (h && !zapnuto && h.dataset.auto) h.dataset.auto = '';
+      if (b && b.getAttribute('aria-pressed') !== String(zapnuto)) {
+        b.setAttribute('aria-pressed', String(zapnuto));
+        b.title = zapnuto ? 'Automatický sken je zapnutý (A)' : 'Automatický sken je vypnutý (A)';
+      }
+      if (!zapnuto && nahled) nahled.quad(null);
     }
+    // Proužek průběhu pro každý sken (quickScanOrv v index.html), i ruční.
+    root.orvNahled = {
+      prubeh: meta => (nahled && root.SkenPrubeh ? nahled.prubeh(meta) : null),
+      foto: () => { if (nahled) nahled.foto(); },
+    };
     root.prepniOrvAuto = function () {
       zapnuto = !zapnuto;
       zapis(KLIC_AUTO, zapnuto ? '1' : '0');

@@ -42,7 +42,7 @@ class Release:
 RELEASES: tuple[Release, ...] = (
     Release("1.37.0", date(2026, 11, 22), "Techničák se naskenuje sám",
             ("Polož ho pod kameru, a jakmile je v klidu, naskenuje se.",
-             "Enter funguje dál, tlačítkem Auto v náhledu to vypneš."),
+             "Enter funguje dál, klávesou A sken sám vypneš."),
             demo="v1_37_0",
             oblast="formular",
             nazev="Techničák se naskenuje sám",

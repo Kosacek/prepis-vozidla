@@ -417,7 +417,7 @@
 
   // ── Tahák: ? ───────────────────────────────────────────────────────────────
   const TAHAK = [
-    ['Typ úkonu', [['1', '–', '6'], 'vybrat typ'], [['Enter'], 'vyfotit ORV a dál'], [['Shift', '+', 'Enter'], 'dál bez skenu']],
+    ['Typ úkonu', [['1', '–', '6'], 'vybrat typ'], [['Enter'], 'vyfotit ORV a dál'], [['Shift', '+', 'Enter'], 'dál bez skenu'], [['A'], 'sken sám zap/vyp']],
     ['Vyplňování', [['Enter'], 'vzít návrh / další krok'], [['↓', '↑'], 'jiný návrh'], [['Esc'], 'zpět']],
     ['Tisk', [['Ctrl', '+', 'Enter'], 'vygenerovat a otevřít vše'], [['Ctrl', '+', 'P'], 'tisk'], [['Ctrl', '+', 'W'], 'další dokument']],
     ['Hotovo', [['Enter'], 'nová žádost']],
