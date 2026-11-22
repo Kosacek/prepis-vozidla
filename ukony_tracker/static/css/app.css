@@ -1983,11 +1983,10 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .orv-viewfinder.is-shot .orv-lock { animation: orv-pop .34s ease-out; }
 @keyframes orv-flash { 0% { opacity: .85; } 100% { opacity: 0; } }
 @keyframes orv-pop { 0% { transform: scale(1); } 40% { transform: scale(.96); } 100% { transform: scale(1); } }
-.orv-auto { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: #00000059; color: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.orv-auto svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.orv-auto[aria-pressed="false"] { color: #ffffff8c; }
-.orv-auto[aria-pressed="false"]::after { content: ""; position: absolute; width: 2px; height: 24px; border-radius: 1px; background: currentColor; transform: rotate(45deg); }
-.orv-auto:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.orv-auto { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.orv-auto i { width: 9px; height: 9px; border-radius: 50%; background: #34c759; box-shadow: 0 0 0 3px #34c75933; }
+.orv-auto[aria-pressed="false"] { color: var(--muted); }
+.orv-auto[aria-pressed="false"] i { background: var(--muted); box-shadow: none; }
 .orv-debug { position: absolute; left: 8px; right: 8px; bottom: 6px; margin: 0; padding: 2px 6px; border-radius: 6px; background: #000000b3; color: #fff; font: 11px/1.4 ui-monospace, monospace; pointer-events: none; }
 .orv-thumb--drop { animation: orv-drop .4s cubic-bezier(.2, .9, .3, 1.25); }
 @keyframes orv-drop { 0% { transform: translateY(-40px) scale(.55); opacity: 0; } 100% { transform: none; opacity: 1; } }
