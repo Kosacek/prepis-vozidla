@@ -39,6 +39,7 @@ COPY ppd.py ./ppd.py
 COPY faktura.py ./faktura.py
 COPY faktura_pdf.py ./faktura_pdf.py
 COPY storno.py ./storno.py
+COPY ocr_vzorky.py ./ocr_vzorky.py
 COPY spayd.py ./spayd.py
 COPY ppd_api.py ./ppd_api.py
 COPY scripts/ppd_do_evidence.py ./scripts/ppd_do_evidence.py

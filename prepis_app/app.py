@@ -25,6 +25,7 @@ import faktura_pdf
 import ppd_api  # POST /api/ppd/vystavit — evidence vystavuje doklady — see ppd_api.py
 import sdileni  # sdílecí odkazy /s/<token> — see sdileni.py
 import storno
+import ocr_vzorky  # vzorky skenů ORV pro test lokálního OCR — see ocr_vzorky.py
 import nahled  # PNG náhledy stránek pro sdílenou stránku
 import evidence_orv  # „Přidat do evidence" ze skenu ORV — see evidence_orv.py
 import hledani  # deterministic history search (no AI) — see hledani.py
@@ -84,6 +85,11 @@ elif getattr(sys, 'frozen', False):
 else:
     DATA_DIR = BASE_DIR
 os.makedirs(DATA_DIR, exist_ok=True)
+# Vzorky skenů ORV (ocr_vzorky.py) jen s výslovným DATA_DIR (kontejner: /data) —
+# bez něj je DATA_DIR složka s kódem a do repa se nesmí nic uložit.
+_OCR_VZORKY = bool(os.environ.get("DATA_DIR"))
+if _OCR_VZORKY:
+    ocr_vzorky.uklid(DATA_DIR)   # starší 7 dní pryč i bez skenu
 
 # ── Migrate data from old location (data/ next to exe) ──────────────────────
 if getattr(sys, 'frozen', False):
@@ -2626,11 +2632,28 @@ def api_scan_orv():
         return jsonify({"success": False, "error": "No image provided"})
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
-    image_b64 = base64.b64encode(f.read()).decode('utf-8')
+    obrazek = f.read()
     qr = _orv_z_qr(request.form.get("orv_qr"))
     zachyt = re.sub(r"[^a-z0-9=. -]", "", str(request.form.get("zachyt") or "rucne"))[:80]
-    data = {}
+    zacatek = time.perf_counter()
+    odpoved, casy = _precti_orv(base64.b64encode(obrazek).decode('utf-8'), mime_type, qr, zachyt)
+    casy["celkem"] = round((time.perf_counter() - zacatek) * 1000)
+    # Test lokálního OCR (David 2026-11-22): příštích 30 fotek + co z nich přečetl model.
+    if _OCR_VZORKY:
+        ocr_vzorky.uloz(DATA_DIR, obrazek, mime_type, {
+            "ts": datetime.now().isoformat(timespec="seconds"), "orv_qr": qr, "zachyt": zachyt,
+            "casy_ms": casy, "odpoved": odpoved})
+    return jsonify(odpoved)
+
+
+def _precti_orv(image_b64: str, mime_type: str, qr, zachyt: str) -> tuple[dict, dict]:
+    """Model přečte ORV (případně i otočené o 180°), pak pravidlo QR.
+    Vrací (odpověď pro prohlížeč, trvání v ms na serveru)."""
+    casy: dict = {"pokusy": 0}
+    data: dict = {}
+    t = time.perf_counter()
     for candidate in [image_b64, rotate_180(image_b64, mime_type)]:
+        casy["pokusy"] += 1
         try:
             data, _ = claude_vision_json([
                 {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": candidate}},
@@ -2640,16 +2663,20 @@ def api_scan_orv():
             if _ma_data_orv(data):
                 break
         except Exception as e:
-            return jsonify({"success": False, "error": str(e)})
+            casy["ocr"] = round((time.perf_counter() - t) * 1000)
+            return {"success": False, "error": str(e)}, casy
+    casy["ocr"] = round((time.perf_counter() - t) * 1000)
     if not qr:
-        return jsonify({"success": True, "data": data})
+        return {"success": True, "data": data}, casy
+    t = time.perf_counter()
     chyba, foto = _pouzij_qr(data, qr)
+    casy["qr_registr"] = round((time.perf_counter() - t) * 1000)
     vysledek = "nesedi" if chyba == QR_CONFLICT else "bez_vin" if chyba == QR_NO_VIN else (
         "pouzito" if data.get("orv_zdroj") == "qr" else "jiny_doklad")
     _zapis_kamera_log("orv_qr", f"qr={qr} foto={foto} vysledek={vysledek} zachyt={zachyt}")
     if chyba:
-        return jsonify({"success": False, "error": chyba, "qr": qr})
-    return jsonify({"success": True, "data": data})
+        return {"success": False, "error": chyba, "qr": qr}, casy
+    return {"success": True, "data": data}, casy
 
 # ── „Přidat do evidence" ze skenu ORV (evidence_orv.py) ──────────────────────
 # Prohlížeč volá jen tyhle tři trasy (za přihlášením); klíč k evidenci zůstává
