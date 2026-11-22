@@ -233,7 +233,7 @@ def test_sken_posune_dal_jen_kdyz_uzivatel_porad_stoji_na_kroku_1():
     navNext() po skenu přeskočil další krok a ten se v liště označil jako
     hotový. Posun smí jen přes skenPosunoutDal (pořád krok 1, stejný typ)."""
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
-    sken = html[html.index("async function quickScanOrv()"):]
+    sken = html[html.index("async function quickScanOrv("):]
     sken = sken[:sken.index("\n}\n")]
     assert "skenPosunoutDal(startIdx, startMode)" in sken
     assert "closeCamera();\n    navNext();" not in sken, "nepodmíněný posun je zpátky"
@@ -271,7 +271,7 @@ def test_klepnuti_otoci_nahled_i_fotku_pro_sken():
     html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
     video = html[html.index('id="camera-video"'):][:300]
     assert 'onclick="prepniOtoceniKamery()"' in video
-    sken = html[html.index("async function _naskenujOrv()"):][:900]
+    sken = html[html.index("async function _naskenujOrv("):][:900]
     assert "if (kameraOtocena())" in sken and "ctx.rotate(Math.PI)" in sken
     assert "!== '0'" in html[html.index("function kameraOtocena()"):][:200], "výchozí = otočeno (doma)"
 

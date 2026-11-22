@@ -405,6 +405,8 @@
     if (currentPanel() === 6) return '';
     return 'dal';
   }
+  // Auto-sken ORV (static/js/orv_auto_zadosti.js) hlídá přesně tehdy, kdy by Enter skenoval.
+  window.enterSkenuje = () => enterCil() === 'sken';
   function oznacEnter() {
     const cil = enterCil();
     if (document.body.dataset.enter !== cil) document.body.dataset.enter = cil;

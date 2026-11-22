@@ -67,7 +67,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.36.3"
+__version__ = "1.37.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2536,8 +2536,13 @@ def api_kamera_log():
     udalost = str(data.get("udalost") or "")
     if not _KAMERA_UDALOST.match(udalost):
         return jsonify({"success": False}), 400
+    _zapis_kamera_log(udalost, str(data.get("detail") or ""))
+    return jsonify({"success": True})
+
+
+def _zapis_kamera_log(udalost: str, detail: str) -> None:
     radek = {"ts": datetime.now().isoformat(timespec="seconds"), "udalost": udalost,
-             "detail": str(data.get("detail") or "")[:300],
+             "detail": detail[:300],
              "ua": (request.headers.get("User-Agent") or "")[:120]}
     _log.info("kamera %s: %s", udalost, radek["detail"])
     cesta = os.path.join(DATA_DIR, KAMERA_LOG)
@@ -2558,7 +2563,61 @@ def api_kamera_log():
             f.write(json.dumps(radek, ensure_ascii=False) + "\n")
     except OSError as e:
         _log.warning("kamera log: %s", e)
-    return jsonify({"success": True})
+
+
+# ── Číslo ORV z QR kódu (1.37.0) ─────────────────────────────────────────────
+# Novější ORV (2024+) mají vpravo nahoře QR jen s číslem ORV. Prohlížeč ho
+# přečte z TÉ fotky, kterou posílá (static/js/orv_auto.js verify), a pošle
+# jako `orv_qr`. Stejné pravidlo jako evidence 2.10.0: číslo z QR se vezme jen
+# když přesně sedí na [A-Z]{3}[0-9]{6}, registr k němu dá VIN, VIN z fotky
+# (pokud je) je stejný a vlastní čtení fotky je nanejvýš překlep od QR.
+# Jinak se nevyplní nic a uživatel naskenuje znovu.
+_ORV_QR = re.compile(r"[A-Z]{3}[0-9]{6}")
+_VIN = re.compile(r"[A-HJ-NPR-Z0-9]{17}")
+QR_MISREAD_MAX_EDITS = 2
+QR_CONFLICT = "Číslo ORV z QR kódu nesedí s techničákem na fotce — naskenuj ho znovu."
+QR_NO_VIN = "Registr nevrátil VIN k číslu ORV z QR kódu — zkus to za chvíli znovu."
+
+
+def _orv_z_qr(value):
+    return value if isinstance(value, str) and _ORV_QR.fullmatch(value) else None
+
+
+def _edits(a: str, b: str) -> int:
+    """Levenshtein: zaměněné, chybějící nebo přebývající znaky."""
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        current = [i]
+        for j, cb in enumerate(b, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca != cb)))
+        previous = current
+    return previous[-1]
+
+
+def _ma_data_orv(data: dict) -> bool:
+    return bool(data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka")
+                or (data.get("vlastnik") or {}).get("jmeno"))
+
+
+def _pouzij_qr(data: dict, qr: str):
+    """Číslo z QR do výsledku skenu — jen když patří kartě na fotce.
+    None = použito (nebo fotka není ORV a QR se neřeší), jinak hláška chyby."""
+    if not _ma_data_orv(data) and not data.get("osvedceni_serie"):
+        return None, "-"
+    foto = re.sub(r"\s", "", f"{data.get('osvedceni_serie') or ''}{data.get('osvedceni_cislo') or ''}").upper()
+    if foto and foto != qr and _edits(foto, qr) > QR_MISREAD_MAX_EDITS:
+        return QR_CONFLICT, foto
+    registr = lookup_orv(qr[:3], qr[3:])
+    vin = re.sub(r"[\s-]", "", str(registr.get("vin") or "")).upper() if registr.get("success") else ""
+    if not _VIN.fullmatch(vin):
+        return QR_NO_VIN, foto
+    foto_vin = re.sub(r"[\s-]", "", str(data.get("vin") or "")).upper()
+    if foto_vin and foto_vin != vin:
+        return QR_CONFLICT, foto
+    data.update(osvedceni_serie=qr[:3], osvedceni_cislo=qr[3:], orv_zdroj="qr")
+    if not foto_vin:
+        data.update(vin=vin, vin_zdroj="registr")
+    return None, foto
 
 
 @app.route("/api/scan-orv", methods=["POST"])
@@ -2568,6 +2627,9 @@ def api_scan_orv():
     f = request.files['image']
     mime_type = f.mimetype or "image/jpeg"
     image_b64 = base64.b64encode(f.read()).decode('utf-8')
+    qr = _orv_z_qr(request.form.get("orv_qr"))
+    zachyt = re.sub(r"[^a-z0-9=. -]", "", str(request.form.get("zachyt") or "rucne"))[:80]
+    data = {}
     for candidate in [image_b64, rotate_180(image_b64, mime_type)]:
         try:
             data, _ = claude_vision_json([
@@ -2575,10 +2637,18 @@ def api_scan_orv():
                 {"type": "text", "text": ORV_SCAN_PROMPT},
             ])
             data = _fix_orv_serie(data)
-            if data.get("spz") or data.get("vin") or data.get("znacka") or data.get("registracni_znacka") or (data.get("vlastnik") or {}).get("jmeno"):
-                return jsonify({"success": True, "data": data})
+            if _ma_data_orv(data):
+                break
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
+    if not qr:
+        return jsonify({"success": True, "data": data})
+    chyba, foto = _pouzij_qr(data, qr)
+    vysledek = "nesedi" if chyba == QR_CONFLICT else "bez_vin" if chyba == QR_NO_VIN else (
+        "pouzito" if data.get("orv_zdroj") == "qr" else "jiny_doklad")
+    _zapis_kamera_log("orv_qr", f"qr={qr} foto={foto} vysledek={vysledek} zachyt={zachyt}")
+    if chyba:
+        return jsonify({"success": False, "error": chyba, "qr": qr})
     return jsonify({"success": True, "data": data})
 
 # ── „Přidat do evidence" ze skenu ORV (evidence_orv.py) ──────────────────────

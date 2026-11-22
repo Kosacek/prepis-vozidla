@@ -506,6 +506,34 @@
   .cam-otocit:hover .cam-otocit-label, .cam-otocit:focus-visible .cam-otocit-label { max-width: 52px; margin-right: 7px; opacity: 1; }
   .cam-otocit:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .cam-otocit .ico { transition: transform .25s ease; }
+  /* Auto-sken ORV (1.37.0, static/js/orv_auto_zadosti.js): rohy se sevřou na
+     klidné kartě, proužek se plní, záblesk = fotka jde na sken. */
+  /* Horní rohy až pod tlačítky Auto a Otočit. */
+  .orv-lock { position: absolute; inset: 40px 4% 4% 4%; pointer-events: none; opacity: 0; transition: opacity .15s ease, inset .22s cubic-bezier(.2, .8, .2, 1); }
+  .orv-hledi[data-auto="lock"] .orv-lock { opacity: 1; inset: 48px 8% 8% 8%; }
+  .orv-lock i { position: absolute; width: 26px; height: 26px; border: 0 solid #fff; filter: drop-shadow(0 0 2px rgba(0,0,0,.5)); }
+  .orv-lock i:nth-child(1) { top: 0; left: 0; border-width: 4px 0 0 4px; border-top-left-radius: 10px; }
+  .orv-lock i:nth-child(2) { top: 0; right: 0; border-width: 4px 4px 0 0; border-top-right-radius: 10px; }
+  .orv-lock i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 4px 4px; border-bottom-left-radius: 10px; }
+  .orv-lock i:nth-child(4) { bottom: 0; right: 0; border-width: 0 4px 4px 0; border-bottom-right-radius: 10px; }
+  .orv-lock b { position: absolute; left: 34px; right: 34px; bottom: 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,.3); overflow: hidden; }
+  .orv-lock b::after { content: ""; position: absolute; inset: 0; background: #fff; transform-origin: left; transform: scaleX(var(--orv-hold, 0)); }
+  .orv-blesk { position: absolute; inset: 0; border-radius: 8px; background: #fff; opacity: 0; pointer-events: none; }
+  .orv-hledi.is-shot .orv-blesk { animation: orv-blesk .34s ease-out; }
+  .orv-hledi.is-shot .orv-lock { animation: orv-pop .34s ease-out; }
+  @keyframes orv-blesk { 0% { opacity: .85; } 100% { opacity: 0; } }
+  @keyframes orv-pop { 0% { transform: scale(1); } 40% { transform: scale(.96); } 100% { transform: scale(1); } }
+  .orv-auto { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); font: 600 12px 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: background .15s, color .15s; }
+  .orv-auto i { width: 8px; height: 8px; border-radius: 50%; background: #34c759; box-shadow: 0 0 0 3px rgba(52,199,89,.3); transition: background .15s, box-shadow .15s; }
+  .orv-auto[aria-pressed="false"] { color: rgba(255,255,255,.7); }
+  .orv-auto[aria-pressed="false"] i { background: rgba(255,255,255,.55); box-shadow: none; }
+  .orv-auto:hover, .orv-auto:focus-visible { background: rgba(0,0,0,.75); }
+  .orv-auto:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .orv-ladeni { position: absolute; left: 8px; right: 8px; bottom: 6px; margin: 0; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,.7); color: #fff; font: 11px/1.4 ui-monospace, monospace; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .orv-lock { transition: none; }
+    .orv-hledi.is-shot .orv-blesk, .orv-hledi.is-shot .orv-lock { animation: none; }
+  }
   .cam-otocit.on .ico { transform: rotate(180deg); }
 
   /* ── Ikony ────────────────────────────────────────────────────────────────
@@ -900,10 +928,15 @@
       <div id="camera-container" style="display:none;margin-bottom:12px;">
         <!-- Klepnutím se obraz otočí o 180° (doma visí kamera nahoře vzhůru
              nohama, na mobilu ne). Otočení drží i fotka, která jde na sken. -->
-        <div style="position:relative;">
+        <div id="orv-hledi" class="orv-hledi" style="position:relative;">
           <video id="camera-video" autoplay playsinline onclick="prepniOtoceniKamery()"
                  title="Klepnutím otočíš obraz o 180°"
                  style="width:100%;max-height:260px;border-radius:8px;background:#000;display:block;cursor:pointer;transform:rotate(180deg);"></video>
+          <!-- Auto-sken ORV (static/js/orv_auto_zadosti.js): položená karta se naskenuje sama. -->
+          <div class="orv-lock" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+          <div class="orv-blesk" aria-hidden="true"></div>
+          <p class="orv-ladeni" id="orv-ladeni" hidden></p>
+          <button type="button" class="orv-auto" id="orv-auto" aria-pressed="true" onclick="window.prepniOrvAuto && prepniOrvAuto()" onkeydown="event.stopPropagation()" title="Sken ORV sám, když kartu položíš pod kameru"><i aria-hidden="true"></i>Auto</button>
           <button type="button" class="cam-otocit" id="camera-otocit" onclick="prepniOtoceniKamery()" onkeydown="event.stopPropagation()" title="Otočit obraz o 180°" aria-label="Otočit obraz o 180°">
             <span class="cam-otocit-label" aria-hidden="true">Otočit</span>
             <svg class="ico" aria-hidden="true"><use href="#i-rotate"></use></svg>
@@ -3999,7 +4032,7 @@ function skenPosunoutDal(startIdx, startMode) {
 
 // Vyfotí, co je zrovna v kameře, a pošle to na sken ORV. Sdílí to
 // „Skenovat ORV" i „Přidat do evidence" — ať obě čtou úplně stejně.
-async function _naskenujOrv() {
+async function _naskenujOrv(volby = {}) {
   const video = document.getElementById('camera-video');
   const canvas = document.getElementById('camera-canvas');
   canvas.width = video.videoWidth;
@@ -4011,18 +4044,26 @@ async function _naskenujOrv() {
     ctx.rotate(Math.PI);
   }
   ctx.drawImage(video, 0, 0);
+  // QR (ORV 2024+) se čte z TÉHLE fotky, ne z živého obrazu — server ho
+  // použije, jen když sedí na kartu na fotce (static/js/orv_auto_zadosti.js).
+  const qr = window.orvAuto ? await window.orvAuto.qrZFotky(canvas) : null;
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
   const fd = new FormData();
   fd.append('image', blob, 'capture.jpg');
+  if (qr) fd.append('orv_qr', qr);
+  fd.append('zachyt', volby.zachyt || 'rucne');
+  if (window.orvAuto) window.orvAuto.poOdeslani(qr, !!volby.auto);
   const resp = await fetch('/api/scan-orv', { method: 'POST', body: fd });
   return resp.json();
 }
 
-async function quickScanOrv() {
-  if (_scanInFlight) return;
+// Vrací true, když se fotka poslala na sken (auto-sken podle toho ví, že
+// tuhle kartu už nemá posílat znovu).
+async function quickScanOrv(volby = {}) {
+  if (_scanInFlight) return false;
   if (!cameraStream) {
-    alert('Kamera není zapnutá. Klikni na Zapnout kameru nebo dej povolení v prohlížeči.');
-    return;
+    if (!volby.auto) alert('Kamera není zapnutá. Klikni na Zapnout kameru nebo dej povolení v prohlížeči.');
+    return false;
   }
   _scanInFlight = true;
   const btn = document.getElementById('quick-scan-btn');
@@ -4038,20 +4079,23 @@ async function quickScanOrv() {
   const startIdx = flowIdx, startMode = appMode;
 
   try {
-    const result = await _naskenujOrv();
+    const result = await _naskenujOrv(volby);
 
     if (!result.success || !result.data) {
       if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = '✗ ' + (result.error || 'sken selhal'); }
-      return;
+      return true;
     }
 
     const filled = await applyOrvData(result.data);
     if (!filled.length) {
       if (resultEl) { resultEl.className = 'scan-result err'; resultEl.textContent = 'Žádná data — zkus znovu'; }
-      return;
+      return true;
     }
 
-    if (resultEl) { resultEl.className = 'scan-result ok'; resultEl.textContent = '✓ ' + filled.join(', '); }
+    if (resultEl) {
+      resultEl.className = 'scan-result ok';
+      resultEl.textContent = '✓ ' + filled.join(', ') + (result.data.orv_zdroj === 'qr' ? ' · číslo ORV z QR' : '');
+    }
     if (skenPosunoutDal(startIdx, startMode)) {
       navNext();
     } else {
@@ -4065,6 +4109,7 @@ async function quickScanOrv() {
     _scanInFlight = false;
     if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
   }
+  return true;
 }
 
 // Enter (i ten na numerické klávesnici) skenuje přes hlavní obsluhu klávesnice.
@@ -4486,6 +4531,10 @@ tryAutoOpenCamera();
 </script>
 <script src="/static/firma_pick.js?v={{ APP_VERSION }}"></script>
 <script src="/static/klavesnice.js?v={{ APP_VERSION }}"></script>
+<script src="/static/js/orv_auto_core.js?v={{ APP_VERSION }}"></script>
+<script src="/static/js/orv_qr.js?v={{ APP_VERSION }}"></script>
+<script src="/static/js/orv_auto.js?v={{ APP_VERSION }}"></script>
+<script src="/static/js/orv_auto_zadosti.js?v={{ APP_VERSION }}"></script>
 <script>
 // ── Kdo vyplňuje (profil) ─────────────────────────────────────────────────────
 // A per-device label of who's filling it out, sent with each žádost so the Úkony
