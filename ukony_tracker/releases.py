@@ -39,6 +39,14 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.10.0", date(2026, 11, 22),
+        "Techničák se vyfotí sám",
+        ("Podrž techničák v rámečku – jakmile je v klidu a ostrý, vyfotí se sám a skočí do řady.",
+         "Nový techničák s QR kódem přečte číslo ORV hned a bez překlepu."),
+        demo="v2_10", oblast="technicak", nazev="Techničák se vyfotí sám",
+        radek="Podrž techničák v rámečku a vyfotí se sám; QR kód přečte číslo ORV bez chyb.",
+    ),
+    Release(
         "2.9.8", date(2026, 11, 19),
         "Stornované doklady najdeš dole",
         ("Seznam ukazuje jen platné doklady; stornované jsou sbalené pod ním v „Stornované (N)“.",),

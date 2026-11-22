@@ -131,7 +131,8 @@
       {key: 'rz', label: 'RZ', value: result.rz || null},
       {key: 'vin', label: 'VIN', value: result.vin || null,
         source: result.vin ? vinSourceLabel(result.vin_zdroj) : ''},
-      {key: 'orv', label: 'ORV', value: result.orv_cislo || null},
+      {key: 'orv', label: 'ORV', value: result.orv_cislo || null,
+        source: result.orv_cislo && result.orv_zdroj === 'qr' ? 'z QR' : ''},
     ];
   }
   function factText(fact) {
@@ -468,6 +469,8 @@
     const chip = el('span', orv ? 'orv-orv' : 'orv-orv orv-orv--missing');
     chip.append(el('span', 'orv-orv-k', 'ORV'));
     chip.append(el('b', '', ' ' + (orv || 'nepřečteno')));
+    // Read from the card's QR code: no misread possible (2.10).
+    if (orv && result.orv_zdroj === 'qr') chip.append(el('span', 'orv-orv-src', 'z QR'));
     row.append(chip);
     return row;
   }

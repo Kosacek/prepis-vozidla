@@ -658,7 +658,8 @@ def test_happy_json_sniffs_bytes_and_logs(client, vision, monkeypatch):
     assert result.json["ukon"]["id"] == uid and result.json["doplneno"] == ["rz", "orv"]
     assert len(logs) == 1 and logs[0][1:3] == ("doplneno", uid) and logs[0][5] == 125
     # The raw reading is logged too, so "nečitelné" can be explained later.
-    assert logs[0][6:] == ("5AB1234", "UBE037263", "UBE037263")
+    assert logs[0][6:9] == ("5AB1234", "UBE037263", "UBE037263")
+    assert logs[0][9:] == ("-", "-", "-")  # no QR, no capture info
 
 
 def test_rate_limit_session_and_window(client, vision, monkeypatch):
@@ -1178,3 +1179,111 @@ def test_a_plate_exchange_on_an_older_ukon_is_asked_not_written(conn, make):
     result = _rescan(conn, _read_albion(rz="9XY9999", orv_cislo=OLD_ORV))
     assert result["stav"] == "zmena_ke_kontrole" and "aktualizovano" not in result
     assert ukony_repo.get(conn, uid)["rz"] == OLD_PLATE
+
+
+# -- QR on the 2024+ ORV front (2.10): the number the browser decoded --------
+
+QR = DATA["orv_cislo"]
+
+
+def test_qr_number_is_authoritative_and_skips_the_second_read(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    misread = "UBE037268"
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": misread})
+    scan.qr_read.set(None)
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=QR,
+                          lookup=registry({misread: OTHER_VIN, QR: VIN}))
+    assert len(client.calls) == 1
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert result["orv_cislo"] == QR and result["orv_zdroj"] == "qr"
+    assert ukony_repo.get(conn, uid)["orv"] == QR
+    assert scan.qr_read.get() == (QR, misread)  # the disagreement reaches the log
+
+
+def test_qr_lets_one_read_offer_a_new_car(conn):
+    # Without a QR one reading is never enough for "Nové auto"; with it the
+    # ORV number is certain and the registry gives the VIN.
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=QR,
+                          lookup=registry({QR: VIN}))
+    assert len(client.calls) == 1
+    assert result["stav"] == "bez_firmy" and result["vin"] == VIN and result["orv_zdroj"] == "qr"
+
+
+def test_qr_still_needs_the_registry_vin(conn, make):
+    # An RZ match alone must never take a QR number (review 2026-11-22).
+    uid = make(typ_kod="NOVÉ", rz=DATA["rz"], vin=None)
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=QR, lookup=registry({}))
+    assert result["stav"] == "chyba" and "Registr" in result["zprava"]
+    assert ukony_repo.get(conn, uid)["orv"] in (None, "")
+    assert conn.execute("SELECT COUNT(*) FROM ukony").fetchone()[0] == 1
+
+
+def test_qr_of_another_car_than_the_photo_vin_writes_nothing(conn, make):
+    uid = make(typ_kod="NOVÉ")  # VIN = the VIN printed on the photo
+    client = SeqClient({**DATA, "orv_cislo": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=QR,
+                          lookup=registry({QR: OTHER_VIN}))
+    assert result["stav"] == "necitelne" and "QR" in result["zprava"]
+    assert ukony_repo.get(conn, uid)["orv"] in (None, "")
+
+
+def test_qr_far_from_the_photo_reading_writes_nothing(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": "UBK551208"})  # another card's number
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=QR,
+                          lookup=registry({QR: VIN, "UBK551208": OTHER_VIN}))
+    assert result["stav"] == "necitelne"
+    assert ukony_repo.get(conn, uid)["orv"] in (None, "")
+    assert scan.qr_read.get() == (QR, "UBK551208")
+
+
+def test_qr_never_turns_another_document_into_an_orv(conn, make):
+    make(typ_kod="NOVÉ")
+    other = {"typ": "jine", "rz": "5AB1234", "vin": None, "orv_cislo": None, "provozovatel": None}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(other), orv_qr=QR,
+                          lookup=registry({QR: VIN}))
+    assert result["stav"] == "necitelne" and result.get("orv_zdroj") is None
+
+
+def test_qr_works_when_the_photo_reads_nothing(conn, make):
+    uid = make(typ_kod="NOVÉ")
+    blank = {"typ": "necitelne", "rz": None, "vin": None, "orv_cislo": None, "provozovatel": None}
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=FakeClient(blank), orv_qr=QR,
+                          lookup=registry({QR: VIN}))
+    assert result["stav"] == "doplneno" and result["ukon"]["id"] == uid
+    assert ukony_repo.get(conn, uid)["orv"] == QR
+
+
+@pytest.mark.parametrize("value", ["ube037263", " UBE037263", "UBE037263 ", "UBE0372631",
+                                   "UB0037263", "UBE037263\nX", "", None, 123, ["UBE037263"]])
+def test_anything_but_an_exact_orv_number_is_ignored(conn, make, value):
+    make(typ_kod="NOVÉ")
+    client = SeqClient({**DATA, "vin": None, "orv_cislo": None}, {**DATA, "vin": None})
+    result = scan.zpracuj(conn, b"p", "image/jpeg", client=client, orv_qr=value,
+                          lookup=registry({QR: VIN}))
+    assert scan.clean_qr(value) is None
+    assert len(client.calls) == 2 and result.get("orv_zdroj") is None  # the normal second read
+
+
+def test_route_passes_the_qr_and_logs_it_with_the_capture(client, vision, monkeypatch):
+    from routes import orv_scan
+    logs = []
+    monkeypatch.setattr(orv_scan.logger, "info", lambda *args: logs.append(args))
+    vision.data = {**DATA, "vin": None, "orv_cislo": "UBE037268"}
+    monkeypatch.setattr(scan.orv_service, "lookup_vin",
+                        lambda orv: {"success": True, "vin": VIN} if orv == QR else {"success": False})
+    with client.application.app_context():
+        c = db.get_db()
+        fid = firmy_repo.create(c, nazev="BSAuto", zkratka="BS")
+        uid = pridat_ukon(c, firma_id=fid, datum=RECENT, typ_kod="NOVÉ", celkem=1300, vin=VIN)
+    r = client.post("/ukony/orv-sken", data={"foto": (BytesIO(photo()), "foto", "image/jpeg"),
+                                             "orv_qr": QR, "zachyt": "qr m=1.4 s=212 e=0.081"})
+    assert r.status_code == 200 and r.json["stav"] == "doplneno" and r.json["ukon"]["id"] == uid
+    assert r.json["orv_zdroj"] == "qr"
+    assert logs[-1][7:] == (QR, "UBE037268", QR, "UBE037268", "qr m=1.4 s=212 e=0.081")
+    r = client.post("/ukony/orv-sken", data={"foto": (BytesIO(photo()), "foto", "image/jpeg"),
+                                             "orv_qr": "<b>UBE037263</b>", "zachyt": "qr <script>"})
+    assert r.status_code == 200 and r.json.get("orv_zdroj") is None
+    assert logs[-1][9:] == ("-", "-", "-")

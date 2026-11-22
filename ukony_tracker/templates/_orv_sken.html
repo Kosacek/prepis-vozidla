@@ -1,4 +1,4 @@
-<section id="orv-sken" class="orv-sken">
+<section id="orv-sken" class="orv-sken" data-jsqr="{{ url_for('static', filename='vendor/jsQR.js') }}?v=1.4.0">
   <header class="orv-heading">
     <p class="orv-step" id="orv-step">1 · Foť</p>
     <h2 id="ukon-modal-title">Techničák</h2>
@@ -12,6 +12,10 @@
     <div class="orv-viewfinder" id="orv-viewfinder" hidden>
       <video id="orv-video" autoplay muted playsinline aria-label="Živý náhled zadní kamery"></video>
       <span class="orv-guide" aria-hidden="true"></span>
+      {# Auto-capture (2.10): brackets lock on a still card, flash on the photo. #}
+      <span class="orv-lock" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span>
+      <span class="orv-flash" aria-hidden="true"></span>
+      <p class="orv-debug" id="orv-debug" hidden></p>
     </div>
     <div class="orv-sources">
       <button class="btn" id="orv-camera" type="button">Zapnout kameru</button>
@@ -19,6 +23,7 @@
         Vyfotit techničák
         <input id="orv-file-camera" type="file" accept="image/*" capture="environment" aria-label="Vyfotit techničák">
       </label>
+      <button type="button" class="btn orv-auto" id="orv-auto" aria-pressed="true" title="Fotit automaticky" hidden><i aria-hidden="true"></i>Auto</button>
       <label class="btn orv-file">Z galerie
         <input id="orv-gallery" type="file" accept="image/*" multiple aria-label="Vybrat fotky z galerie">
       </label>

@@ -122,6 +122,16 @@ SERIES_LOOKALIKES = str.maketrans("01258", "OIZSB")
 NUMBER_LOOKALIKES = str.maketrans("OQIZSB", "001258")
 # Raw ORV readings of this request, for the scan log line.
 raw_orv = ContextVar("orv_scan_raw_orv", default=())
+# The QR code on a 2024+ ORV front holds only the ORV number. A value the
+# browser decoded is untrusted input: exactly 3 letters + 6 digits or nothing.
+QR_ORV = re.compile(r"[A-Z]{3}[0-9]{6}")
+# (qr, photo reading) of this request, for the scan log line.
+qr_read = ContextVar("orv_scan_qr_read", default=None)
+
+
+def clean_qr(value):
+    """The QR value when it is exactly an ORV number, else None."""
+    return value if isinstance(value, str) and QR_ORV.fullmatch(value) else None
 
 
 def _orv_candidate(value):
@@ -206,7 +216,8 @@ def _czech_date(value):
 def _base(data):
     return {"stav": "chyba", "rz": data.get("rz"), "vin": data.get("vin"),
             "orv_cislo": data.get("orv_cislo"), "provozovatel": data.get("provozovatel"),
-            "vin_zdroj": data.get("vin_zdroj"), "ukon": None, "doplneno": [],
+            "vin_zdroj": data.get("vin_zdroj"), "orv_zdroj": data.get("orv_zdroj"),
+            "ukon": None, "doplneno": [],
             "zmeny": {}, "zprava": "Fotku se nepodařilo zpracovat. Zkuste to znovu."}
 
 
@@ -522,17 +533,58 @@ def _second_look(conn, image_bytes, media_type, first, result, *, client, lookup
     return result
 
 
-def zpracuj(conn, image_bytes, media_type, *, client=None, lookup=None, zpracoval=None) -> dict:
+QR_MISREAD_MAX_EDITS = 2
+QR_CONFLICT = "Číslo ORV z QR kódu nesedí s techničákem na fotce — vyfoť ho znovu."
+QR_NO_VIN = "Registr nevrátil VIN k číslu ORV z QR kódu — zkus to za chvíli znovu."
+
+
+def _apply_qr(data, qr, lookup):
+    """Make the QR number the reading — only when it belongs to the card in
+    the photo. Returns None when it may be used (or the photo is another
+    document), else the message of a result that writes nothing:
+
+    - the photo's own ORV reading is more than a misread away → another card;
+    - the registry has no VIN for it → nothing to match safely (an RZ match
+      alone must never take a QR number);
+    - the photo shows a VIN the registry does not give for it → another card.
+    """
+    photo = data.pop("orv_oprava", None)
+    photo = data.get("orv_cislo") or photo
+    qr_read.set((qr, photo or "-"))
+    if data["typ"] == "jine":
+        return None  # another document: the usual "nečitelné" answer
+    if photo and photo != qr and _edits(photo, qr) > QR_MISREAD_MAX_EDITS:
+        return QR_CONFLICT
+    vin = _registry_vin(qr, lookup)
+    if not vin:
+        return QR_NO_VIN
+    if data.get("vin") and data["vin"] != vin:
+        return QR_CONFLICT
+    data.update(orv_cislo=qr, orv_zdroj="qr", typ="orv", vin=vin, vin_zdroj="registr")
+    return None
+
+
+def zpracuj(conn, image_bytes, media_type, *, client=None, lookup=None, zpracoval=None,
+            orv_qr=None) -> dict:
+    """`orv_qr`: the ORV number the browser decoded from the card's QR code.
+    When valid it is authoritative: it skips the second read, and the RZ and
+    provozovatel still come from the photo, the VIN from the registry."""
+    qr = clean_qr(orv_qr)
     try:
         data = extract(image_bytes, media_type, client=client)
         data["vin_zdroj"] = "foto" if data.get("vin") else None
+        problem = _apply_qr(data, qr, lookup) if qr else None
+        if problem:
+            result = _base(data)
+            result.update(stav="chyba" if problem == QR_NO_VIN else "necitelne", zprava=problem)
+            return result
         if data["typ"] != "orv":
             result = _base(data)
             result.update(stav="necitelne", zprava="Nečitelná fotka nebo jiný doklad.")
             return result
         _with_registry_vin(data, lookup)
         result = _fill_or_create(conn, data, zpracoval=zpracoval, auto_firma=True)
-        if not _confirmed(result):
+        if not qr and not _confirmed(result):
             result = _second_look(conn, image_bytes, media_type, data, result,
                                   client=client, lookup=lookup, zpracoval=zpracoval)
         result.pop("_overit_orv", None)

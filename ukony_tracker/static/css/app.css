@@ -1965,6 +1965,35 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .orv-viewfinder { width: 100%; aspect-ratio: 16 / 9; position: relative; background: #14171b; border-radius: var(--radius); overflow: hidden; }
 .orv-viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .orv-guide { position: absolute; inset: 6% 8%; border: 2px solid #ffffff9c; border-radius: 12px; pointer-events: none; }
+/* Auto-capture (2.10): corner brackets close in on a still card, a bar fills
+   while it holds still, a flash marks the photo, the thumbnail drops in. */
+.orv-guide { transition: border-color .15s ease; }
+.orv-viewfinder[data-auto="lock"] .orv-guide { border-color: transparent; }
+.orv-lock { position: absolute; inset: 4% 6%; pointer-events: none; opacity: 0; transition: opacity .15s ease, inset .22s cubic-bezier(.2, .8, .2, 1); }
+.orv-viewfinder[data-auto="lock"] .orv-lock { opacity: 1; inset: 6% 8%; }
+.orv-lock i { position: absolute; width: 28px; height: 28px; border: 0 solid var(--accent); }
+.orv-lock i:nth-child(1) { top: 0; left: 0; border-width: 4px 0 0 4px; border-top-left-radius: 12px; }
+.orv-lock i:nth-child(2) { top: 0; right: 0; border-width: 4px 4px 0 0; border-top-right-radius: 12px; }
+.orv-lock i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 4px 4px; border-bottom-left-radius: 12px; }
+.orv-lock i:nth-child(4) { bottom: 0; right: 0; border-width: 0 4px 4px 0; border-bottom-right-radius: 12px; }
+.orv-lock b { position: absolute; left: 36px; right: 36px; bottom: 0; height: 4px; border-radius: 2px; background: #ffffff40; overflow: hidden; }
+.orv-lock b::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--orv-hold, 0)); }
+.orv-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.orv-viewfinder.is-shot .orv-flash { animation: orv-flash .34s ease-out; }
+.orv-viewfinder.is-shot .orv-lock { animation: orv-pop .34s ease-out; }
+@keyframes orv-flash { 0% { opacity: .85; } 100% { opacity: 0; } }
+@keyframes orv-pop { 0% { transform: scale(1); } 40% { transform: scale(.96); } 100% { transform: scale(1); } }
+.orv-auto { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.orv-auto i { width: 9px; height: 9px; border-radius: 50%; background: #34c759; box-shadow: 0 0 0 3px #34c75933; }
+.orv-auto[aria-pressed="false"] { color: var(--muted); }
+.orv-auto[aria-pressed="false"] i { background: var(--muted); box-shadow: none; }
+.orv-debug { position: absolute; left: 8px; right: 8px; bottom: 6px; margin: 0; padding: 2px 6px; border-radius: 6px; background: #000000b3; color: #fff; font: 11px/1.4 ui-monospace, monospace; pointer-events: none; }
+.orv-thumb--drop { animation: orv-drop .4s cubic-bezier(.2, .9, .3, 1.25); }
+@keyframes orv-drop { 0% { transform: translateY(-40px) scale(.55); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .orv-lock, .orv-guide { transition: none; }
+  .orv-viewfinder.is-shot .orv-flash, .orv-viewfinder.is-shot .orv-lock, .orv-thumb--drop { animation: none; }
+}
 .orv-sources { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .orv-sken .btn, .orv-sken input { min-height: 44px; font-size: 16px; }
 .orv-file { position: relative; overflow: hidden; cursor: pointer; }

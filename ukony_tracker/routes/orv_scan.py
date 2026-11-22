@@ -27,6 +27,9 @@ if not logger.handlers:
     logger.addHandler(logging.StreamHandler())
 logger.propagate = False
 REVIEW_MAX_AGE = 14 * 24 * 3600
+# How the browser took the photo (auto-capture tuning), logged as-is when it
+# has exactly this shape: "qr|klid|rucne" + up to four short numeric metrics.
+ZACHYT = re.compile(r"(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4}")
 
 
 def _session_id():
@@ -116,6 +119,8 @@ def scan():
     result = {"stav": "chyba", "ukon": None}
     orv_scan_service.tokens.set(0)
     orv_scan_service.raw_orv.set(())
+    orv_scan_service.qr_read.set(None)
+    zachyt = "-"
     try:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return jsonify(error="Čtení fotek není nastavené."), 503
@@ -125,12 +130,16 @@ def scan():
         files = list(request.files.items(multi=True))
         if len(files) != 1 or files[0][0] != "foto":
             return jsonify(error="Pošlete právě jednu fotku v poli foto."), 400
+        raw = request.form.get("zachyt")
+        if isinstance(raw, str) and len(raw) <= 60 and ZACHYT.fullmatch(raw):
+            zachyt = raw
         data = files[0][1].read(orv_images.MAX_IMAGE_BYTES + 1)
         if len(data) > orv_images.MAX_IMAGE_BYTES:
             raise RequestEntityTooLarge()
         image_bytes, media_type = orv_images.prepare(data)
         result = orv_scan_service.zpracuj(conn, image_bytes, media_type,
-                                          zpracoval=normalize_profil(request.form.get("zpracoval")))
+                                          zpracoval=normalize_profil(request.form.get("zpracoval")),
+                                          orv_qr=request.form.get("orv_qr"))
         snapshot = result.pop("_snapshot", None)
         if result["stav"] == "zmena_ke_kontrole" and result["lze_zapsat"]:
             _remember_review(conn, result, snapshot)
@@ -144,11 +153,14 @@ def scan():
     finally:
         # What the reader actually saw (no names): "UB0056935" explains a
         # "nečitelné" that a bare state never did (2026-11-11, 4444PARK).
-        logger.info("stav=%s ukon=%s ms=%d cteni=%d tokens=%d rz=%s orv=%s cteno=%s", result["stav"],
+        qr = orv_scan_service.qr_read.get() or ("-", "-")
+        logger.info("stav=%s ukon=%s ms=%d cteni=%d tokens=%d rz=%s orv=%s cteno=%s qr=%s foto=%s"
+                    " zachyt=%s", result["stav"],
                     (result.get("ukon") or {}).get("id", "-"),
                     round((time.monotonic() - start) * 1000), 2 if result.get("druhe_cteni") else 1,
                     orv_scan_service.tokens.get(), result.get("rz") or "-",
-                    result.get("orv_cislo") or "-", ",".join(orv_scan_service.raw_orv.get()) or "-")
+                    result.get("orv_cislo") or "-", ",".join(orv_scan_service.raw_orv.get()) or "-",
+                    qr[0], qr[1], zachyt)
 
 
 @bp.post("/ukony/orv-sken/zapsat")

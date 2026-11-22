@@ -1,0 +1,84 @@
+{# Demo for release 2.10 (Techničák se vyfotí sám): a techničák slides into
+   the viewfinder, the corner brackets lock on and a bar fills while it holds
+   still, a flash, then the thumbnail drops into the strip. CSS-only, 4s loop,
+   app tokens only (the viewfinder is the app's own dark camera box). #}
+<style>
+  .de210-demo { box-sizing: border-box; padding: 12px 14px 10px; margin-bottom: var(--sp-4);
+    border-radius: 14px; background: var(--bg); color: var(--ink); overflow: hidden;
+    display: grid; gap: 8px; }
+  .de210-view { position: relative; height: 112px; border-radius: 10px; background: #14171b; overflow: hidden; }
+  .de210-auto { position: absolute; top: 6px; left: 6px; z-index: 3; display: inline-flex; align-items: center;
+    gap: 4px; padding: 1px 7px; border-radius: 999px; background: #000000a6; color: #fff;
+    font-size: 8.5px; font-weight: 700; }
+  .de210-auto i { width: 5px; height: 5px; border-radius: 50%; background: #34c759; }
+  .de210-card { position: absolute; left: 22%; top: 13%; width: 56%; height: 74%; box-sizing: border-box;
+    padding: 7px 8px; border-radius: 6px; background: #eef3ea; border: 1px solid #d5dccf;
+    box-shadow: 0 6px 16px rgba(0,0,0,.35); transform: translateX(160%) rotate(4deg);
+    animation: de210-card 4s cubic-bezier(.2,.8,.2,1) infinite; }
+  .de210-card i { display: block; height: 3px; margin-bottom: 4px; border-radius: 2px; background: #b9c4b2; }
+  .de210-card i:nth-child(1) { width: 46%; background: #8aa182; }
+  .de210-card i:nth-child(2) { width: 62%; }
+  .de210-card i:nth-child(3) { width: 54%; }
+  .de210-card i:nth-child(4) { width: 70%; }
+  .de210-card em { position: absolute; left: 8px; bottom: 7px; font-style: normal; font-size: 9px;
+    font-weight: 800; letter-spacing: .4px; color: #c62828; }
+  .de210-qr { position: absolute; top: 6px; right: 7px; width: 16px; height: 16px; border-radius: 2px;
+    background: conic-gradient(#222 25%, #eef3ea 0 50%, #222 0 75%, #eef3ea 0) 0 0 / 6px 6px;
+    outline: 2px solid #222; outline-offset: -2px; }
+  .de210-lock { position: absolute; left: 18%; right: 18%; top: 6%; bottom: 6%; opacity: 0;
+    animation: de210-lock 4s ease infinite; }
+  .de210-lock span { position: absolute; width: 14px; height: 14px; border: 0 solid var(--accent); }
+  .de210-lock span:nth-child(1) { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 7px; }
+  .de210-lock span:nth-child(2) { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 7px; }
+  .de210-lock span:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 7px; }
+  .de210-lock span:nth-child(4) { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 7px; }
+  .de210-lock b { position: absolute; left: 20px; right: 20px; bottom: 0; height: 3px; border-radius: 2px;
+    background: #ffffff40; overflow: hidden; }
+  .de210-lock b::after { content: ""; position: absolute; inset: 0; background: var(--accent);
+    transform-origin: left; transform: scaleX(0); animation: de210-hold 4s linear infinite; }
+  .de210-flash { position: absolute; inset: 0; z-index: 2; background: #fff; opacity: 0;
+    animation: de210-flash 4s ease-out infinite; }
+  .de210-strip { display: flex; gap: 6px; height: 34px; }
+  .de210-thumb { flex: 0 0 52px; border-radius: 6px; background: var(--card); border: 1px solid var(--line);
+    position: relative; overflow: hidden; }
+  .de210-thumb::before { content: ""; position: absolute; inset: 5px 8px; border-radius: 3px; background: #eef3ea;
+    border: 1px solid #d5dccf; }
+  .de210-new { opacity: 0; transform: translateY(-34px) scale(.55); animation: de210-drop 4s cubic-bezier(.2,.9,.3,1.25) infinite; }
+  @keyframes de210-card {
+    0%, 6% { transform: translateX(160%) rotate(4deg); }
+    22%, 70% { transform: none; }
+    86%, 100% { transform: translateX(-170%) rotate(-3deg); }
+  }
+  @keyframes de210-lock {
+    0%, 26% { opacity: 0; transform: scale(1.12); }
+    34%, 66% { opacity: 1; transform: none; }
+    74%, 100% { opacity: 0; transform: none; }
+  }
+  @keyframes de210-hold { 0%, 30% { transform: scaleX(0); } 54%, 100% { transform: scaleX(1); } }
+  @keyframes de210-flash { 0%, 55% { opacity: 0; } 57% { opacity: .85; } 66%, 100% { opacity: 0; } }
+  @keyframes de210-drop {
+    0%, 58% { opacity: 0; transform: translateY(-34px) scale(.55); }
+    68%, 92% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .de210-card, .de210-lock, .de210-lock b::after, .de210-flash, .de210-new { animation: none; }
+    .de210-card { transform: none; }
+    .de210-lock { opacity: 1; }
+    .de210-lock b::after { transform: scaleX(1); }
+    .de210-new { opacity: 1; transform: none; }
+  }
+</style>
+<div class="de210-demo" aria-hidden="true">
+  <div class="de210-view">
+    <span class="de210-auto"><i></i>Auto</span>
+    <div class="de210-card"><i></i><i></i><i></i><i></i><span class="de210-qr"></span><em>UBZ 482615</em></div>
+    <div class="de210-lock"><span></span><span></span><span></span><span></span><b></b></div>
+    <div class="de210-flash"></div>
+  </div>
+  <div class="de210-strip">
+    <div class="de210-thumb"></div>
+    <div class="de210-thumb"></div>
+    <div class="de210-thumb de210-new"></div>
+  </div>
+</div>

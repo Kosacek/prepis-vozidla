@@ -267,3 +267,6 @@
   .orv-sken .ask-reveal,.orv-card,.orv-result {animation:none!important; transition:none!important;
     scroll-behavior:auto!important;}
 }
+
+/* 2.10: ORV number read from the QR code */
+.orv-orv-src {margin-left:2px; font-size:11px; font-weight:600; color:var(--muted);}

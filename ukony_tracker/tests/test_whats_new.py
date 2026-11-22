@@ -90,7 +90,8 @@ def test_popup_is_the_newest_release(gated_client):
     html = gated_client.get("/").get_data(as_text=True)
     assert f"{RELEASE_KEY}{CURRENT_VERSION}" in html
     intro = html[html.index('id="nvIntro"'):]
-    assert RELEASES[0].title in intro[:1500]
+    # In the intro card itself (a demo's inline <style> may be long).
+    assert RELEASES[0].title in intro[:intro.index('nv-timer')]
     assert RELEASES[0].points[0] in html
 
 

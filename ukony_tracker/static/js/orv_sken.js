@@ -20,14 +20,19 @@
       el('shutter').disabled = photos.length >= 30 || imported;
       addInputs().forEach(i => { i.disabled = imported || photos.length >= 30; });
     }
-    function addPhoto(blob) {
-      if (dead || running) return;
-      if (photos.length >= 30) { notice('V jedné dávce může být nejvýše 30 fotek.'); return; }
-      if (blob.size > 8 * 1024 * 1024) { notice('Fotka smí mít nejvýše 8 MB. Vyfoťte ji znovu.'); return; }
-      const photo = {blob, url: URL.createObjectURL(blob), id: ++serial, result: null};
+    // meta (from the camera): {zachyt, qr, auto}. The QR value goes to the
+    // server with the photo; it checks it again (3 letters + 6 digits only).
+    function addPhoto(blob, meta) {
+      if (dead || running) return 0;
+      if (photos.length >= 30) { notice('V jedné dávce může být nejvýše 30 fotek.'); return 0; }
+      if (blob.size > 8 * 1024 * 1024) { notice('Fotka smí mít nejvýše 8 MB. Vyfoťte ji znovu.'); return 0; }
+      const info = meta || {};
+      const qr = window.OrvQr ? window.OrvQr.clean(info.qr) : null;
+      const photo = {blob, url: URL.createObjectURL(blob), id: ++serial, result: null,
+        qr, zachyt: typeof info.zachyt === 'string' ? info.zachyt : null};
       photos.push(photo);
       const thumb = document.createElement('div');
-      thumb.className = 'orv-thumb';
+      thumb.className = info.auto ? 'orv-thumb orv-thumb--drop' : 'orv-thumb';
       const img = document.createElement('img');
       img.src = photo.url;
       img.alt = 'Fotka ' + photos.length;
@@ -41,12 +46,14 @@
       remove.addEventListener('click', function () {
         if (running || imported) return;
         photos = photos.filter(p => p !== photo);
+        camera.forget(photo.id); // the same card may be photographed again
         URL.revokeObjectURL(photo.url); thumb.remove(); controls();
       });
       thumb.append(img, number, remove);
       el('thumbnails').append(thumb);
       el('thumbnails').scrollLeft = el('thumbnails').scrollWidth;
       controls();
+      return photo.id;
     }
     const camera = window.OrvCamera(root, addPhoto, notice);
     root.querySelectorAll('input[type=file]:not(#orv-retake)').forEach(input => input.addEventListener('change', async function () {
@@ -112,6 +119,8 @@
       photo.result = null;
       photo.upraveno = false;
       photo.potvrdit = false;
+      photo.qr = null; // a native-camera retake carries no decoded QR
+      photo.zachyt = 'rucne';
       if (photo.thumbEl) { photo.thumbEl.hidden = false; photo.thumbEl.src = photo.url; }
       await run([photo]);
     });
@@ -196,6 +205,8 @@
       const body = new FormData();
       body.append('foto', photo.blob, 'foto');
       body.append('zpracoval', el('zpracoval').value);
+      if (photo.qr) body.append('orv_qr', photo.qr);
+      if (photo.zachyt) body.append('zachyt', photo.zachyt);
       const abort = new AbortController();
       photo.abort = abort;
       const timeout = setTimeout(() => abort.abort(), 90000);
