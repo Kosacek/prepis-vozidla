@@ -193,11 +193,11 @@ test('attach wraps the select and maps options + data-color dots (muted fallback
     ['option', 'option', 'option']);
   assert.deepEqual(items(instance).map(item => item.dataset.firma), ['', '1', '2']);
   assert.deepEqual(items(instance).map(item => oneByClass(item, 'firma-dot').style.background),
-    ['var(--muted)', '#0a84ff', 'var(--muted)']);
+    ['transparent', '#0a84ff', 'var(--muted)']);  // empty option = no firm: no dot (2026-11-23)
 
   // the placeholder is shown in the button until something is picked
   assert.equal(instance.name.textContent, '— bez firmy —');
-  assert.equal(instance.dot.style.background, 'var(--muted)');
+  assert.equal(instance.dot.style.background, 'transparent');
   assert.deepEqual(selectedFlags(instance.list), ['true', 'false', 'false']);
   assert.deepEqual(onFlags(instance.list), [true, false, false]);
 });
@@ -289,7 +289,7 @@ test('sync reflects a programmatic value change and a form.reset()', () => {
   select.value = '';  // what form.reset() does to the native select
   FirmaPick.sync(select);
   assert.equal(instance.name.textContent, '— bez firmy —');
-  assert.equal(instance.dot.style.background, 'var(--muted)');
+  assert.equal(instance.dot.style.background, 'transparent');
   assert.deepEqual(onFlags(instance.list), [true, false, false]);
 
   assert.equal(FirmaPick.sync(makeSelect([])), null);  // unattached select: no-op

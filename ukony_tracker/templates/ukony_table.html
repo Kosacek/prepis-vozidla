@@ -21,10 +21,10 @@
          placeholder="Hledat — RZ, VIN, poznámka, firma, typ…">
   <form method="get" action="/ukony/vse" class="filter-bar" id="filter-form">
     <div class="filter-bar__fields">
-      <select name="firma" class="filter-select">
+      <select name="firma" class="filter-select" id="ukony-firma" aria-label="Firma">
         <option value="">Všechny firmy</option>
         {% for f in firmy %}
-          <option value="{{ f.id }}" {{ 'selected' if sel.firma == f.id }}>{{ f.zkratka }}</option>
+          <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, 'var(--muted)') }}" {{ 'selected' if sel.firma == f.id }}>{{ f.zkratka }}</option>
         {% endfor %}
       </select>
 
@@ -69,7 +69,15 @@
 <script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=14"></script>
 <script src="{{ url_for('static', filename='js/ukon_new_form.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/thinking.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/firma_pick.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/firma_pick.js') }}?v=2"></script>
+<script>
+  // Filtr firem s barevnými tečkami jako všude jinde (pravidlo barev firem);
+  // nativní select zůstává zdrojem hodnoty a jeho `change` filtr načte.
+  (function () {
+    var s = document.getElementById('ukony-firma');
+    if (s && window.FirmaPick && window.FirmaPick.attach) { try { window.FirmaPick.attach(s); } catch (_) {} }
+  })();
+</script>
 <script src="{{ url_for('static', filename='js/orv_helpers.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/orv_auto_core.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/orv_qr.js') }}?v=2"></script>

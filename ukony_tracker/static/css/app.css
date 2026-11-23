@@ -1605,11 +1605,11 @@ a.kpi-link:hover {
   #ukon-modal .modal-card--new #ukon-modal-title { padding-right: var(--sp-7); }
   #ukon-modal #ukon-form .field input,
   #ukon-modal #ukon-form .field select,
-  #ukon-modal #ukon-form .firma-pick__btn,
-  #ukon-modal #ukon-form .firma-pick__item {
+  #ukon-modal #ukon-form .firma-pick__btn {
     min-height: 44px;
     font-size: 16px;
   }
+  #ukon-modal #ukon-form .firma-pick__item { font-size: 16px; }  /* řádky jako seznam, ne 44px dlaždice */
   #ukon-modal #ukon-form .seg span { flex: 0 1 calc((100% - 4 * var(--sp-1)) / 5); padding: var(--sp-2) 2px; font-size: 13px; }
   #ukon-modal #ukon-form .chip { min-height: 36px; padding: var(--sp-2) var(--sp-3); }
   #ukon-modal #ukon-form .ukon-new-actions {
@@ -1875,27 +1875,30 @@ body.modal-open { overflow: hidden; }
 
 .firma-pick__list {
   position: absolute; z-index: 60; top: calc(100% + 5px); left: 0; right: 0;
-  max-height: 290px; overflow-y: auto;
+  /* Jako obyčejný seznam <select>: všechny firmy najednou, bez posouvání
+     (David 2026-11-23). Posuvník až když se nevejdou na obrazovku. */
+  max-height: min(78vh, 640px); overflow-y: auto;
   /* stejný šedý podklad jako mají pole formuláře — bílý panel vypadal odtrženě */
   background: var(--bg); border: 1.5px solid var(--line);
   border-radius: var(--radius-sm); box-shadow: 0 12px 34px rgba(0,0,0,.14);
-  padding: 0;
+  padding: 4px 0;
 }
+/* Položka = řádek obyčejného seznamu: stejné písmo a velikost jako pole,
+   žádné oddělovače, jen malá barevná tečka firmy navíc. */
 .firma-pick__item {
-  display: flex; align-items: center; gap: 9px;
-  width: 100%; padding: 10px 12px;
-  border: none; border-bottom: 1px solid var(--line);   /* oddělovač mezi firmami */
-  border-radius: 0; background: none; color: var(--ink);
-  font-family: var(--font); font-size: 0.9375rem; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 5px 12px;
+  border: none; border-radius: 0; background: none; color: var(--ink);
+  font-family: var(--font); font-size: 0.9375rem; font-weight: 400; line-height: 1.35;
+  text-align: left; cursor: pointer;
 }
-.firma-pick__item:last-child { border-bottom: none; }
 .firma-pick__item:hover { background: var(--card); }
-.firma-pick__item.on { font-weight: 700; background: var(--card); }
+.firma-pick__item.on { background: var(--card); }
 
 @media (max-width: 760px) {
   /* stejné pravidlo jako u ostatních polí — pod 16px iOS zoomuje stránku */
   .firma-pick__btn, .firma-pick__item { font-size: 16px; }
-  .firma-pick__item { padding: 11px 10px; }   /* pohodlný cíl pro prst */
+  .firma-pick__item { padding: 8px 12px; }   /* ~36 px řádek pro prst, pořád celý seznam bez posouvání */
 }
 
 /* Krátké zelené bliknutí řádku po uložení bez reloadu — potvrzení, že se
@@ -2388,11 +2391,13 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .filter-bar .firma-pick { min-width: 10.5rem; }
 .filter-bar .firma-pick__btn { padding: 6px 10px; gap: 7px; font-size: 0.875rem; font-weight: 400; }
 .filter-bar .firma-pick__list { min-width: 12rem; }
+.filter-bar .firma-pick__item { font-size: 0.875rem; }  /* stejné písmo jako tlačítko filtru */
 @media (max-width: 760px) {
   /* Phone: the firm gets the full row (its name never truncates), měsíc and
      platné share the next one — no empty cell. */
   #doklady-filter .filter-bar__fields > .firma-pick { grid-column: 1 / -1; min-width: 0; }
-  .filter-bar .firma-pick__btn { min-height: 40px; font-size: 16px; }
+  .filter-bar .firma-pick__btn, .filter-bar .firma-pick__item { font-size: 16px; }
+  .filter-bar .firma-pick__btn { min-height: 40px; }
 }
 
 /* Tisk / Sdílet kódem sheet (2.8): two big choices, then the code. */

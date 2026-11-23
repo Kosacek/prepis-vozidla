@@ -41,6 +41,9 @@
   }
 
   function colorOf(option) {
+    // „Všechny firmy“ / prázdná volba není firma: tečka zůstane jen jako
+    // průhledné místo, aby text lícoval s ostatními řádky.
+    if (option && option.value === '') return 'transparent';
     var color = option && option.dataset ? option.dataset.color : '';
     return color || FALLBACK_COLOR;
   }
