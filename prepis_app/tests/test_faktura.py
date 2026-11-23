@@ -365,3 +365,17 @@ def test_api_faktura_looks_the_dic_up_in_ares(api, ares):
     assert faktura.get_faktura(str(api.data), cislo)["dic"] == "CZ687307374"
     pdf = (api.data / "output" / f"faktura_{cislo}.pdf").read_bytes()
     assert "DIČ: CZ687307374" in " ".join(_pdf_strings(pdf).split())
+
+
+def test_api_explicit_foreign_dic_wins_and_bad_shape_is_refused(api, ares):
+    r = api.post("/api/ppd/vystavit", headers={"X-Api-Key": KLIC}, json={
+        "prijato_od": "Slovenská firma s.r.o.", "prijato_dic": "sk2020123456",
+        "castka": 1500, "ucel": "ZASTUPOVÁNÍ NA MMB", "vozidla": ["BA123AB"],
+        "druh": "faktura", "request_id": "r-sk"})
+    assert r.status_code == 201
+    assert faktura.get_faktura(str(api.data), r.get_json()["cislo"])["dic"] == "SK2020123456"
+    assert ares == []                                       # no IČO, no ARES call
+    bad = api.post("/api/ppd/vystavit", headers={"X-Api-Key": KLIC}, json={
+        "prijato_od": "X", "prijato_dic": "12-34", "castka": 1500, "ucel": "ZASTUPOVÁNÍ NA MMB",
+        "vozidla": ["BA123AB"], "druh": "faktura", "request_id": "r-bad"})
+    assert bad.status_code == 400 and "prijato_dic" in bad.get_json()["error"]

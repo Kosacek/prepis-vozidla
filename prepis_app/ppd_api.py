@@ -158,10 +158,16 @@ def over(telo) -> dict:
     druh = _text(telo, "druh", max_delka=20).lower() or "faktura"
     if druh not in DRUHY:
         raise Chyba("druh smí být jen " + " nebo ".join(DRUHY) + ".")
+    # Explicit DIČ (a foreign customer from VIES); a Czech one comes from ARES.
+    dic_raw = _text(telo, "prijato_dic", max_delka=20)
+    prijato_dic = faktura.cisty_dic(dic_raw)
+    if dic_raw and not prijato_dic:
+        raise Chyba("prijato_dic musí mít tvar DIČ (např. SK2020123456).")
     return {
         "druh": druh,
         "prijato_od": _text(telo, "prijato_od", povinne=True, max_delka=MAX_PRIJATO_OD),
         "prijato_ico": prijato_ico,
+        "prijato_dic": prijato_dic,
         "prijato_adresa": _text(telo, "prijato_adresa", max_delka=MAX_PRIJATO_ADRESA),
         "castka": _castka(telo.get("castka")),
         "ucel": _text(telo, "ucel", povinne=True, max_delka=MAX_UCEL),
@@ -290,7 +296,7 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico, *, evidence_za
     vozidla = udaje["vozidla"]
     number = faktura.issue_faktura(data_dir, {
         "payer": payer, "payer_ico": udaje["prijato_ico"], "payer_address": address,
-        "payer_dic": faktura.dic_podle_ico(udaje["prijato_ico"]),
+        "payer_dic": udaje.get("prijato_dic") or faktura.dic_podle_ico(udaje["prijato_ico"]),
         "amount": udaje["castka"], "purpose": udaje["ucel"], "vozidla": vozidla})
     rec = faktura.get_faktura(data_dir, number) or {}
     doklad = {

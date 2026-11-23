@@ -68,7 +68,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.37.3"
+__version__ = "1.37.4"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1637,14 +1637,15 @@ def _adresa_firmy_podle_ico(ico: str) -> str:
 
 
 def _vystav_fakturu_k_zadosti(data: dict, amount: int, rz_full: str, vin: str,
-                              payer: str, payer_ico: str, payer_address: str) -> dict:
+                              payer: str, payer_ico: str, payer_address: str,
+                              payer_dic: str = "") -> dict:
     """Doklad k žádosti je vždy faktura, ze stejné řady a stejnou cestou
     jako přes /api/ppd/vystavit (ppd_api.vystav). Vrací doklad (druh, cislo,
     splatnost …); chyby nechává propadnout volajícímu."""
     vozidla = [v.strip() for v in rz_full.split(",") if v.strip()] or ([vin] if vin else [])
     udaje = ppd_api.over({
         "druh": "faktura", "prijato_od": payer, "prijato_ico": payer_ico,
-        "prijato_adresa": payer_address, "castka": amount, "ucel": PPD_UCEL,
+        "prijato_dic": payer_dic, "prijato_adresa": payer_address, "castka": amount, "ucel": PPD_UCEL,
         "vozidla": vozidla, "zpracoval": str(data.get("profil") or "")[:ppd_api.MAX_ZPRACOVAL],
     })
     doklad, _novy = ppd_api.vystav(DATA_DIR, udaje, _adresa_firmy_podle_ico,
@@ -1653,12 +1654,13 @@ def _vystav_fakturu_k_zadosti(data: dict, amount: int, rz_full: str, vin: str,
 
 
 def _doklad_prevodem(result: dict, sdilene: list, data: dict, amount: int, rz_full: str,
-                     vin: str, payer: str, payer_ico: str, payer_address: str) -> None:
+                     vin: str, payer: str, payer_ico: str, payer_address: str,
+                     payer_dic: str = "") -> None:
     """Faktura místo PPD do výsledku /api/generate. Selhání faktury žádost
     neshodí; uživatel dostane `doklad_chyba` a doklad si vystaví znovu."""
     try:
         doklad = _vystav_fakturu_k_zadosti(data, amount, rz_full, vin,
-                                           payer, payer_ico, payer_address)
+                                           payer, payer_ico, payer_address, payer_dic)
     except (ppd_api.Chyba, ppd_api.FakturaNedostupna) as e:
         _log.warning("Faktura k žádosti odmítnuta: %s", e)
         result["doklad_chyba"] = ("Fakturu nejde vystavit: " + str(e)
@@ -1806,10 +1808,13 @@ def api_generate():
             # name or private person). Only when the field is empty do we fall
             # back to the buyer side — name AND its IČO together.
             explicit_name = (data.get("ppd_prijato_od") or "").strip()
+            payer_dic = ""
             if explicit_name:
                 payer = explicit_name
                 payer_ico = (data.get("ppd_prijato_ico") or "").strip()
                 payer_address = (data.get("ppd_prijato_adresa") or "").strip()
+                # A foreign customer picked from VIES; Czech ones get theirs from ARES.
+                payer_dic = faktura.cisty_dic(data.get("ppd_prijato_dic"))
             else:
                 payer, payer_ico, payer_address = resolve_payer_full(data)
             # Receipt fields the user fills go UPPERCASE too, matching the žádosti
@@ -1817,7 +1822,7 @@ def api_generate():
             payer = payer.upper()
             payer_address = payer_address.upper()
             _doklad_prevodem(result, sdilene, data, amount, rz_full, vin,
-                             payer, payer_ico, payer_address)
+                             payer, payer_ico, payer_address, payer_dic)
     except Exception as e:
         _log.warning("PPD generation failed: %s", e)
 

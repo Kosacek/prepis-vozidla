@@ -1333,9 +1333,10 @@
             <div class="field">
               <label>Přijato od</label>
               <div style="position:relative">
-                <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy nebo IČO)" autocomplete="off" oninput="ppdPayerSuggest();ppdNahledScheduled()" style="width:100%">
+                <input type="text" id="ppd_prijato_od" placeholder="(jméno, název firmy, IČO nebo DIČ)" autocomplete="off" oninput="ppdPayerSuggest();ppdNahledScheduled()" style="width:100%">
                 <input type="hidden" id="ppd_prijato_ico">
                 <input type="hidden" id="ppd_prijato_adresa">
+                <input type="hidden" id="ppd_prijato_dic">
                 <div class="firm-dropdown" id="ppd-payer-firms"></div>
               </div>
             </div>
@@ -2263,9 +2264,15 @@ async function ppdPayerSuggest() {
   const inp = document.getElementById('ppd_prijato_od');
   const dd  = document.getElementById('ppd-payer-firms');
   const q = inp.value.trim();
-  // User is typing → the previously-picked IČO/adresa no longer apply.
+  // User is typing → the previously-picked IČO/adresa/DIČ no longer apply,
+  // except a VIES DIČ whose name VIES does not publish: that one waits for
+  // the name typed here.
+  const vat = q.replace(/\s/g, '').toUpperCase();
+  const isVat = /^[A-Z]{2}[0-9A-Z]{2,13}$/.test(vat) && /\d/.test(vat) && !vat.startsWith('CZ');
+  const dicEl = document.getElementById('ppd_prijato_dic');
   document.getElementById('ppd_prijato_ico').value = '';
   document.getElementById('ppd_prijato_adresa').value = '';
+  if (dicEl && (isVat || dicEl.dataset.drzi !== '1')) { dicEl.value = ''; dicEl.dataset.drzi = ''; }
   if (!q) { dd.classList.remove('open'); return; }
   const firms = await getSavedFirms();
   const filtered = najdiFirmy(firms, q).slice(0, 8);
@@ -2284,13 +2291,42 @@ async function ppdPayerSuggest() {
     clearTimeout(_ppdAresTimer);
     _ppdAresTimer = setTimeout(() => ppdPayerAres(q), 400);
   }
+  // A foreign VAT number (SK…, HU…, DE…) → EU VIES (debounced). Czech DIČ
+  // is not needed: the faktura takes it from ARES by the IČO.
+  if (isVat) {
+    clearTimeout(_ppdAresTimer);
+    _ppdAresTimer = setTimeout(() => ppdPayerVies(vat), 400);
+  }
 }
-function ppdPayerPick(name, ico, adresa) {
-  document.getElementById('ppd_prijato_od').value = name;
+function ppdPayerPick(name, ico, adresa, dic) {
+  const inp = document.getElementById('ppd_prijato_od');
+  const dicEl = document.getElementById('ppd_prijato_dic');
+  inp.value = name;
   document.getElementById('ppd_prijato_ico').value = ico || '';
   document.getElementById('ppd_prijato_adresa').value = adresa || '';
+  if (dicEl) {
+    dicEl.value = dic || '';
+    // VIES confirmed the DIČ but keeps the name private (DE, ES…): type the name.
+    dicEl.dataset.drzi = dic && !name ? '1' : '';
+  }
   document.getElementById('ppd-payer-firms').classList.remove('open');
+  if (dic && !name) inp.focus();
   ppdNahledScheduled();
+}
+async function ppdPayerVies(dic) {
+  try {
+    const res = await fetch('/api/vies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({dic}) });
+    const d = await res.json();
+    const inp = document.getElementById('ppd_prijato_od');
+    if (!d || !d.success || !d.valid || inp.value.replace(/\s/g, '').toUpperCase() !== dic) return;
+    const dd = document.getElementById('ppd-payer-firms');
+    const nazev = d.nazev || '';
+    dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(nazev)}','','${esc(d.adresa||'')}','${esc(dic)}')">
+      <div class="firm-name">${nazev ? esc(nazev) : 'DIČ ' + esc(dic) + ' platné'}</div>
+      <div class="firm-sub">VIES · DIČ ${esc(dic)}${d.adresa ? ' · ' + esc(d.adresa) : ''}</div></div>`;
+    dd.classList.add('open');
+    _dropdownKlavesy(inp, dd, () => ppdPayerPick(nazev, '', d.adresa || '', dic));
+  } catch (e) { /* ignore — VIES optional */ }
 }
 async function ppdPayerAres(ico) {
   try {
@@ -3657,6 +3693,7 @@ async function generatePDFs() {
     ppd_prijato_od:      v('ppd_prijato_od'),
     ppd_prijato_ico:     v('ppd_prijato_ico'),
     ppd_prijato_adresa:  v('ppd_prijato_adresa'),
+    ppd_prijato_dic:     v('ppd_prijato_dic'),
     ppd_extra_spz:       ppdExtraSpzList().join(', '),
     profil:              (window.getProfil ? window.getProfil() : ''),
     // Evidence úkonu (evidence.spznaklic.cz) — stable id + the explicit choice.

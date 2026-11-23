@@ -122,3 +122,33 @@ def test_build_record_ppd_bez_druhu_faktura_s_druhem():
     assert "druh" not in ppd_push.build_record(base) and "splatnost" not in ppd_push.build_record(base)
     fa = ppd_push.build_record({**base, "druh": "faktura", "splatnost": "08.01.2026"})
     assert fa["druh"] == "faktura" and fa["splatnost"] == "08.01.2026"
+
+
+# ── DIČ zahraničního odběratele (VIES), 1.37.4 ──────────────────────────────
+def test_zahranicni_dic_z_formulare_je_na_fakture(client, tmp_path, monkeypatch, pushes):
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+    looked_up = []
+    monkeypatch.setattr(faktura, "dic_podle_ico", lambda ico: looked_up.append(ico) or "")
+    data = client.post("/api/generate", json=_payload(
+        ppd_prijato_od="Slovenská firma s.r.o.", ppd_prijato_dic=" sk 2020123456 ",
+        ppd_prijato_adresa="Mierová 1, Bratislava")).get_json()
+    rec = faktura.get_faktura(str(tmp_path), data["doklad_cislo"])
+    assert rec["dic"] == "SK2020123456" and rec["ico"] in ("", None)
+    tisk = client.get(data["ppd_print"]).data
+    from tests.test_faktura import _pdf_strings
+    text = " ".join(_pdf_strings(tisk).split())
+    assert "DIČ: SK2020123456" in text and "IČO" not in text.split("Odběratel")[1].split("Datum")[0]
+
+
+def test_neplatny_dic_z_formulare_se_zahodi_a_faktura_vznikne(client, tmp_path, monkeypatch, pushes):
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+    data = client.post("/api/generate", json=_payload(ppd_prijato_dic="<script>")).get_json()
+    assert data["doklad_druh"] == "faktura"
+    assert faktura.get_faktura(str(tmp_path), data["doklad_cislo"])["dic"] in ("", None)
+
+
+def test_formular_hleda_zahranicni_dic_ve_vies(client, monkeypatch):
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="ppd_prijato_dic"' in html and "ppdPayerVies" in html
+    assert "ppd_prijato_dic:" in html
