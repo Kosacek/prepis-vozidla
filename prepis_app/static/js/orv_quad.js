@@ -1,136 +1,98 @@
-// Skutečné rohy karty v obraze kamery nad stolem (žádosti 1.37.1).
-//
-// Kamera nad stolem stojí, takže nejlevnější spolehlivá cesta je rozdíl proti
-// prázdnému stolu (pozadí), ne hrany: na dřevěném stole by hrany splynuly se
-// vzorem dřeva. Postup na zmenšeném snímku (~256 px): rozdíl proti pozadí →
-// maska → otevření (šum pryč) → největší souvislá oblast → konvexní obal →
-// čtyřúhelník (průměr obalu = úhlopříčka, nejvzdálenější body po stranách) →
-// kontrola, že je to karta (vyplnění, poměr stran, velikost). Když karta
-// nesedí, vrátí null — obrys se pak nekreslí, nikdy se nic nepředstírá.
-// Žádné DOM ani časovače; testy v tests/test_orv_quad.cjs.
+// ORV outline on a small grayscale frame. Adapted from the Žádosti quad
+// detector: reuse the hull and card geometry checks with live contours so the
+// first frame can already contain a card. No DOM, timers or learned background.
 (function (root) {
   'use strict';
-  const DEFAULTS = Object.freeze({
-    diff: 30,          // rozdíl jasu proti pozadí, od kterého je pixel „karta"
-    minArea: 0.05,     // nejmenší karta (podíl snímku)
-    maxArea: 0.92,     // větší = změna světla nebo kamera viděla něco jiného
-    minFill: 0.82,     // plocha oblasti / plocha čtyřúhelníku (ruka přes kartu = méně)
-    minAspect: 1.2,    // ORV 85,6 × 54 mm = 1,59; perspektiva ho trochu mění
-    maxAspect: 2.2,
-    maxSkew: 18,       // kamera shora: rohy skoro pravé (°), ruka v záběru je zkřiví
-    maxSideRatio: 1.3, // protilehlé strany skoro stejně dlouhé
-  });
+  const EDGE = 32;
 
-  function create(options) {
-    const p = Object.assign({}, DEFAULTS, options || {});
-    let bg = null, w = 0, h = 0, mask = null, tmp = null, labels = null, stack = null;
+  function create() {
+    let mask = new Uint8Array(0), stack = new Int32Array(0);
 
-    function size(width, height) {
-      if (width === w && height === h) return;
-      w = width; h = height;
-      mask = new Uint8Array(w * h); tmp = new Uint8Array(w * h);
-      labels = new Int32Array(w * h); stack = new Int32Array(w * h);
-      bg = null;
-    }
-    function setBackground(gray, width, height) {
-      size(width, height);
-      bg = Uint8Array.from(gray);
-    }
-    // Eroze a dilatace 3×3 (otevření): osamělé pixely šumu zmizí, karta zůstane.
-    function morph(src, dst, erode) {
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          let v = erode ? 1 : 0;
-          for (let dy = -1; dy <= 1 && (erode ? v : !v); dy++) {
-            const yy = y + dy;
-            if (yy < 0 || yy >= h) { if (erode) v = 0; continue; }
-            for (let dx = -1; dx <= 1; dx++) {
-              const xx = x + dx;
-              const on = xx >= 0 && xx < w && src[yy * w + xx];
-              if (erode && !on) { v = 0; break; }
-              if (!erode && on) { v = 1; break; }
-            }
-          }
-          dst[y * w + x] = v;
-        }
+    function find(gray, w, h, guide) {
+      if (mask.length !== w * h) {
+        mask = new Uint8Array(w * h);
+        stack = new Int32Array(w * h);
       }
-    }
-    // Největší souvislá oblast (4-sousedství) → její hranice po řádcích.
-    function largest() {
-      labels.fill(0);
-      let best = 0, bestCount = 0, label = 0;
-      for (let i = 0; i < w * h; i++) {
-        if (!mask[i] || labels[i]) continue;
-        label++;
-        let top = 0, count = 0;
-        stack[top++] = i; labels[i] = label;
-        while (top) {
-          const j = stack[--top];
-          count++;
-          const x = j % w;
-          if (x > 0 && mask[j - 1] && !labels[j - 1]) { labels[j - 1] = label; stack[top++] = j - 1; }
-          if (x < w - 1 && mask[j + 1] && !labels[j + 1]) { labels[j + 1] = label; stack[top++] = j + 1; }
-          if (j >= w && mask[j - w] && !labels[j - w]) { labels[j - w] = label; stack[top++] = j - w; }
-          if (j < w * (h - 1) && mask[j + w] && !labels[j + w]) { labels[j + w] = label; stack[top++] = j + w; }
-        }
-        if (count > bestCount) { best = label; bestCount = count; }
-      }
-      if (!best) return null;
-      const pts = [];
-      for (let y = 0; y < h; y++) {
-        let l = -1, r = -1;
-        for (let x = 0; x < w; x++) if (labels[y * w + x] === best) { if (l < 0) l = x; r = x; }
-        if (l >= 0) { pts.push([l, y], [r + 1, y], [l, y + 1], [r + 1, y + 1]); }
-      }
-      return {count: bestCount, pts};
-    }
-
-    function find(gray, width, height) {
-      if (!bg || width !== w || height !== h) return null;
-      for (let i = 0; i < w * h; i++) tmp[i] = Math.abs(gray[i] - bg[i]) > p.diff ? 1 : 0;
-      morph(tmp, mask, true);
-      morph(mask, tmp, false);
-      mask.set(tmp);
-      const blob = largest();
-      if (!blob || blob.count < p.minArea * w * h) return null;
-      const quad = quadOf(hull(blob.pts));
-      if (!quad) return null;
-      const area = polyArea(quad);
-      const fill = blob.count / area;
-      const sides = [0, 1, 2, 3].map(k => dist(quad[k], quad[(k + 1) % 4]));
-      const long = (sides[0] + sides[2]) / 2, short = (sides[1] + sides[3]) / 2;
-      const aspect = Math.max(long, short) / Math.max(1, Math.min(long, short));
-      const share = area / (w * h);
-      const skew = Math.max(...[0, 1, 2, 3].map(k => Math.abs(90 - angle(quad[(k + 3) % 4], quad[k], quad[(k + 1) % 4]))));
-      const rovne = skew <= p.maxSkew && Math.max(sides[0], sides[2]) / Math.max(1, Math.min(sides[0], sides[2])) <= p.maxSideRatio &&
-        Math.max(sides[1], sides[3]) / Math.max(1, Math.min(sides[1], sides[3])) <= p.maxSideRatio;
-      const ok = rovne && fill >= p.minFill && share <= p.maxArea && aspect >= p.minAspect && aspect <= p.maxAspect;
-      // Uvnitř je méně potisku než v pozadí: karta odešla a „vidí" se jen
-      // díra po ní (pozadí se učilo s kartou na stole) → pozadí naučit znovu.
-      const hole = ok && energy(gray, quad) < energy(bg, quad) * 0.6;
-      return {
-        ok: ok && !hole, hole, fill, aspect, share, skew,
-        corners: quad.map(([x, y]) => [x / w, y / h]),
-      };
-    }
-    // Součet gradientů uvnitř obdélníku čtyřúhelníku (potisk karty).
-    function energy(g, quad) {
-      const xs = quad.map(q => q[0]), ys = quad.map(q => q[1]);
-      const x0 = Math.max(1, Math.floor(Math.min(...xs))), x1 = Math.min(w - 2, Math.ceil(Math.max(...xs)));
-      const y0 = Math.max(1, Math.floor(Math.min(...ys))), y1 = Math.min(h - 2, Math.ceil(Math.max(...ys)));
-      let sum = 0;
-      for (let y = y0; y <= y1; y += 2) {
-        for (let x = x0; x <= x1; x += 2) {
+      mask.fill(0);
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
           const i = y * w + x;
-          sum += Math.abs(g[i + 1] - g[i - 1]) + Math.abs(g[i + w] - g[i - w]);
+          if (Math.abs(gray[i + 1] - gray[i - 1]) + Math.abs(gray[i + w] - gray[i - w]) >= EDGE) {
+            // Bridge one-pixel breaks in the outline at this analysis resolution.
+            for (let dy = -1; dy <= 1; dy++) mask.fill(1, i + dy * w - 1, i + dy * w + 2);
+          }
         }
       }
-      return sum;
+
+      const left = new Int32Array(h), right = new Int32Array(h);
+      let best = null, bestArea = 0;
+      for (let i = 0; i < mask.length; i++) {
+        if (!mask[i]) continue;
+        left.fill(w);
+        right.fill(-1);
+        let top = 0, clipped = false;
+        push(i);
+        while (top) {
+          const j = stack[--top], x = j % w, y = Math.floor(j / w);
+          left[y] = Math.min(left[y], x);
+          right[y] = Math.max(right[y], x);
+          if (x === 0 || y === 0 || x === w - 1 || y === h - 1) clipped = true;
+          if (x > 0 && mask[j - 1]) push(j - 1);
+          if (x < w - 1 && mask[j + 1]) push(j + 1);
+          if (y > 0 && mask[j - w]) push(j - w);
+          if (y < h - 1 && mask[j + w]) push(j + w);
+        }
+        function push(j) {
+          mask[j] = 0;
+          stack[top++] = j;
+        }
+        if (clipped) continue;
+
+        const points = [];
+        for (let y = 0; y < h; y++) {
+          if (right[y] >= 0) points.push([left[y], y], [right[y], y]);
+        }
+        if (points.length < h * 0.3) continue;
+        const outline = hull(points);
+        const quad = quadOf(outline);
+        if (!quad) continue;
+        const area = polyArea(quad);
+        if (area <= bestArea || area < w * h * 0.08 || area > w * h * 0.92 ||
+            area < polyArea(outline) * 0.88) continue;
+        const sides = quad.map((pt, k) => dist(pt, quad[(k + 1) % 4]));
+        const a = (sides[0] + sides[2]) / 2, b = (sides[1] + sides[3]) / 2;
+        const aspect = Math.max(a, b) / Math.min(a, b);
+        if (aspect < 1.2 || aspect > 2.2 || sides[0] / sides[2] > 1.5 || sides[2] / sides[0] > 1.5 ||
+            sides[1] / sides[3] > 1.5 || sides[3] / sides[1] > 1.5 ||
+            quad.some((pt, k) => Math.abs(90 - angle(quad[(k + 3) % 4], pt, quad[(k + 1) % 4])) > 25)) continue;
+        const cx = quad.reduce((sum, pt) => sum + pt[0], 0) / (4 * w);
+        const cy = quad.reduce((sum, pt) => sum + pt[1], 0) / (4 * h);
+        if (cx < guide.x || cx > guide.x + guide.w || cy < guide.y || cy > guide.y + guide.h) continue;
+        if (!quad.every((pt, k) => supported(gray, w, h, pt, quad[(k + 1) % 4], sides[k]))) continue;
+
+        bestArea = area;
+        best = quad.map(([x, y]) => [x / w, y / h]);
+      }
+      return best;
     }
-    return {find, setBackground, hasBackground: () => !!bg, params: Object.freeze(Object.assign({}, p))};
+    return {find};
   }
 
-  // ── Geometrie ───────────────────────────────────────────────────────────────
+  // Each side must have an edge for most of its length. A hull alone also
+  // fits open shapes, wood grain and isolated bits of printing.
+  function supported(gray, w, h, a, b, length) {
+    const nx = (b[1] - a[1]) / length, ny = (a[0] - b[0]) / length;
+    const pixel = (x, y) => gray[Math.round(y) * w + Math.round(x)];
+    let hits = 0;
+    for (let k = 1; k <= 9; k++) {
+      const x = a[0] + (b[0] - a[0]) * k / 10, y = a[1] + (b[1] - a[1]) * k / 10;
+      const x0 = x - 5 * nx, y0 = y - 5 * ny, x1 = x + nx, y1 = y + ny;
+      if (Math.min(x0, x1) < 0 || Math.min(y0, y1) < 0 ||
+          Math.max(x0, x1) > w - 1 || Math.max(y0, y1) > h - 1) continue;
+      if (Math.abs(pixel(x0, y0) - pixel(x1, y1)) >= EDGE) hits++;
+    }
+    return hits >= 6;
+  }
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   // Úhel ve vrcholu b mezi body a a c, ve stupních.
@@ -187,7 +149,7 @@
     return Math.abs(s) / 2;
   }
 
-  const api = {create, hull, quadOf, order, polyArea, DEFAULTS};
+  const api = {create};
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.OrvQuad = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -10,7 +10,7 @@
 //   onTick(info),           every analysed frame (lock / progress for the UI)
 //   params, fps, qrFps, jsqrUrl, debug
 // })
-// After onFire the app calls commit(photoId) or release(); after a manual
+// After onFire the app calls commit(photoId, verifiedQr) or release(); after a manual
 // shot manual(photoId, qr); when a photo leaves the batch forget(photoId).
 // verify(canvas, w, h) reads the QR from the photo itself before upload.
 (function (root) {
@@ -25,18 +25,18 @@
   function zachyt(reason, info) {
     const i = info || {};
     return [reason, 'm=' + num(i.motion, 1, 9999), 's=' + num(i.sharp, 0, 99999),
-      'e=' + num(i.edges, 3, 1)].join(' ');
+      'e=' + num(i.edges, 3, 1), 'quad=' + Number(!!i.quad)].join(' ');
   }
 
   function create(o) {
     const core = C.create(o.params);
-    const p = core.params;
+    const detector = root.OrvQuad ? root.OrvQuad.create() : null;
     const qr = root.OrvQr ? root.OrvQr.create({jsqrUrl: o.jsqrUrl, guide: o.guide}) : null;
     const guide = o.guide || {x: 0.08, y: 0.06, w: 0.84, h: 0.88};
     const period = 1000 / (o.fps || 8), qrPeriod = 1000 / (o.qrFps || 4);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', {willReadFrequently: true});
-    let timer = null, running = false, enabled = true, prev = null, armed = true;
+    let timer = null, running = false, enabled = true, prev = null, stable = false;
     // A QR read belongs to the frame it was taken from; any real movement
     // after that frame (qrGen++) throws the read away when it arrives.
     let qrGen = 0, qrTry = -Infinity, qrResult = null, lastLog = -Infinity;
@@ -48,9 +48,8 @@
         (info.qr ? ' qr=' + info.qr : '');
       (kind === 'tick' ? root.console.debug : root.console.info).call(root.console, '[orv-auto] ' + kind + ' ' + line);
     }
-    function readQr(v, crop, t, m) {
-      if (!qr || m == null || m > p.steadyMotion * 2) return; // only a steady picture is worth it
-      if (t - qrTry < (armed ? qrPeriod : 1000)) return;
+    function readQr(v, crop, t, out) {
+      if (!qr || !out.stable || t - qrTry < (out.armed ? qrPeriod : 1000)) return;
       qrTry = t;
       const gen = qrGen;
       qr.decode(v, crop).then(value => {
@@ -72,15 +71,18 @@
       const t = clock();
       const m = C.motion(prev, g);
       prev = g;
-      if (m == null || m > p.enterMotion) { qrGen++; qrResult = null; }
+      const quad = detector ? detector.find(g, WIDTH, h, guide) : null;
       const found = qrResult;
       qrResult = null;
       const sample = {t, motion: m, sharp: C.sharpness(g, WIDTH, h, guide), edges: C.edges(g, WIDTH, h, guide),
-        sig: C.signature(g, WIDTH, h), qr: found ? found.value : null, qrT: found ? found.t : t};
-      readQr(v, crop, t, m);
+        sig: C.signature(g, WIDTH, h), quad, cardSig: quad ? C.cardSignature(g, WIDTH, h, quad) : null,
+        qr: found ? found.value : null, qrT: found ? found.t : t};
       const out = core.step(sample);
-      armed = out.armed;
-      const info = Object.assign({}, out, {motion: m, sharp: sample.sharp, edges: sample.edges, t});
+      if (!out.stable) qrGen++;
+      if (out.stable && !stable) qrTry = -Infinity;
+      stable = out.stable;
+      if (!out.fire) readQr(v, crop, t, out);
+      const info = Object.assign({}, out, {motion: m, sharp: sample.sharp, edges: sample.edges, quad: !!quad, t});
       if (o.onTick) o.onTick(info);
       if (out.rearmed) log('rearm ' + out.rearmed, info);
       if (o.debug && t - lastLog >= 1000) { lastLog = t; log('tick', info); }
@@ -99,6 +101,7 @@
       if (running) return;
       running = true;
       prev = null;
+      stable = false;
       core.reset(); // a restarted camera looks at a new scene: learn it afresh
       if (qr) qr.prepare();
       timer = setTimeout(tick, period);
@@ -115,12 +118,13 @@
       enabled = !!on;
       prev = null;
       qrGen++;
+      qrResult = null;
       if (!enabled) core.reset();
     }
     return {
       start, stop, setEnabled,
       isEnabled: () => enabled,
-      commit: id => core.commit(id),
+      commit: (id, value) => core.commit(id, value),
       release: () => core.release(),
       // Only while the auto-capture watches: otherwise there is no scene to lock.
       manual: (id, value) => { if (enabled && running) core.manual(id, value); },

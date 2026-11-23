@@ -3,11 +3,13 @@
 // No DOM, no timers, no app names: feed `step()` one sample per analysed frame
 // and it says when to take the photo. Žádosti copies this file verbatim.
 //
-// A sample is {t (ms), motion, sharp, edges, sig, qr, qrT}:
+// A sample is {t (ms), motion, sharp, edges, sig, quad, cardSig, qr, qrT}:
 //   motion  mean absolute grey difference to the previous analysed frame (0–255)
 //   sharp   variance of the Laplacian inside the guide (focus / blur)
 //   edges   share of strong-gradient pixels inside the guide (printed card vs. bare desk)
 //   sig     coarse grey signature of the frame (`signature()`), to tell scenes apart
+//   quad    four cyclically ordered corners in fractions of the frame, or null
+//   cardSig coarse signature sampled inside the quad, independent of its position
 //   qr      an ORV number decoded from a QR in the guide, or null
 //   qrT     time of the frame that QR was decoded from (defaults to t)
 //
@@ -20,8 +22,10 @@
   // Every misfire costs a Haiku read and a "nečitelné" card, so these lean
   // conservative. Tune them from the logged values on a real phone.
   const DEFAULTS = Object.freeze({
-    steadyMotion: 6,    // at or below: the frame is still (hand tremor included)
-    enterMotion: 14,    // above: something moved in the picture
+    steadyMotion: 18,   // fallback when corners are unavailable
+    enterMotion: 35,    // large change in a scene without a quad
+    quadMotion: 0.025, // maximum corner displacement from the start of a hold
+    requireQuad: false, // phones opt in; fixed cameras can use the empty desk
     sharpMin: 90,       // Laplacian variance that counts as in focus
     edgeMin: 0.045,     // printed card inside the guide
     emptyEdge: 0.02,    // below: the guide is empty (card taken away)
@@ -104,27 +108,62 @@
     return sum / a.length;
   }
 
+  function cardSignature(g, w, h, quad) {
+    const [a, b, c, d] = quad;
+    const out = [];
+    for (let row = 1; row <= 9; row++) {
+      const v = row / 10;
+      for (let col = 1; col <= 16; col++) {
+        const u = col / 17;
+        const x = (1 - v) * ((1 - u) * a[0] + u * b[0]) + v * ((1 - u) * d[0] + u * c[0]);
+        const y = (1 - v) * ((1 - u) * a[1] + u * b[1]) + v * ((1 - u) * d[1] + u * c[1]);
+        const px = Math.max(2, Math.min(w - 3, Math.round(x * w)));
+        const py = Math.max(2, Math.min(h - 3, Math.round(y * h)));
+        let sum = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) sum += g[(py + dy) * w + px + dx];
+        }
+        out.push(sum / 25);
+      }
+    }
+    return out;
+  }
+
+  function nearby(a, b, limit) {
+    // The detector's first corner can change when the card is diagonal.
+    return a.some((_, shift) => a.every(([x, y], k) => {
+      const [bx, by] = b[(k + shift) % 4];
+      return Math.hypot(x - bx, y - by) <= limit;
+    }));
+  }
+
   // -- Decision --------------------------------------------------------------
   // One photo per card. After a photo nothing fires until the scene clearly
-  // changes: the guide goes empty, the idle background comes back, a new still
-  // scene unlike the photographed one, or a different QR. The same QR never
-  // fires twice in a row. Without a QR, a still scene must also differ from
-  // the idle background, so a hand passing over a textured desk fires nothing.
+  // changes: the quad leaves, a different card settles in view, or a different
+  // QR appears. A fixed camera can also re-arm against its learned idle scene.
   function create(options) {
     const p = Object.assign({}, DEFAULTS, options || {});
     let s;
     function reset() {
-      s = {captured: false, entered: false, lastQr: null, ref: null, bg: null, lastFire: -Infinity,
+      s = {captured: false, entered: false, lastQr: null, photoQrs: new Map(), ref: null, bg: null, lastFire: -Infinity,
+        quadAnchor: null,
         stillSince: null, goodSince: null, emptySince: null, newSince: null,
-        recentQr: null, recentQrT: -Infinity, reserved: null, photoId: null, lastSig: null, lastT: 0};
+        recentQr: null, recentQrT: -Infinity, reserved: null, photoId: null, lastFrame: null};
     }
     function since(key, on, t) { s[key] = on ? (s[key] == null ? t : s[key]) : null; }
     const differs = (a, b) => !!a && !!b && sigDiff(a, b) >= p.sceneDiff;
+    function seen(qr) {
+      for (const value of s.photoQrs.values()) if (value === qr) return true;
+      return false;
+    }
 
     function rearm(x, t, qr, still) {
-      since('emptySince', x.edges < p.emptyEdge, t);
-      since('newSince', still && differs(x.sig, s.ref), t);
-      const otherQr = !!qr && !!s.lastQr && qr !== s.lastQr;
+      since('emptySince', s.ref?.quad ? !x.quad : !x.quad && x.edges < p.emptyEdge, t);
+      const newScene = s.ref?.quad
+        ? x.quad && differs(x.cardSig, s.ref.cardSig)
+        : differs(x.sig, s.ref?.sig);
+      since('newSince', still && newScene, t);
+      const otherQr = !!qr && !!s.lastQr && qr !== s.lastQr && !seen(qr);
       const empty = s.emptySince != null && t - s.emptySince >= p.rearmMs;
       const fresh = s.newSince != null && t - s.newSince >= p.rearmMs;
       if (!otherQr && !empty && !fresh) return null;
@@ -132,30 +171,39 @@
       s.emptySince = s.newSince = null;
       if (otherQr) return 'jiny-qr';
       // The idle background again counts as an empty guide.
-      const background = fresh && s.bg && !differs(x.sig, s.bg);
+      const background = fresh && !x.quad && s.bg && !differs(x.sig, s.bg);
       if (empty || background) { s.entered = false; return 'prazdno'; }
       s.entered = true; // a new card replaced the photographed one in one move
       return 'nova-scena';
     }
-    function lock(t, sig, qr, photoId) {
+    function lock(x, qr, photoId) {
       s.captured = true;
-      s.ref = sig || null;
+      s.ref = x;
       s.lastQr = qr || null;
-      s.lastFire = t;
+      s.lastFire = x?.t ?? 0;
       s.entered = false;
-      s.stillSince = s.goodSince = null;
+      s.stillSince = s.goodSince = s.emptySince = s.newSince = null;
       s.photoId = photoId == null ? null : photoId;
     }
-    function fire(x, t, reason, qr) {
-      s.reserved = {lastQr: s.lastQr, ref: s.ref, entered: s.entered, photoId: s.photoId};
-      lock(t, x.sig, qr, null);
-      return {fire: true, reason, qr: qr || null, armed: false, locked: true, progress: 1, rearmed: null};
+    function fire(x, reason, qr) {
+      s.reserved = {lastQr: s.lastQr, ref: s.ref, photoId: s.photoId};
+      lock(x, qr, null);
+      return {fire: true, reason, qr: qr || null, armed: false, locked: true, stable: true, progress: 1, rearmed: null};
     }
     function step(x) {
       const t = +x.t;
       const m = typeof x.motion === 'number' ? x.motion : null;
-      const still = m != null && m <= p.steadyMotion;
-      if (m != null && m > p.enterMotion) { s.entered = true; s.recentQr = null; }
+      // A card can be swapped without changing the outline. Invalidate any
+      // pending QR if both raw motion and the card's own content jump.
+      const swapped = x.quad && m > p.enterMotion && differs(x.cardSig, s.lastFrame?.cardSig);
+      const changed = swapped || !!x.quad !== !!s.quadAnchor ||
+        (x.quad && s.quadAnchor && !nearby(x.quad, s.quadAnchor, p.quadMotion));
+      if (changed || m == null) {
+        s.quadAnchor = x.quad || null;
+        s.stillSince = s.goodSince = s.newSince = s.recentQr = null;
+      }
+      const still = m != null && (x.quad ? !changed || !s.lastFrame?.quad : m <= p.steadyMotion);
+      if (!x.quad && m != null && m > p.enterMotion) s.entered = true;
       since('stillSince', still, t);
       // A QR counts only when it was read in the current still spell: a read
       // from before the card moved must never ride along with the next card.
@@ -165,36 +213,41 @@
       const qr = s.recentQr && s.stillSince != null && s.recentQrT >= s.stillSince &&
         t - s.recentQrT <= p.qrMemoryMs ? s.recentQr : null;
       const sharp = x.sharp >= p.sharpMin;
-      const card = x.edges >= p.edgeMin;
-      since('goodSince', still && sharp && card, t);
-      // Learn the idle background: a still scene while nothing has moved in,
-      // and at start the first scene held still (raising the phone counts as
-      // movement, and the desk it then looks at must not fire). A card already
-      // held up when the camera opens becomes the background: it needs the
-      // shutter or a QR, never a guess.
-      if (!s.captured && still && x.sig && t - s.stillSince >= p.rearmMs && (!s.entered || !s.bg)) s.bg = x.sig;
-      s.lastSig = x.sig || s.lastSig;
-      s.lastT = t;
+      const edges = x.edges >= p.edgeMin;
+      const card = !!x.quad || (!p.requireQuad && s.entered && !!s.bg && differs(x.sig, s.bg));
+      since('goodSince', still && sharp && edges && card, t);
+      // Only the fixed-camera fallback learns an idle background.
+      if (!p.requireQuad && !x.quad && !s.captured && still && x.sig &&
+          t - s.stillSince >= p.rearmMs && (!s.entered || !s.bg)) s.bg = x.sig;
+      s.lastFrame = x;
       const rearmed = s.captured && !s.reserved ? rearm(x, t, qr, still) : null;
-      const base = {fire: false, reason: null, qr, armed: !s.captured, locked: false, progress: 0, rearmed};
-      if (s.captured || t - s.lastFire < p.cooldownMs) return base;
+      const base = {fire: false, reason: null, qr, armed: !s.captured, locked: false, stable: still, progress: 0, rearmed};
+      if (s.captured) return {...base, reason: 'captured'};
+      if (t - s.lastFire < p.cooldownMs) return {...base, reason: 'cooldown'};
+      if (!still) return {...base, reason: 'moving'};
+      if (p.requireQuad && !x.quad) return {...base, reason: 'no-quad'};
       if (qr) {
-        if (qr === s.lastQr) return base; // the same card again: never automatic
-        const held = s.stillSince == null ? 0 : t - s.stillSince;
-        const ready = still && x.sharp >= p.sharpMin * 0.7;
-        if (ready && held >= p.qrHoldMs) return fire(x, t, 'qr', qr);
-        return Object.assign(base, {locked: ready, progress: ready ? Math.min(1, held / p.qrHoldMs) : 0});
+        if (seen(qr)) return {...base, reason: 'same-qr'};
+        if (x.sharp < (x.quad ? p.sharpMin : p.sharpMin * 0.7)) return {...base, reason: 'blur'};
+        if (x.quad && !edges) return {...base, reason: 'few-edges'};
+        const held = t - (x.quad ? s.goodSince : s.stillSince);
+        if (held >= p.qrHoldMs) return fire(x, 'qr', qr);
+        return {...base, reason: 'qr-hold', locked: true, progress: held / p.qrHoldMs};
       }
-      const held = s.goodSince == null ? 0 : t - s.goodSince;
-      const locked = s.entered && s.goodSince != null && (!s.bg || differs(x.sig, s.bg));
-      if (locked && held >= p.holdMs) return fire(x, t, 'klid', null);
-      return Object.assign(base, {locked, progress: locked ? Math.min(1, held / p.holdMs) : 0});
+      if (!sharp) return {...base, reason: 'blur'};
+      if (!edges) return {...base, reason: 'few-edges'};
+      if (s.goodSince == null) return {...base, reason: 'idle-scene'};
+      const held = t - s.goodSince;
+      if (held >= p.holdMs) return fire(x, 'klid', null);
+      return {...base, reason: 'hold', locked: true, progress: held / p.holdMs};
     }
     // The reserved photo is in the batch.
-    function commit(photoId) {
+    function commit(photoId, qr) {
       if (!s.reserved) return;
       s.reserved = null;
       s.photoId = photoId == null ? null : photoId;
+      s.lastQr = cleanQr(qr) || s.lastQr;
+      if (s.lastQr) s.photoQrs.set(s.photoId, s.lastQr);
     }
     // The reserved photo failed: the same card may fire again after the cooldown.
     function release() {
@@ -209,12 +262,15 @@
     // A manual shot of the scene in front: no automatic duplicate of it.
     function manual(photoId, qr) {
       if (s.reserved) return;
-      lock(s.lastT, s.lastSig, cleanQr(qr), photoId);
+      lock(s.lastFrame, cleanQr(qr), photoId);
+      if (s.lastQr) s.photoQrs.set(s.photoId, s.lastQr);
     }
     // The latest photo was removed from the batch: its card may be taken again,
     // even while it is still held in front of the camera.
     function forget(photoId) {
-      if (photoId == null || photoId !== s.photoId || s.reserved) return;
+      if (photoId == null) return;
+      s.photoQrs.delete(photoId);
+      if (photoId !== s.photoId || s.reserved) return;
       s.captured = false;
       s.lastQr = s.ref = s.photoId = null;
       s.entered = true;
@@ -224,7 +280,7 @@
     return {step, reset, commit, release, manual, forget, params: Object.freeze(Object.assign({}, p))};
   }
 
-  const api = {DEFAULTS, cleanQr, gray, motion, sharpness, edges, signature, sigDiff, create};
+  const api = {DEFAULTS, cleanQr, gray, motion, sharpness, edges, signature, cardSignature, sigDiff, create};
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.OrvAutoCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);

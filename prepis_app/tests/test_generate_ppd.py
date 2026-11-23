@@ -59,8 +59,9 @@ def _pdf_text(data: bytes) -> str:
 
 
 @pytest.fixture(autouse=True)
-def evidence_pushes(monkeypatch):
+def evidence_pushes(client, monkeypatch):
     """Capture both request hooks; ordinary PDF tests never start HTTP threads."""
+    # Install the capture after client disables the real tracker sender.
     calls = {"ppd": [], "tracker": []}
     monkeypatch.setattr(ppd_push, "push_async", lambda body, dd: calls["ppd"].append((body, dd)))
     monkeypatch.setattr(tracker_push, "push_async", lambda data, dd: calls["tracker"].append(

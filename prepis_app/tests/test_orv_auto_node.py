@@ -1,7 +1,7 @@
 """Auto-sken ORV (1.37.0): node testy modulů z evidence a stráže žádostí.
 
-tests/test_orv_auto.cjs je kopie z evidence (moduly static/js/orv_auto_core.js,
-orv_qr.js a orv_auto.js jsou beze změny), tests/test_orv_auto_zadosti.cjs hlídá,
+tests/test_orv_auto.cjs je kopie z evidence stejně jako sdílené JS moduly,
+tests/test_orv_auto_zadosti.cjs hlídá,
 že karta, která po skenu zůstala na stole, se do další žádosti sama nenaskenuje.
 """
 import os
@@ -25,7 +25,7 @@ def test_node(soubor):
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-2000:]
 
 
-@pytest.mark.parametrize("modul", ["orv_auto_core.js", "orv_qr.js", "orv_auto.js"])
+@pytest.mark.parametrize("modul", ["orv_auto_core.js", "orv_qr.js", "orv_auto.js", "orv_quad.js"])
 def test_moduly_jsou_stejne_jako_v_evidenci(modul):
     """Opravu dělat v evidenci a zkopírovat sem — ať se kód nerozejde."""
     vlastni = os.path.join(TESTS, "..", "static", "js", modul)

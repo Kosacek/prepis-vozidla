@@ -1,7 +1,7 @@
 // Žádosti: ORV se naskenuje samo, když ho položíš pod kameru (1.37.0).
 //
-// Rozhodování a QR jsou moduly evidence 2.10.0 beze změny (orv_auto_core.js,
-// orv_qr.js, orv_auto.js). Tady je jen to, co je jiné u kamery nad stolem:
+// Rozhodování, QR a obrys jsou sdílené s evidencí. Tady je jen to, co je
+// jiné u kamery nad stolem:
 // - Jediné živé <video> (novaZadost ho jen přesouvá). Kvůli auto-skenu se
 //   kamera nikdy nezavírá ani neotevírá: USB kamera se po rychlém puštění a
 //   novém otevření zasekne (KAMERA_KLID_MS). Smyčka se proto spustí jednou a
@@ -22,25 +22,29 @@
   const QR_PAMET_MS = 30 * 60 * 1000;   // po obnovení stránky si pamatuje poslední QR kartu
   const VZOREK_MS = 5 * 60 * 1000;      // vzorek čísel do kamera logu (ladění prahů)
   const QR_FOTKA_MS = 1500;             // jak dlouho sken čeká na QR z fotky
+  const PARAMETRY_STOLU = {steadyMotion: 6, enterMotion: 14};
+  const VODITKO = {x: 0.08, y: 0.06, w: 0.84, h: 0.88};
 
   // ── Stráž: kdy smí další auto-sken (bez DOM, testy v tests/test_orv_auto_zadosti.cjs)
-  function straz(edgeMin) {
-    let cekame = false, posledniQr = null;
+  function straz(edgeMin, rearmMs) {
+    let cekame = false, posledniQr = null, prazdnoOd = null;
     return {
       // Právě se odeslal sken (sám nebo Enterem) karty s tímhle QR (nebo bez).
-      poSkenu(qr) { cekame = true; posledniQr = qr || null; },
+      poSkenu(qr) { cekame = true; posledniQr = qr || null; prazdnoOd = null; },
       // Po obnovení stránky: QR karta, která se skenovala naposled.
       obnov(qr) { if (qr) { cekame = true; posledniQr = qr; } },
-      // Stůl je zase prázdný: prázdné hledí, znovu klidné pozadí, nebo nová
-      // klidná scéna bez potisku. Vrací true, když se tím stráž uvolnila.
+      // Chybějící obrys sám nestačí: ruka může zakrýt roh karty.
+      // Prázdný stůl potvrzujeme i po tom, co se sdílený detektor už odjistil.
       tick(info) {
-        if (!cekame || !info || !info.rearmed) return false;
-        if (info.rearmed === 'prazdno' || (info.rearmed === 'nova-scena' && info.edges < edgeMin)) {
-          cekame = false;
-          posledniQr = null;
-          return true;
+        if (!cekame || !info || !info.stable || info.quad || info.edges >= edgeMin) {
+          prazdnoOd = null;
+          return false;
         }
-        return false;
+        if (prazdnoOd == null) prazdnoOd = info.t;
+        if (info.t - prazdnoOd < rearmMs) return false;
+        cekame = false;
+        posledniQr = prazdnoOd = null;
+        return true;
       },
       // Posunutá karta, ruka v záběru nebo stejný QR se znovu nefotí.
       smiFotit(reason, qr) {
@@ -51,7 +55,7 @@
     };
   }
 
-  const api = {straz};
+  const api = {straz, PARAMETRY_STOLU};
   if (typeof module === 'object' && module.exports) { module.exports = api; return; }
   root.OrvAutoZadosti = api;
 
@@ -80,7 +84,8 @@
     try { ladeni = ladeni || new URLSearchParams(location.search).get('ladeni') === '1'; } catch (_) {}
     let zapnuto = cti(KLIC_AUTO) !== '0';
     let fotka = 0, posledniVzorek = -Infinity;
-    const hlidac = straz(root.OrvAutoCore.DEFAULTS.edgeMin);
+    const {edgeMin, rearmMs} = root.OrvAutoCore.DEFAULTS;
+    const hlidac = straz(edgeMin, rearmMs);
 
     function dialogOtevreny() {
       if (document.querySelector('dialog[open], .nv.is-open')) return true;
@@ -102,38 +107,18 @@
     function hledi() { return document.getElementById('orv-hledi'); }
     const nahled = root.OrvNahled ? root.OrvNahled.create(video, {log}) : null;
 
-    // ── Obrys karty: rohy z rozdílu proti prázdnému stolu (orv_quad.js) ──
-    // Pozadí = klidný snímek stolu: první klidná vteřina, potvrzený prázdný
-    // stůl (auto_prazdno), „díra" po kartě, která ležela v pozadí, nebo 4 s
-    // klidu bez karty (změna světla).
+    // Obrys pro náhled se počítá z většího snímku než rozhodnutí o skenu.
     const QUAD_W = 256;
     const detektor = root.OrvQuad ? root.OrvQuad.create() : null;
     const qPlatno = document.createElement('canvas');
     const qCtx = qPlatno.getContext('2d', {willReadFrequently: true});
-    let klidOd = null, posledniKarta = -Infinity, ucitPozadi = false;
     function obrys(info) {
       if (!detektor || !nahled || !video.videoWidth) return;
       const h = Math.max(1, Math.round(QUAD_W * video.videoHeight / video.videoWidth));
       if (qPlatno.width !== QUAD_W || qPlatno.height !== h) { qPlatno.width = QUAD_W; qPlatno.height = h; }
       qCtx.drawImage(video, 0, 0, QUAD_W, h);
       const g = root.OrvAutoCore.gray(qCtx.getImageData(0, 0, QUAD_W, h).data, QUAD_W, h);
-      const klid = typeof info.motion === 'number' && info.motion <= root.OrvAutoCore.DEFAULTS.steadyMotion;
-      klidOd = klid ? (klidOd == null ? info.t : klidOd) : null;
-      const klidMs = klidOd == null ? 0 : info.t - klidOd;
-      if (!detektor.hasBackground() || (ucitPozadi && klid)) {
-        if (klidMs >= 1000 || ucitPozadi) { detektor.setBackground(g, QUAD_W, h); ucitPozadi = false; }
-        nahled.quad(null);
-        return;
-      }
-      const r = detektor.find(g, QUAD_W, h);
-      if (r && r.hole && klidMs >= 500) { detektor.setBackground(g, QUAD_W, h); nahled.quad(null); return; }
-      if (r && r.ok) {
-        posledniKarta = info.t;
-        nahled.quad(r.corners, info.locked ? 'zamek' : 'sleduje');
-        return;
-      }
-      nahled.quad(null);
-      if (klidMs >= 4000 && info.t - posledniKarta >= 4000 && !info.locked) detektor.setBackground(g, QUAD_W, h);
+      nahled.quad(detektor.find(g, QUAD_W, h, VODITKO), info.locked ? 'zamek' : 'sleduje');
     }
 
     function ukaz(info) {
@@ -157,35 +142,50 @@
     function onTick(info) {
       ukaz(info);
       try { obrys(info); } catch (_) { if (nahled) nahled.quad(null); }   // obrys nesmí shodit sken
-      if (info.rearmed === 'prazdno') ucitPozadi = true;   // potvrzený prázdný stůl = nové pozadí
-      if (hlidac.tick(info)) log('auto_prazdno', root.OrvAuto.zachyt(info.rearmed, info));
-      else if (info.rearmed) logTlumene('auto_rearm', root.OrvAuto.zachyt(info.rearmed, info));
+      if (hlidac.tick(info)) {
+        auto.forget(fotka);
+        log('auto_prazdno', root.OrvAuto.zachyt('prazdno', info));
+      } else if (info.rearmed) logTlumene('auto_rearm', root.OrvAuto.zachyt(info.rearmed, info));
       if (info.t - posledniVzorek >= VZOREK_MS) {
         posledniVzorek = info.t;
         log('auto_vzorek', root.OrvAuto.zachyt(info.armed ? 'ceka' : 'hotovo', info) + ' ' + auto.qrKind());
       }
     }
+    // Evidence drží QR celé série, v žádostech hlídáme jen poslední fotku.
+    function uzamkni(qr, rucne = false) {
+      const predchozi = fotka++;
+      if (rucne) auto.manual(fotka, qr);
+      else auto.commit(fotka, qr);
+      auto.forget(predchozi);
+    }
+
     function onFire(info) {
+      if (!sleduje() || typeof quickScanOrv !== 'function') { auto.release(); return; }
       const qr = info.reason === 'qr' ? info.qr : null;
       const popis = info.zachyt + (qr ? ' qr=' + qr : '');
       if (!hlidac.smiFotit(info.reason, qr)) {
-        auto.commit(++fotka);   // karta zůstává „vyfocená", nic se neposílá
+        uzamkni(qr);   // karta zůstává „vyfocená", nic se neposílá
         logTlumene('auto_potlaceno', popis);
         return;
       }
-      if (!sleduje() || typeof quickScanOrv !== 'function') { auto.release(); return; }
       blesk();
       if (nahled) nahled.foto();
       log('auto_foto', popis);
-      Promise.resolve(quickScanOrv({auto: true, zachyt: info.zachyt})).then(
-        odeslano => { if (odeslano) auto.commit(++fotka); else auto.release(); },
-        () => auto.commit(++fotka));
+      // PoOdeslani rezervaci potvrdí. Pokud sken skončil už před uploadem,
+      // uvolníme ji, aby šlo kartu zkusit znovu.
+      Promise.resolve(quickScanOrv({auto: true, zachyt: info.zachyt})).then(auto.release, auto.release);
     }
 
     const auto = root.OrvAuto.create({
       video,
       crop: () => ({x: 0, y: 0, w: video.videoWidth, h: video.videoHeight}),
-      canFire: sleduje,
+      guide: VODITKO,
+      params: PARAMETRY_STOLU,
+      canFire() {
+        const ano = sleduje();
+        if (!ano) hlidac.tick(null);
+        return ano;
+      },
       onTick,
       onFire,
       jsqrUrl: '/static/vendor/jsQR.js?v=1.4.0',
@@ -224,7 +224,7 @@
       poOdeslani(qr, jeAuto) {
         hlidac.poSkenu(qr);
         zapis(KLIC_QR, qr ? JSON.stringify({qr, t: Date.now()}) : null);
-        if (!jeAuto) auto.manual(++fotka, qr);   // ručně vyfocená karta se sama znovu nefotí
+        uzamkni(qr, !jeAuto);
       },
       stav: () => Object.assign({zapnuto, qrKind: auto.qrKind()}, hlidac.stav()),
     };

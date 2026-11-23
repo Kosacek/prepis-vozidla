@@ -229,24 +229,14 @@ def test_push_succeeds_on_second_attempt_without_recording_failure(tmp_path, mon
 
 # ── push_async: /api/generate must never block on the tracker ───────────────
 
-def test_push_async_returns_immediately(tmp_path, monkeypatch):
-    """The whole point: even a tracker that hangs for a full second must not
-    make push_async's CALLER wait — that second-plus used to sit inside
-    every /api/generate response."""
+def test_push_async_returns_immediately(tmp_path, pending_tracker_post):
+    """The caller returns while the tracker POST is still pending."""
     import time as _time
 
-    def _slow(url, json=None, headers=None, timeout=None):
-        _time.sleep(1)
-        class _R:
-            status_code = 201
-            def json(self_):
-                return {"status": "auto"}
-        return _R()
-
-    monkeypatch.setattr(tracker_push.requests, "post", _slow)
-    t0 = _time.time()
+    t0 = _time.monotonic()
     tracker_push.push_async({"mode": "prevod"}, str(tmp_path))
-    assert _time.time() - t0 < 0.2, "push_async must return before the network call finishes"
+    assert _time.monotonic() - t0 < 0.2, "push_async must return before the network call finishes"
+    assert pending_tracker_post.wait(2)
 
 
 # ── retry_failed: the guarantee David asked for — it really lands ───────────
