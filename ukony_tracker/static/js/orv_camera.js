@@ -1,5 +1,8 @@
 // Stream lifetime and in-memory resizing, independent of batch processing.
 (function () {
+  const LOG_INTERVAL = 3000;
+  let lastAutoLog = -Infinity;
+
   window.OrvCamera = function (root, addPhoto, notice) {
     const video = root.querySelector('#orv-video');
     const view = root.querySelector('#orv-viewfinder');
@@ -8,7 +11,7 @@
     const startButton = root.querySelector('#orv-camera');
     const autoButton = root.querySelector('#orv-auto');
     const debugLine = root.querySelector('#orv-debug');
-    let stream, opening, generation = 0, dead = false, capturing = false, lastInfo = null;
+    let stream, opening, generation = 0, dead = false, capturing = false, lastInfo = null, logAfter = null;
     // Hands-free capture (2.10): photographs a card held still in the guide.
     let debug = false;
     try { debug = new URLSearchParams(location.search).get('ladeni') === '1'; } catch (_) {}
@@ -16,6 +19,7 @@
     try { autoOn = localStorage.getItem('ukony_orv_auto') !== '0'; } catch (_) {}
     const auto = window.OrvAuto && window.OrvAutoCore ? window.OrvAuto.create({
       video, crop: visibleCrop, debug, jsqrUrl: (root.dataset || {}).jsqr || null,
+      params: {requireQuad: !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)},
       canFire: () => !!stream && !capturing && !shutter.hidden && !shutter.disabled,
       onTick: paint,
       onFire: info => capture({zachyt: info.zachyt, auto: true}),
@@ -30,6 +34,14 @@
     }
     function paint(info) {
       lastInfo = info;
+      if (logAfter === null || info.fire) logAfter = info.t + LOG_INTERVAL;
+      if (!info.fire && info.t >= logAfter && info.t - lastAutoLog >= LOG_INTERVAL) {
+        lastAutoLog = info.t;
+        fetch('/ukony/orv-sken/log', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({m: info.motion, s: info.sharp, e: info.edges,
+            quad: Number(info.quad), stable: Number(info.stable), qr: info.qr, reason: info.reason}),
+          redirect: 'error'}).catch(() => {}); // diagnostics must never interrupt capture
+      }
       if (view.dataset) view.dataset.auto = info.locked ? 'lock' : '';
       if (view.style && view.style.setProperty) view.style.setProperty('--orv-hold', String(info.progress || 0));
       if (debug && debugLine) {
@@ -66,6 +78,7 @@
       if (auto) auto.stop();
       release(stream);
       stream = null;
+      lastInfo = logAfter = null;
       video.pause();
       video.srcObject = null;
       view.hidden = shutter.hidden = true;
@@ -150,7 +163,7 @@
       finally {
         capturing = false;
         // Tell the auto-capture which card is now in the batch.
-        if (auto && isAuto) { if (id) auto.commit(id); else auto.release(); }
+        if (auto && isAuto) { if (id) auto.commit(id, qr); else auto.release(); }
         else if (auto && id) auto.manual(id, qr);
       }
     }

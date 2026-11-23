@@ -28,8 +28,10 @@ if not logger.handlers:
 logger.propagate = False
 REVIEW_MAX_AGE = 14 * 24 * 3600
 # How the browser took the photo (auto-capture tuning), logged as-is when it
-# has exactly this shape: "qr|klid|rucne" + up to four short numeric metrics.
-ZACHYT = re.compile(r"(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4}")
+# has exactly this shape: mode, short numeric metrics and optional quad flag.
+ZACHYT = re.compile(r"(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4}( quad=[01])?")
+TICK_REASONS = ("captured", "cooldown", "moving", "no-quad", "same-qr", "blur",
+                "few-edges", "qr-hold", "idle-scene", "hold")
 
 
 def _session_id():
@@ -94,6 +96,24 @@ def fragment():
     return render_template("_orv_sken.html", firmy=firmy, typy=types, profily=config.PROFILY,
                            ceny=ceny, firma_colors=firma_colors, firmy_data=firmy_data), \
         200, {"Cache-Control": "no-store"}
+
+
+@bp.post("/ukony/orv-sken/log")
+def log_tick():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.keys() != {"m", "s", "e", "quad", "stable", "qr", "reason"}:
+        return "", 400
+    m, s, e = data["m"], data["s"], data["e"]
+    quad, stable, qr, reason = data["quad"], data["stable"], data["qr"], data["reason"]
+    for value, limit in ((m if m is not None else 0, 255), (s, 1040400), (e, 1)):
+        if type(value) not in (int, float) or not 0 <= value <= limit:
+            return "", 400
+    if (type(quad) is not int or quad not in (0, 1) or type(stable) is not int or stable not in (0, 1)
+            or reason not in TICK_REASONS or (qr is not None and not orv_scan_service.clean_qr(qr))):
+        return "", 400
+    logger.info("orv-auto tick m=%s s=%.0f e=%.3f quad=%d stable=%d qr=%s reason=%s",
+                "-" if m is None else f"{m:.1f}", s, e, quad, stable, qr or "-", reason)
+    return "", 204
 
 
 def _clean_poznamka(value):

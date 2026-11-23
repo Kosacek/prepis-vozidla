@@ -12,6 +12,8 @@ class ScanRequest(Request):
     def max_content_length(self):
         if self.path == "/ukony/orv-sken":
             return MAX_IMAGE_BYTES + 64 * 1024  # multipart envelope
+        if self.path == "/ukony/orv-sken/log":
+            return 512
         return super().max_content_length
 
     def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):

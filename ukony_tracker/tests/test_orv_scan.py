@@ -1279,11 +1279,28 @@ def test_route_passes_the_qr_and_logs_it_with_the_capture(client, vision, monkey
         fid = firmy_repo.create(c, nazev="BSAuto", zkratka="BS")
         uid = pridat_ukon(c, firma_id=fid, datum=RECENT, typ_kod="NOVÉ", celkem=1300, vin=VIN)
     r = client.post("/ukony/orv-sken", data={"foto": (BytesIO(photo()), "foto", "image/jpeg"),
-                                             "orv_qr": QR, "zachyt": "qr m=1.4 s=212 e=0.081"})
+                                             "orv_qr": QR, "zachyt": "qr m=1.4 s=212 e=0.081 quad=1"})
     assert r.status_code == 200 and r.json["stav"] == "doplneno" and r.json["ukon"]["id"] == uid
     assert r.json["orv_zdroj"] == "qr"
-    assert logs[-1][7:] == (QR, "UBE037268", QR, "UBE037268", "qr m=1.4 s=212 e=0.081")
+    assert logs[-1][7:] == (QR, "UBE037268", QR, "UBE037268", "qr m=1.4 s=212 e=0.081 quad=1")
     r = client.post("/ukony/orv-sken", data={"foto": (BytesIO(photo()), "foto", "image/jpeg"),
                                              "orv_qr": "<b>UBE037263</b>", "zachyt": "qr <script>"})
     assert r.status_code == 200 and r.json.get("orv_zdroj") is None
     assert logs[-1][9:] == ("-", "-", "-")
+
+
+def test_auto_tick_logging_requires_login_and_accepts_only_small_valid_samples(client, monkeypatch):
+    from routes import orv_scan
+    url = "/ukony/orv-sken/log"
+    sample = dict(m=11.2, s=4083, e=0.184, quad=1, stable=1, qr=None, reason="hold")
+    logs = []
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "test-password")
+    monkeypatch.setattr(orv_scan.logger, "info", lambda fmt, *args: logs.append(fmt % args))
+    assert client.post(url, json=sample).status_code == 302
+    with client.session_transaction() as session:
+        session["authed"] = True
+    assert client.post(url, json=sample).status_code == 204
+    for bad in ({"qr": "ABC123456\n"}, {"reason": "hold\nextra"}, {"quad": True}, {"e": 1.1}):
+        assert client.post(url, json={**sample, **bad}).status_code == 400
+    assert client.post(url, json={**sample, "reason": "a" * 600}).status_code == 413
+    assert logs == ["orv-auto tick m=11.2 s=4083 e=0.184 quad=1 stable=1 qr=- reason=hold"]

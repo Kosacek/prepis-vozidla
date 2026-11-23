@@ -6,6 +6,7 @@ const fs = require('node:fs');
 
 const core = require('../static/js/orv_auto_core.js');
 const qrApi = require('../static/js/orv_qr.js');
+const quadApi = require('../static/js/orv_quad.js');
 
 const STEP = 125; // 8 fps
 const QR_A = 'UBZ482615', QR_B = 'UBE037263';
@@ -13,7 +14,7 @@ const sig = v => new Array(144).fill(v);
 const CARD_A = sig(100), CARD_B = sig(150), DESK = sig(60), TEXTURED_DESK = sig(200);
 // One analysed frame of a card held still in the guide.
 const still = (s, extra) => Object.assign({motion: 2, sharp: 300, edges: 0.09, sig: s || CARD_A, qr: null}, extra);
-const moving = extra => Object.assign({motion: 30, sharp: 20, edges: 0.05, sig: sig(80), qr: null}, extra);
+const moving = extra => Object.assign({motion: 45, sharp: 20, edges: 0.05, sig: sig(80), qr: null}, extra);
 const empty = extra => Object.assign({motion: 2, sharp: 15, edges: 0.005, sig: DESK, qr: null}, extra);
 
 // Feeds frames; every fire is committed as photo 1, 2, … unless `onFire` says otherwise.
@@ -58,7 +59,7 @@ test('raising the phone over a textured desk fires nothing', () => {
   assert.deepEqual(run(auto, [...times(3, moving()), ...times(40, still(TEXTURED_DESK))]).fires, []);
 });
 
-test('a card already held up when the camera opens waits for the shutter or a QR', () => {
+test('a fixed camera without a quad waits for the shutter or a QR on its initial scene', () => {
   const auto = core.create();
   assert.deepEqual(run(auto, [...times(3, moving()), ...times(40, still())]).fires, []);
   const withQr = core.create();
@@ -81,10 +82,94 @@ test('a card held still fires once after the hold time, never again while it sta
 });
 
 test('blur, a bare hand or shaking never fire', () => {
-  for (const frame of [still(CARD_A, {sharp: 40}), still(CARD_A, {edges: 0.02}), still(CARD_A, {motion: 9})]) {
+  for (const frame of [still(CARD_A, {sharp: 40}), still(CARD_A, {edges: 0.02}), still(CARD_A, {motion: 25})]) {
     const auto = core.create();
     assert.deepEqual(run(auto, [...times(3, moving()), ...times(40, frame)]).fires, [], JSON.stringify(frame));
   }
+});
+
+const corners = dx => [[0.2 + dx, 0.16], [0.8 + dx, 0.16], [0.8 + dx, 0.84], [0.2 + dx, 0.84]];
+const phone = (n, extra) => Object.assign({
+  motion: [9, 11.2, 20, 14.4][n % 4],
+  sharp: [4083, 9593, 6288][n % 3], edges: [0.2, 0.347, 0.270][n % 3],
+  sig: n % 2 ? CARD_A : TEXTURED_DESK,
+  quad: corners(n % 2 ? -0.009 : 0.009), cardSig: CARD_A,
+}, extra);
+const handheld = (n, extra) => Array.from({length: n}, (_, i) => phone(i, extra));
+
+test('hand-held phone captures its first card once, then captures again after removal', () => {
+  const auto = core.create({requireQuad: true});
+  const first = run(auto, handheld(40));
+  assert.equal(first.fires.length, 1);
+  assert.ok(first.fires[0].t <= 1500);
+  assert.equal(first.fires[0].reason, 'klid');
+  const miss = run(auto, [...handheld(1, {quad: null}), ...handheld(20)], first.t);
+  assert.deepEqual(miss.fires, []); // a dropped detection is shorter than rearmMs
+  const removed = run(auto, handheld(6, {quad: null, sig: TEXTURED_DESK}), miss.t);
+  assert.deepEqual(removed.fires, []);
+  // Same card layout and signature: disappearance alone should re-arm.
+  const next = run(auto, handheld(20), removed.t);
+  assert.equal(next.fires.length, 1);
+  assert.ok(next.fires[0].t - removed.t <= 1500);
+});
+
+test('a textured desk without a quad never fires on a phone, even after a scene change', () => {
+  const auto = core.create({requireQuad: true});
+  assert.deepEqual(run(auto, [...handheld(8, {quad: null}), moving(), ...handheld(50, {quad: null})]).fires, []);
+});
+
+test('slow corner drift cannot accumulate a hold despite low raw motion', () => {
+  const frames = Array.from({length: 40}, (_, i) => phone(i, {motion: 9, quad: corners((i % 20) * 0.006)}));
+  assert.deepEqual(run(core.create({requireQuad: true}), frames).fires, []);
+});
+
+test('a stable quad fires via QR on a hand-held phone and a seen QR stays blocked', () => {
+  const auto = core.create({requireQuad: true});
+  const first = run(auto, handheld(16, {motion: 20, qr: QR_A}));
+  assert.deepEqual(first.fires, [{t: 250, reason: 'qr', qr: QR_A}]);
+  const swapped = run(auto, handheld(16, {motion: 20, qr: QR_B}), first.t, a => a.commit(2));
+  assert.deepEqual(swapped.fires.map(f => f.qr), [QR_B]);
+  const end = run(auto, [...handheld(5, {quad: null}), ...handheld(20, {qr: QR_A})], swapped.t);
+  assert.deepEqual(end.fires, []);
+});
+
+test('a large change inside unchanged corners invalidates a pending QR', () => {
+  const auto = core.create({requireQuad: true});
+  const initial = run(auto, [phone(0, {qr: QR_A}), phone(1)]);
+  const replacement = [phone(2, {motion: 45, cardSig: CARD_B}), ...handheld(16, {cardSig: CARD_B})];
+  const {fires} = run(auto, replacement, initial.t);
+  assert.equal(fires.length, 1);
+  assert.equal(fires[0].reason, 'klid');
+  assert.equal(fires[0].qr, null);
+});
+
+const FRAME = {w: 160, h: 90};
+const GUIDE = {x: 0.08, y: 0.06, w: 0.84, h: 0.88};
+function cameraPixels(dx, light, hasCard) {
+  const pixels = new Uint8Array(FRAME.w * FRAME.h);
+  for (let y = 0; y < FRAME.h; y++) {
+    for (let x = 0; x < FRAME.w; x++) {
+      const card = hasCard && x >= 31 + dx && x < 129 + dx && y >= 15 && y < 75;
+      const print = card && x > 45 + dx && x < 115 + dx && y > 24 && y < 65 && y % 5 < 2;
+      pixels[y * FRAME.w + x] = card ? (print ? 120 : 225) : light + (y % 6 < 3 ? 15 : 0);
+    }
+  }
+  return pixels;
+}
+
+test('the pixel detector finds a printed card already in view, with no desk calibration', () => {
+  const detector = quadApi.create();
+  for (const dx of [-1, 0, 1]) {
+    const quad = detector.find(cameraPixels(dx, 50, true), FRAME.w, FRAME.h, GUIDE);
+    assert.ok(quad);
+    const expected = [[31 + dx, 15], [129 + dx, 15], [129 + dx, 75], [31 + dx, 75]];
+    quad.forEach(([x, y], k) => {
+      assert.ok(Math.abs(x * FRAME.w - expected[k][0]) < 4);
+      assert.ok(Math.abs(y * FRAME.h - expected[k][1]) < 4);
+    });
+  }
+  const texture = cameraPixels(0, 50, false).map((v, i) => v + (i % 7 < 4 ? 82 : 0));
+  assert.equal(detector.find(texture, FRAME.w, FRAME.h, GUIDE), null);
 });
 
 test('the next card fires only after the first one leaves', () => {
@@ -254,7 +339,7 @@ test('a detector that never answers cannot hold the photo', async () => {
 
 test('the capture summary always matches the server log pattern', () => {
   const auto = require('../static/js/orv_auto.js');
-  const ZACHYT = /^(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4}$/;
+  const ZACHYT = /^(qr|klid|rucne)( [a-z]=[0-9]{1,5}(\.[0-9]{1,3})?){0,4} quad=[01]$/;
   for (const info of [{motion: 1.234, sharp: 312.6, edges: 0.0812}, {motion: null}, {},
     {motion: 1e9, sharp: 1e9, edges: 7}, null]) {
     for (const reason of ['qr', 'klid', 'rucne']) {
@@ -265,13 +350,7 @@ test('the capture summary always matches the server log pattern', () => {
   }
 });
 
-test('the driver feeds frames, fires through onFire and stops cleanly', async () => {
-  // A fake video whose analysed copy is a sharp, still, printed card.
-  const pixels = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => ((i >> 2) % 160 >> 1) % 2 ? 230 : 20);
-  const desk = new Uint8ClampedArray(160 * 90 * 4).fill(90);
-  // Another textured place, as after "Vyfotit další" at another desk.
-  const elsewhere = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => (((i >> 2) % 160) / 6 | 0) % 2 ? 250 : 60);
-  let frames = 0, scene = () => (++frames <= 4 ? desk : pixels);
+function driverEnv(scene) {
   const ctx = {drawImage() {}, getImageData: () => ({data: scene()})};
   const document = {createElement: () => ({width: 0, height: 0, getContext: () => ctx})};
   let now = 0;
@@ -279,26 +358,67 @@ test('the driver feeds frames, fires through onFire and stops cleanly', async ()
   const window = {performance: {now: () => now}, console: {info() {}, debug() {}}};
   const context = {window, document, setTimeout: fn => { timers.push(fn); return timers.length; },
     clearTimeout() {}, Promise};
-  vm.runInNewContext(fs.readFileSync(require.resolve('../static/js/orv_auto_core.js'), 'utf8'), context);
-  vm.runInNewContext(fs.readFileSync(require.resolve('../static/js/orv_auto.js'), 'utf8'), context);
-  const fires = [];
+  for (const file of ['orv_auto_core', 'orv_quad', 'orv_auto']) {
+    vm.runInNewContext(fs.readFileSync(require.resolve('../static/js/' + file + '.js'), 'utf8'), context);
+  }
   const video = {readyState: 4, videoWidth: 1920, videoHeight: 1080};
-  const driver = window.OrvAuto.create({video, crop: () => ({x: 0, y: 0, w: 1920, h: 1080}),
+  function create(options) {
+    return window.OrvAuto.create({video, crop: () => ({x: 0, y: 0, w: 1920, h: 1080}), ...options});
+  }
+  function advance() {
+    if (timers.length) { now += STEP; timers.shift()(); }
+  }
+  return {window, timers, create, advance};
+}
+
+test('the driver feeds frames, fires through onFire and stops cleanly', () => {
+  // A fake video whose analysed copy is a sharp, still, printed card.
+  const pixels = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => ((i >> 2) % 160 >> 1) % 2 ? 230 : 20);
+  const desk = new Uint8ClampedArray(160 * 90 * 4).fill(90);
+  // Another textured place, as after "Vyfotit další" at another desk.
+  const elsewhere = new Uint8ClampedArray(160 * 90 * 4).map((_, i) => (((i >> 2) % 160) / 6 | 0) % 2 ? 250 : 60);
+  let frames = 0, scene = () => (++frames <= 4 ? desk : pixels);
+  const {create, timers, advance} = driverEnv(() => scene());
+  const fires = [];
+  const driver = create({
     onFire: info => { fires.push(info); driver.commit(fires.length); }, canFire: () => true,
     params: {enterMotion: -1}});
   driver.start();
-  for (let i = 0; i < 24 && timers.length; i++) { now += STEP; timers.shift()(); }
+  for (let i = 0; i < 24; i++) advance();
   driver.stop();
   assert.equal(fires.length, 1);
   assert.equal(fires[0].reason, 'klid');
-  assert.match(fires[0].zachyt, /^klid m=0\.0 s=\d+ e=[01]\.\d{3}$/);
-  if (timers.length) timers.shift()();
+  assert.match(fires[0].zachyt, /^klid m=0\.0 s=\d+ e=[01]\.\d{3} quad=0$/);
+  advance();
   assert.equal(timers.length, 0); // a stopped driver schedules nothing more
   // Restarted over another textured surface: a fresh start, so it is the
   // background and fires nothing (review 2026-11-22).
   scene = () => elsewhere;
   driver.start();
-  for (let i = 0; i < 24 && timers.length; i++) { now += STEP; timers.shift()(); }
+  for (let i = 0; i < 24; i++) advance();
   driver.stop();
   assert.equal(fires.length, 1);
+});
+
+test('the driver requests QR reads above the raw stability threshold when the quad is steady', async () => {
+  let frame = 0;
+  const {window, create, advance} = driverEnv(() => {
+    const odd = frame++ % 2;
+    const gray = cameraPixels(odd, odd ? 75 : 20, true);
+    return new Uint8ClampedArray(gray.length * 4).map((_, i) => gray[i >> 2]);
+  });
+  let reads = 0;
+  window.OrvQr = {create: () => ({prepare() {}, decode: async () => { reads++; return QR_A; }})};
+  const fires = [];
+  const driver = create({params: {requireQuad: true},
+    onFire: info => { fires.push(info); driver.commit(fires.length); }});
+  driver.start();
+  for (let i = 0; i < 16; i++) { advance(); await Promise.resolve(); }
+  driver.stop();
+  assert.ok(reads > 0);
+  assert.equal(fires.length, 1);
+  assert.equal(fires[0].reason, 'qr');
+  assert.ok(fires[0].motion > core.DEFAULTS.steadyMotion);
+  assert.ok(fires[0].t <= 500);
+  assert.match(fires[0].zachyt, /quad=1$/);
 });

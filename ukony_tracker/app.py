@@ -96,8 +96,10 @@ def create_app():
         # Otázka pro „Zeptej se" je POST jen kvůli historii konverzace v těle —
         # nic nezapisuje, a záloha při každé otázce by vytlačila skutečné
         # zálohy z rotace posledních 30.
-        # Totéž sdílecí kód dokladu (ppd.sdilet, 2.8): jen se ptá žádostí, nic nezapisuje.
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.endpoint not in ("ask.kolo", "ppd.sdilet"):
+        # Totéž sdílecí kód dokladu a diagnostika automatického focení.
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.endpoint not in (
+            "ask.kolo", "ppd.sdilet", "orv_scan.log_tick",
+        ):
             db.backup_db()
 
     @app.context_processor

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-function cameraEnv(getUserMedia) {
+function cameraEnv(getUserMedia, options = {}) {
   const elements = new Map();
   const events = {};
   const captured = [];
@@ -13,6 +13,7 @@ function cameraEnv(getUserMedia) {
   function element(id) {
     if (!elements.has(id)) elements.set(id, {hidden: true, disabled: false, handlers: {},
       videoWidth: 3840, videoHeight: 2160, pause() {}, play: async () => {},
+      setAttribute(name, value) { this[name] = value; },
       addEventListener(name, fn) { this.handlers[name] = fn; }});
     return elements.get(id);
   }
@@ -25,9 +26,10 @@ function cameraEnv(getUserMedia) {
       return canvas;
     }};
   const window = {addEventListener: (name, fn) => { events[name] = fn; },
-    removeEventListener: name => { delete events[name]; }};
+    removeEventListener: name => { delete events[name]; }, ...options.window};
   vm.runInNewContext(fs.readFileSync(require.resolve('../static/js/orv_camera.js'), 'utf8'), {
-    window, document, navigator: {mediaDevices: {getUserMedia}}, URL, Image: function () {}
+    window, document, navigator: {mediaDevices: {getUserMedia}}, URL, Image: function () {},
+    fetch: options.fetch
   });
   const camera = window.OrvCamera({querySelector: element}, blob => captured.push(blob), text => notices.push(text));
   return {camera, stream, element, events, captured, notices, document, stopped: () => stopped};
@@ -98,5 +100,28 @@ test('portrait camera output is cropped to the landscape viewfinder; gallery sta
   const gallery = await e.camera.jpeg({}, 1080, 1920);
   assert.equal(gallery.width, 1013);
   assert.equal(gallery.height, 1800);
+  e.camera.destroy();
+});
+
+test('phone cameras require a quad and send at most one idle diagnostic per three seconds', async () => {
+  let settings;
+  const requests = [];
+  const driver = {start() {}, stop() {}, setEnabled() {}};
+  const window = {matchMedia: () => ({matches: true}), OrvAutoCore: {},
+    OrvAuto: {create: options => { settings = options; return driver; }}};
+  const fetch = async (url, init) => requests.push({url, method: init.method, body: JSON.parse(init.body)});
+  const e = cameraEnv(async () => e.stream, {window, fetch});
+  await e.camera.start();
+  assert.equal(settings.params.requireQuad, true);
+  const sample = {motion: 20, sharp: 4083, edges: 0.2, quad: true, stable: true, qr: null, reason: 'hold'};
+  for (const t of [0, 125, 2999, 3000, 3001, 5999]) settings.onTick({...sample, t});
+  assert.deepEqual(requests, [{url: '/ukony/orv-sken/log', method: 'POST',
+    body: {m: 20, s: 4083, e: 0.2, quad: 1, stable: 1, qr: null, reason: 'hold'}}]);
+  settings.onTick({...sample, t: 6000, fire: true});
+  settings.onTick({...sample, t: 6500});
+  assert.equal(requests.length, 1);
+  settings.onTick({...sample, t: 9000, reason: 'captured'});
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].body.reason, 'captured');
   e.camera.destroy();
 });
