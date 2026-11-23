@@ -290,6 +290,7 @@ def _vystav_fakturu(data_dir: str, udaje: dict, adresa_podle_ico, *, evidence_za
     vozidla = udaje["vozidla"]
     number = faktura.issue_faktura(data_dir, {
         "payer": payer, "payer_ico": udaje["prijato_ico"], "payer_address": address,
+        "payer_dic": faktura.dic_podle_ico(udaje["prijato_ico"]),
         "amount": udaje["castka"], "purpose": udaje["ucel"], "vozidla": vozidla})
     rec = faktura.get_faktura(data_dir, number) or {}
     doklad = {

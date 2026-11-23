@@ -269,3 +269,99 @@ def test_one_letter_words_never_end_a_line():
 def test_iban_display_groups_of_four():
     import faktura_pdf
     assert faktura_pdf._iban_display("CZ6508000000192000145399") == "CZ65 0800 0000 1920 0014 5399"
+
+
+# ── DIČ odběratele (2026-11-23, Duna Aszfalt: faktura bez DIČ) ──────────────
+class _Ares:
+    def __init__(self, status=200, dic=None):
+        self.status_code, self._dic = status, dic
+
+    def json(self):
+        return {"ico": "22337997", "dic": self._dic}
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(self.status_code)
+
+
+@pytest.fixture
+def ares(monkeypatch):
+    calls = []
+    answers = {"22337997": _Ares(dic="CZ687307374"), "44960263": _Ares(dic="CZ44960263"),
+               "11111111": _Ares(dic=None), "99999999": _Ares(status=404)}
+
+    def get(url, **kw):
+        calls.append(url)
+        ico = url.rsplit("/", 1)[-1]
+        if ico == "55555555":
+            raise ConnectionError("ARES down")
+        return answers[ico]
+
+    faktura._ares_dic.cache_clear()
+    monkeypatch.setattr(faktura.requests, "get", get)
+    yield calls
+    faktura._ares_dic.cache_clear()
+
+
+def test_cisty_dic_shape():
+    assert faktura.cisty_dic(" cz 687307374 ") == "CZ687307374"
+    assert faktura.cisty_dic("SK2020123456") == "SK2020123456"
+    for bad in ("", None, "687307374", "CZ", "CZ-68<b>", 42):
+        assert faktura.cisty_dic(bad) == ""
+
+
+def test_dic_comes_from_ares_and_never_from_the_ico(ares):
+    assert faktura.dic_podle_ico("22337997") == "CZ687307374"   # IČO ≠ DIČ digits
+    assert faktura.dic_podle_ico(" 2233 7997 ") == "CZ687307374"
+    assert len(ares) == 1                                         # cached
+    assert faktura.dic_podle_ico("11111111") == ""               # not a VAT payer
+    assert faktura.dic_podle_ico("99999999") == ""               # unknown IČO
+    assert faktura.dic_podle_ico("123") == "" and faktura.dic_podle_ico(None) == ""
+    assert faktura.dic_podle_ico("55555555") == ""               # ARES down
+    assert faktura.dic_podle_ico("55555555") == "" and ares.count(ares[-1]) == 2  # failure not cached
+
+
+def test_issued_faktura_keeps_the_dic_and_prints_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKTURA_IBAN", IBAN)
+    number = faktura.issue_faktura(str(tmp_path), {**REC, "payer": "DUNA ASZFALT ZRT., ODŠTĚPNÝ ZÁVOD",
+                                                   "payer_ico": "22337997", "payer_dic": "CZ687307374"})
+    rec = faktura.get_faktura(str(tmp_path), number)
+    assert rec["dic"] == "CZ687307374"
+    record = faktura.pdf_record(rec)
+    assert record["payer_dic"] == "CZ687307374"
+    text = " ".join(_pdf_strings(faktura_pdf.build_faktura_pdf(record)).split())
+    assert "IČO: 22337997" in text and "DIČ: CZ687307374" in text
+    # A customer without a DIČ prints no DIČ line.
+    plain = faktura.pdf_record({**rec, "dic": ""})
+    assert "DIČ" not in " ".join(_pdf_strings(faktura_pdf.build_faktura_pdf(plain)).split())
+
+
+def test_an_older_faktura_gets_its_dic_from_ares_when_reprinted(tmp_path, ares):
+    import openpyxl
+    path = tmp_path / faktura.BACKUP_NAME
+    wb = openpyxl.Workbook()
+    wb.active.append(faktura._BACKUP_HEADER[:-1])               # file from before the DIČ column
+    wb.active.append([20264683, "2026-11-19T18:11:26", "19.11.2026", "26.11.2026",
+                      "DUNA ASZFALT ZRT., ODŠTĚPNY ZÁVOD", "22337997", "PŘÍKOP 843/4, BRNO, 60200",
+                      2000, "Zastupování na MMB", "KMHHB8127RU162124"])
+    wb.save(path)
+    rec = faktura.get_faktura(str(tmp_path), 20264683)
+    assert faktura.pdf_record(rec)["payer_dic"] == ""
+    assert faktura.pdf_record(rec, dic_lookup=faktura.dic_podle_ico)["payer_dic"] == "CZ687307374"
+    # The next issue adds the DIČ header to the old file and keeps the old row readable.
+    faktura.issue_faktura(str(tmp_path), {**REC, "payer_ico": "44960263", "payer_dic": "CZ44960263"})
+    header = [c.value for c in openpyxl.load_workbook(path).active[1]]
+    assert header == faktura._BACKUP_HEADER
+    assert faktura.get_faktura(str(tmp_path), 20264683)["odberatel"].startswith("DUNA")
+
+
+def test_api_faktura_looks_the_dic_up_in_ares(api, ares):
+    r = api.post("/api/ppd/vystavit", headers={"X-Api-Key": KLIC}, json={
+        "prijato_od": "Duna Aszfalt Zrt., odštěpný závod", "prijato_ico": "22337997",
+        "castka": 2000, "ucel": "ZASTUPOVÁNÍ NA MMB", "vozidla": ["KMHHB8127RU162124"],
+        "druh": "faktura", "request_id": "r-duna"})
+    assert r.status_code == 201
+    cislo = r.get_json()["cislo"]
+    assert faktura.get_faktura(str(api.data), cislo)["dic"] == "CZ687307374"
+    pdf = (api.data / "output" / f"faktura_{cislo}.pdf").read_bytes()
+    assert "DIČ: CZ687307374" in " ".join(_pdf_strings(pdf).split())

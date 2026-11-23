@@ -68,7 +68,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.37.2"
+__version__ = "1.37.3"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -2317,7 +2317,7 @@ def _zajisti_pdf_faktury(number: int) -> bool:
     try:
         os.makedirs(os.path.dirname(cesta), exist_ok=True)
         with open(cesta, "wb") as f:
-            f.write(faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec)))
+            f.write(faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec, dic_lookup=faktura.dic_podle_ico)))
     except Exception as e:
         _log.warning("Faktura %s: PDF se nepovedlo postavit (%s)", number, e)
         return False
@@ -2431,7 +2431,7 @@ def faktura_print(number):
     with storno.transakce(DATA_DIR):
         stav = _storno_faktury(number)
         pdf_bytes = faktura_pdf.build_faktura_pdf(
-            faktura.pdf_record(rec), storno=bool(stav.get("storno")),
+            faktura.pdf_record(rec, dic_lookup=faktura.dic_podle_ico), storno=bool(stav.get("storno")),
             storno_cas=stav.get("storno_cas", ""))
         if not stav.get("storno"):
             try:
@@ -2721,7 +2721,7 @@ def _stornovane_pdf(number: int, storno_cas: str) -> bytes:
     rec = faktura.get_faktura(DATA_DIR, number)
     if rec is None:
         abort(404)
-    return faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec), storno=True, storno_cas=storno_cas)
+    return faktura_pdf.build_faktura_pdf(faktura.pdf_record(rec, dic_lookup=faktura.dic_podle_ico), storno=True, storno_cas=storno_cas)
 
 
 @app.route("/download/<filename>")

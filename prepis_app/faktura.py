@@ -10,9 +10,12 @@ PDF drawing lives in faktura_pdf.py, the QR string in spayd.py.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 
 import openpyxl
+import requests
 
 import sdileni
 import spayd
@@ -31,7 +34,39 @@ PLACEHOLDER = "[doplnit]"
 
 _HEADER = ["Číslo", "Datum", "Splatnost", "Odběratel", "Částka (Kč)", "Účel", "Vozidlo"]
 _BACKUP_HEADER = ["Číslo", "Vystaveno", "Datum", "Splatnost", "Odběratel", "IČO",
-                  "Adresa", "Částka (Kč)", "Účel", "Vozidla"]
+                  "Adresa", "Částka (Kč)", "Účel", "Vozidla", "DIČ"]
+
+# Odběratel's DIČ belongs on the faktura (2026-11-23: Duna Aszfalt asked for it).
+# It comes from ARES by IČO: the IČO and DIČ can differ (Duna's branch:
+# IČO 22337997, DIČ CZ687307374), so it is never derived from the IČO.
+ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}"
+_DIC = re.compile(r"[A-Z]{2}[0-9A-Z]{2,13}")
+
+
+def cisty_dic(value) -> str:
+    """'cz 687307374' -> 'CZ687307374'; anything not shaped like a DIČ -> ''."""
+    v = "".join(str(value or "").split()).upper()
+    return v if _DIC.fullmatch(v) else ""
+
+
+@lru_cache(maxsize=256)
+def _ares_dic(ico: str) -> str:
+    r = requests.get(ARES_URL.format(ico=ico), timeout=4, headers={"Accept": "application/json"})
+    if r.status_code == 404:
+        return ""
+    r.raise_for_status()  # a failure is not cached: the next print asks again
+    return cisty_dic(r.json().get("dic"))
+
+
+def dic_podle_ico(ico) -> str:
+    """DIČ from ARES for an 8-digit IČO; '' when there is none or ARES fails."""
+    ico = "".join(ch for ch in str(ico or "") if ch.isdigit())
+    if len(ico) != 8:
+        return ""
+    try:
+        return _ares_dic(ico)
+    except Exception:
+        return ""
 
 # Public registry data (ARES), overridable by env ISSUER_ADRESA / ISSUER_SPISOVA_ZNACKA.
 DEFAULT_ISSUER_ADRESA = "Cacovická 1592/30a, Husovice, 614 00 Brno"
@@ -147,7 +182,12 @@ def _next_number(used: set, year: int, blocked_codes=()) -> int:
 def _open(path: str, title: str, header: list):
     if os.path.exists(path) and os.path.getsize(path) > 0:
         wb = openpyxl.load_workbook(path)
-        return wb, wb.active
+        ws = wb.active
+        # A column added later (DIČ) gets its header in an existing file too.
+        for i, name in enumerate(header, start=1):
+            if ws.cell(row=1, column=i).value in (None, ""):
+                ws.cell(row=1, column=i, value=name)
+        return wb, ws
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = title
@@ -159,7 +199,7 @@ def issue_faktura(data_dir: str, rec: dict, today: date | None = None) -> int:
     """Allocate the next number of the current year and write ledger + backup
     rows under one exclusive lock. Returns the number.
 
-    rec: {payer, payer_ico, payer_address, amount, purpose, vozidla (list)}
+    rec: {payer, payer_ico, payer_dic, payer_address, amount, purpose, vozidla (list)}
     """
     today = today or date.today()
     os.makedirs(data_dir, exist_ok=True)
@@ -180,7 +220,8 @@ def issue_faktura(data_dir: str, rec: dict, today: date | None = None) -> int:
                    rec.get("purpose", ""), vozidla])
         wsb.append([number, datetime.now().isoformat(timespec="seconds"), issued, due,
                     rec.get("payer", ""), rec.get("payer_ico", ""), rec.get("payer_address", ""),
-                    rec.get("amount", ""), rec.get("purpose", ""), vozidla])
+                    rec.get("amount", ""), rec.get("purpose", ""), vozidla,
+                    cisty_dic(rec.get("payer_dic"))])
         # Backup first: if the ledger write then fails the number is still burnt.
         _atomic_save(wbb, backup)
         _atomic_save(wb, ledger)
@@ -227,7 +268,7 @@ def read_faktura_backup(data_dir: str) -> list:
     """Append-only backup, newest first (full record incl. address)."""
     return _read(os.path.join(data_dir, BACKUP_NAME),
                  ["cislo", "vystaveno", "datum", "splatnost", "odberatel", "ico",
-                  "adresa", "castka", "ucel", "vozidla"])
+                  "adresa", "castka", "ucel", "vozidla", "dic"])
 
 
 def get_faktura(data_dir: str, number: int) -> dict | None:
@@ -239,10 +280,16 @@ def get_faktura(data_dir: str, number: int) -> dict | None:
                  if r["cislo"] == number), None)
 
 
-def pdf_record(rec: dict) -> dict:
-    """Backup row -> input for faktura_pdf.build_faktura_pdf."""
+def pdf_record(rec: dict, dic_lookup=None) -> dict:
+    """Backup row -> input for faktura_pdf.build_faktura_pdf.
+
+    A faktura issued before the DIČ column has none stored; `dic_lookup`
+    (dic_podle_ico) fills it from ARES when it is reprinted."""
     vozidla = [v.strip() for v in str(rec.get("vozidla") or rec.get("vozidlo") or "").split(",") if v.strip()]
+    dic = cisty_dic(rec.get("dic"))
+    if not dic and dic_lookup and rec.get("ico"):
+        dic = cisty_dic(dic_lookup(rec.get("ico")))
     return {"number": rec["cislo"], "date": rec.get("datum", ""), "due": rec.get("splatnost", ""),
-            "payer": rec.get("odberatel", ""), "payer_ico": rec.get("ico", ""),
+            "payer": rec.get("odberatel", ""), "payer_ico": rec.get("ico", ""), "payer_dic": dic,
             "payer_address": rec.get("adresa", ""), "amount": rec.get("castka", 0),
             "purpose": rec.get("ucel", ""), "vozidla": vozidla}

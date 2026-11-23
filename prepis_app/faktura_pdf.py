@@ -157,8 +157,10 @@ def _customer_lines(record: dict) -> list:
     lines = [record.get("payer", "") or "-"]
     if record.get("payer_address"):
         lines.append(record["payer_address"])
-    if record.get("payer_ico"):
-        lines.append(f"IČO: {record['payer_ico']}")
+    ids = [f"IČO: {record['payer_ico']}" if record.get("payer_ico") else "",
+           f"DIČ: {record['payer_dic']}" if record.get("payer_dic") else ""]
+    if any(ids):
+        lines.append("   ".join(i for i in ids if i))
     return lines
 
 
