@@ -47,7 +47,7 @@ def test_zadna_pilulka_ani_stavova_tecka():
     html = _sablona()
     assert '<i aria-hidden="true"></i>Auto' not in html
     assert ".orv-auto i {" not in html and "box-shadow: 0 0 0 3px rgba(52,199,89" not in html
-    tlacitko = html[html.index('id="orv-auto"') - 60:html.index('id="orv-auto"') + 400]
+    tlacitko = html[html.index('id="orv-auto"') - 60:html.index('id="orv-auto"') + 1000]
     assert 'class="cam-otocit orv-auto"' in tlacitko and "#i-scan" in tlacitko
 
 

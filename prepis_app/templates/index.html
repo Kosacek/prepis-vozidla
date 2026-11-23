@@ -500,10 +500,12 @@
   .hbtn:hover .ico { color: var(--primary); }
   .hbtn-icon { padding: 8px 10px; }
 
-  .cam-otocit { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; width: 34px; max-width: calc(100% - 16px); height: 34px; padding: 0 6.5px; border: 1.5px solid transparent; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); font: 600 12px 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; transition: width .18s ease, border-color .15s, background .15s; }
+  .cam-otocit { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; width: 34px; max-width: calc(100% - 16px); height: 34px; padding: 0 8px; border: 0; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); font: 600 12px 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; transition: width .18s ease, border-color .15s, background .15s; }
   .cam-otocit-label { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .18s ease, margin-right .18s ease, opacity .18s ease; }
-  .cam-otocit:hover, .cam-otocit:focus-visible { width: 92px; border-color: var(--primary); background: var(--primary); }
-  .cam-otocit:hover .cam-otocit-label, .cam-otocit:focus-visible .cam-otocit-label { max-width: 52px; margin-right: 7px; opacity: 1; }
+  /* Šířka po rozbalení = přesně štítek + mezera + ikona (--w-open/--label-w
+     měří JS u tlačítek), takže vlevo nezůstává prázdné místo. */
+  .cam-otocit:hover, .cam-otocit:focus-visible { width: var(--w-open, 92px); border-color: var(--primary); background: var(--primary); }
+  .cam-otocit:hover .cam-otocit-label, .cam-otocit:focus-visible .cam-otocit-label { max-width: var(--label-w, 52px); margin-right: 6px; opacity: 1; }
   .cam-otocit:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .cam-otocit .ico { transition: transform .25s ease; }
   /* Auto-sken ORV (static/js/orv_nahled.js): obrys sedí na skutečných rozích
@@ -522,21 +524,22 @@
   .sken-bar[data-stav="pryc"] { opacity: 0; }
   /* Přepínač auto-skenu: jen ikona vedle Otočit, ukáže se nad náhledem; když je
      vypnutý, zůstane vidět přeškrtnutá. Klávesa A. */
-  .cam-otocit.orv-auto { right: 48px; opacity: 0; transition: width .18s ease, border-color .15s, background .15s, opacity .15s; }
+  /* Obě tlačítka v jedné řadě vpravo nahoře: když se jedno rozbalí, druhé
+     plynule odsune, místo aby ho překrylo. */
+  .cam-tlacitka { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 6px; }
+  .cam-tlacitka .cam-otocit { position: static; }
+  .cam-otocit.orv-auto { opacity: 0; }
   .orv-hledi:hover .orv-auto, .orv-auto:focus-visible, .orv-auto[aria-pressed="false"] { opacity: 1; }
-  .orv-auto:hover, .orv-auto:focus-visible { width: 104px; }
-  .orv-auto:hover .cam-otocit-label, .orv-auto:focus-visible .cam-otocit-label { max-width: 64px; }
-  /* Vypnuto = ikona ztlumená + lomítko, které se dokreslí shora dolů (i nad
-     rozbalenou modrou pilulkou). Okraj lomítka má barvu pozadí, takže ikonu „řízne". */
-  .orv-auto { --lomitko-okraj: rgba(0,0,0,.55); }
-  .orv-auto:hover, .orv-auto:focus-visible { --lomitko-okraj: var(--primary); }
-  .orv-auto .ico { transition: transform .25s ease, opacity .2s ease; }
-  .orv-auto[aria-pressed="false"] .ico { opacity: .6; }
-  .orv-auto::after { content: ""; position: absolute; right: 15.5px; top: 7px; width: 2px; height: 20px; border-radius: 1px; background: #fff; box-shadow: 0 0 0 1.5px var(--lomitko-okraj); transform: rotate(45deg) scaleY(0); transform-origin: 50% 0; opacity: 0; pointer-events: none; transition: transform .24s cubic-bezier(.2, .8, .2, 1), opacity .12s ease, box-shadow .15s; }
-  .orv-auto[aria-pressed="false"]::after { transform: rotate(45deg) scaleY(1); opacity: 1; }
+  /* Vypnuto = lomítko se dokreslí přímo v ikoně (souřadnice ikony, takže vždy
+     sedí) a maska pod ním ikonu „prořízne“; zapnuto = zmizí stejnou cestou. */
+  .orv-auto .lomitko, .orv-auto .lomitko-rez { stroke-dasharray: 1 2; stroke-dashoffset: 1; stroke-linecap: round; opacity: 0;
+    transition: stroke-dashoffset var(--dur-base, 220ms) var(--ease-out, ease-out), opacity var(--dur-fast, 140ms) var(--ease-out, ease-out); }
+  .orv-auto .lomitko-rez { stroke: #000; stroke-width: 5.5; }
+  .orv-auto[aria-pressed="false"] .lomitko, .orv-auto[aria-pressed="false"] .lomitko-rez { stroke-dashoffset: 0; opacity: 1; }
+  .orv-auto[aria-pressed="false"] .ico use { opacity: .7; }
   .orv-ladeni { position: absolute; left: 8px; right: 8px; bottom: 16px; margin: 0; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,.7); color: #fff; font: 11px/1.4 ui-monospace, monospace; pointer-events: none; }
   @media (prefers-reduced-motion: reduce) {
-    .orv-obrys polygon, .sken-bar, .cam-otocit.orv-auto, .orv-auto::after, .orv-auto .ico { transition: none; }
+    .orv-obrys polygon, .sken-bar, .cam-otocit, .cam-otocit-label, .orv-auto .lomitko, .orv-auto .lomitko-rez { transition: none; }
     .orv-hledi.is-shot .orv-blesk { animation: none; }
   }
   .cam-otocit.on .ico { transform: rotate(180deg); }
@@ -943,14 +946,16 @@
           <div class="orv-blesk" aria-hidden="true"></div>
           <div class="sken-bar" id="sken-bar" role="progressbar" aria-label="Průběh skenu ORV" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
           <p class="orv-ladeni" id="orv-ladeni" hidden></p>
+          <div class="cam-tlacitka">
           <button type="button" class="cam-otocit orv-auto" id="orv-auto" aria-pressed="true" onclick="window.prepniOrvAuto && prepniOrvAuto()" onkeydown="event.stopPropagation()" title="Automatický sken je zapnutý (A)" aria-label="Automatický sken">
             <span class="cam-otocit-label" aria-hidden="true">Sken sám</span>
-            <svg class="ico" aria-hidden="true"><use href="#i-scan"></use></svg>
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><defs><mask id="orv-auto-maska" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><line class="lomitko-rez" x1="19.5" y1="4.5" x2="4.5" y2="19.5" pathLength="1"/></mask></defs><use href="#i-scan" mask="url(#orv-auto-maska)"></use><line class="lomitko" x1="19.5" y1="4.5" x2="4.5" y2="19.5" pathLength="1"/></svg>
           </button>
           <button type="button" class="cam-otocit" id="camera-otocit" onclick="prepniOtoceniKamery()" onkeydown="event.stopPropagation()" title="Otočit obraz o 180°" aria-label="Otočit obraz o 180°">
             <span class="cam-otocit-label" aria-hidden="true">Otočit</span>
             <svg class="ico" aria-hidden="true"><use href="#i-rotate"></use></svg>
           </button>
+          </div>
         </div>
         <div class="scan-actions">
           <button id="quick-scan-btn" onclick="quickScanOrv()" title="Vyplní žádost z ORV a posune dál (Enter)" style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;"><svg class="ico"><use href="#i-scan"></use></svg> Skenovat ORV</button>
@@ -4033,6 +4038,28 @@ function _kameraOtoceniUI() {
     button.classList.toggle('on', kameraOtocena());
     button.setAttribute('aria-pressed', String(kameraOtocena()));
   }
+}
+/** Rozbalovací tlačítka nad kamerou: změří štítek, aby se tlačítko otevřelo
+    přesně na jeho šířku (bez mezery vlevo) — stejně u Otočit i Sken sám. */
+function zmerCamTlacitka() {
+  if (typeof document.querySelectorAll !== 'function') return;
+  document.querySelectorAll('.cam-otocit').forEach(function (b) {
+    const l = b.querySelector('.cam-otocit-label');
+    if (!l || !l.scrollWidth) return;
+    const w = Math.ceil(l.scrollWidth);
+    b.style.setProperty('--label-w', w + 'px');
+    b.style.setProperty('--w-open', (34 + 6 + w) + 'px');
+  });
+}
+// Kamera bývá při načtení skrytá (šířka 0) → měří se znovu při najetí/fokusu.
+zmerCamTlacitka();
+if (typeof document.querySelectorAll === 'function') document.querySelectorAll('.cam-otocit').forEach(function (b) {
+  b.addEventListener('pointerenter', zmerCamTlacitka);
+  b.addEventListener('focus', zmerCamTlacitka);
+});
+// …a hlavně ve chvíli, kdy se náhled kamery ukáže (ze skrytého dostane rozměr).
+if (typeof window !== 'undefined' && window.ResizeObserver && document.getElementById && document.getElementById('orv-hledi')) {
+  new ResizeObserver(zmerCamTlacitka).observe(document.getElementById('orv-hledi'));
 }
 function prepniOtoceniKamery() {
   try { localStorage.setItem(KAMERA_OTOC_KLIC, kameraOtocena() ? '0' : '1'); } catch (_) {}

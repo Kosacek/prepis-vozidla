@@ -84,14 +84,24 @@ input[type="submit"]:active,
                 transform var(--dur-fast) var(--ease-out);
 }
 
-/* .cam-otocit (L460) animated width/max-width/margin on hover = layout work on
-   every pointer move. Width now snaps; only the ink and the label fade move. */
+/* .cam-otocit — both camera buttons (Otočit, Sken sám) open the same way:
+   width eases out to the measured label width, the label slides in with it
+   and fades in slightly behind; closing mirrors it. One rule for both so they
+   can never drift apart again (2026-11-23: Otočit snapped, Sken sám eased). */
 .cam-otocit {
-    transition: border-color var(--dur-fast) var(--ease-out),
-                background-color var(--dur-fast) var(--ease-out);
+    transition: width var(--dur-base) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out);
 }
 .cam-otocit-label {
-    transition: opacity var(--dur-fast) var(--ease-out);
+    transition: max-width var(--dur-base) var(--ease-out),
+                margin-right var(--dur-base) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out);
+}
+.cam-otocit:hover .cam-otocit-label,
+.cam-otocit:focus-visible .cam-otocit-label {
+    transition-delay: 0s, 0s, 60ms;
 }
 .cam-otocit .ico {
     transition: transform var(--dur-base) var(--ease-out);
