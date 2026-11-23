@@ -102,6 +102,7 @@
       .then(function (html) {
         if (stack !== wrap || serial !== openSerial) return;
         body.innerHTML = html;
+        if (window.FirmaPick) window.FirmaPick.attachMarked(body);
         var title = body.querySelector('.card-title');
         if (title) title.id = title.id || 'ukon-stack-title';
         body.addEventListener('submit', function (event) { submitStacked(wrap, event); });
@@ -134,6 +135,7 @@
         if (serial !== openSerial) return;
         lastFocused = document.activeElement;
         modalBody.innerHTML = html;
+        if (window.FirmaPick) window.FirmaPick.attachMarked(modalBody);
         modalCard.classList.toggle("modal-card--new", !!isNew);
         modalCard.classList.toggle("modal-card--scan", !!isScan);
         if (isNew) document.dispatchEvent(new CustomEvent('ukon:new-form-shown', { detail: { form: modalBody.querySelector('#ukon-form') } }));

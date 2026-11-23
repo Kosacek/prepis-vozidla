@@ -1,0 +1,28 @@
+/* spz-tokens.css — shared design tokens for all spznaklic apps (žádosti,
+   evidence, hunter). This file must stay byte-identical in every app; edit
+   the canonical copy in D:\Claude Code\_tools\design_skills\ and copy it out.
+   Each app sets --app-brand / --app-brand-soft to its own brand colour; shared
+   components (update bar, "Co je nového", version chip) use only --spz-*. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-enter: 320ms;
+
+  --spz-brand: var(--app-brand, #1a56db);
+  --spz-brand-soft: var(--app-brand-soft, #e8f0fe);
+  --spz-ok: #1f8a4c;
+  --spz-radius: 12px;
+  --spz-radius-sm: 8px;
+  --spz-muted-ink: #5d6672;   /* ≥ 4.5:1 on white */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

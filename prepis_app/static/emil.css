@@ -13,14 +13,6 @@
 
 /* ── 1. Foundation (emil-base.css) ───────────────────────────────────────── */
 
-:root {
-    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-    --dur-fast: 140ms;
-    --dur-base: 220ms;
-    --dur-enter: 320ms;
-}
-
 html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
@@ -113,11 +105,17 @@ input[type="submit"]:active,
                 transform var(--dur-fast) var(--ease-out);
 }
 
-/* .hl-chip (L545) had no transition at all: hover state popped in. */
+.firma-pick__btn,
+.firm-chip,
+.firm-delete,
+.hbtn,
+.ask-go,
 .hl-chip {
     transition: background-color var(--dur-fast) var(--ease-out),
                 border-color var(--dur-fast) var(--ease-out),
-                color var(--dur-fast) var(--ease-out);
+                color var(--dur-fast) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
 }
 
 /* ── 3. Press feedback ───────────────────────────────────────────────────── */

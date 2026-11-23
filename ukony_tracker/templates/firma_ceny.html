@@ -2,7 +2,7 @@
 {% block title %}Ceník — {{ firma.zkratka }}{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1>Ceník — {{ firma.nazev }}</h1>
+  <h1>Ceník — <span class="firma-mark"><span class="firma-dot" aria-hidden="true" style="background: {{ firma_colors.get(firma.zkratka, 'var(--muted)') }}"></span>{{ firma.nazev }}</span></h1>
   <a href="/firmy" class="btn">Zpět na firmy</a>
 </div>
 

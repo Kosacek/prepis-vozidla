@@ -1,25 +1,44 @@
 {# "Co umí Žádosti": the new "what's new".
 
    Phase 1: the newest release pops up as a centered card .
-   Phase 2: after ~3.5 s or on any tap/key the card slides up and fades,
+   Phase 2: after ~3.5 s the card slides up and fades,
    revealing a full-page sheet with only what the app can do now, in a few
    sections (novinky.py). "Verze X ⓘ" ([data-releases-open]) opens the sheet
-   directly. prefers-reduced-motion: the sheet directly, no slide.
+   directly. The card and sheet also close on Esc or scrim tap.
 
    Needs: NOVA (newest Release), NOVINKY_SEKCE (novinky.sekce()),
    NOVINKY_START ("auto" | "hold" | "sheet"), NOVINKY_KEY (localStorage key,
    None = preview, always opens). Logic: static/novinky.js.
-   Same tokens as the app (--card, --primary, --text, --muted, --border, --bg);
-   demos read the --wn-* aliases, so those are defined here too. #}
+   Demos read the --wn-* aliases for the shared colours. #}
 <style>
   .nv {
-    --wn-card: var(--card, #fff); --wn-ink: var(--text, #1a1d23);
-    --wn-muted: var(--muted, #6b7280); --wn-line: var(--border, #dde1e7);
-    --wn-accent: var(--primary, #1a56db); --wn-accent-dark: var(--primary-dark, #1341b0);
-    --wn-soft: var(--accent, #e8f0fe); --wn-bg: var(--bg, #f0f2f5);
-    --nv-ease: cubic-bezier(.2, .8, .25, 1);
+    --spz-card: #fff;
+    --spz-ink: #1a1d23;
+    --spz-line: #dde1e7;
+    --spz-bg: #f0f2f5;
+    --spz-on-brand: #fff;
+    --spz-soft-ink: var(--spz-brand);
+    --spz-scrim: rgba(0, 0, 0, .45);
+    --spz-card-shadow: 0 8px 40px rgba(0, 0, 0, .18), 0 2px 10px rgba(0, 0, 0, .06);
+    --spz-panel-shadow: 0 12px 48px rgba(0, 0, 0, .25);
+    --wn-card: var(--spz-card); --wn-ink: var(--spz-ink);
+    --wn-muted: var(--spz-muted-ink); --wn-line: var(--spz-line);
+    --wn-accent: var(--spz-soft-ink); --wn-accent-dark: var(--spz-brand);
+    --wn-soft: var(--spz-brand-soft); --wn-bg: var(--spz-bg);
+    --nv-ease: var(--ease-out);
     position: fixed; inset: 0; z-index: 600; visibility: hidden;
-    font-family: 'Segoe UI', system-ui, sans-serif; color: var(--wn-ink);
+    font-family: 'Segoe UI', system-ui, sans-serif; color: var(--spz-ink);
+  }
+  @media (prefers-color-scheme: dark) {
+    .nv {
+      --spz-card: #232935;
+      --spz-ink: #f1f4f8;
+      --spz-muted-ink: #b6c1d0;
+      --spz-line: #404a5a;
+      --spz-bg: #171c26;
+      --spz-brand-soft: #253752;
+      --spz-soft-ink: #a4c2ff;
+    }
   }
   .nv[hidden] { display: none; }
   .nv.is-open { visibility: visible; }
@@ -27,45 +46,45 @@
   /* -- Phase 1: the card ------------------------------------------------ */
   .nv-intro {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    padding: 16px; background: rgba(0, 0, 0, .45);
-    opacity: 0; transition: opacity .2s ease;
+    padding: 16px; background: var(--spz-scrim);
+    opacity: 0; transition: opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-open .nv-intro { opacity: 1; }
   .nv.is-sheet .nv-intro { opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity .45s ease, visibility 0s .5s; }
+    transition: opacity var(--dur-base) var(--nv-ease), visibility 0s var(--dur-base); }
   .nv.nv-direct .nv-intro { display: none; }
 
   .nv-card {
-    position: relative; overflow: hidden; width: 100%; max-width: 380px; border-radius: 16px;
-    padding: 18px 22px 24px; background: var(--wn-card);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, .18), 0 2px 10px rgba(0, 0, 0, .06);
+    position: relative; overflow: hidden; width: 100%; max-width: 380px; border-radius: calc(var(--spz-radius) + 4px);
+    padding: 18px 22px 24px; background: var(--spz-card);
+    box-shadow: var(--spz-card-shadow);
     opacity: 0; transform: translateY(10px) scale(.97);
-    transition: transform .26s var(--nv-ease), opacity .26s ease;
+    transition: transform var(--dur-enter) var(--nv-ease), opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-open .nv-card { opacity: 1; transform: none; }
   .nv.is-sheet .nv-card {
     opacity: 0; transform: translateY(-72px) scale(.96);
-    transition: transform .5s cubic-bezier(.5, 0, .75, 0), opacity .42s ease;
+    transition: transform var(--dur-base) var(--nv-ease), opacity var(--dur-base) var(--nv-ease);
   }
   .nv-card:focus { outline: none; }
   .nv-head {
     display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
-    font-size: 12px; font-weight: 600; color: var(--wn-muted); font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 600; color: var(--spz-muted-ink); font-variant-numeric: tabular-nums;
   }
   .nv-new {
     margin-left: auto; padding: 2px 9px; border-radius: 999px;
-    background: var(--wn-soft); color: var(--wn-accent); font-size: 11px; font-weight: 700;
+    background: var(--spz-brand-soft); color: var(--spz-soft-ink); font-size: 11px; font-weight: 700;
   }
   .nv-card h3 { margin: 0 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
   .nv-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .nv-points li { display: flex; gap: 10px; font-size: 15px; line-height: 1.4; color: var(--wn-muted); }
+  .nv-points li { display: flex; gap: 10px; font-size: 15px; line-height: 1.4; color: var(--spz-muted-ink); }
   .nv-points li::before {
     content: ''; flex: none; width: 6px; height: 6px; margin-top: 8px;
-    border-radius: 50%; background: var(--wn-accent);
+    border-radius: 50%; background: var(--spz-soft-ink);
   }
   /* Timer: a thin line that fills while phase 1 waits. No text. */
   .nv-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
-    background: var(--wn-accent); opacity: .85; transform: scaleX(0); transform-origin: 0 50%; }
+    background: var(--spz-soft-ink); opacity: .85; transform: scaleX(0); transform-origin: 0 50%; }
   .nv.is-open:not(.is-sheet):not(.nv-hold) .nv-timer {
     animation: nv-fill var(--nv-delay, 3.5s) linear forwards; }
   @keyframes nv-fill { to { transform: scaleX(1); } }
@@ -73,15 +92,15 @@
   /* -- Phase 2: the sheet ----------------------------------------------- */
   .nv-sheet {
     position: absolute; inset: 0; display: flex; justify-content: center;
-    background: rgba(0, 0, 0, .45);
-    opacity: 0; pointer-events: none; transition: opacity .45s ease .1s;
+    background: var(--spz-scrim);
+    opacity: 0; pointer-events: none; transition: opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-sheet .nv-sheet { opacity: 1; pointer-events: auto; }
   .nv.nv-locked .nv-sheet { pointer-events: none; }
   .nv-panel {
     display: flex; flex-direction: column; width: 100%; max-width: 720px; min-height: 0;
-    background: var(--wn-bg);
-    transform: translateY(28px); transition: transform .55s var(--nv-ease) .1s;
+    background: var(--spz-bg);
+    transform: translateY(28px); transition: transform var(--dur-enter) var(--nv-ease);
   }
   .nv.is-sheet .nv-panel { transform: none; }
   .nv-panel:focus { outline: none; }
@@ -90,51 +109,54 @@
     padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 8px;
   }
   .nv-top h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
-  .nv-top span { font-size: 13px; font-weight: 600; color: var(--wn-muted); font-variant-numeric: tabular-nums; }
+  .nv-top span { font-size: 13px; font-weight: 600; color: var(--spz-muted-ink); font-variant-numeric: tabular-nums; }
   .nv-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px;
     -webkit-overflow-scrolling: touch; }
   .nv-sec { margin: 0; padding: 0; }
   .nv-sec h4 {
     position: sticky; top: 0; z-index: 2; margin: 0 -16px; padding: 14px 16px 8px;
-    background: var(--wn-bg); font-size: 12px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--wn-muted);
+    background: var(--spz-bg); font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--spz-muted-ink);
   }
   .nv-list { display: grid; gap: 10px; }
 
   .nv-fe {
     --s: .5;
-    display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 14px;
-    background: var(--wn-card); border: 1px solid var(--wn-line);
+    display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: var(--spz-radius);
+    background: var(--spz-card); border: 1px solid var(--spz-line);
   }
-  .nv-fe.is-new { border-color: var(--wn-accent); box-shadow: 0 0 0 3px var(--wn-soft); }
+  .nv-fe.is-new { border-color: var(--spz-soft-ink); box-shadow: 0 0 0 3px var(--spz-brand-soft); }
   .nv-demo {
-    flex: none; position: relative; overflow: hidden; border-radius: 10px;
+    flex: none; position: relative; overflow: hidden; border-radius: var(--spz-radius-sm);
     width: calc(300px * var(--s)); height: calc(140px * var(--s));
   }
   .nv-demo-in { width: 300px; transform: scale(var(--s)); transform-origin: 0 0; pointer-events: none; }
   .nv-demo-in > div { margin-bottom: 0 !important; }
   .nv-tile {
-    flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--wn-bg);
+    flex: none; display: grid; place-items: center; border-radius: var(--spz-radius-sm); background: var(--spz-bg);
     width: calc(300px * var(--s)); height: calc(140px * var(--s));
-    font-size: 20px; font-weight: 800; color: var(--wn-accent);
+    font-size: 20px; font-weight: 800; color: var(--spz-soft-ink);
   }
   .nv-txt { min-width: 0; display: grid; gap: 3px; align-content: center; }
   .nv-txt b { font-size: 15px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
-  .nv-txt p { margin: 0; font-size: 13px; line-height: 1.35; color: var(--wn-muted); }
+  .nv-txt p { margin: 0; font-size: 13px; line-height: 1.35; color: var(--spz-muted-ink); }
   .nv-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; min-height: 16px;
-    font-size: 11px; color: var(--wn-muted); opacity: .8; font-variant-numeric: tabular-nums; }
+    font-size: 11px; color: var(--spz-muted-ink); font-variant-numeric: tabular-nums; }
   .nv-fe .nv-new { margin-left: 0; opacity: 1; }
 
   .nv-bar {
     flex: none; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(to bottom, transparent, var(--wn-bg) 28%);
-    margin-top: -18px; position: relative; z-index: 3;
+    background: var(--spz-bg); border-top: 1px solid var(--spz-line);
   }
   .nv-ok {
-    width: 100%; padding: 13px 20px; border: 0; border-radius: 10px; cursor: pointer;
-    background: var(--wn-accent); color: #fff; font: inherit; font-size: 16px; font-weight: 600;
+    width: 100%; padding: 13px 20px; border: 0; border-radius: var(--spz-radius-sm); cursor: pointer;
+    background: var(--spz-brand); color: var(--spz-on-brand); font: inherit; font-size: 16px; font-weight: 600;
+    transition: filter var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
   }
-  .nv-ok:hover { background: var(--wn-accent-dark); }
+  .nv-card .nv-ok { margin-top: 16px; }
+  @media (hover: hover) and (pointer: fine) {
+    .nv-ok:hover { filter: brightness(.9); }
+  }
 
   @media (min-width: 640px) {
     .nv-fe { --s: .6; padding: 12px; gap: 16px; }
@@ -142,8 +164,8 @@
     .nv-txt p { font-size: 14px; }
   }
   @media (min-width: 740px) {
-    .nv-panel { margin: 24px 0; border-radius: 18px; overflow: hidden;
-      box-shadow: 0 12px 48px rgba(0, 0, 0, .25); }
+    .nv-panel { margin: 24px 0; border-radius: var(--spz-radius); overflow: hidden;
+      box-shadow: var(--spz-panel-shadow); }
     .nv-top { padding-top: 22px; }
     .nv-top, .nv-body { padding-left: 24px; padding-right: 24px; }
     .nv-sec h4 { margin: 0 -24px; padding: 16px 24px 8px; }
@@ -203,6 +225,7 @@
       <ul class="nv-points">
         {% for point in NOVA.points %}<li><span>{{ point }}</span></li>{% endfor %}
       </ul>
+      <button type="button" class="nv-ok">Rozumím</button>
       <div class="nv-timer"></div>
     </div>
   </div>

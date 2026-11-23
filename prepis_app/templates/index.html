@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Přepis vozidla</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='spz-tokens.css') }}?v={{ APP_VERSION }}">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -13,6 +14,9 @@
     --primary-dark: #1341b0;
     --accent: #e8f0fe;
     --border: #dde1e7;
+    --line: var(--border);
+    --app-brand: var(--primary);
+    --app-brand-soft: var(--accent);
     --text: #1a1d23;
     --muted: #6b7280;
     --success: #059669;
@@ -70,7 +74,6 @@
     font-size: 12px; font-weight: 700;
     background: var(--border); color: var(--muted);
     position: relative; z-index: 1;
-    transition: all .2s;
     flex-shrink: 0;
   }
   .step-item.active .step-circle  { background: var(--primary); color: #fff; }
@@ -85,11 +88,6 @@
   .step-item.skipped .step-lbl { color: #9ca3af; text-decoration: line-through; }
   .step-item.warn .step-circle { background: #fee2e2; color: #dc2626; }
   .step-item.warn .step-lbl    { color: #dc2626; }
-
-  /* Keyboard hint bar */
-  .kb-hints { display:flex; gap:18px; justify-content:center; padding:6px 0 2px; flex-wrap:wrap; }
-  .kb-hint  { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; }
-  .kb-key   { background:#f1f3f5; border:1px solid #d1d5db; border-radius:4px; padding:1px 6px; font-size:10px; font-family:monospace; color:#374151; }
 
   /* Žádosti bez myši: štítek ↵ u toho, co právě udělá Enter (static/klavesnice.js
      nastavuje body[data-enter]). U návrhů je to zvýrazněný řádek. */
@@ -138,7 +136,7 @@
   .th-klavesy kbd { font: 600 12px/1 ui-monospace, Consolas, monospace; background: #f6f7f9; border: 1px solid #d1d5db;
                     border-bottom-width: 2px; border-radius: 5px; padding: 4px 7px 3px; color: var(--text); }
   .th-mezi { color: var(--muted); font-size: 12px; }
-  @media (prefers-reduced-motion: no-preference) { .tahak-scrim.open .tahak { animation: tahak-in .16s ease-out; } }
+  @media (prefers-reduced-motion: no-preference) { .tahak-scrim.open .tahak { animation: tahak-in var(--dur-fast) var(--ease-out); } }
   @keyframes tahak-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
 
   /* Cards */
@@ -174,31 +172,40 @@
   /* Výběr firmy jako v evidenci: barevná tečka (`barva` z /api/evidence-meta) před
      názvem, název normální barvou textu. Skrytý <select> drží hodnotu;
      static/firma_pick.js nad ním dělá tlačítko + seznam. */
-  .firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
-  .firma-pick { position: relative; }
+  .firma-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .firma-dot[hidden] { display: none; }
+  .firm-name > .firma-dot, .firm-card-name > .firma-dot, .hl-when > .firma-dot, .hl-sub > .firma-dot, .evo-firma > .firma-dot { margin-right: 6px; vertical-align: 1px; }
+  .evo-firma { white-space: nowrap; }
+  .firma-pick { position: relative; font-size: 16px; --firma-field-bg: #fafbfc; }
   .firma-pick.js > select { position: absolute; opacity: 0; pointer-events: none; height: 0; padding: 0; border: 0; }
   .firma-pick__btn {
     display: flex; align-items: center; gap: 9px; width: 100%; padding: 12px 15px;
-    border: 1.5px solid var(--border); border-radius: 8px; background: #fafbfc; color: var(--text);
-    font: inherit; font-size: 16px; text-align: left; cursor: pointer; transition: border-color .15s;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--firma-field-bg); color: var(--text);
+    font: inherit; text-align: left; cursor: pointer;
   }
   .firma-pick__btn:focus-visible { outline: none; border-color: var(--primary); background: #fff; }
   .firma-pick__btn:disabled { cursor: default; }
   .firma-pick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .firma-pick__chev { flex: 0 0 auto; width: 9px; height: 9px; margin-right: 2px;
-    border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
-    transform: rotate(45deg) translate(-2px, -2px); }
+  .spz-chevron { display: block; flex: none; width: 16px; height: 16px; color: var(--muted); }
   .firma-pick__list { position: absolute; z-index: 60; top: calc(100% + 5px); left: 0; right: 0;
-    max-height: 290px; overflow-y: auto; background: #fafbfc; border: 1.5px solid var(--border);
-    border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,.14); }
-  .firma-pick.up .firma-pick__list { top: auto; bottom: calc(100% + 5px); }
+    max-height: min(78vh, 640px); padding: 4px 0; overflow-y: auto; background: var(--firma-field-bg); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,.14); transform-origin: top center;
+    opacity: 1; transform: none; transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+  .firma-pick.up .firma-pick__list { top: auto; bottom: calc(100% + 5px); transform-origin: bottom center; }
+  @media (prefers-reduced-motion: no-preference) {
+    @starting-style {
+      .firma-pick__list { opacity: 0; transform: scale(.98) translateY(-4px); }
+      .firma-pick.up .firma-pick__list { transform: scale(.98) translateY(4px); }
+    }
+  }
   .firma-pick__list[hidden] { display: none; }
-  .firma-pick__item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 12px;
-    border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: none; color: var(--text);
-    font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
-  .firma-pick__item:last-child { border-bottom: 0; }
-  .firma-pick__item:hover, .firma-pick__item:focus-visible { background: var(--card); outline: none; }
-  .firma-pick__item.on { font-weight: 700; background: var(--card); }
+  .firma-pick__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 12px;
+    border: 0; background: none; color: var(--text); font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
+  .firma-pick__item.on, .firma-pick__item:focus-visible { background: var(--accent); }
+  .firma-pick__item:focus-visible { outline-offset: -2px; }
+  @media (hover: hover) and (pointer: fine) {
+    .firma-pick__item:hover { background: var(--accent); }
+  }
   .ev-toggle span { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; color: var(--text); }
   #ppd-card > p, #evidence-status { font-size: 13.5px; }
   #summary-card .card-title { font-size: 19px; }
@@ -239,7 +246,7 @@
   /* ICO row */
   .ico-row { display: flex; gap: 8px; }
   .ico-row input { flex: 1; }
-  .btn-lookup { padding: 9px 14px; background: var(--accent); border: 1.5px solid var(--primary); color: var(--primary); border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .btn-lookup { padding: 9px 14px; background: var(--accent); border: 1.5px solid var(--primary); color: var(--primary); border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .btn-lookup:hover { background: var(--primary); color: #fff; }
   .lookup-status { font-size: 12px; margin-top: 4px; padding: 5px 9px; border-radius: 5px; display: none; }
   .lookup-status.ok  { background: #d1fae5; color: var(--success); display: block; }
@@ -247,13 +254,13 @@
 
   /* Firm dropdown */
   .ico-input-wrap { position: relative; flex: 1; }
-  .firm-dropdown { position: absolute; top: calc(100% + 4px); left: 0; z-index: 200; background: #fff; border: 1.5px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); width: 100%; max-height: 220px; overflow-y: auto; display: none; }
+  .firm-dropdown { position: absolute; top: calc(100% + 4px); left: 0; z-index: 200; background: #fafbfc; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); width: 100%; max-height: min(78vh, 640px); padding: 4px 0; overflow-y: auto; display: none; }
   .firm-dropdown.open { display: block; }
-  .firm-option { padding: 9px 13px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border); }
-  .firm-option:last-child { border-bottom: none; }
-  .firm-option:hover { background: var(--accent); }
-  .firm-option.active { background: var(--accent); box-shadow: inset 3px 0 0 var(--primary); }
-  .firm-name { font-weight: 600; }
+  .firm-option { padding: 5px 12px; cursor: pointer; font-size: 16px; }
+  @media (hover: hover) and (pointer: fine) {
+    .firm-option:hover { background: var(--accent); }
+  }
+  .firm-option.active { background: var(--accent); }
   .firm-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
   .firm-option.add-new { color: var(--primary); font-weight: 600; }
 
@@ -299,7 +306,7 @@
   .dok-card .firm-card-sub { grid-column: 2 / 4; grid-row: 2; min-width: 0; }
   .dok-card .firm-chips { grid-column: 2 / 4; grid-row: 3; flex-wrap: nowrap; }
   /* Koš v pravém dolním rohu jako v evidenci. */
-  .dok-card .firm-delete { flex: none; margin: -2px -4px -2px auto; width: 36px; height: 36px; padding: 9px; }
+  .dok-card .firm-delete { flex: none; margin: -2px -4px -2px auto; width: 36px; height: 36px; }
   .dok-card:hover, .dok-card:focus-within { border-color: #b5caf5; background: #f7faff; }
   .dok-num { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 40px; border-radius: 10px; background: var(--accent); color: var(--primary); font-size: 13px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .dok-num small { font-size: 9px; font-weight: 700; letter-spacing: .04em; opacity: .7; }
@@ -312,8 +319,8 @@
   .dok-deleted { margin-top: 8px; flex-shrink: 0; }
   .dok-deleted summary { display: flex; align-items: center; gap: 8px; padding: 8px 2px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; list-style: none; }
   .dok-deleted summary::-webkit-details-marker { display: none; }
-  .dok-deleted summary::after { content: ""; width: 7px; height: 7px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
-  .dok-deleted[open] summary::after { transform: rotate(45deg); }
+  .dok-deleted summary .spz-chevron { transform: rotate(-90deg); transition: transform var(--dur-fast) var(--ease-out); }
+  .dok-deleted[open] summary .spz-chevron { transform: none; }
   .dok-deleted .dok-list { display: flex; flex-direction: column; gap: 8px; }
   #firmy-modal { padding: 16px; }
   #firmy-modal .modal-header { border-bottom: none; flex-shrink: 0; padding-bottom: 12px; }
@@ -324,7 +331,12 @@
   #firmy-modal-body { display: flex; flex-direction: column; gap: 8px; padding-top: 0; flex: 1 1 auto; min-height: 0; overflow-x: hidden; }
   .firm-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) 32px; align-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; flex-shrink: 0; transition: border-color .15s, background .15s; }
   .firm-card:hover, .firm-card:focus-within { border-color: #b5caf5; background: #f7faff; }
-  .firm-avatar { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .firm-avatar { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--line); font-size: 13px; font-weight: 600; color: var(--text); }
+  .firm-avatar-initials { display: flex; align-items: center; gap: 3px; }
+  .firm-avatar img { display: block; width: 100%; height: 100%; padding: 3px; border-radius: inherit; background: #fff; object-fit: contain; }
+  .firm-avatar img + .firm-avatar-initials { position: absolute; right: 2px; bottom: 2px; }
+  .firm-avatar img + .firm-avatar-initials .firm-initials { display: none; }
+  .firm-avatar img + .firm-avatar-initials .firma-dot { box-shadow: 0 0 0 1px #fff; }
   .firm-info { min-width: 0; }
   .firm-card-name { font-weight: 600; font-size: 14px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .firm-card-sub { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -332,7 +344,7 @@
   .firm-ico-label { font-size: 10px; font-weight: 700; letter-spacing: .04em; margin-right: 4px; }
   .firm-chips, .firm-id-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
   .firm-chips { margin-top: 8px; }
-  .firm-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font: 600 12px 'Segoe UI', system-ui, sans-serif; line-height: 1.4; white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+  .firm-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font: 600 12px 'Segoe UI', system-ui, sans-serif; line-height: 1.4; white-space: nowrap; cursor: pointer; }
   .firm-chip:hover, .firm-chip:focus-visible, .firm-pm-chip:focus-within { border-color: var(--primary); background: var(--accent); color: var(--primary); }
   .firm-chip:focus-visible, .firm-pm-chip a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .firm-chip .ico { width: 16px; height: 16px; }
@@ -344,7 +356,7 @@
   .firm-pm-chip a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 8px; color: inherit; text-decoration: none; border-radius: 6px; }
   .firm-pm-remove { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; border: none; border-radius: 6px; background: transparent; color: inherit; font-size: 17px; cursor: pointer; }
   .firm-pm-remove:hover, .firm-pm-remove:focus-visible { color: var(--error); background: #fee2e2; }
-  .firm-delete { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 6px; border: 1.5px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: opacity .15s, border-color .15s, background .15s, color .15s; }
+  .firm-delete { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
   .firm-delete:hover, .firm-delete:focus-visible { border-color: var(--error); background: #fee2e2; color: var(--error); }
   .firm-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 12px; color: var(--muted); text-align: center; font-size: 14px; }
   @media (hover: hover) and (pointer: fine) {
@@ -376,7 +388,7 @@
   .step-panel.active { display: block; }
 
   /* Mode cards */
-  .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 10px 18px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 16px; }
+  .mode-card { border: 2px solid var(--border); border-radius: var(--radius); padding: 10px 18px; cursor: pointer; display: flex; align-items: center; gap: 16px; }
   .mode-card:hover { border-color: var(--primary); background: var(--accent); }
   .mode-card:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.2); }
   .mode-card.selected { border-color: var(--primary); background: var(--accent); }
@@ -392,7 +404,7 @@
   .mode-card.selected .mode-icon { background: var(--primary); color: #fff; }
 
   /* Profil (kdo vyplňuje) choice cards — same language as .mode-card */
-  .profil-card { width: 100%; border: 2px solid var(--border); border-radius: var(--radius); padding: 15px 18px; background: #fff; color: var(--text); font-size: 16px; font-weight: 700; cursor: pointer; transition: all .15s; }
+  .profil-card { width: 100%; border: 2px solid var(--border); border-radius: var(--radius); padding: 15px 18px; background: #fff; color: var(--text); font-size: 16px; font-weight: 700; cursor: pointer; }
   .profil-card:hover { border-color: var(--primary); background: var(--accent); color: var(--primary); }
   .profil-card:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.2); }
   .mode-title { font-size: 15px; font-weight: 700; }
@@ -470,10 +482,10 @@
     border-top: 1px solid var(--border);
     box-shadow: 0 -2px 10px rgba(0,0,0,0.07);
     display: flex; align-items: center; justify-content: flex-end;
-    gap: 12px; padding: 0 32px;
+    gap: 12px; padding: 0 32px 0 24px;
     z-index: 200;
   }
-  .btn { padding: 11px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
+  .btn { padding: 11px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
   .btn-primary   { background: var(--primary); color: #fff; }
   .btn-primary:hover   { background: var(--primary-dark); }
   .btn-secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
@@ -492,13 +504,13 @@
     padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--border);
     background: #fff; color: var(--text); cursor: pointer;
     font-size: 13px; font-weight: 600; font-family: inherit;
-    transition: border-color .15s, background .15s, color .15s;
   }
   .hbtn:hover { border-color: var(--primary); background: var(--accent); color: var(--primary); }
   .hbtn:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.2); }
   .hbtn .ico { color: var(--muted); transition: color .15s; }
   .hbtn:hover .ico { color: var(--primary); }
   .hbtn-icon { padding: 8px 10px; }
+  .hbtn.kb-help { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0; border-width: 1px; font-size: 16px; }
 
   .cam-otocit { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: flex-end; width: 34px; max-width: calc(100% - 16px); height: 34px; padding: 0 8px; border: 0; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); font: 600 12px 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; cursor: pointer; transition: width .18s ease, border-color .15s, background .15s; }
   .cam-otocit-label { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .18s ease, margin-right .18s ease, opacity .18s ease; }
@@ -561,7 +573,7 @@
   .ask-bar { display: flex; gap: 8px; margin: 0 22px 14px; flex-shrink: 0; }
   .ask-bar .firm-search { flex: 1; margin: 0; }
   #hledani-q { padding: 10px 12px 10px 38px; font-family: inherit; font-size: 14px; }
-  .ask-go { display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font: 600 14px 'Segoe UI', system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background .15s; }
+  .ask-go { display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font: 600 14px 'Segoe UI', system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
   .ask-go:hover { background: var(--primary-dark); }
   .ask-go:disabled { opacity: .6; cursor: default; }
   #hledani-body { padding-top: 0; flex: 1 1 auto; min-height: 0; }
@@ -593,14 +605,14 @@
   .ask-dots i { display: inline-block; width: 4px; height: 4px; margin-left: 3px; border-radius: 50%; background: currentColor; animation: ask-dot 1.2s infinite; }
   .ask-dots i:nth-child(2) { animation-delay: .15s; } .ask-dots i:nth-child(3) { animation-delay: .3s; }
   .ask-skeleton { display: grid; gap: 8px; margin-top: 10px; }
-  .ask-skeleton span { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%); background-size: 200% 100%; animation: ask-shimmer 1.4s linear infinite; }
+  .ask-skeleton span { height: 10px; border-radius: 6px; background: var(--line); animation: ask-skeleton-pulse calc(4 * var(--dur-enter)) var(--ease-in-out) infinite; }
   .ask-skeleton span:nth-child(1) { width: 92%; } .ask-skeleton span:nth-child(2) { width: 68%; } .ask-skeleton span:nth-child(3) { width: 40%; }
-  .ask-reveal { animation: ask-in .5s cubic-bezier(.22, .8, .25, 1) both; animation-delay: calc(var(--i, 0) * 60ms + 40ms); }
+  .ask-reveal { animation: ask-in var(--dur-enter) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms + 40ms); }
   @keyframes ask-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
   @keyframes ask-spin { to { transform: rotate(360deg); } }
   @keyframes ask-pulse { 0%, 100% { scale: .88; opacity: .7; } 50% { scale: 1.12; opacity: 1; } }
   @keyframes ask-dot { 0%, 80%, 100% { opacity: .2; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
-  @keyframes ask-shimmer { to { background-position: -200% 0; } }
+  @keyframes ask-skeleton-pulse { 50% { opacity: .5; } }
 
   /* Přechod mezi kroky („Jemný"): starý krok vybledne doleva, nový přijede
      zprava. Odcházející krok je kopie bez id (.panel-ghost), aby se dal
@@ -696,7 +708,8 @@
     #firmy-modal-body { padding: 0 16px 16px; }
     .firm-card { column-gap: 8px; }
     .form-grid { grid-template-columns: 1fr; }
-    .nav-bar { padding: 0 16px; }
+    .nav-bar { gap: 6px; padding: 0 8px; }
+    .nav-bar .btn { padding-inline: 12px; }
     .step-lbl { display: none; }
     /* Čtyřsloupcová mřížka plné moci má vyšší specificitu než obecné
        .form-grid pravidlo — na telefonu ji musíme přebít, jinak by z polí
@@ -751,6 +764,7 @@
   <symbol id="i-plate" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 7v10"/><path d="M10.5 11h7M10.5 13.5h4.5"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 20v-5M5 11V4M12 20v-8M12 8V4M19 20v-4M19 12V4"/><path d="M2.5 15h5M9.5 8h5M16.5 16h5"/></symbol>
   <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 16 16"><path d="M3 5.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <header class="app-header">
@@ -777,12 +791,6 @@
     </div>
     <div id="profil-choices" style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:12px;"></div>
   </div>
-</div>
-
-<!-- Update notification banner -->
-<div id="update-banner" style="display:none;background:#059669;color:#fff;padding:10px 32px;font-size:14px;font-weight:500;text-align:center;">
-  <span id="update-text"></span>
-  <button onclick="applyUpdate()" style="margin-left:12px;padding:5px 14px;border-radius:6px;border:none;background:#fff;color:#059669;font-weight:600;cursor:pointer;font-size:13px;">Restartovat a aktualizovat</button>
 </div>
 
 <!-- Správa firem modal -->
@@ -1572,17 +1580,11 @@
 
 <!-- Fixed nav bar -->
 <div class="nav-bar">
-  <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">Zpět</button>
   {# Version + its history (templates/_novinky.html). #}
   <button type="button" id="app-version-bar" class="app-ver" data-releases-open aria-label="Verze {{ APP_VERSION }} – co je nového">v{{ APP_VERSION }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.4" r=".6" fill="currentColor"/></svg></button>
+  <button class="btn btn-secondary" id="nav-back" onclick="navBack()" style="display:none;">Zpět</button>
   <button class="btn btn-primary"   id="nav-next" onclick="navNext()">Pokračovat</button>
-</div>
-<div class="kb-hints">
-  <span class="kb-hint"><span class="kb-key">Enter</span> další krok</span>
-  <span class="kb-hint"><span class="kb-key">Esc</span> zpět</span>
-  <span class="kb-hint"><span class="kb-key">Ctrl</span>+<span class="kb-key">Enter</span> vytisknout vše</span>
-  <span class="kb-hint"><span class="kb-key">?</span> zkratky</span>
-
+  <button type="button" class="hbtn kb-help" onclick="prepniTahak(true)" title="Klávesové zkratky (?)" aria-label="Klávesové zkratky (?)" aria-haspopup="dialog">?</button>
 </div>
 
 <script>
@@ -1750,6 +1752,7 @@ function currentPanel() { return FLOWS[appMode].panels[flowIdx]; }
 // ── Keyboard ─────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Enter' && (e.target.classList.contains('kb-help') || e.target.id === 'app-version-bar')) return;
 
   // Krok 1 (Žádosti bez myši, v1.26.0): číslice 1–6 vyberou typ, Enter
   // vyfotí ORV a sken sám posune dál; Shift+Enter jde dál bez skenu. Plná moc
@@ -1876,7 +1879,7 @@ function navBack() {
 // (zpátky obráceně), čára ve stepperu doběhne k dalšímu kroku a jeho kroužek
 // naskočí. Animace je jen kosmetika: rychlé Entery ji zkrátí, chyba v ní ani
 // zastavená časová osa (tab na pozadí) navigaci nikdy neshodí.
-const _KROK_EASE = 'cubic-bezier(.22,1,.36,1)';
+const _KROK_EASE = getComputedStyle(document.documentElement).getPropertyValue('--ease-out').trim();
 let _krokPredIdx = 0;
 let _krokAnimace = [];
 let _krokPojistka = 0;
@@ -1921,7 +1924,7 @@ function _krokStepper(dir) {
   }
   const kruh = items[flowIdx] && items[flowIdx].querySelector('.step-circle');
   if (kruh) {
-    _krokAnim(kruh, [{ transform: 'scale(.6)', opacity: .4 }, { transform: 'scale(1.12)', offset: .6 },
+    _krokAnim(kruh, [{ transform: 'scale(.96)', opacity: .4 },
                      { transform: 'scale(1)', opacity: 1 }],
               { duration: 380, delay: dir > 0 ? 160 : 0, easing: _KROK_EASE });
   }
@@ -1941,7 +1944,7 @@ function activatePanel(n) {
     const duch = _krokDuch(from, rect);
     _krokAnim(duch, [{ opacity: 1, transform: 'none' },
                      { opacity: 0, transform: `translateX(${-20 * dir}px)` }],
-              { duration: 140, easing: 'ease-in' })
+              { duration: 140, easing: _KROK_EASE })
       .finished.then(() => duch.remove(), () => duch.remove());
     _krokAnim(to, [{ opacity: 0, transform: `translateX(${28 * dir}px)` },
                    { opacity: 1, transform: 'none' }],
@@ -2176,7 +2179,7 @@ async function openFirmDropdown(party, source) {
   const filtered = najdiFirmy(firms, query);
   let html = filtered.map(f => `
     <div class="firm-option" data-ico="${esc(f.ico)}" onclick="selectFirm('${esc(party)}','${esc(f.ico)}')">
-      <div class="firm-name">${esc(f.nazev)}</div>
+      <div class="firm-name">${firmaDot(f)}${esc(f.nazev)}</div>
       <div class="firm-sub">IČO: ${esc(f.ico)} · ${esc(f.adresa)}</div>
     </div>`).join('');
   const curIco  = document.getElementById(`${party}_ico`).value.trim();
@@ -2278,7 +2281,7 @@ async function ppdPayerSuggest() {
   const filtered = najdiFirmy(firms, q).slice(0, 8);
   dd.innerHTML = filtered.map(f => `
     <div class="firm-option" data-ico="${esc(f.ico)}" onclick="ppdPayerPick('${esc(f.nazev)}','${esc(f.ico)}','${esc(f.adresa||'')}')">
-      <div class="firm-name">${esc(f.nazev)}</div>
+      <div class="firm-name">${firmaDot(f)}${esc(f.nazev)}</div>
       <div class="firm-sub">IČO: ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}</div>
     </div>`).join('');
   dd.classList.toggle('open', filtered.length > 0);
@@ -2322,7 +2325,7 @@ async function ppdPayerVies(dic) {
     const dd = document.getElementById('ppd-payer-firms');
     const nazev = d.nazev || '';
     dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(nazev)}','','${esc(d.adresa||'')}','${esc(dic)}')">
-      <div class="firm-name">${nazev ? esc(nazev) : 'DIČ ' + esc(dic) + ' platné'}</div>
+      <div class="firm-name">${firmaDot({nazev})}${nazev ? esc(nazev) : 'DIČ ' + esc(dic) + ' platné'}</div>
       <div class="firm-sub">VIES · DIČ ${esc(dic)}${d.adresa ? ' · ' + esc(d.adresa) : ''}</div></div>`;
     dd.classList.add('open');
     _dropdownKlavesy(inp, dd, () => ppdPayerPick(nazev, '', d.adresa || '', dic));
@@ -2335,7 +2338,7 @@ async function ppdPayerAres(ico) {
     if (d && d.success && d.nazev) {
       const dd = document.getElementById('ppd-payer-firms');
       dd.innerHTML = `<div class="firm-option" onclick="ppdPayerPick('${esc(d.nazev)}','${esc(ico)}','${esc(d.adresa||'')}')">
-        <div class="firm-name">${esc(d.nazev)}</div>
+        <div class="firm-name">${firmaDot({ico, nazev: d.nazev})}${esc(d.nazev)}</div>
         <div class="firm-sub">ARES · IČO ${esc(ico)}${d.adresa ? ' · ' + esc(d.adresa) : ''}</div></div>`;
       dd.classList.add('open');
       _dropdownKlavesy(document.getElementById('ppd_prijato_od'), dd,
@@ -2995,14 +2998,14 @@ function _hlOdpovedHtml(res) {
     h += res.doklady.map(d => `<div class="hl-radek${r()}"><a class="hl-row" href="${esc(d.url)}" target="_blank">
         <span class="hl-badge">č. ${esc(d.cislo)}</span>
         <span class="hl-when">${_czDate(d.datum)}</span>
-        <span class="hl-sub">${esc(d.prijato_od || '')}${d.vozidlo ? ' · ' + esc(d.vozidlo) : ''}</span>
+        <span class="hl-sub">${firmaDot({ico: d.prijato_ico || d.ico, nazev: d.prijato_od})}${esc(d.prijato_od || '')}${d.vozidlo ? ' · ' + esc(d.vozidlo) : ''}</span>
         <span class="hl-kc">${_kcFmt(d.castka)}</span></a>${_hlSdilet(d.url)}</div>`).join('');
   }
 
   if ((res.firmy || []).length) {
     h += `<div class="hl-sec${r()}">Firmy (${res.firmy.length})</div>`;
     h += res.firmy.map(f => `<div class="hl-row${r()}">
-        <span class="hl-when">${esc(f.nazev || '')}</span>
+        <span class="hl-when">${firmaDot(f)}${esc(f.nazev || '')}</span>
         <span class="hl-sub">IČO ${esc(f.ico || '—')}${f.id ? ' · ID ' + esc(f.id) : ''}</span>
         ${f.has_plna_moc ? `<a class="hl-kc" style="font-weight:600;font-size:12px;" href="/plna-moc/${esc(f.ico)}" target="_blank"><svg class="ico"><use href="#i-file"></use></svg> plná moc</a>` : ''}
       </div>`).join('');
@@ -3083,7 +3086,7 @@ function _dokladKarta(d, smazany) {
   return `<div class="dok-card${smazany ? ' smazany' : ''}">
       <div class="dok-num" aria-label="Doklad číslo ${c}"${fa ? ` title="Faktura č. ${c}"` : ''}><small>Č.</small>${esc(_dokladKod(d))}</div>
       <div class="firm-info">
-        <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${esc(String(d.prijato_od || '—'))}</div>
+        <div class="firm-card-name" title="${esc(String(d.prijato_od || ''))}">${firmaDot({ico: d.prijato_ico || d.ico, nazev: d.prijato_od})}${esc(String(d.prijato_od || '—'))}</div>
         <div class="firm-card-sub" title="${sub}">${sub}</div>
         <div class="firm-chips">${akce}${smazany ? '' : `<button type="button" class="firm-delete" data-cislo="${c}" onclick="otevriStornoDokladu(this.dataset.cislo)" title="Odebrat" aria-label="Odebrat"><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg></button>`}</div>
       </div>
@@ -3127,7 +3130,7 @@ function renderDoklady() {
   if (del.length) {
     const otevreno = body.querySelector('.dok-deleted')?.open;
     html += `<details class="dok-deleted"${otevreno ? ' open' : ''}>
-      <summary><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg>Stornované <span class="firm-count">${del.length}</span></summary>
+      <summary><svg class="ico" aria-hidden="true"><use href="#i-trash"></use></svg>Stornované <span class="firm-count">${del.length}</span><svg class="spz-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg></summary>
       <div class="dok-list">${del.map(d => _dokladKarta(d, true)).join('')}</div>
     </details>`;
   }
@@ -3173,11 +3176,20 @@ function _firmInitials(name) {
   return words.slice(0, 2).map(word => word[0]).join('').toUpperCase() || '—';
 }
 
-function _firmTint(ico) {
-  const tints = ['#e8eefb', '#e5f2ed', '#f6ecd9', '#f0e8f6', '#f9e7e9', '#e4f0f3'];
-  let hash = 0;
-  for (const char of String(ico)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return tints[hash % tints.length];
+let _firmaLoga = {};
+
+async function loadFirmaLoga() {
+  try {
+    const res = await fetch('/api/firma-loga', {cache: 'no-store'});
+    if (res.ok) _firmaLoga = await res.json();
+  } catch { /* Bez loga zůstanou iniciály. */ }
+}
+
+function _firmAvatar(f) {
+  const ico = String(f.ico || '').trim();
+  const logo = /^[0-9]{8}$/.test(ico) && ['svg', 'png'].includes(_firmaLoga[ico])
+    ? `<img src="/firma-logo/${ico}" alt="" onerror="this.remove()">` : '';
+  return `<div class="firm-avatar" aria-hidden="true">${logo}<span class="firm-avatar-initials">${firmaDot(f)}<span class="firm-initials">${esc(_firmInitials(f.nazev))}</span></span></div>`;
 }
 
 function _renderFirmyBody() {
@@ -3198,7 +3210,7 @@ function _renderFirmyBody() {
     const ids = String(f.id || '').split(',').map(id => id.trim()).filter(Boolean);
     return `
     <div class="firm-card" id="firm-card-${esc(f.ico)}">
-      <div class="firm-avatar" style="background:${esc(_firmTint(f.ico))}" aria-hidden="true">${esc(_firmInitials(f.nazev))}</div>
+      ${_firmAvatar(f)}
       <div class="firm-info">
         <div class="firm-card-name" title="${esc(f.nazev)}">${esc(f.nazev)}</div>
         <div class="firm-card-sub" title="IČO ${esc(f.ico)}${f.adresa ? ' · ' + esc(f.adresa) : ''}">
@@ -3235,8 +3247,8 @@ async function renderFirmyModal() {
   const body = document.getElementById('firmy-modal-body');
   if (!_firmsCache) {
     body.innerHTML = 'Načítám...';
-    await getSavedFirms(); // populates _firmsCache
   }
+  await Promise.all([getSavedFirms(), loadFirmaLoga()]);
   _renderFirmyBody();
 }
 
@@ -3508,14 +3520,54 @@ function evidenceBarva(f) {
   return /^#[0-9a-fA-F]{3,8}$/.test(b) ? b : '';
 }
 
+function evidenceFirma({ico, nazev, firma_id, zkratka}) {
+  const firmy = _evidenceMeta?.firmy || [];
+  const cislo = String(ico || '').trim();
+  const jmeno = _firmSearchText(nazev).trim();
+  return firmy.find(f => firma_id != null && String(f.id) === String(firma_id))
+      || firmy.find(f => cislo && String(f.ico).trim() === cislo)
+      || firmy.find(f => (zkratka && f.zkratka === zkratka)
+        || (jmeno && (!cislo || !f.ico) && _firmSearchText(f.nazev).trim() === jmeno));
+}
+
+let _evidenceDotsRequested = false;
+function firmaDot({ico, nazev, firma_id, zkratka}, fallback = false) {
+  const party = {ico, nazev, firma_id, zkratka};
+  const firma = evidenceFirma(party);
+  if (_evidenceMeta && !firma && !fallback) return '';
+
+  // Evidence can be offline. Keep search and keyboard selection usable while
+  // the colour request is in flight and update only the dots once it resolves.
+  let pending = '';
+  if (!_evidenceMeta && (ico || nazev || firma_id != null || zkratka)) {
+    if (!_evidenceDotsRequested) {
+      _evidenceDotsRequested = true;
+      loadEvidenceMeta();
+    }
+    pending = ` data-firma="${esc(JSON.stringify(party))}"${fallback ? '' : ' hidden'}`;
+  }
+  if (!firma && !fallback && !pending) return '';
+  return `<span class="firma-dot" aria-hidden="true" style="background:${evidenceBarva(firma) || 'var(--muted)'}"${pending}></span>`;
+}
+
+let _evidenceMetaRequest;
 async function loadEvidenceMeta() {
   if (_evidenceMeta) return _evidenceMeta;
-  try {
-    const r = await fetch('/api/evidence-meta');
-    const m = await r.json();
-    if (m && Array.isArray(m.firmy) && m.firmy.length) _evidenceMeta = m;
-  } catch { /* offline → picker stays empty */ }
-  return _evidenceMeta;
+  _evidenceMetaRequest ??= fetch('/api/evidence-meta').then(r => r.json()).then(m => {
+    if (m && Array.isArray(m.firmy) && m.firmy.length) {
+      _evidenceMeta = m;
+      document.querySelectorAll('.firma-dot[data-firma]').forEach(dot => {
+        const firma = evidenceFirma(JSON.parse(dot.dataset.firma));
+        if (firma) {
+          dot.style.background = evidenceBarva(firma) || 'var(--muted)';
+          dot.hidden = false;
+        }
+        delete dot.dataset.firma;
+      });
+    }
+    return _evidenceMeta;
+  }).catch(() => null).finally(() => { _evidenceMetaRequest = null; });
+  return _evidenceMetaRequest;
 }
 
 async function prepareEvidence() {
@@ -4356,8 +4408,9 @@ async function hledejVEvidenci() {
     box.innerHTML = r.ukony.map(u => {
       const chybi = !u.rz || !u.orv;
       const datum = String(u.datum || '').split('-').reverse().join('.');
+      const firma = {firma_id: u.firma_id, zkratka: u.firma_zkratka, nazev: u.firma};
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);color:var(--text)">
-        <span>${esc(datum)} · <b>${esc(u.firma_zkratka || u.firma || '')}</b> · ${esc(u.typ_kod || '')} · RZ ${u.rz ? esc(u.rz) : '<i style="color:var(--muted)">chybí</i>'}</span>
+        <span>${esc(datum)} · <b class="evo-firma">${firmaDot(firma, true)}${esc(u.firma_zkratka || u.firma || '')}</b> · ${esc(u.typ_kod || '')} · RZ ${u.rz ? esc(u.rz) : '<i style="color:var(--muted)">chybí</i>'}</span>
         ${chybi ? `<button onclick="doplnUkon(${Number(u.id)}, this)" style="padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Doplnit SPZ</button>` : '<span style="color:var(--muted);font-size:12px">✓ má SPZ</span>'}
       </div>`;
     }).join('');
@@ -4595,45 +4648,6 @@ function resetForm() {
   closeCamera('reload');
   location.reload();
 }
-
-// ── Auto-update check ─────────────────────────────────────────────────────────
-let _updateMode = null;
-async function checkForUpdate() {
-  try {
-    const r = await fetch('/api/update-status');
-    const d = await r.json();
-    if (d.available && d.version) {
-      _updateMode = d.mode || 'download';
-      const banner = document.getElementById('update-banner');
-      const btn = banner.querySelector('button');
-      if (_updateMode === 'restart') {
-        document.getElementById('update-text').textContent = `Nová verze ${d.version} je k dispozici.`;
-        btn.textContent = 'Zavřít a znovu otevřít';
-      } else {
-        document.getElementById('update-text').textContent = `Nová verze ${d.version} je připravena k instalaci.`;
-        btn.textContent = 'Restartovat a aktualizovat';
-      }
-      banner.style.display = 'block';
-    }
-  } catch(e) {}
-}
-async function applyUpdate() {
-  const btn = event.target;
-  if (_updateMode === 'restart') {
-    btn.textContent = 'Zavírám...';
-    btn.disabled = true;
-    try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
-    // App will exit — tell user to reopen
-    document.getElementById('update-text').textContent = 'Aplikace se zavřela. Otevřete ji znovu.';
-  } else {
-    btn.textContent = 'Aktualizuji...';
-    btn.disabled = true;
-    try { await fetch('/api/apply-update', {method:'POST'}); } catch(e) {}
-  }
-}
-// Check after 8 seconds, then every 30 seconds
-setTimeout(checkForUpdate, 8000);
-setInterval(checkForUpdate, 30000);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderStepper();

@@ -34,6 +34,7 @@ def test_popup_is_on_pages_for_logged_in_people(gated_client):
     assert RELEASE_KEY in html
     assert "Rozumím" in html
     assert "Zeptej se" in html and "Techničák" in html
+    assert html.index("css/spz-tokens.css") < html.index("css/app.css")
 
 
 def test_popup_never_on_the_login_page(gated_client):
@@ -93,6 +94,7 @@ def test_popup_is_the_newest_release(gated_client):
     # In the intro card itself (a demo's inline <style> may be long).
     assert RELEASES[0].title in intro[:intro.index('nv-timer')]
     assert RELEASES[0].points[0] in html
+    assert 'class="wn-firmy" aria-hidden="true"' in intro
 
 
 def test_sheet_shows_each_current_release_exactly_once(gated_client):

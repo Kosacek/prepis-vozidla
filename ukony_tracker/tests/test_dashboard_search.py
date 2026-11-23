@@ -116,7 +116,26 @@ def test_hledat_no_match_shows_message(client):
 
 def test_dashboard_renders_search_box_and_firm_colors(client):
     c, _, _ = client
-    body = c.get("/").get_data(as_text=True)
+    body = c.get("/?obdobi=2026-06").get_data(as_text=True)
     assert 'id="recent-search"' in body                # the quick-find box
     assert "firma-dot" in body                         # colored firm dots in the list
     assert "window.FIRMA_COLORS" in body               # chart shares the same map
+    assert 'class="bar-row" style="--firma: #0a84ff"' in body
+    assert '<span class="firma-dot" aria-hidden="true"></span><span class="bar-name">Cardion</span>' in body
+
+
+def test_edit_form_firm_picker_has_colours_on_page_and_in_modal(client):
+    c, cardion, _ = client
+    with c.application.app_context():
+        uid = ukony_repo.search(db.get_db(), "2BS2200")[0]["id"]
+    for suffix in ("", "?modal=1"):
+        html = c.get(f"/ukony/{uid}/upravit{suffix}").get_data(as_text=True)
+        assert 'name="firma_id" data-firma-pick' in html
+        assert f'<option value="{cardion}" data-color="#0a84ff" selected>Cardion</option>' in html
+
+
+def test_firm_colour_matches_on_firm_table_price_list_and_export(client):
+    c, cardion, _ = client
+    dot = '<span class="firma-dot" aria-hidden="true" style="background: #0a84ff"></span>Cardion'
+    for path in ("/firmy", f"/firmy/{cardion}/ceny", "/export"):
+        assert dot in c.get(path).get_data(as_text=True), path

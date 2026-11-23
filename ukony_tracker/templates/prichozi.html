@@ -78,10 +78,10 @@
     <div class="prichozi-fields">
       <div class="field">
         <label>Firma</label>
-        <select name="firma_id" required>
+        <select name="firma_id" data-firma-pick aria-label="Firma" required>
           <option value="">— vyber —</option>
           {% for f in firmy %}
-          <option value="{{ f.id }}" {{ 'selected' if p.suggested_firma_id == f.id }}>{{ f.zkratka }}</option>
+          <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, 'var(--muted)') }}" {{ 'selected' if p.suggested_firma_id == f.id }}>{{ f.zkratka }}</option>
           {% endfor %}
         </select>
       </div>
@@ -124,7 +124,7 @@
 {% endfor %}
 
 {% include "_ukon_modal.html" %}
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=15"></script>
 <script>
 (function () {
   var FIRM_PRICES = {{ firm_prices_json|safe }};

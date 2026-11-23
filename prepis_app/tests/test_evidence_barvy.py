@@ -52,3 +52,45 @@ def test_zadna_vlastni_paleta():
     h = _html()
     start = h.index("function evidenceBarva")
     assert "PALETTE" not in h[start:start + 1500]
+
+
+def test_avatarem_je_logo_nebo_inicialy_a_tecka_patri_firme():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    h = _html()
+
+    def function(name):
+        start = h.index(f"function {name}(")
+        return h[start:h.index("\n}", start) + 2]
+
+    js = "\n".join(function(name) for name in (
+        "esc", "_firmSearchText", "_firmInitials", "_firmAvatar",
+        "evidenceBarva", "evidenceFirma", "firmaDot",
+    )) + """
+const _firmaLoga = {'01234567': 'svg'};
+const _evidenceMeta = {firmy: [
+  {id: 1, ico: '01234567', zkratka: 'AV', nazev: 'Auto Vltava', barva: '#0a84ff'},
+  {id: 2, ico: '87654321', nazev: 'Auto Morava', barva: '#137200'},
+]};
+console.log(JSON.stringify([
+  _firmAvatar({ico: '01234567', nazev: 'Auto Vltava'}),
+  _firmAvatar({ico: '87654321', nazev: 'Auto Morava'}),
+  _firmAvatar({ico: '55555555', nazev: 'Nové Auto', id: '1'}),
+  firmaDot({nazev: ' AUTO VLTAVA '}),
+  firmaDot({zkratka: 'AV'}, true),
+  firmaDot({firma_id: 3}, true),
+  firmaDot({ico: '99999999', nazev: 'Auto Vltava'}),
+  firmaDot({firma_id: 2}, true),
+]));
+"""
+    result = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                            encoding="utf-8", check=True)
+    logo, evidence, neutral, jmeno, zkratka, neznamy, jine_ico, ukon = json.loads(result.stdout)
+    assert 'src="/firma-logo/01234567"' in logo and 'onerror="this.remove()"' in logo
+    assert "background:#0a84ff" in logo and ">AV</span>" in logo
+    assert "<img" not in evidence and "background:#137200" in evidence and ">AM</span>" in evidence
+    assert "<img" not in neutral and "firma-dot" not in neutral and ">NA</span>" in neutral
+    assert "background:#0a84ff" in jmeno and "background:#0a84ff" in zkratka
+    assert "background:var(--muted)" in neznamy and jine_ico == ""
+    assert "background:#137200" in ukon

@@ -29,13 +29,15 @@ def client(tmp_path, monkeypatch):
 
 
 def test_inbox_renders_pending(client):
-    c, _, _ = client
+    c, fid, _ = client
     r = c.get("/prichozi")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "Příchozí" in body and "1AB2345" in body and "ABC123456" in body
     assert "Cardion" in body                 # company name shown
     assert "Škoda Octavia" in body           # vehicle make from raw_json shown
+    assert 'name="firma_id" data-firma-pick aria-label="Firma" required' in body
+    assert f'<option value="{fid}" data-color="#0a84ff" selected>Cardion</option>' in body
 
 
 def test_inbox_headlines_provozovatel_over_leasing_owner(client):

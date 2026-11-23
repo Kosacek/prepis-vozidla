@@ -9,16 +9,15 @@
    Included by base.html for logged-in pages. Needs: NOVA (newest Release), NOVINKY_SEKCE (novinky.sekce()),
    NOVINKY_START ("auto" | "hold" | "sheet"), NOVINKY_KEY (localStorage key,
    None = preview, always opens). Logic: static/novinky.js.
-   Same tokens as the app (--card, --primary, --text, --muted, --border, --bg);
-   demos read the --wn-* aliases, so those are defined here too. #}
+   The demos read the --wn-* aliases of the shared release tokens. #}
 <style>
   .nv {
-    --wn-card: var(--card); --wn-ink: var(--ink); --wn-muted: var(--muted);
-    --wn-line: var(--line); --wn-accent: var(--accent); --wn-accent-dark: var(--accent-dark);
-    --wn-soft: color-mix(in srgb, var(--accent) 12%, transparent); --wn-bg: var(--bg);
-    --nv-ease: cubic-bezier(.2, .8, .25, 1);
+    --wn-card: var(--spz-card); --wn-ink: var(--spz-ink); --wn-muted: var(--spz-muted-ink);
+    --wn-line: var(--spz-line); --wn-accent: var(--spz-brand);
+    --wn-soft: var(--spz-brand-soft); --wn-bg: var(--spz-bg);
+    --nv-ease: var(--ease-out);
     position: fixed; inset: 0; z-index: 1060; visibility: hidden;
-    font-family: var(--font); color: var(--wn-ink);
+    font-family: var(--spz-font); color: var(--wn-ink);
   }
   .nv[hidden] { display: none; }
   .nv.is-open { visibility: visible; }
@@ -26,25 +25,26 @@
   /* -- Phase 1: the card ------------------------------------------------ */
   .nv-intro {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    padding: 16px; background: rgba(0, 0, 0, .45);
-    opacity: 0; transition: opacity .2s ease;
+    padding: 16px; background: var(--spz-scrim);
+    opacity: 0; transition: opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-open .nv-intro { opacity: 1; }
   .nv.is-sheet .nv-intro { opacity: 0; visibility: hidden; pointer-events: none;
-    transition: opacity .45s ease, visibility 0s .5s; }
+    transition: opacity var(--dur-base) var(--nv-ease), visibility var(--dur-base) step-end; }
   .nv.nv-direct .nv-intro { display: none; }
 
   .nv-card {
-    position: relative; overflow: hidden; width: 100%; max-width: 380px; border-radius: var(--radius);
+    position: relative; overflow: hidden; width: 100%; max-width: 380px;
+    border-radius: calc(var(--spz-radius) + var(--spz-radius-sm) / 2);
     padding: 18px 22px 24px; background: var(--wn-card);
     box-shadow: 0 8px 40px rgba(0, 0, 0, .18), 0 2px 10px rgba(0, 0, 0, .06);
     opacity: 0; transform: translateY(10px) scale(.97);
-    transition: transform .26s var(--nv-ease), opacity .26s ease;
+    transition: transform var(--dur-enter) var(--nv-ease), opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-open .nv-card { opacity: 1; transform: none; }
   .nv.is-sheet .nv-card {
     opacity: 0; transform: translateY(-72px) scale(.96);
-    transition: transform .5s cubic-bezier(.5, 0, .75, 0), opacity .42s ease;
+    transition: transform var(--dur-base) var(--nv-ease), opacity var(--dur-base) var(--nv-ease);
   }
   .nv-card:focus { outline: none; }
   .nv-head {
@@ -72,15 +72,15 @@
   /* -- Phase 2: the sheet ----------------------------------------------- */
   .nv-sheet {
     position: absolute; inset: 0; display: flex; justify-content: center;
-    background: rgba(0, 0, 0, .45);
-    opacity: 0; pointer-events: none; transition: opacity .45s ease .1s;
+    background: var(--spz-scrim);
+    opacity: 0; pointer-events: none; transition: opacity var(--dur-enter) var(--nv-ease);
   }
   .nv.is-sheet .nv-sheet { opacity: 1; pointer-events: auto; }
   .nv.nv-locked .nv-sheet { pointer-events: none; }
   .nv-panel {
     display: flex; flex-direction: column; width: 100%; max-width: 720px; min-height: 0;
     background: var(--wn-bg);
-    transform: translateY(28px); transition: transform .55s var(--nv-ease) .1s;
+    transform: translateY(28px); transition: transform var(--dur-enter) var(--nv-ease);
   }
   .nv.is-sheet .nv-panel { transform: none; }
   .nv-panel:focus { outline: none; }
@@ -102,18 +102,18 @@
 
   .nv-fe {
     --s: .5;
-    display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 14px;
+    display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: var(--spz-radius);
     background: var(--wn-card); border: 1px solid var(--wn-line);
   }
   .nv-fe.is-new { border-color: var(--wn-accent); box-shadow: 0 0 0 3px var(--wn-soft); }
   .nv-demo {
-    flex: none; position: relative; overflow: hidden; border-radius: 10px;
+    flex: none; position: relative; overflow: hidden; border-radius: var(--spz-radius-sm);
     width: calc(300px * var(--s));
   }
   .nv-demo-in { width: 300px; zoom: var(--s); pointer-events: none; }
   .nv-demo-in > div { margin-bottom: 0 !important; }
   .nv-tile {
-    flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--wn-bg);
+    flex: none; display: grid; place-items: center; border-radius: var(--spz-radius-sm); background: var(--wn-bg);
     width: calc(300px * var(--s)); height: calc(110px * var(--s));
     font-size: 20px; font-weight: 800; color: var(--wn-accent);
   }
@@ -126,14 +126,17 @@
 
   .nv-bar {
     flex: none; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(to bottom, transparent, var(--wn-bg) 28%);
-    margin-top: -18px; position: relative; z-index: 3;
+    background: var(--wn-bg); border-top: 1px solid var(--wn-line);
+    position: relative; z-index: 3;
   }
   .nv-ok {
-    width: 100%; padding: 13px 20px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
-    background: var(--wn-accent); color: var(--accent-ink); font: inherit; font-size: 16px; font-weight: 600;
+    width: 100%; padding: 13px 20px; border: 0; border-radius: var(--spz-radius-sm); cursor: pointer;
+    background: var(--wn-accent); color: var(--spz-on-brand); font: inherit; font-size: 16px; font-weight: 600;
+    transition: background-color var(--dur-fast) var(--nv-ease);
   }
-  .nv-ok:hover { background: var(--wn-accent-dark); }
+  @media (hover: hover) and (pointer: fine) {
+    .nv-ok:hover { background: color-mix(in srgb, var(--spz-brand) 90%, var(--spz-ink)); }
+  }
 
   @media (min-width: 640px) {
     .nv-fe { --s: .6; padding: 12px; gap: 16px; }
@@ -141,7 +144,7 @@
     .nv-txt p { font-size: 14px; }
   }
   @media (min-width: 740px) {
-    .nv-panel { margin: 24px 0; border-radius: 18px; overflow: hidden;
+    .nv-panel { margin: 24px 0; border-radius: var(--spz-radius); overflow: hidden;
       box-shadow: 0 12px 48px rgba(0, 0, 0, .25); }
     .nv-top { padding-top: 22px; }
     .nv-top, .nv-body { padding-left: 24px; padding-right: 24px; }

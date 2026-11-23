@@ -399,7 +399,16 @@
     return instance;
   }
 
-  var api = { attach: attach, sync: sync, refresh: refresh };
+  function attachMarked(container) {
+    container.querySelectorAll('select[data-firma-pick]').forEach(function (select) {
+      attach(select);
+      select.tabIndex = -1;
+    });
+  }
+
+  if (doc()) doc().addEventListener('DOMContentLoaded', function () { attachMarked(doc()); });
+
+  var api = { attach: attach, attachMarked: attachMarked, sync: sync, refresh: refresh };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.FirmaPick = api;
 })(typeof window !== 'undefined' ? window : globalThis);

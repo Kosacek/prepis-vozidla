@@ -1,0 +1,47 @@
+<style>
+  .wn-firmy {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 12px; margin-bottom: 16px; border-radius: var(--spz-radius);
+    background: var(--wn-bg); font-size: 11px; line-height: 1.4;
+  }
+  .wn-firmy__title { display: block; margin-bottom: 5px; color: var(--wn-muted); }
+  .wn-firmy__picker, .wn-firmy__bars {
+    padding: 4px 6px; border: 1px solid var(--wn-line); border-radius: var(--spz-radius-sm);
+    background: var(--wn-card);
+  }
+  .wn-firmy__picker { margin-top: 4px; transform-origin: top center; }
+  .wn-firmy__row { display: flex; align-items: center; gap: 5px; padding: 3px; }
+  .wn-firmy .firma-dot { width: 6px; height: 6px; background: var(--firma); }
+  .wn-firmy__track { flex: 1; height: 4px; border-radius: var(--spz-radius-sm); background: var(--wn-line); }
+  .wn-firmy__fill { display: block; width: var(--bar); height: 100%; border-radius: inherit; background: var(--firma); }
+  @media (prefers-reduced-motion: no-preference) {
+    .wn-firmy__picker { animation: wn-firmy-open calc(13 * var(--dur-enter)) var(--ease-out) infinite; }
+  }
+  @keyframes wn-firmy-open {
+    0%, 10% { opacity: 0; transform: translateY(-4px) scale(.98); }
+    18%, 94% { opacity: 1; transform: none; }
+    100% { opacity: 0; }
+  }
+</style>
+{% set firmy_demo = (('Albion', '#0a84ff', '100%'), ('Cardion', '#34c759', '74%'), ('Orbion', '#ff9f0a', '50%')) %}
+<div class="wn-firmy" aria-hidden="true">
+  <div>
+    <b class="wn-firmy__title">Příchozí · Firma</b>
+    <div class="wn-firmy__bars">
+      <span class="wn-firmy__row" style="--firma: {{ firmy_demo[0][1] }}"><span class="firma-dot"></span>{{ firmy_demo[0][0] }}<span class="firma-pick__chev" style="margin-left:auto"></span></span>
+    </div>
+    <div class="wn-firmy__picker">
+      {% for name, color, width in firmy_demo %}
+      <div class="wn-firmy__row" style="--firma: {{ color }}"><span class="firma-dot"></span>{{ name }}</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div>
+    <b class="wn-firmy__title">Podle firmy</b>
+    <div class="wn-firmy__bars">
+      {% for name, color, width in firmy_demo %}
+      <div class="wn-firmy__row" style="--firma: {{ color }}; --bar: {{ width }}"><span class="firma-dot"></span>{{ name }}<span class="wn-firmy__track"><span class="wn-firmy__fill"></span></span></div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

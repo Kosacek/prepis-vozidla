@@ -40,6 +40,11 @@ class Release:
 
 
 RELEASES: tuple[Release, ...] = (
+    Release("1.38.0", date(2026, 11, 23), "Firmy poznáš podle loga",
+            ("Ve Správě firem uvidíš logo tam, kde je k dispozici.",
+             "Firmy vybíráš z kratšího seznamu a celá aplikace má klidnější, jednotný vzhled."),
+            demo="v1_38_0",
+            oblast="formular"),
     Release("1.37.0", date(2026, 11, 22), "Techničák se naskenuje sám",
             ("Polož ho pod kameru, a jakmile je v klidu, naskenuje se.",
              "Enter funguje dál, klávesou A sken sám vypneš."),

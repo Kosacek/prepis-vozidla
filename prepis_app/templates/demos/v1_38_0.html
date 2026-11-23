@@ -1,0 +1,43 @@
+<style>
+  .dz1380-demo {
+    display: grid; align-content: center; gap: 6px; height: 140px; padding: 12px;
+    margin-bottom: 16px; border-radius: var(--spz-radius); background: var(--spz-bg);
+  }
+  .dz1380-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+    border: 1px solid var(--spz-line); border-radius: var(--spz-radius-sm);
+    background: var(--spz-card); color: var(--spz-ink); font-size: 12px; font-weight: 600;
+  }
+  .dz1380-row small { display: block; color: var(--spz-muted-ink); font-size: 10px; font-weight: 400; }
+  .dz1380-avatar {
+    display: grid; place-items: center; flex: none; position: relative; width: 36px; height: 36px;
+    background: var(--spz-line); border-radius: var(--spz-radius-sm); font-size: 13px;
+  }
+  .dz1380-avatar svg {
+    position: absolute; inset: 0; width: 36px; height: 36px; padding: 3px;
+    border-radius: inherit; background: var(--spz-on-brand); color: var(--spz-brand);
+    animation: dz1380-logo calc(12 * var(--dur-enter)) var(--ease-out) infinite;
+  }
+  .dz1380-dot {
+    position: absolute; right: 2px; bottom: 2px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--spz-ok); box-shadow: 0 0 0 1px var(--spz-on-brand);
+  }
+  @keyframes dz1380-logo {
+    0%, 16% { opacity: 0; transform: scale(.96); }
+    28%, 88% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: scale(.96); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dz1380-avatar svg { animation: none !important; }
+  }
+</style>
+<div class="dz1380-demo" aria-hidden="true">
+  <div class="dz1380-row">
+    <span class="dz1380-avatar">AV<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21l8-12 8 12M8 16h8m2-6 4 6 4-6"/></svg><span class="dz1380-dot"></span></span>
+    <span>AUTO VLTAVA<small>IČO 01234567</small></span>
+  </div>
+  <div class="dz1380-row">
+    <span class="dz1380-avatar">AM</span>
+    <span>AUTO MORAVA<small>IČO 12345678</small></span>
+  </div>
+</div>

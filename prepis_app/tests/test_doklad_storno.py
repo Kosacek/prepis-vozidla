@@ -509,8 +509,10 @@ def test_stary_smazany_ppd_odmitne_replay_vystaveni_i_push(api, monkeypatch):
     assert api.poslano[0]["smazano"] is True
 
 
-def test_novinky_prebiraji_barvy_aplikace(api):
+def test_novinky_pouzivaji_sdilene_tokeny(api):
     _prihlas(api)
     html = api.get("/").get_data(as_text=True)
-    assert "prefers-color-scheme: dark" not in html
-    assert "--wn-card: var(--card," in html
+    assert html.index("spz-tokens.css") < html.index("emil.css")
+    assert "--app-brand: var(--primary)" in html
+    assert "--wn-card: var(--spz-card)" in html
+    assert "prefers-color-scheme: dark" in html

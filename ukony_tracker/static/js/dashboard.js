@@ -74,7 +74,12 @@
     }
     rows.forEach(function (r) {
       var row = document.createElement("div"); row.className = "bar-row";
-      var label = document.createElement("span"); label.className = "bar-label"; label.textContent = r.zkratka;
+      row.style.setProperty("--firma", FIRMA_COLORS[r.zkratka] || "var(--muted)");
+      var label = document.createElement("span"); label.className = "bar-label";
+      var dot = document.createElement("span"); dot.className = "firma-dot";
+      dot.setAttribute("aria-hidden", "true");
+      var name = document.createElement("span"); name.className = "bar-name"; name.textContent = r.zkratka;
+      label.append(dot, name);
       var track = document.createElement("span"); track.className = "bar-track";
       var fill = document.createElement("span"); fill.className = "bar-fill";
       fill.style.width = (max ? Math.floor(100 * (r[metric] || 0) / max) : 0) + "%";

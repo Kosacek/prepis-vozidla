@@ -62,7 +62,7 @@
     <tbody>
       {% for firma in firmy %}
       <tr>
-        <td>{{ firma.nazev }}</td>
+        <td><span class="firma-mark"><span class="firma-dot" aria-hidden="true" style="background: {{ firma_colors.get(firma.zkratka, 'var(--muted)') }}"></span>{{ firma.nazev }}</span></td>
         <td>{{ firma.zkratka }}</td>
         <td class="muted">{{ firma.ico or '—' }}</td>
         <td class="muted">{{ firma.psc or '—' }}</td>

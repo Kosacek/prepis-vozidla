@@ -66,8 +66,8 @@
     <div id="firmaBars">
       {% set maxt = (per_firma|map(attribute='trzby')|max) if per_firma else 0 %}
       {% for r in per_firma %}
-      <div class="bar-row">
-        <span class="bar-label">{{ r.zkratka }}</span>
+      <div class="bar-row" style="--firma: {{ firma_colors.get(r.zkratka, 'var(--muted)') }}">
+        <span class="bar-label"><span class="firma-dot" aria-hidden="true"></span><span class="bar-name">{{ r.zkratka }}</span></span>
         <span class="bar-track"><span class="bar-fill" style="width: {{ ((100*r.trzby/maxt)|int) if maxt else 0 }}%"></span></span>
         <span class="bar-amt">{{ r.trzby|kc }}</span>
       </div>
@@ -110,6 +110,6 @@
   window.FIRMA_COLORS = {{ firma_colors|tojson }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=19"></script>
-<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20"></script>
+<script src="{{ url_for('static', filename='js/ukon_modal.js') }}?v=15"></script>
 {% endblock %}

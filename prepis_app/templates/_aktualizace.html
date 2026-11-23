@@ -6,37 +6,43 @@
    card and sheet live in _novinky.html. #}
 <style>
   .wn-update {
-    --wn-ink: var(--text, #1a1d23); --wn-accent: var(--primary, #1a56db);
+    --spz-update-bg: #1a1d23;
+    --spz-on-brand: #fff;
+    --spz-update-shadow: 0 10px 30px rgba(0, 0, 0, .22);
   }
 
-  /* "v1.21.0 ⓘ" in the bottom bar. */
+  /* Version chip in the bottom bar. */
   .app-ver {
-    position: absolute; left: 24px; display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 8px; border: 0; border-radius: 8px; background: none; cursor: pointer;
-    font: 400 16px inherit; font-family: inherit; color: #bbb;
+    display: inline-flex; flex: none; align-items: center; gap: 6px; margin-inline-end: auto;
+    padding: 6px 8px; border: 0; border-radius: var(--spz-radius-sm); background: none; cursor: pointer;
+    font: inherit; font-size: 16px; color: var(--spz-muted-ink);
     font-variant-numeric: tabular-nums;
+    transition: background-color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
   }
-  .app-ver:hover { color: var(--muted, #6b7280); background: var(--bg, #f0f2f5); }
+  @media (hover: hover) and (pointer: fine) {
+    .app-ver:hover { background: var(--spz-brand-soft); }
+  }
   .app-ver svg { display: block; }
-  @media (max-width: 600px) { .app-ver { left: 8px; font-size: 14px; } }
+  @media (max-width: 600px) { .app-ver { font-size: 14px; } }
 
   /* -- "Nová verze" bar ----------------------------------------------- */
   .wn-update {
     position: fixed; left: 50%; z-index: 700;
     top: calc(12px + env(safe-area-inset-top, 0px));
     transform: translate(-50%, calc(-100% - 40px));
-    transition: transform .42s cubic-bezier(.2, .7, .3, 1);
+    transition: transform var(--dur-enter) var(--ease-out);
     display: flex; align-items: center; gap: 12px; white-space: nowrap;
     padding: 6px 6px 6px 16px; border-radius: 999px;
-    background: var(--wn-ink); color: #fff;
+    background: var(--spz-update-bg); color: var(--spz-on-brand);
     font-size: 14px; font-weight: 600; line-height: 1.2;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+    box-shadow: var(--spz-update-shadow);
   }
   .wn-update[hidden] { display: none; }
   .wn-update.show { transform: translate(-50%, 0); }
   .wn-update button {
     border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
-    background: var(--wn-accent); color: #fff; font: inherit; font-weight: 700;
+    background: var(--spz-brand); color: var(--spz-on-brand); font: inherit; font-weight: 700;
   }
 
   @media (prefers-reduced-motion: reduce) { .wn-update { transition: none; } }

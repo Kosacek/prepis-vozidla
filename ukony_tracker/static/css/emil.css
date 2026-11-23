@@ -4,20 +4,8 @@
    rule here is an override. No layout or business styling is redefined: only
    motion, press/hover/focus states, touch behaviour, safe areas and numeric
    alignment. The `Before` column of REVIEW.md maps each block to the rule it
-   replaces. Tokens and the shared base come from internal-apps/emil-base.css —
-   keep them in sync with the sibling apps.
+   replaces. The shared motion tokens come from spz-tokens.css.
    ========================================================================== */
-
-/* ----------------------------------------------------------------------------
-   1. Shared tokens (from emil-base.css)
-   ------------------------------------------------------------------------- */
-:root {
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --dur-fast: 140ms;
-  --dur-base: 220ms;
-  --dur-enter: 320ms;
-}
 
 /* ----------------------------------------------------------------------------
    2. Touch baseline
@@ -106,7 +94,7 @@ button,
    transition list — so the press snapped. Everything else had no :active at
    all. Rows are full-width links: they get a tint instead of a scale.
    ------------------------------------------------------------------------- */
-button:active,
+button:not(.firma-pick__btn):active,
 [role="button"]:active,
 input[type="submit"]:active {
   transform: scale(0.97);
@@ -124,7 +112,6 @@ input[type="submit"]:active {
 .modal-close:active,
 .orv-last:active,
 .orv-open-ukon:active,
-.firma-pick__btn:active,
 .dn-ukony__head:active,
 .dn-payer:active,
 .nav-ver:active,
@@ -154,9 +141,9 @@ input[type="submit"]:active {
 .seg span,
 .seg a,
 .chip,
+.pill,
 .dn-payer,
 .dn-ukony__head,
-.firma-pick__btn,
 .firma-pick__item,
 .orv-last,
 .orv-open-ukon,
@@ -170,6 +157,7 @@ input[type="submit"]:active {
 }
 
 .recent-row,
+.list-item,
 .ukony-item,
 .doklad-row,
 tbody td {
@@ -186,15 +174,21 @@ tbody td {
 .filter-month,
 .month-line input[type="month"],
 .month-field input[type="month"],
-.firma-pick__btn,
 .orv-assign .orv-card-field select,
 .orv-assign .orv-card-field input,
 .orv-person select {
   transition: border-color var(--dur-fast) var(--ease-out);
 }
 
+.firma-pick__btn {
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
 /* Disclosure chevrons rotate, so transform is the only thing to animate. */
-.doklad-chev::before,
+.doklad-chev,
 .dn-ukony__chev {
   transition: transform var(--dur-fast) var(--ease-out);
 }
@@ -445,8 +439,7 @@ table,
 
 /* ----------------------------------------------------------------------------
    14. Reduced motion: no movement, opacity is allowed to stay
-   The shared base already collapses durations; these rules make the intent
-   explicit and keep the modal scrim fading instead of snapping.
+   The global rule in spz-tokens.css collapses animation durations.
    ------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .bar-fill {
@@ -500,7 +493,7 @@ table,
   .ukony-item,
   .doklad-row,
   tbody td,
-  .doklad-chev::before,
+  .doklad-chev,
   .dn-ukony__chev {
     transition: none !important;
   }
@@ -556,15 +549,13 @@ table,
 .nav-ver {
   margin-left: auto; flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: none;
-  font: 500 .8125rem var(--font); color: var(--muted); cursor: pointer;
+  padding: 6px 8px; border: 0; border-radius: var(--spz-radius-sm); background: none;
+  font: 500 .8125rem var(--spz-font); color: var(--spz-muted-ink); cursor: pointer;
   font-variant-numeric: tabular-nums;
-  transition: background-color .14s cubic-bezier(.23, 1, .32, 1);
 }
 @media (hover: hover) and (pointer: fine) {
-  .nav-ver:hover { background: var(--line); }
+  .nav-ver:hover { background: var(--spz-line); }
 }
-.nav-ver:active { transform: scale(.97); }
 .nav-ver svg { display: block; }
 .nav-ver + .logout-form { margin-left: var(--sp-2); }
 

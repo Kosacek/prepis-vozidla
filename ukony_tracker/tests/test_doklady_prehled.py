@@ -132,6 +132,8 @@ def test_share_sheet_offers_print_and_share_code(client, data):
 def test_paid_chip_is_green_in_the_list(client, data):
     html = client.get("/doklady").get_data(as_text=True)
     assert 'doklad-pocet is-paid' in html and 'doklad-pocet is-unpaid' in html
+    partial_halves = '<span class="doklad-pocet__half" aria-hidden="true"></span>' * 2
+    assert html.count(partial_halves) == 2
 
 
 def test_firm_filter_options_carry_their_colour(client, data):

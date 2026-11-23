@@ -39,6 +39,14 @@ class Release:
 
 RELEASES: tuple[Release, ...] = (
     Release(
+        "2.11.0", date(2026, 11, 23),
+        "Firmy poznáš všude podle barvy",
+        ("Stejnou barevnou tečku uvidíš při výběru firmy, v přehledu i v exportu.",
+         "Při práci tě čekají klidnější přechody a jednotnější vzhled."),
+        demo="v2_11", oblast="firmy", nazev="Barvy firem v celé Evidenci",
+        radek="Firmu poznáš podle stejné barvy při výběru, v přehledu i v exportu.",
+    ),
+    Release(
         "2.10.1", date(2026, 11, 23),
         "Techničák se vyfotí i s mobilem v ruce",
         ("Podrž techničák v rámečku. Drobné chvění ruky při focení nevadí.",),

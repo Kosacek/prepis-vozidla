@@ -239,6 +239,7 @@ def edit_form(uid):
     # selectable, and the úkon can be re-assigned to a different company here.
     return render_template(
         template, u=u, typy=typy_repo.list_active(conn), firmy=firmy_repo.list_all(conn),
+        firma_colors=colors_service.firma_color_map(conn),
         # Sanitized here so the template never emits a crafted ?back= (e.g. a
         # javascript: URL) into the Zpět link — same rule as the POST redirect.
         back=_safe_back(request.args.get("back")) or "",

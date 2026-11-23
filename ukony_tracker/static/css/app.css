@@ -24,6 +24,18 @@
   --accent:      #0071e3;
   --accent-dark: #0051a3;
   --accent-ink:  #ffffff;
+  --app-brand: var(--accent);
+  --app-brand-soft: #e8f2fd;
+
+  /* Shared release UI surfaces. Motion and shape tokens live in spz-tokens.css. */
+  --spz-ink: #1d1d1f;
+  --spz-card: #fff;
+  --spz-bg: #f3f4f7;
+  --spz-line: #e5e5ea;
+  --spz-radius-pill: 999px;
+  --spz-on-brand: #fff;
+  --spz-scrim: rgb(0 0 0 / .45);
+  --spz-font: system-ui, sans-serif;
 
   /* Shape */
   --radius:      18px;
@@ -54,6 +66,21 @@
   --flash-info-ink:     #1e40af;
 }
 
+@media (prefers-color-scheme: dark) {
+  .nv, .wn-update {
+    --app-brand: #86bfff;
+    --app-brand-soft: #25364d;
+    --spz-brand: var(--app-brand);
+    --spz-brand-soft: var(--app-brand-soft);
+    --spz-ink: #f3f4f7;
+    --spz-card: #24262b;
+    --spz-bg: #1b1d22;
+    --spz-line: #3e4149;
+    --spz-muted-ink: #b8bec8;
+    --spz-on-brand: #151a23;
+  }
+}
+
 /* ------------------------------------------------------------
    2. Reset & base
    ------------------------------------------------------------ */
@@ -75,6 +102,7 @@ body {
   font-size: 0.9375rem;   /* 15 px — Apple's preferred body size */
   line-height: 1.55;
   min-height: 100vh;
+  min-height: 100svh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -301,7 +329,6 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   color: var(--muted);
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -503,7 +530,6 @@ h3 { font-size: 1rem;    font-weight: 600; margin-bottom: var(--sp-2); }
   gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-5);
   border-bottom: 1px solid var(--line);
-  transition: background 0.1s ease;
 }
 
 .list-item:last-child {
@@ -904,20 +930,29 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 /* Horizontal bar rows for per-firma breakdown */
 .bar-row {
   display: grid;
-  grid-template-columns: 80px 1fr 64px;
+  grid-template-columns: 94px minmax(0, 1fr) 64px;
   align-items: center;
   gap: var(--sp-3);
   padding: 6px 0;
 }
 
 .bar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
+}
+
+.bar-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.bar-label .firma-dot, .bar-fill { background: var(--firma, var(--muted)); }
 
 .bar-track {
   height: 8px;
@@ -929,7 +964,6 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 .bar-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
   border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
@@ -964,6 +998,7 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
    stacking margin must not also apply between them (it would push the second
    card down and break the row's alignment). */
 .dash-breakdowns .card + .card { margin-top: 0; }
+.dash-breakdowns canvas { max-width: 100%; }
 /* Stays 2 columns down to phone width — David wants "Podle firmy" and "Typy
    úkonů" side by side like on desktop, not stacked. The 640px block below
    shrinks both cards' internals (bar rows, doughnut legend) to fit. */
@@ -990,14 +1025,10 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
   font-weight: 400;
 }
 
-a.kpi-link {
-  text-decoration: none;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-a.kpi-link:hover {
-  text-decoration: none;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .10);
+a.kpi-link { text-decoration: none; }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  a.kpi-link { transition: transform var(--dur-fast) var(--ease-out); }
+  a.kpi-link:hover { transform: translateY(-1px); }
 }
 
 .kpi-warn .kpi-v { color: var(--flash-warning-ink); }
@@ -1291,11 +1322,11 @@ a.kpi-link:hover {
   .dash-breakdowns .card h2 { font-size: 0.9375rem; margin-bottom: var(--sp-2); }
 
   .bar-row {
-    grid-template-columns: 46px 1fr 38px;
+    grid-template-columns: 58px minmax(0, 1fr) 38px;
     gap: 5px;
     padding: 4px 0;
   }
-  .bar-label { font-size: 0.6875rem; }
+  .bar-label { gap: 4px; font-size: 0.6875rem; }
   .bar-amt { font-size: 0.6875rem; }
   .bar-track { height: 6px; }
 
@@ -1457,6 +1488,7 @@ a.kpi-link:hover {
   font-weight: 600; font-size: 0.875rem;
 }
 .firma-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.firma-mark { display: inline-flex; align-items: center; gap: 8px; }
 .recent-mid { min-width: 0; overflow: hidden; white-space: nowrap; display: flex; align-items: baseline; column-gap: var(--sp-4); }
 /* VIN is the key identifier — bold + dark, same size as the SPZ (15px). Fixed
    flex-basis (fits a full 17-char VIN) so the poznámka column starts at the
@@ -1865,12 +1897,16 @@ body.modal-open { overflow: hidden; }
   font-family: var(--font); font-size: 0.9375rem; font-weight: 500;
   text-align: left; cursor: pointer;
 }
-.firma-pick__btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.18); }
+.firma-pick__btn:focus-visible,
+.firma-pick.js > select[data-firma-pick]:focus + .firma-pick__btn { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.18); }
 .firma-pick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.firma-pick__chev {
-  flex: 0 0 auto; width: 9px; height: 9px; margin-right: 2px;
-  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
-  transform: rotate(45deg) translate(-2px, -2px);
+.firma-pick__chev, .doklad-chev, .dn-ukony__chev {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .firma-pick__list {
@@ -1919,7 +1955,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 @keyframes ask-spin { to { transform: rotate(360deg); } }
 @keyframes ask-pulse { 0%, 100% { transform: scale(.88); opacity: .7; } 50% { transform: scale(1.12); opacity: 1; } }
 @keyframes ask-dot { 0%, 80%, 100% { opacity: .2; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
-@keyframes ask-shimmer { to { background-position: -200% 0; } }
+@keyframes ask-skeleton-pulse { 50% { opacity: .45; } }
 .ask-reveal { animation: ask-in .55s cubic-bezier(.22, .8, .25, 1) both; animation-delay: calc(var(--i, 0) * 110ms + 60ms); }
 .ask-table tbody tr { animation: ask-in .45s cubic-bezier(.22, .8, .25, 1) both; animation-delay: calc(var(--i, 3) * 110ms + 120ms + var(--r, 0) * 35ms); }
 .ask-table tbody tr:nth-child(1) { --r: 0; } .ask-table tbody tr:nth-child(2) { --r: 1; } .ask-table tbody tr:nth-child(3) { --r: 2; }
@@ -1936,7 +1972,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .ask-dots i { display: inline-block; width: 4px; height: 4px; margin-left: 3px; border-radius: 50%; background: currentColor; animation: ask-dot 1.2s infinite; }
 .ask-dots i:nth-child(2) { animation-delay: .15s; } .ask-dots i:nth-child(3) { animation-delay: .3s; }
 .ask-skeleton { display: grid; gap: 8px; margin-top: var(--sp-3); }
-.ask-skeleton span { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--line, #e3e3e8) 25%, var(--bg, #f4f4f6) 50%, var(--line, #e3e3e8) 75%); background-size: 200% 100%; animation: ask-shimmer 1.4s linear infinite; }
+.ask-skeleton span { height: 10px; border-radius: 6px; background: var(--line); animation: ask-skeleton-pulse calc(6 * var(--dur-base)) var(--ease-in-out) infinite; }
 .ask-skeleton span:nth-child(1) { width: 92%; } .ask-skeleton span:nth-child(2) { width: 68%; } .ask-skeleton span:nth-child(3) { width: 40%; }
 @media (prefers-reduced-motion: reduce) {
   .ask-reveal, .ask-table tbody tr, .ask-thinking.is-in, .ask-thinking__icon, .ask-dots i, .ask-skeleton span { animation: none; }
@@ -1946,9 +1982,6 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .ask-em { font-weight: 700; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent, #0a6cd6); text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
 #ask-verb, .ask-verb { display: inline-block; transition: opacity .16s ease, transform .16s ease; }
 #ask-verb.is-swap, .ask-verb.is-swap { opacity: 0; transform: translateY(4px); }
-.topnav nav a.nav-ai { position: relative; padding-right: calc(var(--sp-3) + 6px); }
-.nav-ai__spark { position: absolute; right: 5px; bottom: 5px; color: var(--accent, #0a6cd6); opacity: .8; }
-.topnav nav a.nav-ai.active .nav-ai__spark { color: currentColor; }
 @media (prefers-reduced-motion: reduce) { #ask-verb, .ask-verb { transition: none; } }
 
 /* ORV batch camera — large controls and a landscape document in a portrait sheet. */
@@ -1972,8 +2005,8 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
    while it holds still, a flash marks the photo, the thumbnail drops in. */
 .orv-guide { transition: border-color .15s ease; }
 .orv-viewfinder[data-auto="lock"] .orv-guide { border-color: transparent; }
-.orv-lock { position: absolute; inset: 4% 6%; pointer-events: none; opacity: 0; transition: opacity .15s ease, inset .22s cubic-bezier(.2, .8, .2, 1); }
-.orv-viewfinder[data-auto="lock"] .orv-lock { opacity: 1; inset: 6% 8%; }
+.orv-lock { position: absolute; inset: 6% 8%; pointer-events: none; opacity: 0; transform: scale(1.05); transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.orv-viewfinder[data-auto="lock"] .orv-lock { opacity: 1; transform: none; }
 .orv-lock i { position: absolute; width: 28px; height: 28px; border: 0 solid var(--accent); }
 .orv-lock i:nth-child(1) { top: 0; left: 0; border-width: 4px 0 0 4px; border-top-left-radius: 12px; }
 .orv-lock i:nth-child(2) { top: 0; right: 0; border-width: 4px 4px 0 0; border-top-right-radius: 12px; }
@@ -1991,8 +2024,8 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .orv-auto[aria-pressed="false"] { color: var(--muted); }
 .orv-auto[aria-pressed="false"] i { background: var(--muted); box-shadow: none; }
 .orv-debug { position: absolute; left: 8px; right: 8px; bottom: 6px; margin: 0; padding: 2px 6px; border-radius: 6px; background: #000000b3; color: #fff; font: 11px/1.4 ui-monospace, monospace; pointer-events: none; }
-.orv-thumb--drop { animation: orv-drop .4s cubic-bezier(.2, .9, .3, 1.25); }
-@keyframes orv-drop { 0% { transform: translateY(-40px) scale(.55); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.orv-thumb--drop { animation: orv-drop var(--dur-base) var(--ease-out); }
+@keyframes orv-drop { 0% { transform: translateY(-40px) scale(.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .orv-lock, .orv-guide { transition: none; }
   .orv-viewfinder.is-shot .orv-flash, .orv-viewfinder.is-shot .orv-lock, .orv-thumb--drop { animation: none; }
@@ -2066,7 +2099,6 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   .topnav-inner::-webkit-scrollbar { display: none; }
   .topnav nav { flex-shrink: 0; }
   .topnav nav a { padding: var(--sp-2) 7px; font-size: 0.8125rem; }
-  .topnav nav a.nav-ai { padding-right: 12px; }
   .logout-form { flex-shrink: 0; margin-left: 0; }
 }
 
@@ -2208,7 +2240,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; }
 .doklad-row {
   display: grid;
-  grid-template-columns: 132px 92px minmax(150px, 200px) minmax(0, 1fr) 96px 112px 14px;
+  grid-template-columns: 132px 92px minmax(150px, 200px) minmax(0, 1fr) 96px 112px 16px;
   gap: var(--sp-3);
   align-items: center;
   width: 100%;
@@ -2286,8 +2318,10 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-pocet.is-unpaid { background: var(--flash-warning-bg); color: #754600; border-color: #e7b04a; }
 .doklad-pocet.is-partial {
   color: #4a4a00; border-color: #c9c56b;
-  background: linear-gradient(90deg, var(--flash-success-bg) 0 50%, var(--flash-warning-bg) 50% 100%);
+  position: relative; isolation: isolate; overflow: hidden;
 }
+.doklad-pocet__half { position: absolute; inset: 0 50% 0 0; z-index: -1; background: var(--flash-success-bg); }
+.doklad-pocet__half + .doklad-pocet__half { inset: 0 0 0 50%; background: var(--flash-warning-bg); }
 .doklad-pocet.is-none { background: var(--bg); color: var(--muted); }
 /* Paid by the bank (2.9.3): a 11px bank icon inside the SAME footprint. The
    icon takes room from the side padding, never from the chip: min-width holds. */
@@ -2301,18 +2335,14 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-cislo-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .doklad-druh { flex: 0 0 auto; }
 .doklad-po { color: var(--flash-error-ink); font-weight: 600; white-space: nowrap; }
-.doklady-list.has-faktura .doklad-row { grid-template-columns: 132px 158px minmax(150px, 200px) minmax(0, 1fr) 96px 112px 14px; }
+.doklady-list.has-faktura .doklad-row { grid-template-columns: 132px 158px minmax(150px, 200px) minmax(0, 1fr) 96px 112px 16px; }
 @media (max-width: 1100px) {
-  .doklady-list.has-faktura .doklad-row { grid-template-columns: 118px 158px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 14px; }
+  .doklady-list.has-faktura .doklad-row { grid-template-columns: 118px 158px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 16px; }
 }
 
 
-.doklad-chev::before {
-  content: ""; display: block; width: 7px; height: 7px;
-  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
-  transform: rotate(-45deg); transition: transform .15s ease;
-}
-.doklad-row[aria-expanded="true"] .doklad-chev::before { transform: rotate(45deg); }
+.doklad-chev { transform: rotate(-90deg); }
+.doklad-row[aria-expanded="true"] .doklad-chev { transform: none; }
 .doklad-item.is-open .doklad-row { background: var(--bg); }
 .doklad-item.is-smazany .doklad-cislo { text-decoration: line-through; color: var(--muted); }
 /* Stornovaný doklad (žádosti 1.36.0): stays in the list, greyed, out of every sum. */
@@ -2341,7 +2371,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-share:hover { background: var(--bg); }
 .doklad-share:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.doklad-drawer { margin: 2px var(--sp-3) var(--sp-3); padding-left: var(--sp-3); border-left: 3px solid var(--accent); }
+.doklad-drawer { margin: 2px var(--sp-3) var(--sp-3); padding: var(--sp-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .doklad-chybi { color: #9b1c13; font-size: 0.85rem; font-weight: 600; padding: 8px var(--sp-3); }
 .doklad-souhrn { color: var(--muted); font-size: 0.8125rem; padding: 6px var(--sp-3) 2px; }
 .doklad-sedi { color: var(--flash-success-ink); font-weight: 700; }
@@ -2349,17 +2379,16 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .doklad-bez-ukonu { display: flex; align-items: center; gap: var(--sp-2); }
 .doklad-bez-ukonu__text { flex: 1 1 auto; min-width: 0; }
 .doklad-bez-ukonu form { flex: 0 0 auto; margin: 0; }
-@media (prefers-reduced-motion: reduce) { .doklad-chev::before { transition: none; } }
 
 @media (max-width: 1100px) {
-  .doklad-row { grid-template-columns: 118px 84px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 14px; gap: 10px; }
+  .doklad-row { grid-template-columns: 118px 84px minmax(130px, 170px) minmax(0, 1fr) 88px 104px 16px; gap: 10px; }
 }
 
 @media (max-width: 760px) {
   .doklad-head { gap: 0; }
-  .doklady-list.has-faktura .doklad-row { grid-template-columns: minmax(0, 1fr) auto 12px; }
+  .doklady-list.has-faktura .doklad-row { grid-template-columns: minmax(0, 1fr) auto 16px; }
   .doklad-row {
-    grid-template-columns: minmax(0, 1fr) auto 12px;
+    grid-template-columns: minmax(0, 1fr) auto 16px;
     grid-template-areas: "firma kc kc" "auta auta auta" "od od od" "id pocet chev";
     gap: 5px 8px;
     padding: 12px 4px 12px var(--sp-3);
@@ -2388,16 +2417,21 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 
 /* Doklady firm filter (2.8): the coloured picker, sized like its neighbours. */
-.filter-bar .firma-pick { min-width: 10.5rem; }
+.filter-bar .firma-pick { min-width: 0; }
 .filter-bar .firma-pick__btn { padding: 6px 10px; gap: 7px; font-size: 0.875rem; font-weight: 400; }
 .filter-bar .firma-pick__list { min-width: 12rem; }
 .filter-bar .firma-pick__item { font-size: 0.875rem; }  /* stejné písmo jako tlačítko filtru */
+.filter-bar :is(.firma-pick__btn, .filter-select, .filter-month) { min-height: 36px; border-width: 1px; line-height: 1.5; }
+@media (pointer: coarse) {
+  .filter-bar :is(.firma-pick__btn, .filter-select),
+  .filter-bar .month-field .filter-month { min-height: 40px; }
+}
 @media (max-width: 760px) {
   /* Phone: the firm gets the full row (its name never truncates), měsíc and
      platné share the next one — no empty cell. */
-  #doklady-filter .filter-bar__fields > .firma-pick { grid-column: 1 / -1; min-width: 0; }
+  #doklady-filter .filter-bar__fields > .firma-pick { grid-column: 1 / -1; }
+  .filter-bar :is(.firma-pick__btn, .filter-select) { min-height: 40px; }
   .filter-bar .firma-pick__btn, .filter-bar .firma-pick__item { font-size: 16px; }
-  .filter-bar .firma-pick__btn { min-height: 40px; }
 }
 
 /* Tisk / Sdílet kódem sheet (2.8): two big choices, then the code. */
@@ -2497,10 +2531,8 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .dn-ukony__head:hover { background: var(--bg); }
 .dn-ukony__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dn-ukony__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dn-ukony__chev { flex: none; margin-left: auto; width: 8px; height: 8px;
-  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
-  transform: rotate(45deg); transition: transform 0.18s ease; }
-.dn-ukony__head[aria-expanded="true"] .dn-ukony__chev { transform: rotate(-45deg); }
+.dn-ukony__chev { margin-left: auto; }
+.dn-ukony__head[aria-expanded="true"] .dn-ukony__chev { transform: rotate(180deg); }
 .dn-ukony { display: grid; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
 .dn-ukon {
   display: grid; grid-template-columns: 20px 10.5rem auto minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
@@ -2527,7 +2559,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 .dn-paid__toggle:hover { background: var(--bg); color: var(--ink); }
 .dn-paid__toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dn-paid__toggle[aria-expanded="true"] .dn-ukony__chev { transform: rotate(-45deg); }
+.dn-paid__toggle[aria-expanded="true"] .dn-ukony__chev { transform: rotate(180deg); }
 .dn-paid__rows { display: grid; }
 .dn-ukon.is-paid .dn-ukon__kc { color: var(--flash-success-ink); }
 .dn-ukon.is-paid .dn-ukon__kc::before { content: "✓ "; }

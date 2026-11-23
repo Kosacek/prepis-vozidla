@@ -17,7 +17,7 @@ FAKE = r"""
 class El {
   constructor(tag) { this.tagName = tag.toUpperCase(); this.children = []; this.parentNode = null;
     this.className = ''; this.dataset = {}; this.attrs = {}; this.h = {}; this.style = {};
-    this.hidden = false; this.disabled = false; this._t = ''; this.value = ''; }
+    this.hidden = false; this.disabled = false; this._t = ''; this.value = ''; this.scrollHeight = 100; }
   get classList() { const s = this; return {
     add: n => { if (!s.className.split(' ').includes(n)) s.className = (s.className + ' ' + n).trim(); },
     toggle: (n, f) => { const l = s.className.split(' ').filter(Boolean); const has = l.includes(n);
@@ -45,7 +45,8 @@ class Sel extends El {
 globalThis.Event = class { constructor(t, o) { this.type = t; this.bubbles = !!(o && o.bubbles); } stopPropagation() { this.stopped = true; } preventDefault() { this.prevented = true; } };
 globalThis.window = globalThis; window.innerHeight = 800;
 const body = new El('body');
-globalThis.document = { createElement: t => new El(t), addEventListener() {}, active: null };
+globalThis.document = { createElement: t => new El(t), createElementNS: (_, t) => new El(t),
+  addEventListener() {}, active: null };
 function opt(value, text, color) { const o = new El('option'); o.value = value; o.textContent = text; if (color) o.dataset.color = color; return o; }
 const wrap = new El('div'); wrap.className = 'firma-pick'; body.append(wrap);
 const sel = new Sel(); wrap.append(sel);
@@ -76,6 +77,15 @@ console.log(JSON.stringify({ a, bez: i.dot.style.background, polozek: i.items.le
     assert r["a"] == ["ALSETA", "#0a84ff", "1", -1]
     assert r["bez"] == "var(--muted)"          # firma bez barvy = šedá tečka
     assert r["polozek"] == 4 and r["barvy"][1] == "#0a84ff"
+
+
+def test_picker_uses_the_shared_inline_chevron():
+    assert _run("""
+const { button } = FirmaPick.attach(sel);
+const chev = button.children[2];
+console.log(JSON.stringify([chev.tagName, chev.getAttribute('class'),
+  chev.children[0].getAttribute('href')]));
+""") == ["SVG", "spz-chevron", "#i-chevron-down"]
 
 
 def test_click_item_sets_select_value_and_fires_change():

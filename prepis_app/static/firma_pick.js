@@ -121,9 +121,12 @@
   // Seznam se otevře POD tlačítkem; když dole není místo, nad ním (CSS třída).
   function place(inst) {
     var r = inst.button.getBoundingClientRect();
-    var h = Math.min(290, inst.list.scrollHeight || 290);
-    var below = (window.innerHeight || 0) - r.bottom;
-    inst.wrap.classList.toggle('up', below < h + 12 && r.top > below);
+    var viewport = window.innerHeight;
+    var h = Math.min(viewport * .78, 640, inst.list.scrollHeight + 2);
+    var below = viewport - r.bottom;
+    var up = below < h + 12 && r.top > below;
+    inst.wrap.classList.toggle('up', up);
+    inst.list.style.maxHeight = Math.min(h, Math.max(0, (up ? r.top : below) - 12)) + 'px';
   }
   function open(inst) {
     if (inst.open || inst.button.disabled) return;
@@ -244,9 +247,13 @@
     dot.className = 'firma-dot';
     var name = doc().createElement('span');
     name.className = 'firma-pick__name';
-    var chev = doc().createElement('span');
-    chev.className = 'firma-pick__chev';
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var chev = doc().createElementNS(svgNS, 'svg');
+    var use = doc().createElementNS(svgNS, 'use');
+    chev.setAttribute('class', 'spz-chevron');
     chev.setAttribute('aria-hidden', 'true');
+    use.setAttribute('href', '#i-chevron-down');
+    chev.append(use);
     button.append(dot, name, chev);
 
     var list = doc().createElement('div');

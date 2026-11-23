@@ -172,7 +172,9 @@
     var toggle = el('button', 'dn-paid__toggle');
     toggle.type = 'button';
     toggle.setAttribute('aria-expanded', 'false');
-    toggle.append(el('span', null, 'Zaplacené bez dokladu · ' + paid.length), el('span', 'dn-ukony__chev'));
+    var chevron = el('span', 'dn-ukony__chev');
+    chevron.setAttribute('aria-hidden', 'true');
+    toggle.append(el('span', null, 'Zaplacené bez dokladu · ' + paid.length), chevron);
     var rows = el('div', 'dn-paid__rows');
     rows.hidden = true;
     paid.forEach(function (u) { rows.append(ukonRow(u)); });

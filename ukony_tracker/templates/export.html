@@ -20,7 +20,7 @@
       <label>Firmy <span class="muted small">— nic nezaškrtnuto = všechny</span></label>
       <div class="export-firmy">
         {% for f in firmy %}
-        <label class="chk"><input type="checkbox" name="firma" value="{{ f.id }}"> {{ f.zkratka }}</label>
+        <label class="chk"><input type="checkbox" name="firma" value="{{ f.id }}"><span class="firma-dot" aria-hidden="true" style="background: {{ firma_colors.get(f.zkratka, 'var(--muted)') }}"></span>{{ f.zkratka }}</label>
         {% else %}
         <span class="muted">Žádné firmy.</span>
         {% endfor %}

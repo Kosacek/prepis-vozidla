@@ -158,6 +158,21 @@ function press(node, key) {
 }
 function click(node) { (node.handlers.click || []).slice().forEach(handler => handler({ preventDefault() {} })); }
 function items(instance) { return allByClass(instance && instance.list ? instance.list : instance, 'firma-pick__item'); }
+
+test('a marked select in a page or injected form gets the shared picker once', () => {
+  const select = makeSelect([{value: '1', label: 'Albion', color: '#0a84ff'}]);
+  const container = {
+    querySelectorAll(selector) {
+      assert.equal(selector, 'select[data-firma-pick]');
+      return [select];
+    }
+  };
+  FirmaPick.attachMarked(container);
+  FirmaPick.attachMarked(container);
+  assert.equal(select.tabIndex, -1);
+  assert.equal(allByClass(select.parentNode, 'firma-pick__btn').length, 1);
+  assert.equal(items(select.parentNode).length, 1);
+});
 function selectedFlags(list) {
   return items(list).map(item => item.getAttribute('aria-selected'));
 }

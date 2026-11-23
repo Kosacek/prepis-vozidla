@@ -68,7 +68,7 @@ import sys
 import shutil
 BASE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "1.37.4"
+__version__ = "1.38.0"
 
 # Writable data dir. Precedence:
 #   1. DATA_DIR env var (web container sets it to /data — the bind mount)
@@ -1439,6 +1439,48 @@ def index():
 @app.route("/api/firmy", methods=["GET"])
 def api_firmy_get():
     return jsonify(read_firmy())
+
+
+_LOGO_NAME = re.compile(r"([0-9]{8})\.(svg|png)")
+_LOGO_MIMETYPES = {"svg": "image/svg+xml", "png": "image/png"}
+
+
+@app.get("/api/firma-loga")
+def api_firma_loga():
+    loga = {}
+    try:
+        with os.scandir(os.path.join(DATA_DIR, "loga")) as entries:
+            for entry in entries:
+                match = _LOGO_NAME.fullmatch(entry.name)
+                if match and entry.is_file(follow_symlinks=False):
+                    ico, ext = match.groups()
+                    if ext == "svg" or ico not in loga:
+                        loga[ico] = ext
+    except (FileNotFoundError, NotADirectoryError):
+        pass
+    return jsonify(loga)
+
+
+@app.get("/firma-logo/<ico>")
+def firma_logo(ico):
+    if not re.fullmatch(r"[0-9]{8}", ico):
+        abort(404)
+    for ext, mimetype in _LOGO_MIMETYPES.items():
+        path = os.path.join(DATA_DIR, "loga", f"{ico}.{ext}")
+        if not os.path.isfile(path) or os.path.islink(path):
+            continue
+        try:
+            resp = send_file(os.path.abspath(path), mimetype=mimetype, max_age=86400)
+        except FileNotFoundError:
+            continue
+        resp.cache_control.public = None
+        resp.cache_control.private = True
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        if ext == "svg":
+            resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+        return resp
+    abort(404)
+
 
 @app.route("/api/firmy", methods=["POST"])
 def api_firmy_add():

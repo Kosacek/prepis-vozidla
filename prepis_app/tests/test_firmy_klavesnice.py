@@ -150,11 +150,13 @@ function key(input, name, modifiers = {}) {
 def _browser(scenario):
     names = ["_jeVyplnitelne", "_chybiPovinne", "dalsiPrazdne", "prvniPrazdne", "_skoc",
              "esc", "_hideDropdowns", "najdiFirmy", "_dropdownKlavesy", "openFirmDropdown",
+             "_firmSearchText", "evidenceBarva", "evidenceFirma", "firmaDot",
              "selectFirm", "ppdPayerSuggest", "ppdPayerPick", "icoMistoJmena"]
     html = TEMPLATE.read_text(encoding="utf-8")
     start = html.index("// ── Keyboard")
     global_handler = html[start:html.index("// ── Mode selection", start)]
-    script = FAKE + "\n" + "\n".join(_function(name) for name in names) + global_handler
+    script = FAKE + "\nconst _evidenceMeta = {firmy: []};\n"
+    script += "\n".join(_function(name) for name in names) + global_handler
     return _node(script + "\n(async () => {\n" + scenario + "\n})();\n")
 
 
@@ -277,7 +279,9 @@ def test_input_handler_stops_enter_before_global_navigation_and_active_css_exist
     assert "_dropdownKlavesy(inp, dd" in _function("ppdPayerSuggest")
     css = re.search(r"\.firm-option\.active\s*\{([^}]*)\}", html).group(1)
     assert "background: var(--accent)" in css
-    assert "inset 3px 0 0 var(--primary)" in css
+    assert "box-shadow" not in css
+    row_css = re.search(r"\.firm-option\s*\{([^}]*)\}", html).group(1)
+    assert "font-size: 16px" in row_css and "border-bottom" not in row_css
     # Uppercasing listens to input in capture phase; it cannot swallow keydown.
     assert re.search(r"document.addEventListener\('input', function \(ev\) \{\s*"
                      r"if \(isUcTarget\(ev.target\)\) forceUppercase\(ev.target\);\s*\}, true\)", html)

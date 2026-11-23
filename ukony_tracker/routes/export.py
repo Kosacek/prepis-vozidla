@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, send_file
 
 import db
 from repositories import firmy_repo
-from services import export_service
+from services import colors_service, export_service
 
 bp = Blueprint("export", __name__)
 
@@ -34,11 +34,13 @@ def _filename(conn, ext, dfrom, dto, firma_ids):
 @bp.get("/export")
 def index():
     t = date.today()
+    conn = db.get_db()
     return render_template(
         "export.html",
         dfrom=f"{t.year}-01-01",
         dto=t.isoformat(),
-        firmy=firmy_repo.list_all(db.get_db()),
+        firmy=firmy_repo.list_all(conn),
+        firma_colors=colors_service.firma_color_map(conn),
     )
 
 

@@ -28,9 +28,9 @@
     </div>
     <div class="field">
       <label>Firma</label>
-      <select name="firma_id">
+      <select name="firma_id" data-firma-pick aria-label="Firma">
         {% for f in firmy %}
-          <option value="{{ f.id }}" {{ 'selected' if u.firma_id == f.id }}>{{ f.zkratka }}</option>
+          <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, 'var(--muted)') }}" {{ 'selected' if u.firma_id == f.id }}>{{ f.zkratka }}</option>
         {% endfor %}
       </select>
     </div>
