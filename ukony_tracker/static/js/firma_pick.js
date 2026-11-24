@@ -22,6 +22,7 @@
   'use strict';
 
   var FALLBACK_COLOR = 'var(--muted)';
+  var FOLDED_MAX = 250;  // px, ~7 firms — only inside a popup (David, 2026-11-24)
   var instances = typeof WeakMap === 'function' ? new WeakMap() : null;
   var openInstances = [];
   var documentHooked = false;
@@ -242,7 +243,10 @@
     list.style.left = Math.max(left + edge, Math.min(rect.left, right - edge - width)) + 'px';
     var below = bottom - rect.bottom - gap - edge;
     var above = rect.top - top - gap - edge;
-    var height = Math.min(list.scrollHeight + list.offsetHeight - list.clientHeight, 250);
+    // Folded (~7 items, own scroll) only inside a popup; on a page the whole list shows.
+    var folded = !!(button.closest && button.closest('.modal-card, [role="dialog"]'));
+    var height = list.scrollHeight + list.offsetHeight - list.clientHeight;
+    if (folded) height = Math.min(height, FOLDED_MAX);
     var upward = below < height && above > below;
     list.style.maxHeight = Math.max(0, Math.min(height, upward ? above : below)) + 'px';
     list.style.top = upward ? 'auto' : rect.bottom + gap + 'px';
