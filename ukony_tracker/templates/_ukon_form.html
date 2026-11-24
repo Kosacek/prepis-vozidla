@@ -39,7 +39,7 @@
   <div class="form-row">
     <div class="field">
       <label>Cena (Kč)</label>
-      <input name="celkem" inputmode="numeric" value="{{ u.celkem|int }}" required>
+      <input name="celkem" inputmode="numeric" value="{{ u.celkem|amount_input }}" required>
     </div>
     <div class="field">
       <label>VIN</label>

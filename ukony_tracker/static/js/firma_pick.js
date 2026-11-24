@@ -43,7 +43,7 @@
   function colorOf(option) {
     // „Všechny firmy“ / prázdná volba není firma: tečka zůstane jen jako
     // průhledné místo, aby text lícoval s ostatními řádky.
-    if (option && option.value === '') return 'transparent';
+    if (valueOf(option) === '') return 'transparent';
     var color = option && option.dataset ? option.dataset.color : '';
     return color || FALLBACK_COLOR;
   }
@@ -174,6 +174,7 @@
     var current = currentOption(select);
     if (instance.name) instance.name.textContent = labelOf(current);
     setDot(instance.dot, colorOf(current));
+    instance.dot.hidden = valueOf(current) === '';
     if (instance.button) instance.button.disabled = !!select.disabled;
     var active = -1;
     instance.items.forEach(function (entry, index) {
@@ -190,7 +191,12 @@
     var entry = instance.items[index];
     if (!entry) return;
     instance.activeIndex = index;
-    if (entry.item.focus) entry.item.focus();
+    if (entry.item.focus) entry.item.focus({ preventScroll: true });
+    var list = instance.list;
+    var top = entry.item.offsetTop;
+    var bottom = top + entry.item.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
   }
 
   function focusCurrent(instance) {
@@ -213,18 +219,53 @@
     focusItem(instance, next);
   }
 
+  // The popover stays next to its select in the DOM, but the top layer
+  // keeps it out of the modal's scrollable area and positioning context.
+  function position(instance) {
+    var button = instance.button;
+    var list = instance.list;
+    var rect = button.getBoundingClientRect();
+    var viewport = root.visualViewport;
+    var left = viewport ? viewport.offsetLeft : 0;
+    var top = viewport ? viewport.offsetTop : 0;
+    var right = left + (viewport ? viewport.width : doc().documentElement.clientWidth);
+    var bottom = top + (viewport ? viewport.height : root.innerHeight);
+    var edge = 8;
+    var gap = 5;
+    if (!rect.width || rect.bottom <= top || rect.top >= bottom) {
+      close(instance);
+      return false;
+    }
+    var minWidth = parseFloat(root.getComputedStyle(list).getPropertyValue('--firma-list-min-width')) || 0;
+    var width = Math.min(Math.max(rect.width, minWidth), right - left - 2 * edge);
+    list.style.width = width + 'px';
+    list.style.left = Math.max(left + edge, Math.min(rect.left, right - edge - width)) + 'px';
+    var below = bottom - rect.bottom - gap - edge;
+    var above = rect.top - top - gap - edge;
+    var height = Math.min(list.scrollHeight + list.offsetHeight - list.clientHeight, 250);
+    var upward = below < height && above > below;
+    list.style.maxHeight = Math.max(0, Math.min(height, upward ? above : below)) + 'px';
+    list.style.top = upward ? 'auto' : rect.bottom + gap + 'px';
+    list.style.bottom = upward ? root.innerHeight - rect.top + gap + 'px' : 'auto';
+    list.style.transformOrigin = upward ? 'bottom center' : '';
+    return true;
+  }
+
   function open(instance) {
     if (instance.open) return;
+    openInstances.slice().forEach(close);
     instance.open = true;
     instance.list.hidden = false;
     instance.button.setAttribute('aria-expanded', 'true');
-    if (openInstances.indexOf(instance) < 0) openInstances.push(instance);
-    focusCurrent(instance);
+    openInstances.push(instance);
+    instance.list.showPopover();
+    if (position(instance)) focusCurrent(instance);
   }
 
   function close(instance) {
     if (!instance.open) return;
     instance.open = false;
+    if (instance.list.matches(':popover-open')) instance.list.hidePopover();
     instance.list.hidden = true;
     instance.button.setAttribute('aria-expanded', 'false');
     var at = openInstances.indexOf(instance);
@@ -325,6 +366,17 @@
         if (!instance.wrap.contains || !instance.wrap.contains(target)) close(instance);
       });
     });
+    function reposition(event) {
+      openInstances.slice().forEach(function (instance) {
+        if (event.target !== instance.list) position(instance);
+      });
+    }
+    root.addEventListener('scroll', reposition, true);
+    root.addEventListener('resize', reposition);
+    if (root.visualViewport) {
+      root.visualViewport.addEventListener('resize', reposition);
+      root.visualViewport.addEventListener('scroll', reposition);
+    }
   }
 
   function attach(select, opts) {
@@ -332,6 +384,8 @@
     var existing = instanceOf(select);
     if (existing) return existing;
 
+    var list = doc().createElement('div');
+    if (!list.showPopover) return null;  // native select on older browsers
     var wrap = ensureWrapper(select);
     clearRendered(wrap);
     var listId = 'firma-pick-list-' + (++uid);
@@ -352,14 +406,15 @@
     chev.setAttribute('aria-hidden', 'true');
     button.append(dot, name, chev);
 
-    var list = doc().createElement('div');
     list.className = 'firma-pick__list';
     list.id = listId;
     list.setAttribute('role', 'listbox');
+    list.setAttribute('popover', 'manual');
     list.hidden = true;
 
     wrap.append(button, list);
     if (wrap.classList) wrap.classList.add('js');
+    select.tabIndex = -1;
 
     var instance = {
       select: select,
@@ -382,6 +437,9 @@
     });
     button.addEventListener('keydown', function (event) { onButtonKey(instance, event); });
     list.addEventListener('keydown', function (event) { onListKey(instance, event); });
+    list.addEventListener('toggle', function () {
+      if (!list.matches(':popover-open')) close(instance);
+    });
     // An external programmatic value + change still updates the picker.
     select.addEventListener('change', function () { sync(select); });
 
@@ -395,14 +453,13 @@
     if (!instance) return null;
     renderItems(instance);
     sync(select);
-    if (instance.open) focusCurrent(instance);
+    if (instance.open && position(instance)) focusCurrent(instance);
     return instance;
   }
 
   function attachMarked(container) {
     container.querySelectorAll('select[data-firma-pick]').forEach(function (select) {
       attach(select);
-      select.tabIndex = -1;
     });
   }
 

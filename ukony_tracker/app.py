@@ -65,6 +65,14 @@ def create_app():
         from services.ai_assistant import emphasize
         return emphasize(value)
 
+    @app.template_filter("amount_input")
+    def _amount_input(value):
+        if value is None:
+            return ""
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
+
     app.teardown_appcontext(db.close_db)
 
     @app.before_request
@@ -153,11 +161,11 @@ def create_app():
     from releases import CURRENT_VERSION, RELEASES
     app.jinja_env.globals["RELEASES"] = RELEASES
     app.jinja_env.globals["CURRENT_VERSION"] = CURRENT_VERSION
-    # "Co umí Evidence" (templates/_novinky.html): popup = newest release,
-    # sheet = only what is still true.
+    # Feature releases have an intro. Maintenance releases open the sheet on demand.
     app.jinja_env.globals.update(
         NOVA=RELEASES[0], NOVINKY_SEKCE=novinky.sekce(CURRENT_VERSION),
-        NOVINKY_START="auto", NOVINKY_KEY="evidence_whatsnew_" + CURRENT_VERSION)
+        NOVINKY_START="auto" if RELEASES[0].oblast else "manual",
+        NOVINKY_KEY="evidence_whatsnew_" + CURRENT_VERSION if RELEASES[0].oblast else None)
 
     @app.get("/novinky-nahled")
     def novinky_nahled():

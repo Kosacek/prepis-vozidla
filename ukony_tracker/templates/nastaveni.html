@@ -4,7 +4,7 @@
 <h1 class="page-header">Nastavení — typy úkonů</h1>
 
 {% if typy %}
-<div class="table-wrap">
+<div class="table-wrap typy-table">
   <table>
     <thead>
       <tr>
@@ -17,30 +17,34 @@
     </thead>
     <tbody>
       {% for typ in typy %}
+      {% set typ_form = 'form-typ-' ~ loop.index %}
       <tr>
-        <td>
-          <form method="post" action="/nastaveni" id="form-typ-{{ loop.index }}">
-            <input type="hidden" name="kod" value="{{ typ.kod }}">
-            <span class="strong">{{ typ.kod }}</span>
+        <td class="typ-kod">
+          <form method="post" action="/nastaveni" id="{{ typ_form }}"></form>
+          <input type="hidden" name="kod" value="{{ typ.kod }}" form="{{ typ_form }}">
+          <span class="strong">{{ typ.kod }}</span>
         </td>
         <td>
-            <div class="field" style="margin-bottom:0;">
-              <input type="number" name="vychozi_cena" value="{{ typ.vychozi_cena if typ.vychozi_cena is not none else '' }}"
-                min="0" step="0.01" placeholder="—" style="width:120px;">
-            </div>
+          <div class="field">
+            <label for="{{ typ_form }}-cena">Cena (Kč)</label>
+            <input type="number" id="{{ typ_form }}-cena" name="vychozi_cena" value="{{ typ.vychozi_cena|amount_input }}"
+              min="0" step="0.01" placeholder="—" form="{{ typ_form }}">
+          </div>
         </td>
         <td>
-            <div class="field" style="margin-bottom:0;">
-              <input type="number" name="poradi" value="{{ typ.poradi }}" min="0" style="width:80px;">
-            </div>
+          <div class="field">
+            <label for="{{ typ_form }}-poradi">Pořadí</label>
+            <input type="number" id="{{ typ_form }}-poradi" name="poradi" value="{{ typ.poradi }}" min="0" form="{{ typ_form }}">
+          </div>
         </td>
         <td>
-            <input type="checkbox" name="aktivni" {% if typ.aktivni %}checked{% endif %}
-              style="width:auto; cursor:pointer;">
+          <div class="field typ-active">
+            <input type="checkbox" id="{{ typ_form }}-aktivni" name="aktivni" {% if typ.aktivni %}checked{% endif %} form="{{ typ_form }}">
+            <label for="{{ typ_form }}-aktivni">Aktivní</label>
+          </div>
         </td>
-        <td class="actions">
-            <button type="submit" class="btn btn-primary btn-sm">Uložit</button>
-          </form>
+        <td class="typ-save">
+          <button type="submit" class="btn btn-primary btn-sm" form="{{ typ_form }}">Uložit</button>
         </td>
       </tr>
       {% endfor %}

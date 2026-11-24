@@ -22,70 +22,10 @@
 
   function init(form) {
     if (!form) return;
-    var wrap = form.querySelector('#firma-pick');
-    var sel = form.querySelector('#firma-select');
-    if (wrap && sel && !wrap.classList.contains('js')) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'firma-pick__btn';
-      btn.setAttribute('aria-haspopup', 'listbox');
-      btn.setAttribute('aria-expanded', 'false');
-      var dot = document.createElement('span');
-      dot.className = 'firma-dot';
-      var name = document.createElement('span');
-      name.className = 'firma-pick__name';
-      var chev = document.createElement('span');
-      chev.className = 'firma-pick__chev';
-      chev.setAttribute('aria-hidden', 'true');
-      btn.append(dot, name, chev);
-      var list = document.createElement('div');
-      list.className = 'firma-pick__list';
-      list.setAttribute('role', 'listbox');
-      list.hidden = true;
-      Array.prototype.forEach.call(sel.options, function (opt) {
-        var item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'firma-pick__item' + (opt.selected ? ' on' : '');
-        item.setAttribute('role', 'option');
-        item.setAttribute('aria-selected', opt.selected ? 'true' : 'false');
-        item.dataset.firma = opt.value;
-        var d = document.createElement('span');
-        d.className = 'firma-dot';
-        d.style.background = opt.dataset.color;
-        var label = document.createElement('span');
-        label.textContent = opt.text;
-        item.append(d, label);
-        list.appendChild(item);
-      });
-      wrap.append(btn, list);
-      wrap.classList.add('js');
-      updatePicker(form);
-    }
+    if (window.FirmaPick) window.FirmaPick.attachMarked(form);
     var person = field(form, 'zpracoval');
     if (person && !person.value) {
       try { person.value = localStorage.getItem('ukony_zpracoval') || ''; } catch (_) {}
-    }
-  }
-
-  function updatePicker(form) {
-    var sel = form.querySelector('#firma-select');
-    var wrap = form.querySelector('#firma-pick');
-    if (!sel || !wrap) return;
-    var opt = sel.options[sel.selectedIndex];
-    var btn = wrap.querySelector('.firma-pick__btn');
-    if (btn && opt) {
-      btn.querySelector('.firma-dot').style.background = opt.dataset.color;
-      btn.querySelector('.firma-pick__name').textContent = opt.text;
-      btn.setAttribute('aria-expanded', 'false');
-    }
-    var list = wrap.querySelector('.firma-pick__list');
-    if (list) {
-      list.hidden = true;
-      Array.prototype.forEach.call(list.children, function (item) {
-        var on = item.dataset.firma === sel.value;
-        item.classList.toggle('on', on);
-        item.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
     }
   }
 
@@ -93,7 +33,6 @@
   function switchFirma(form) {
     var sel = form.querySelector('#firma-select');
     if (!sel) return;
-    updatePicker(form);
     var q = params(form);
     var modal = form.dataset.context === 'modal';
     var url = modal ? '/ukony/novy?modal=1&firma=' + encodeURIComponent(sel.value) + '&' + q.toString()
@@ -133,7 +72,7 @@
         if (!modal) { window.location.href = url; return; }
         var old = /\/ukony\/(\d+)$/.exec(form.action);
         if (old) sel.value = old[1];
-        updatePicker(form);
+        if (window.FirmaPick) window.FirmaPick.sync(sel);
         var note = form.querySelector('.ukon-new-message');
         note.textContent = 'Firmu se nepodařilo načíst.';
         note.className = 'ukon-new-message error';
@@ -168,31 +107,6 @@
   });
 
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.firma-pick__btn');
-    if (btn) {
-      // Tenhle inline picker patří jen formuláři Úkonu (#firma-pick). Sdílený
-      // FirmaPick (Doklady, Techničák) si otevírání řeší sám — jinak by mu
-      // tenhle handler seznam hned zavřel a rozbil stav.
-      if (!btn.closest('#firma-pick')) return;
-      var list = btn.parentElement.querySelector('.firma-pick__list');
-      list.hidden = !list.hidden;
-      btn.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
-      return;
-    }
-    var item = e.target.closest('.firma-pick__item');
-    if (item) {
-      if (!item.closest('#firma-pick')) return;
-      var form = item.closest('#ukon-form');
-      var sel = form.querySelector('#firma-select');
-      sel.value = item.dataset.firma;
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-      return;
-    }
-    document.querySelectorAll('#firma-pick .firma-pick__list').forEach(function (list) {
-      list.hidden = true;
-      var b = list.parentElement.querySelector('.firma-pick__btn');
-      if (b) b.setAttribute('aria-expanded', 'false');
-    });
     var typ = e.target.closest('#ukon-form #typ-seg span[data-kod]');
     if (typ) {
       var form = typ.closest('#ukon-form');
@@ -211,7 +125,7 @@
   document.addEventListener('change', function (e) {
     var form = e.target.closest('#ukon-form');
     if (!form) return;
-    if (e.target.id === 'firma-select') switchFirma(form);
+    if (e.target.dataset.action === 'switchFirma') switchFirma(form);
     if (e.target.name === 'zpracoval') {
       try { localStorage.setItem('ukony_zpracoval', e.target.value); } catch (_) {}
     }

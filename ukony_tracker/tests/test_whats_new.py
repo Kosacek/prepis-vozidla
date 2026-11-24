@@ -28,10 +28,10 @@ def _login(client):
     client.post("/login", data={"heslo": "secret123"})
 
 
-def test_popup_is_on_pages_for_logged_in_people(gated_client):
+def test_release_sheet_is_on_pages_for_logged_in_people(gated_client):
     _login(gated_client)
     html = gated_client.get("/").get_data(as_text=True)
-    assert RELEASE_KEY in html
+    assert 'id="nv"' in html
     assert "Rozumím" in html
     assert "Zeptej se" in html and "Techničák" in html
     assert html.index("css/spz-tokens.css") < html.index("css/app.css")
@@ -86,15 +86,25 @@ def test_version_button_opens_the_sheet(gated_client):
     assert "Starší" not in html and "Novější" not in html
 
 
-def test_popup_is_the_newest_release(gated_client):
+def test_intro_uses_the_newest_release_in_preview(gated_client, monkeypatch):
     _login(gated_client)
-    html = gated_client.get("/").get_data(as_text=True)
-    assert f"{RELEASE_KEY}{CURRENT_VERSION}" in html
+    monkeypatch.setenv("NOVINKY_NAHLED", "1")
+    html = gated_client.get("/novinky-nahled").get_data(as_text=True)
     intro = html[html.index('id="nvIntro"'):]
     # In the intro card itself (a demo's inline <style> may be long).
     assert RELEASES[0].title in intro[:intro.index('nv-timer')]
-    assert RELEASES[0].points[0] in html
-    assert 'class="wn-firmy" aria-hidden="true"' in intro
+    assert RELEASES[0].points[0] in intro
+
+
+def test_release_opens_automatically_only_for_feature_updates(gated_client):
+    _login(gated_client)
+    html = gated_client.get("/").get_data(as_text=True)
+    if RELEASES[0].oblast:
+        assert 'data-start="auto"' in html
+        assert f'data-key="{RELEASE_KEY}{CURRENT_VERSION}"' in html
+    else:
+        assert 'data-start="manual"' in html
+        assert RELEASE_KEY not in html
 
 
 def test_sheet_shows_each_current_release_exactly_once(gated_client):
@@ -103,7 +113,7 @@ def test_sheet_shows_each_current_release_exactly_once(gated_client):
     for r in novinky.aktualni():
         assert html.count(f'class="nv-fe') >= 1
         assert html.count(f'data-version="{r.version}"') == 1, r.version
-    assert 'is-new" data-version="%s"' % CURRENT_VERSION in html
+    assert ('is-new" data-version="%s"' % CURRENT_VERSION in html) == bool(RELEASES[0].oblast)
 
 
 def test_superseded_and_obsolete_releases_never_appear(gated_client):
@@ -127,7 +137,7 @@ def test_every_release_is_classified():
             assert r.nazev and r.radek
         # Anything not shown is either replaced or marked obsolete.
         assert r.version in {v for v, _ in novinky.skryte()} or r.oblast
-    assert RELEASES[0].oblast and not RELEASES[0].zastarale
+    assert not RELEASES[0].zastarale
 
 
 def test_sections_are_a_few_and_ordered():

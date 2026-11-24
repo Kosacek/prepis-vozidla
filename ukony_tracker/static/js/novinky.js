@@ -1,7 +1,7 @@
 /* "Co umí Evidence" (templates/_novinky.html).
    Phase 1 card -> (3.5 s | any tap/key) -> slides away, sheet underneath.
    data-start: "auto" card then sheet | "hold" card stays (screenshots)
-               | "sheet" sheet only, no motion (screenshots).
+               | "sheet" sheet only | "manual" from the version button only.
    data-key present = production: opens once per device (localStorage).
    Absent = preview: always opens. "Verze X ⓘ" = [data-releases-open] opens
    the sheet directly. */
@@ -105,7 +105,7 @@
     }
     open(START === 'sheet-still' ? 'still' : START);
   }
-  setTimeout(autoOpen, KEY ? 900 : 150);
+  if (START !== 'manual') setTimeout(autoOpen, KEY ? 900 : 150);
 
   window.novinky = { open: open, close: close };
 })();

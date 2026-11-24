@@ -9,13 +9,13 @@
 <div class="card">
   <div class="card-title">Přidat firmu</div>
   <form method="post" action="/firmy">
-    <div class="fields-row">
+    <div class="firma-ico-row">
       <div class="field">
         <label for="new-ico">IČO</label>
         <input type="text" id="new-ico" name="ico" maxlength="8" placeholder="12345678">
       </div>
-      <div class="field" style="align-self:flex-end;">
-        <button type="button" class="btn btn-sm" onclick="aresFill(this)">Načíst z ARES</button>
+      <div class="field">
+        <button type="button" class="btn" onclick="aresFill(this)">Načíst z ARES</button>
       </div>
     </div>
     <div class="fields-row">
@@ -46,7 +46,7 @@
   </form>
 </div>
 
-<div class="table-wrap" style="margin-top: var(--sp-5);">
+<div class="table-wrap firmy-table" style="margin-top: var(--sp-5);">
   <table>
     <thead>
       <tr>
@@ -61,14 +61,14 @@
     </thead>
     <tbody>
       {% for firma in firmy %}
-      <tr>
+      <tr class="firma-row">
         <td><span class="firma-mark"><span class="firma-dot" aria-hidden="true" style="background: {{ firma_colors.get(firma.zkratka, 'var(--muted)') }}"></span>{{ firma.nazev }}</span></td>
         <td>{{ firma.zkratka }}</td>
         <td class="muted">{{ firma.ico or '—' }}</td>
         <td class="muted">{{ firma.psc or '—' }}</td>
         <td>{% if firma.aktivni %}✓{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="muted">{{ pocty[firma.id] }}</td>
-        <td class="actions">
+        <td><div class="firma-row-actions">
           <a class="btn btn-sm" href="/firmy/{{ firma.id }}/ceny">Ceník</a>
           <button type="button" class="btn btn-sm"
             onclick="toggleEdit({{ firma.id }})">Upravit</button>
@@ -78,18 +78,18 @@
             <button type="submit" class="btn btn-sm btn-danger">Smazat</button>
           </form>
           {% endif %}
-        </td>
+        </div></td>
       </tr>
       <tr id="edit-row-{{ firma.id }}" style="display:none;">
         <td colspan="7" style="padding: var(--sp-4);">
           <form method="post" action="/firmy/{{ firma.id }}">
-            <div class="fields-row">
+            <div class="firma-ico-row">
               <div class="field">
                 <label>IČO</label>
                 <input type="text" name="ico" value="{{ firma.ico or '' }}" maxlength="8">
               </div>
-              <div class="field" style="align-self:flex-end;">
-                <button type="button" class="btn btn-sm" onclick="aresFill(this)">Načíst z ARES</button>
+              <div class="field">
+                <button type="button" class="btn" onclick="aresFill(this)">Načíst z ARES</button>
               </div>
             </div>
             <div class="fields-row">

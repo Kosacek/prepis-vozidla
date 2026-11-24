@@ -15,9 +15,9 @@
     {% for t in typy %}
     <div class="cenik-row">
       <span class="cenik-kod">{{ t.kod }}</span>
-      <input name="cena_{{ t.kod }}" class="cenik-input" inputmode="numeric" autocomplete="off"
-        value="{{ overrides[t.kod]|int if t.kod in overrides else '' }}"
-        placeholder="{% if t.vychozi_cena is not none %}{{ t.vychozi_cena|int }} (výchozí){% else %}bez výchozí{% endif %}">
+      <input name="cena_{{ t.kod }}" class="cenik-input" inputmode="decimal" autocomplete="off"
+        value="{{ overrides.get(t.kod)|amount_input }}"
+        placeholder="{% if t.vychozi_cena is not none %}{{ t.vychozi_cena|amount_input }} (výchozí){% else %}bez výchozí{% endif %}">
       <span class="cenik-unit muted">Kč</span>
     </div>
     {% else %}

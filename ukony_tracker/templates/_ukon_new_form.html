@@ -7,7 +7,7 @@
       {# Nativní select zůstává jako fallback bez JS; skript ho schová a vykreslí
          vlastní seznam s barevnými tečkami — stejná paleta jako v přehledech. #}
       <div class="firma-pick" id="firma-pick">
-        <select id="firma-select" data-action="switchFirma">
+        <select id="firma-select" data-action="switchFirma" data-firma-pick aria-label="Firma">
           {% for f in firmy %}
             <option value="{{ f.id }}" data-color="{{ firma_colors.get(f.zkratka, '#8e8e93') }}"
                     {{ 'selected' if f.id == firma.id }}>{{ f.zkratka }}</option>
@@ -23,14 +23,14 @@
       <label>Typ úkonu</label>
       <div class="seg" id="typ-seg">
         {% for t in typy %}
-        <span data-kod="{{ t.kod }}" data-cena="{{ ceny.get(t.kod)|int if ceny.get(t.kod) is not none else '' }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
+        <span data-kod="{{ t.kod }}" data-cena="{{ ceny.get(t.kod)|amount_input }}" class="{{ 'on' if (t.kod == sel_typ) or (not sel_typ and loop.first) }}">{{ t.kod }}</span>
         {% endfor %}
       </div>
       <input type="hidden" name="typ_kod" id="typ_kod" value="{{ sel_typ if sel_typ else (typy[0].kod if typy) }}">
     </div>
     {% set init_typ = sel_typ if sel_typ else (typy[0].kod if typy else none) %}
     <div class="form-row">
-      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ sel_celkem if sel_celkem is not none else (ceny.get(init_typ)|int if ceny.get(init_typ) is not none else '') }}"></div>
+      <div class="field"><label>Cena (Kč)</label><input name="celkem" id="celkem" inputmode="numeric" value="{{ (sel_celkem if sel_celkem is not none else ceny.get(init_typ))|amount_input }}"></div>
       <div class="field"><label>VIN</label><input name="vin" id="vin" class="input-upper" value="{{ sel_vin }}" inputmode="text" autocapitalize="characters" enterkeyhint="next"></div>
     </div>
     <div class="field">

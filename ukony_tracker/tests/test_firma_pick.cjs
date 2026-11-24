@@ -91,14 +91,22 @@ class Node {
     return false;
   }
   focus() { this.focused = true; }
+  showPopover() { this.popoverOpen = true; }
+  hidePopover() { this.popoverOpen = false; }
+  matches(selector) { return selector === ':popover-open' && this.popoverOpen; }
+  getBoundingClientRect() { return { left: 10, top: 80, bottom: 120, width: 140 }; }
 }
 
 const fakeDocument = {
   handlers: {},
+  documentElement: { clientWidth: 375 },
   createElement: tag => new Node(tag),
   addEventListener(name, handler) { (this.handlers[name] ||= []).push(handler); },
 };
 globalThis.document = fakeDocument;
+globalThis.innerHeight = 812;
+globalThis.addEventListener = () => {};
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 const FirmaPick = require('../static/js/firma_pick.js');
 
@@ -213,6 +221,7 @@ test('attach wraps the select and maps options + data-color dots (muted fallback
   // the placeholder is shown in the button until something is picked
   assert.equal(instance.name.textContent, '— bez firmy —');
   assert.equal(instance.dot.style.background, 'transparent');
+  assert.equal(instance.dot.hidden, true);
   assert.deepEqual(selectedFlags(instance.list), ['true', 'false', 'false']);
   assert.deepEqual(onFlags(instance.list), [true, false, false]);
 });
@@ -262,6 +271,7 @@ test('picking an item sets select.value, closes the list and fires a bubbling ch
 
   click(instance.button);
   assert.equal(instance.list.hidden, false);
+  assert.equal(instance.list.popoverOpen, true);
   assert.equal(instance.button.getAttribute('aria-expanded'), 'true');
 
   click(items(instance)[1]);  // ALB (#0a84ff)
@@ -269,9 +279,11 @@ test('picking an item sets select.value, closes the list and fires a bubbling ch
   assert.equal(select.selectedIndex, 1);
   assert.deepEqual(seen, [{ value: '1', bubbles: true }]);
   assert.equal(instance.list.hidden, true);
+  assert.equal(instance.list.popoverOpen, false);
   assert.equal(instance.button.getAttribute('aria-expanded'), 'false');
   assert.equal(instance.name.textContent, 'ALB');
   assert.equal(instance.dot.style.background, '#0a84ff');
+  assert.equal(instance.dot.hidden, false);
   assert.deepEqual(selectedFlags(instance.list), ['false', 'true', 'false']);
   assert.deepEqual(onFlags(instance.list), [false, true, false]);
 });

@@ -19,6 +19,7 @@
 
   /* Borders & dividers */
   --line:        #e5e5ea;
+  --line-strong: #d1d1d6;  /* separators on the grey (--bg) surfaces, e.g. firm lists */
 
   /* Accent (interactive blue) */
   --accent:      #0071e3;
@@ -613,6 +614,77 @@ tfoot td {
   color: var(--ink);
 }
 
+.typy-table .field { margin-bottom: 0; }
+.typy-table .field label {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.typy-table input[name="vychozi_cena"] { max-width: 120px; }
+.typy-table input[name="poradi"] { max-width: 80px; }
+.typy-table .typ-active { flex-direction: row; align-items: center; }
+.typ-save { width: 1%; }
+
+.firma-ico-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: var(--sp-4); }
+.firma-ico-row :is(input, .btn) { height: 40px; }
+.firmy-table tbody td { border-bottom: 0; }
+.firmy-table .firma-row td { padding-block: 8px; }
+.firmy-table .firma-row ~ .firma-row td { border-top: 1px solid var(--line); }
+.firmy-table .firma-row ~ .firma-row td:first-child { border-top: 0; position: relative; }
+.firmy-table .firma-row ~ .firma-row td:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto calc(var(--sp-4) + 16px); /* name starts after the dot and gap */
+  border-top: 1px solid var(--line);
+}
+.firmy-table .firma-mark { overflow-wrap: anywhere; }
+.firma-row-actions { display: flex; align-items: center; gap: 5px; }
+.firma-row-actions .btn-sm { line-height: 1.5; }
+.firma-row-actions form { display: flex; }
+
+@media (max-width: 760px) {
+  :is(.typy-table, .firmy-table) table,
+  :is(.typy-table, .firmy-table) tbody { display: block; }
+  :is(.typy-table, .firmy-table) thead {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  :is(.typy-table, .firmy-table) tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2) var(--sp-4);
+    align-items: center;
+    padding: var(--sp-3) var(--sp-4);
+  }
+  :is(.typy-table, .firmy-table) tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .typy-table { background: none; box-shadow: none; overflow: visible; }
+  .typy-table tbody tr {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+  }
+  .typy-table tbody tr + tr { margin-top: var(--sp-2); }
+  .typy-table .field label { position: static; width: auto; height: auto; clip-path: none; }
+  .typy-table input[name="vychozi_cena"], .typy-table input[name="poradi"] { max-width: none; }
+  .typ-kod, .firmy-table :is(td:first-child, td:last-child, td[colspan]) { grid-column: 1 / -1; }
+  .typ-save { width: auto; justify-self: end; }
+  .firmy-table tbody .firma-row { padding-block: 8px; }
+  .firmy-table .firma-row td { padding-block: 0; }
+  .firmy-table .firma-row ~ .firma-row td { border-top: 0; }
+  .firmy-table .firma-row ~ .firma-row td:first-child::before {
+    inset: -8px calc(-1 * var(--sp-4)) auto 16px;
+  }
+  .firma-row-actions { flex-wrap: wrap; }
+}
+
 /* ------------------------------------------------------------
    15. Status badges
    ------------------------------------------------------------ */
@@ -703,6 +775,10 @@ tfoot td {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--sp-4);
+}
+.form-row input:not([type="hidden"]) { height: 42px; }
+@media (max-width: 760px) {
+  .form-row input:not([type="hidden"]) { height: 44px; }
 }
 
 /* Tag chips below the poznámka field */
@@ -929,27 +1005,34 @@ th.shrink, td.shrink { width: 1%; white-space: nowrap; }
 
 /* Horizontal bar rows for per-firma breakdown */
 .bar-row {
+  --bar-firm-gap: 6px;
+  position: relative;
   display: grid;
   grid-template-columns: 94px minmax(0, 1fr) 64px;
   align-items: center;
   gap: var(--sp-3);
-  padding: 6px 0;
+  padding: 8px 0;
+}
+
+.bar-row + .bar-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto calc(8px + var(--bar-firm-gap));
+  border-top: 1px solid var(--line);
 }
 
 .bar-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--bar-firm-gap);
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--ink);
-  white-space: nowrap;
 }
 
 .bar-name {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .bar-label .firma-dot, .bar-fill { background: var(--firma, var(--muted)); }
@@ -1312,7 +1395,7 @@ a.kpi-link { text-decoration: none; }
   }
   .kpis .kpi-v { font-size: 1.35rem; }
   .kpis .kpi-l { font-size: 0.6rem; letter-spacing: 0.01em; line-height: 1.15; }
-  .kpis .kpi-sub { font-size: 0.7rem; }
+  .kpis .kpi-sub { font-size: 0.7rem; white-space: normal; }
 
   /* "Podle firmy" and "Typy úkonů" stay side by side like on desktop — the
      bar list and the doughnut both get a tighter, phone-sized layout instead
@@ -1322,11 +1405,11 @@ a.kpi-link { text-decoration: none; }
   .dash-breakdowns .card h2 { font-size: 0.9375rem; margin-bottom: var(--sp-2); }
 
   .bar-row {
-    grid-template-columns: 58px minmax(0, 1fr) 38px;
+    --bar-firm-gap: 4px;
+    grid-template-columns: minmax(0, 1fr) minmax(12px, 1fr) max-content;
     gap: 5px;
-    padding: 4px 0;
   }
-  .bar-label { gap: 4px; font-size: 0.6875rem; }
+  .bar-label { font-size: 0.6875rem; }
   .bar-amt { font-size: 0.6875rem; }
   .bar-track { height: 6px; }
 
@@ -1399,17 +1482,22 @@ a.kpi-link { text-decoration: none; }
 .prichozi-dup a { color: inherit; font-weight: 700; }
 .prichozi-fields {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.7fr 1fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 1fr);
   gap: var(--sp-3);
   align-items: end;
 }
 .prichozi-form .field { margin: 0; }
 .prichozi-pozn { margin-top: var(--sp-3); }
-.prichozi-form .btn-primary { margin-top: var(--sp-3); }
-.discard-form { margin-top: var(--sp-2); }
+.prichozi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.prichozi-fields :is(input, select, .firma-pick__btn) { height: 40px; }
 
 @media (max-width: 760px) {
-  .prichozi-fields { grid-template-columns: 1fr 1fr; }
+  .prichozi-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* --- Per-firm ceník --- */
@@ -1427,21 +1515,30 @@ a.kpi-link { text-decoration: none; }
 
 /* --- Export: firm multi-select --- */
 .export-firmy {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  column-gap: var(--sp-4);
   margin-top: var(--sp-2);
 }
 .export-firmy .chk {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 8px 0;
   font-size: 0.95rem;
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
-.export-firmy .chk input { width: auto; margin: 0; }
+.export-firmy .chk input { width: 13px; flex: 0 0 13px; margin: 0; }
+.export-firmy .chk + .chk::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 33px; /* checkbox + dot + two gaps */
+  border-top: 1px solid var(--line);
+}
 .export-firmy-actions { margin-top: var(--sp-3); display: flex; gap: var(--sp-2); }
-.export-buttons { display: flex; gap: var(--sp-3); margin-top: var(--sp-4); }
+.export-buttons { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-4); }
 
 /* --- Dashboard: Poslední úkony (standalone clickable list) --- */
 .recent-card { margin-top: var(--sp-4); }
@@ -1466,9 +1563,11 @@ a.kpi-link { text-decoration: none; }
 /* Fixed type + firm columns so every row's firm/VIN start at the same x; the
    VIN+poznámka column (1fr) absorbs the slack instead of leaving it on the right. */
 .recent-row {
+  --recent-price-width: 80px;
+  --recent-person-width: 4rem;
   display: grid;
   /* firm column sized to the longest real zkratka ('BSAuto Brno' + dot ≈ 98px) */
-  grid-template-columns: 44px 88px 72px 104px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 44px 88px 72px 104px minmax(0, 1fr) auto var(--recent-person-width) var(--recent-price-width);
   gap: var(--sp-3);
   align-items: center;
   padding: 11px var(--sp-3);
@@ -1495,7 +1594,8 @@ a.kpi-link { text-decoration: none; }
    same x on every row, whatever the VIN length (or none at all). */
 .recent-vin { flex: 0 0 172px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-size: 0.9375rem; }
 .recent-pozn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.recent-kdo { white-space: nowrap; }
+.recent-kdo { min-width: 0; }
+.recent-kdo .kdo { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 /* "Kdo přidal" — who added the car (attribution badge). */
 .kdo {
@@ -1588,10 +1688,7 @@ a.kpi-link { text-decoration: none; }
 
 .modal-card .firma-pick,
 .modal-card .firma-pick__btn,
-.modal-card .firma-pick__list,
 .modal-card .firma-pick__item { min-width: 0; max-width: 100%; }
-.modal-card .firma-pick__list { overflow-x: hidden; }
-.modal-card .firma-pick__item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 
 .modal-close {
   position: absolute;
@@ -1666,7 +1763,14 @@ body.modal-open { overflow: hidden; }
   .modal-backdrop, .modal-card { transition: none; }
 }
 .recent-pay { white-space: nowrap; text-align: right; }
-.recent-kc { text-align: right; white-space: nowrap; }
+.recent-kc {
+  width: var(--recent-price-width);
+  display: flex;
+  justify-content: flex-end;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 @media (max-width: 760px) {
   /* drop the type badge; firm keeps its color dot for at-a-glance ID */
@@ -1688,13 +1792,13 @@ body.modal-open { overflow: hidden; }
 .ukony-item .recent-row { flex: 1 1 auto; min-width: 0; border-bottom: none; }
 .ukony-item .recent-row:hover { background: transparent; }  /* hover lives on the item */
 /* first column widened: this list shows the full date incl. year */
-.ukony-list .recent-row { grid-template-columns: 78px 88px 72px 104px minmax(0, 1fr) auto auto auto; }
+.ukony-list .recent-row { grid-template-columns: 78px 88px 72px 104px minmax(0, 1fr) 24px var(--recent-price-width); }
 /* Per-firm "Tento měsíc" list: 7 columns (no pay slot — the payment toggle in
    the actions shows the state). Every row is the SAME firm, so the firm column
    can be max-content — kills the fixed-104px slack between firm and VIN. The RZ
    column is 72px (a 7-char plate is ~60px), not the dashboard's 88px — keeps
    the SPZ→tag gap at the same ~22px rhythm as the rest of the row. */
-.mesic-recent .recent-row { grid-template-columns: 44px 72px 72px max-content minmax(0, 1fr) auto auto; }
+.mesic-recent .recent-row { grid-template-columns: 44px 72px 72px max-content minmax(0, 1fr) var(--recent-person-width) var(--recent-price-width); }
 /* balance the whitespace around the firm: the fixed 72px tag column leaves
    ~10px slack on the firm's left, so give the VIN side the same visual gap */
 .mesic-recent .recent-mid { padding-left: 10px; }
@@ -1869,6 +1973,7 @@ body.modal-open { overflow: hidden; }
   .recent-list .recent-firma, .ukony-list .recent-firma, .mesic-recent .recent-firma { order: 6; }
   .recent-list .recent-pay,   .ukony-list .recent-pay,   .mesic-recent .recent-pay   { order: 7; }
   .recent-list .recent-kdo,   .ukony-list .recent-kdo,   .mesic-recent .recent-kdo   { order: 8; }
+  .recent-list .recent-kdo:not(:empty) { flex: 0 0 var(--recent-person-width); margin-left: auto; }
   .recent-list .recent-mid,   .ukony-list .recent-mid,   .mesic-recent .recent-mid   { order: 9; }
 
   /* Filtry: po zvětšení písma na 16px se rozsypaly do pěti řádků.
@@ -1900,6 +2005,7 @@ body.modal-open { overflow: hidden; }
 .firma-pick__btn:focus-visible,
 .firma-pick.js > select[data-firma-pick]:focus + .firma-pick__btn { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.18); }
 .firma-pick__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.firma-pick__btn .firma-dot[hidden] { display: none; }
 .firma-pick__chev, .doklad-chev, .dn-ukony__chev {
   display: block;
   flex: none;
@@ -1910,31 +2016,36 @@ body.modal-open { overflow: hidden; }
 }
 
 .firma-pick__list {
-  position: absolute; z-index: 60; top: calc(100% + 5px); left: 0; right: 0;
-  /* Jako obyčejný seznam <select>: všechny firmy najednou, bez posouvání
-     (David 2026-11-23). Posuvník až když se nevejdou na obrazovku. */
-  max-height: min(78vh, 640px); overflow-y: auto;
+  position: fixed; inset: auto; margin: 0;
+  max-height: 250px; max-width: none;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
   /* stejný šedý podklad jako mají pole formuláře — bílý panel vypadal odtrženě */
   background: var(--bg); border: 1.5px solid var(--line);
   border-radius: var(--radius-sm); box-shadow: 0 12px 34px rgba(0,0,0,.14);
   padding: 4px 0;
 }
-/* Položka = řádek obyčejného seznamu: stejné písmo a velikost jako pole,
-   žádné oddělovače, jen malá barevná tečka firmy navíc. */
 .firma-pick__item {
+  position: relative;
   display: flex; align-items: center; gap: 8px;
-  width: 100%; padding: 5px 12px;
+  width: 100%; padding: 8px 12px;
   border: none; border-radius: 0; background: none; color: var(--ink);
   font-family: var(--font); font-size: 0.9375rem; font-weight: 400; line-height: 1.35;
   text-align: left; cursor: pointer;
 }
+.firma-pick__item + .firma-pick__item::before {
+  content: "";
+  position: absolute;
+  inset: 0 28px auto 28px; /* od textu (12px padding + 8px tečka + 8px mezera), vpravo stejně daleko od kraje — David 2026-11-24 */
+  border-top: 1px solid var(--line-strong);
+}
+.firma-pick__item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .firma-pick__item:hover { background: var(--card); }
 .firma-pick__item.on { background: var(--card); }
 
 @media (max-width: 760px) {
   /* stejné pravidlo jako u ostatních polí — pod 16px iOS zoomuje stránku */
   .firma-pick__btn, .firma-pick__item { font-size: 16px; }
-  .firma-pick__item { padding: 8px 12px; }   /* ~36 px řádek pro prst, pořád celý seznam bez posouvání */
 }
 
 /* Krátké zelené bliknutí řádku po uložení bez reloadu — potvrzení, že se
@@ -2103,6 +2214,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 }
 
 /* ── Dashboard: period picker, Kč | Počet toggle, empty state ─────────────── */
+.header-actions:has(.period-select) { align-items: stretch; }
 .period-select { max-width: 12rem; text-overflow: ellipsis; }
 .seg--sm { padding: 2px; flex-shrink: 0; }
 .seg--sm span { padding: 3px 10px; font-size: 0.75rem; min-height: 0; }
@@ -2125,7 +2237,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
   border-radius: var(--radius-sm); background: var(--card); color: var(--ink);
   border: 1px solid var(--line); overflow: hidden;
 }
-.dup-list .recent-row { grid-template-columns: 84px 88px 72px 104px minmax(0, 1fr) auto auto auto; border-bottom: none; }
+.dup-list .recent-row { grid-template-columns: 84px 88px 72px 104px minmax(0, 1fr) auto var(--recent-person-width) var(--recent-price-width); border-bottom: none; }
 .recent-row--incoming { cursor: default; background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
 .recent-row--incoming:hover { background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
 .recent-row--incoming .is-diff { color: var(--flash-warning-ink); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
@@ -2419,18 +2531,20 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 /* Doklady firm filter (2.8): the coloured picker, sized like its neighbours. */
 .filter-bar .firma-pick { min-width: 0; }
 .filter-bar .firma-pick__btn { padding: 6px 10px; gap: 7px; font-size: 0.875rem; font-weight: 400; }
-.filter-bar .firma-pick__list { min-width: 12rem; }
+.filter-bar .firma-pick__list { --firma-list-min-width: 192px; }
 .filter-bar .firma-pick__item { font-size: 0.875rem; }  /* stejné písmo jako tlačítko filtru */
-.filter-bar :is(.firma-pick__btn, .filter-select, .filter-month) { min-height: 36px; border-width: 1px; line-height: 1.5; }
+.filter-bar { --filter-height: 36px; }
+.filter-bar :is(.firma-pick__btn, .filter-select, input.filter-month, .filter-bar__fields > .btn) {
+  height: var(--filter-height); border-width: 1px; line-height: 1.5;
+}
 @media (pointer: coarse) {
-  .filter-bar :is(.firma-pick__btn, .filter-select),
-  .filter-bar .month-field .filter-month { min-height: 40px; }
+  .filter-bar { --filter-height: 40px; }
 }
 @media (max-width: 760px) {
   /* Phone: the firm gets the full row (its name never truncates), měsíc and
      platné share the next one — no empty cell. */
   #doklady-filter .filter-bar__fields > .firma-pick { grid-column: 1 / -1; }
-  .filter-bar :is(.firma-pick__btn, .filter-select) { min-height: 40px; }
+  .filter-bar { --filter-height: 40px; }
   .filter-bar .firma-pick__btn, .filter-bar .firma-pick__item { font-size: 16px; }
 }
 
@@ -2472,7 +2586,7 @@ body.firma-switching .recent-card { opacity: .55; transition: opacity .12s ease;
 .month-field input[type="month"] { width: 100%; min-height: 36px; box-sizing: border-box; }
 .month-field input[type="month"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
 .month-field__placeholder {
-  display: none; position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  display: none; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
   color: var(--muted); font-size: 0.875rem; pointer-events: none;
 }
 .month-field[data-empty="1"] .month-field__placeholder { display: block; }
